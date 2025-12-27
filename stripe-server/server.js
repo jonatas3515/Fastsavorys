@@ -23,8 +23,8 @@ const supabaseAdmin = (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_
 app.use(cors());
 
 app.post('/webhook/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
-  const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-  if (!webhookSecret) {
+  const webhookSecretRaw = process.env.STRIPE_WEBHOOK_SECRET;
+  if (!webhookSecretRaw) {
     return res.status(500).send('STRIPE_WEBHOOK_SECRET não configurado no .env');
   }
   if (!supabaseAdmin) {
@@ -35,7 +35,25 @@ app.post('/webhook/stripe', express.raw({ type: 'application/json' }), async (re
   let event;
 
   try {
-    event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+    const secrets = String(webhookSecretRaw)
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean);
+
+    let lastErr;
+    for (const secret of secrets) {
+      try {
+        event = stripe.webhooks.constructEvent(req.body, sig, secret);
+        lastErr = null;
+        break;
+      } catch (e) {
+        lastErr = e;
+      }
+    }
+
+    if (!event) {
+      throw lastErr || new Error('Assinatura inválida');
+    }
   } catch (err) {
     console.error('❌ Webhook signature verification failed:', err.message);
     return res.status(400).send(`Webhook Error: ${err.message}`);
@@ -201,7 +219,15 @@ app.post('/create-checkout-session', async (req, res) => {
     }
 
     const successUrl = process.env.CHECKOUT_SUCCESS_URL || 'http://localhost:8000/pages/fast.html?checkout=success&session_id={CHECKOUT_SESSION_ID}';
-    const cancelUrl = process.env.CHECKOUT_CANCEL_URL || 'http://localhost:8000/pages/fast.html?checkout=cancel&order_id=' + encodeURIComponent(String(orderId));
+    const cancelBaseUrl = process.env.CHECKOUT_CANCEL_URL || 'http://localhost:8000/pages/fast.html?checkout=cancel&order_id=';
+    const encodedOrderId = encodeURIComponent(String(orderId));
+    const cancelUrl = cancelBaseUrl.includes('{ORDER_ID}')
+      ? cancelBaseUrl.replace('{ORDER_ID}', encodedOrderId)
+      : cancelBaseUrl.includes('{order_id}')
+        ? cancelBaseUrl.replace('{order_id}', encodedOrderId)
+        : cancelBaseUrl.endsWith('order_id=')
+          ? (cancelBaseUrl + encodedOrderId)
+          : (cancelBaseUrl + (cancelBaseUrl.includes('?') ? '&' : '?') + 'order_id=' + encodedOrderId);
 
     const sessionPayload = {
       mode: 'payment',
