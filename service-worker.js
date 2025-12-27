@@ -1,5 +1,5 @@
-const CACHE_NAME = 'fastsavorys-v9';
-const CACHE_VERSION = 'v9';
+const CACHE_NAME = 'fastsavorys-v10';
+const CACHE_VERSION = 'v10';
 
 // URLs para cache - paths relativos à raiz do site
 const urlsToCache = [
@@ -64,6 +64,11 @@ self.addEventListener('activate', function(event) {
 
 // Interceptar requisições - NETWORK FIRST para HTML, CACHE FIRST para assets
 self.addEventListener('fetch', function(event) {
+  // Ignorar requisições POST, PUT, DELETE (não podem ser cacheadas)
+  if (event.request.method !== 'GET') {
+    return;
+  }
+
   var url = new URL(event.request.url);
 
   // Ignorar requisições não-HTTP (extensões Chrome, data:, blob:, etc.)

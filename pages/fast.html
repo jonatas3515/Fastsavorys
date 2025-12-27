@@ -1759,6 +1759,7 @@
           if (checkout === 'success' && sessionId) {
             console.log('[Stripe] Retorno do Checkout detectado. Sincronizando pagamento...', sessionId);
             const baseUrl = (typeof getStripeServerBaseUrl === 'function') ? getStripeServerBaseUrl() : '';
+            let syncedOrderId = null;
             if (!baseUrl) {
               console.warn('[Stripe] Stripe server URL não configurada para sync (ok em produção se webhook estiver ativo).');
             } else {
@@ -1772,8 +1773,22 @@
                 console.warn('[Stripe] Falha ao sincronizar Checkout:', data);
               } else {
                 console.log('[Stripe] Sincronização concluída:', data);
+                syncedOrderId = data.orderId;
                 try { loadDashboardOrders(); } catch (e) {}
               }
+            }
+            
+            // Redirecionar para WhatsApp após pagamento bem-sucedido
+            if (syncedOrderId) {
+              const waMessage = `Olá! Acabei de realizar o pagamento do pedido #${syncedOrderId} pelo cartão. Aguardo confirmação!`;
+              const waUrl = `https://wa.me/5573999366554?text=${encodeURIComponent(waMessage)}`;
+              
+              // Limpar URL params e redirecionar para WhatsApp
+              window.history.replaceState({}, document.title, window.location.pathname);
+              
+              // Mostrar confirmação e abrir WhatsApp
+              alert('✅ Pagamento confirmado!\n\nVocê será redirecionado para o WhatsApp para confirmar seu pedido.');
+              window.open(waUrl, '_blank');
             }
           }
         } catch (e) {
@@ -5153,11 +5168,7 @@
             
             <div class="flex flex-wrap gap-2">
               ${needsAcceptance ? `
-                <button onclick="acceptCardOrder(${order.id})" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded text-sm font-medium">💳 Aceitar & Enviar Link</button>
-              ` : ''}
-              ${awaitingPayment ? `
-                <button onclick="markPaymentReceived(${order.id}, 'partial')" class="bg-orange-500 hover:bg-orange-600 text-white px-3 py-2 rounded text-sm">💰 Entrada 50%</button>
-                <button onclick="markPaymentReceived(${order.id}, 'full')" class="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded text-sm">✅ Pago Total</button>
+                <button id="acceptBtn_${order.id}" onclick="acceptCardOrder(${order.id})" class="flex-1 bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded text-sm font-medium">💳 Aceitar & Enviar Link</button>
               ` : ''}
               ${order.status === 'pending' && !needsAcceptance ? `
                 <button onclick="updateOrderStatus(${order.id}, 'preparing')" class="flex-1 bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-2 rounded text-sm">🍳 Preparar</button>
@@ -5295,7 +5306,6 @@
       generatePaymentMessage(order, paymentLink) {
         const greeting = this.getGreeting();
         const firstName = MsgTemplateService.getFirstName(order.client_name);
-        const minPercent = this.config?.min_payment_percent || 50;
         
         return `${greeting}, ${firstName}! 🎉
 
@@ -5304,11 +5314,7 @@ Seu pedido #${order.id} foi *ACEITO* pela Fast Savory's!
 Para confirmar sua encomenda, realize o pagamento pelo link abaixo:
 ${paymentLink}
 
-💳 *Opções de pagamento:*
-• Pague no mínimo ${minPercent}% agora (entrada)
-• Ou pague o valor total
-
-Após o pagamento, seu pedido será preparado com muito carinho! 🥟
+Após a confirmação do pagamento, seu pedido será preparado com muito carinho! 🥟
 
 *Valor total:* R$ ${(order.total || 0).toFixed(2).replace('.', ',')}
 
@@ -5361,7 +5367,17 @@ Obrigado pela preferência! ❤️`;
 
     // Aceitar pedido com cartão e gerar link de pagamento
     async function acceptCardOrder(orderId) {
+      const btn = document.getElementById(`acceptBtn_${orderId}`);
+      const originalText = btn ? btn.innerHTML : '';
+      
       try {
+        // Mostrar loading no botão
+        if (btn) {
+          btn.innerHTML = '⏳ Gerando link...';
+          btn.disabled = true;
+          btn.classList.add('opacity-75', 'cursor-wait');
+        }
+        
         // Busca dados completos do pedido
         const { data: order, error: fetchError } = await window.supabaseClient
           .from('fast_orders')
@@ -5411,6 +5427,13 @@ Obrigado pela preferência! ❤️`;
       } catch (error) {
         console.error('Erro ao aceitar pedido:', error);
         alert('Erro ao aceitar pedido: ' + error.message);
+      } finally {
+        // Restaurar botão ao estado original
+        if (btn) {
+          btn.innerHTML = originalText;
+          btn.disabled = false;
+          btn.classList.remove('opacity-75', 'cursor-wait');
+        }
       }
     }
 
