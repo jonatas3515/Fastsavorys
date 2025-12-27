@@ -5230,9 +5230,9 @@
         if (isLocal || isPrivateIP) return 'http://localhost:3001';
       } catch (e) {}
       try {
-        return localStorage.getItem('fastStripeServerUrl') || '';
+        return localStorage.getItem('fastStripeServerUrl') || 'https://fastsavorys.onrender.com';
       } catch (e2) {
-        return '';
+        return 'https://fastsavorys.onrender.com';
       }
     }
 
