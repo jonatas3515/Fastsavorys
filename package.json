@@ -1,0 +1,38 @@
+{
+  "name": "fastsavorys",
+  "version": "1.0.0",
+  "description": "FastSavory's - Sistema de Delivery e Encomendas",
+  "main": "index.html",
+  "scripts": {
+    "dev": "npm run build-css && python -m http.server 8000",
+    "build-css": "tailwindcss -i ./assets/css/tailwind.css -o ./assets/css/styles.css --watch",
+    "build": "tailwindcss -i ./assets/css/tailwind.css -o ./assets/css/styles.css --minify",
+    "serve": "python -m http.server 8000",
+    "start": "npm run build && npm run serve",
+    "android:build": "npx cap copy android && npx cap sync android && npx cap open android",
+    "android:sync": "npx cap sync android",
+    "android:open": "npx cap open android"
+  },
+  "keywords": [
+    "delivery",
+    "food",
+    "fastsavorys",
+    "pwa",
+    "tailwindcss"
+  ],
+  "author": "FastSavory's",
+  "license": "MIT",
+  "dependencies": {
+    "@capacitor/android": "^5.5.1",
+    "@capacitor/core": "^5.5.1",
+    "@capacitor/cli": "^5.5.1"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.0",
+    "autoprefixer": "^10.4.16",
+    "postcss": "^8.4.32"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}

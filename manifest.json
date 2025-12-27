@@ -1,0 +1,35 @@
+{
+  "name": "Fast Savory's - Delivery e Encomendas",
+  "short_name": "FastSavorys",
+  "description": "Peça salgados, mini-salgados e kits da Fast Savory's. Delivery e encomendas agendadas.",
+  "start_url": "/pages/fast.html",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#f43f5e",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/assets/img/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/assets/img/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["food", "shopping"],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Fast Savory's",
+      "short_name": "Fast",
+      "description": "Abrir cardápio Fast Savory's",
+      "url": "/pages/fast.html",
+      "icons": [{ "src": "/assets/img/icon-192.svg", "sizes": "192x192" }]
+    }
+  ]
+}

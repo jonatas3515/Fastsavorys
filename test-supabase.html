@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="utf-8" />
+    <title>Teste Supabase</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+</head>
+
+<body>
+    <h1>Teste Supabase - Verificação de Chamadas Automáticas</h1>
+    <p>Abra o console do navegador e veja se há requisições automáticas para fast_delivery_fees</p>
+
+    <script>
+        console.log('Página carregada. Criando cliente Supabase...');
+
+        const { createClient } = supabase;
+        const SUPABASE_URL = 'https://vqjyjdllapqbqpylshkw.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxanlqZGxsYXBxYnFweWxzaGt3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzQwOTA0OTIsImV4cCI6MjA0OTY2NjQ5Mn0.g_zCpn-mOjrcuLWl_4jHnr6wPPO2E71YDxRtBpBa3GA'; // Chave pública anon
+
+        const client = createClient(SUPABASE_URL, SUPABASE_KEY);
+        console.log('Cliente Supabase criado:', client);
+
+        console.log('Aguardando 5 segundos...');
+        setTimeout(() => {
+            console.log('5 segundos passaram. Se houver requisições automáticas, elas já teriam acontecido.');
+        }, 5000);
+    </script>
+</body>
+
+</html>

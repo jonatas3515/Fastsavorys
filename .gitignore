@@ -1,0 +1,31 @@
+# Arquivos do sistema
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+
+# Arquivos temporários
+*.tmp
+*.temp
+*~
+
+# Node modules (se usar)
+node_modules/
+
+# Capacitor
+www/
+ios/
+*.keystore
+
+# Arquivos de IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+stripe-server/.env
+.env
+*.env
+
