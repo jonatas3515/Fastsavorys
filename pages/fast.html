@@ -612,10 +612,46 @@
       <div class="lg:col-span-2">
         <div class="bg-white rounded-xl shadow p-6">
           <h3 class="text-xl font-bold text-gray-800 mb-4">Clientes Cadastrados</h3>
-          <div class="mb-4">
-            <input type="text" id="clientSearch" placeholder="Buscar por nome ou telefone..."
-              class="w-full px-3 py-2 border rounded-lg">
+          
+          <!-- Filtros de Clientes -->
+          <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
+            <div>
+              <input type="text" id="clientSearch" placeholder="Buscar nome/telefone..."
+                class="w-full px-3 py-2 border rounded-lg text-sm">
+            </div>
+            <div>
+              <select id="filterNameInitial" class="w-full px-3 py-2 border rounded-lg text-sm">
+                <option value="">Inicial: Todas</option>
+                <option value="A">A</option><option value="B">B</option><option value="C">C</option>
+                <option value="D">D</option><option value="E">E</option><option value="F">F</option>
+                <option value="G">G</option><option value="H">H</option><option value="I">I</option>
+                <option value="J">J</option><option value="K">K</option><option value="L">L</option>
+                <option value="M">M</option><option value="N">N</option><option value="O">O</option>
+                <option value="P">P</option><option value="Q">Q</option><option value="R">R</option>
+                <option value="S">S</option><option value="T">T</option><option value="U">U</option>
+                <option value="V">V</option><option value="W">W</option><option value="X">X</option>
+                <option value="Y">Y</option><option value="Z">Z</option>
+              </select>
+            </div>
+            <div>
+              <select id="filterBirthMonth" class="w-full px-3 py-2 border rounded-lg text-sm">
+                <option value="">Aniversário: Todos</option>
+                <option value="01">Janeiro</option><option value="02">Fevereiro</option>
+                <option value="03">Março</option><option value="04">Abril</option>
+                <option value="05">Maio</option><option value="06">Junho</option>
+                <option value="07">Julho</option><option value="08">Agosto</option>
+                <option value="09">Setembro</option><option value="10">Outubro</option>
+                <option value="11">Novembro</option><option value="12">Dezembro</option>
+                <option value="no-date">Sem data</option>
+              </select>
+            </div>
+            <div>
+              <button id="clearClientFilters" class="w-full px-3 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg text-sm font-medium">
+                🔄 Limpar Filtros
+              </button>
+            </div>
           </div>
+          
           <div id="clientsList" class="space-y-3"></div>
         </div>
       </div>
@@ -884,12 +920,28 @@
         </div>
       </div>
 
-      <div class="flex flex-wrap items-center justify-between gap-2 mb-6">
-        <button id="deleteTestOrdersBtn"
-          class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium text-sm">
-          🧹 Excluir pedidos de teste
-        </button>
-        <p class="text-xs text-gray-500">Remove pedidos do banco (Supabase) e zera os dados usados em Relatórios.</p>
+      <!-- Excluir Pedidos por Código -->
+      <div class="bg-amber-50 border border-amber-300 rounded-lg p-4 mb-6">
+        <h4 class="font-semibold text-amber-800 mb-2">🗑️ Excluir Pedidos de Teste</h4>
+        <p class="text-sm text-amber-700 mb-3">
+          Digite o código do pedido que deseja excluir (ex: FAST-0001). 
+          Para excluir vários, separe por vírgula.
+        </p>
+        <div class="flex gap-2 items-center flex-wrap">
+          <input 
+            type="text" 
+            id="orderCodesToDelete" 
+            placeholder="FAST-0001, FAST-0002, ..."
+            class="flex-1 min-w-[200px] px-3 py-2 border border-amber-300 rounded-lg text-sm"
+          />
+          <button 
+            id="confirmDeleteOrdersBtn" 
+            class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap"
+          >
+            🗑️ Excluir
+          </button>
+        </div>
+        <div id="deleteOrdersResult" class="mt-2 text-sm font-medium"></div>
       </div>
 
       <!-- Stats Summary -->
@@ -1168,6 +1220,30 @@
         <button id="mobileCheckoutBtn"
           class="w-full bg-rose-600 hover:bg-rose-700 text-black py-3 rounded-lg font-semibold disabled:bg-gray-300 disabled:cursor-not-allowed"
           disabled>Finalizar Pedido</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de confirmação de exclusão de pedidos -->
+  <div id="deleteOrdersModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center">
+    <div class="bg-white rounded-xl p-6 max-w-md w-full mx-4 text-gray-800">
+      <h3 class="text-xl font-bold text-amber-700 mb-4">⚠️ Confirmar Exclusão de Pedidos</h3>
+      <p id="deleteOrdersModalText" class="text-gray-700 mb-4"></p>
+      <div class="flex gap-3 justify-end">
+        <button id="cancelDeleteOrdersModalBtn" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg font-medium">Cancelar</button>
+        <button id="confirmDeleteOrdersModalBtn" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium">Excluir</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de confirmação de exclusão de cliente -->
+  <div id="deleteClientModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center">
+    <div class="bg-white rounded-xl p-6 max-w-md w-full mx-4 text-gray-800">
+      <h3 class="text-xl font-bold text-amber-700 mb-4">⚠️ Confirmar Exclusão de Cliente</h3>
+      <div id="deleteClientModalText" class="text-gray-700 mb-4"></div>
+      <div class="flex gap-3 justify-end">
+        <button id="cancelDeleteClientModalBtn" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg font-medium">Cancelar</button>
+        <button id="confirmDeleteClientModalBtn" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium">Excluir Cliente</button>
       </div>
     </div>
   </div>
@@ -1989,34 +2065,19 @@
       }
     }
 
-    // Função para buscar cliente por nome parcial ou telefone
+    // Função para buscar cliente – SOMENTE POR TELEFONE VÁLIDO
     function searchClient(name, phone) {
-      if (!name && !phone) return null;
+      // Normaliza telefone: mantém apenas dígitos
+      const normalizedPhone = (phone || '').replace(/\D/g, '');
 
-      // Busca exata por telefone primeiro
-      if (phone) {
-        const exactPhone = clients.find(c => c.phone === phone);
-        if (exactPhone) return exactPhone;
+      // Sem telefone válido (11 dígitos), não há busca automática
+      if (normalizedPhone.length !== 11) {
+        return null;
       }
 
-      // Busca por nome parcial + telefone
-      if (name && phone) {
-        const partialMatch = clients.find(c =>
-          c.phone === phone &&
-          c.name.toLowerCase().includes(name.toLowerCase().trim())
-        );
-        if (partialMatch) return partialMatch;
-      }
-
-      // Busca por nome parcial (sem telefone)
-      if (name) {
-        const nameMatch = clients.find(c =>
-          c.name.toLowerCase().includes(name.toLowerCase().trim())
-        );
-        if (nameMatch) return nameMatch;
-      }
-
-      return null;
+      // Busca exata por telefone (único critério para autoidentificar cliente)
+      const exactPhone = clients.find(c => c.phone === normalizedPhone);
+      return exactPhone || null;
     }
 
     // Função para renderizar endereços do cliente
@@ -2112,13 +2173,52 @@
 
       alert('Endereço salvo com sucesso!');
     }
+    // Variáveis globais para filtros de clientes
+    let currentNameInitial = '';
+    let currentBirthMonth = '';
+
     function renderClients(searchTerm = '') {
       const box = document.getElementById('clientsList'); if (!box) return;
-      const filtered = clients.filter(c =>
+      
+      // Filtra por texto de busca (nome/telefone)
+      let filtered = clients.filter(c =>
         c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         c.phone.includes(searchTerm)
       );
-      box.innerHTML = filtered.length ? filtered.map((c, i) => `
+
+      // Filtra por inicial do nome
+      if (currentNameInitial) {
+        filtered = filtered.filter(c => {
+          const firstName = (c.name || '').trim().toUpperCase();
+          return firstName.startsWith(currentNameInitial);
+        });
+      }
+
+      // Filtra por mês de aniversário
+      if (currentBirthMonth) {
+        if (currentBirthMonth === 'no-date') {
+          filtered = filtered.filter(c => !c.birthdate);
+        } else {
+          filtered = filtered.filter(c => {
+            if (!c.birthdate) return false;
+            let month = '';
+            if (c.birthdate.includes('/')) {
+              const parts = c.birthdate.split('/');
+              month = parts[1];
+            } else if (c.birthdate.includes('-')) {
+              const parts = c.birthdate.split('-');
+              month = parts[1];
+            }
+            return month === currentBirthMonth;
+          });
+        }
+      }
+
+      // Renderiza a lista filtrada
+      box.innerHTML = filtered.length ? filtered.map((c, i) => {
+        // Encontra o índice original no array clients para as funções edit/delete
+        const originalIndex = clients.findIndex(client => client.phone === c.phone);
+        return `
         <div class='flex items-center justify-between p-4 border rounded-lg'>
           <div class='flex-1'>
             <p class='font-medium text-gray-800'>${c.name}</p>
@@ -2129,10 +2229,11 @@
             ${clientDiscounts[c.phone] ? `<p class='text-xs text-green-600 font-semibold'>Desconto: ${clientDiscounts[c.phone]}%</p>` : ''}
           </div>
           <div class='flex gap-2'>
-            <button class='px-3 py-1 rounded bg-blue-500 hover:bg-blue-600 text-white text-sm' onclick='editClient(${i})'>Editar</button>
-            <button class='px-3 py-1 rounded bg-red-500 hover:bg-red-600 text-white text-sm' onclick='deleteClient(${i})'>Excluir</button>
+            <button class='px-3 py-1 rounded bg-blue-500 hover:bg-blue-600 text-white text-sm' onclick='editClient(${originalIndex})'>Editar</button>
+            <button class='px-3 py-1 rounded bg-red-500 hover:bg-red-600 text-white text-sm' onclick='deleteClient(${originalIndex})'>Excluir</button>
           </div>
-        </div>`).join('') : '<p class="text-gray-500 text-center py-8">Nenhum cliente cadastrado.</p>';
+        </div>`;
+      }).join('') : '<p class="text-gray-500 text-center py-8">Nenhum cliente encontrado com os filtros aplicados.</p>';
     }
     function editClient(i) {
       const c = clients[i];
@@ -2143,16 +2244,109 @@
       document.getElementById('clientAddress').value = c.address || '';
       editingClientId = i;
     }
+    // Variável para armazenar cliente pendente de exclusão
+    let clientToDelete = null;
+    let clientToDeleteIndex = null;
+
     function deleteClient(i) {
-      if (confirm('Excluir cliente ' + clients[i].name + '?')) {
-        const phone = clients[i].phone;
-        clients.splice(i, 1);
+      const client = clients[i];
+      if (!client) return;
+      
+      clientToDelete = client;
+      clientToDeleteIndex = i;
+      
+      // Conta pedidos do cliente
+      const ordersCount = orders.filter(o => o.client_phone === client.phone).length;
+      
+      // Monta texto do modal
+      const deleteClientModalText = document.getElementById('deleteClientModalText');
+      deleteClientModalText.innerHTML = `
+        <p><strong>Nome:</strong> ${client.name || 'Cliente'}</p>
+        <p><strong>Telefone:</strong> ${client.phone}</p>
+        ${client.birthdate ? `<p><strong>Aniversário:</strong> ${client.birthdate}</p>` : ''}
+        <div class="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm">
+          ⚠️ Este cliente possui <strong>${ordersCount} pedido(s)</strong> no histórico.
+          ${ordersCount > 0 ? '<br>Os pedidos NÃO serão excluídos, apenas o cadastro do cliente.' : ''}
+        </div>
+        <p class="mt-3">Deseja realmente excluir este cliente?</p>
+      `;
+      
+      // Abre o modal
+      document.getElementById('deleteClientModal').classList.remove('hidden');
+    }
+
+    // Executa exclusão de cliente após confirmação no modal
+    async function executeDeleteClient() {
+      if (!clientToDelete) return;
+      
+      const deleteClientModal = document.getElementById('deleteClientModal');
+      deleteClientModal.classList.add('hidden');
+      
+      try {
+        // Exclui do Supabase
+        const { error } = await window.supabaseClient
+          .from('fast_clients')
+          .delete()
+          .eq('phone', clientToDelete.phone);
+        
+        if (error) throw error;
+        
+        // Remove da lista local
+        const phone = clientToDelete.phone;
+        clients = clients.filter(c => c.phone !== phone);
         delete clientDiscounts[phone];
+        
+        // Salva no localStorage como backup
         saveClients();
         saveClientDiscounts();
+        
+        // Recarrega lista
         renderClients();
+        
+        // Limpa variáveis
+        clientToDelete = null;
+        clientToDeleteIndex = null;
+        
+        // Feedback visual
+        showInlineMessage('clientsPanelFast', '✅ Cliente excluído com sucesso!', 'success');
+        
+      } catch (error) {
+        console.error('Erro ao excluir cliente:', error);
+        
+        // Mesmo com erro no Supabase, tenta excluir localmente
+        if (clientToDeleteIndex !== null && clients[clientToDeleteIndex]) {
+          const phone = clients[clientToDeleteIndex].phone;
+          clients.splice(clientToDeleteIndex, 1);
+          delete clientDiscounts[phone];
+          saveClients();
+          saveClientDiscounts();
+          renderClients();
+        }
+        
+        clientToDelete = null;
+        clientToDeleteIndex = null;
+        
+        showInlineMessage('clientsPanelFast', `⚠️ Cliente removido localmente. Erro no servidor: ${error.message}`, 'warning');
       }
     }
+
+    // Event listeners para modal de exclusão de cliente
+    document.getElementById('cancelDeleteClientModalBtn')?.addEventListener('click', () => {
+      document.getElementById('deleteClientModal').classList.add('hidden');
+      clientToDelete = null;
+      clientToDeleteIndex = null;
+    });
+
+    document.getElementById('confirmDeleteClientModalBtn')?.addEventListener('click', executeDeleteClient);
+
+    // Fechar modal ao clicar fora
+    document.getElementById('deleteClientModal')?.addEventListener('click', (e) => {
+      if (e.target.id === 'deleteClientModal') {
+        e.target.classList.add('hidden');
+        clientToDelete = null;
+        clientToDeleteIndex = null;
+      }
+    });
     document.addEventListener('submit', (e) => {
       if (e.target && e.target.id === 'clientForm') {
         e.preventDefault();
@@ -2338,9 +2532,17 @@
     }
 
     function calculateClientRanking(periodOrders) {
+      // Filtra apenas pedidos pagos/entregues/prontos (exclui pendentes e cancelados)
+      const validOrders = periodOrders.filter(order => {
+        const status = (order.status || '').toLowerCase();
+        return status.includes('paid') || status.includes('delivered') || status.includes('confirmed') || 
+               status.includes('pago') || status.includes('entregue') || status.includes('pronto') ||
+               status === 'preparing' || status === 'out_for_delivery';
+      });
+
       const clientTotals = {};
 
-      periodOrders.forEach(order => {
+      validOrders.forEach(order => {
         const key = order.client_phone || order.client_name;
         if (!clientTotals[key]) {
           clientTotals[key] = {
@@ -2885,6 +3087,33 @@
       renderClients(e.target.value);
     });
 
+    // Filtros de clientes - inicial do nome
+    document.getElementById('filterNameInitial')?.addEventListener('change', (e) => {
+      currentNameInitial = e.target.value;
+      const searchTerm = document.getElementById('clientSearch')?.value || '';
+      renderClients(searchTerm);
+    });
+
+    // Filtros de clientes - mês de aniversário
+    document.getElementById('filterBirthMonth')?.addEventListener('change', (e) => {
+      currentBirthMonth = e.target.value;
+      const searchTerm = document.getElementById('clientSearch')?.value || '';
+      renderClients(searchTerm);
+    });
+
+    // Limpar filtros de clientes
+    document.getElementById('clearClientFilters')?.addEventListener('click', () => {
+      currentNameInitial = '';
+      currentBirthMonth = '';
+      const filterNameInitialSelect = document.getElementById('filterNameInitial');
+      const filterBirthMonthSelect = document.getElementById('filterBirthMonth');
+      const clientSearchInput = document.getElementById('clientSearch');
+      if (filterNameInitialSelect) filterNameInitialSelect.value = '';
+      if (filterBirthMonthSelect) filterBirthMonthSelect.value = '';
+      if (clientSearchInput) clientSearchInput.value = '';
+      renderClients();
+    });
+
     // =================== COUPON MANAGEMENT ===================
     async function loadCoupons() {
       try {
@@ -3371,6 +3600,66 @@
       if (d === 5) return timeNow >= 14 && timeNow < 19.5; // sexta até 19h30
       return timeNow >= 14 && timeNow < 18; // seg-qui e sáb
     }
+
+    /**
+     * Verifica se o pedido pode ser realizado no horário escolhido
+     * Entre 07:00 e 14:00, só libera se:
+     * - Houver pelo menos um bolo no carrinho, OU
+     * - O total do pedido for >= R$ 30,00
+     * 
+     * @param {string} timeSlot - Horário no formato "HH:MM" (ex: "07:30", "14:00")
+     * @param {number} cartTotal - Total do carrinho em reais
+     * @param {Array} cartItems - Array com os itens do carrinho
+     * @returns {Object} { allowed: boolean, reason: string }
+     */
+    function isOrderAllowedAtTime(timeSlot, cartTotal, cartItems) {
+      // Normaliza o horário para comparação (remove ":")
+      const normalizedTime = (timeSlot || '').replace(/:/g, '');
+      const timeAsNumber = parseInt(normalizedTime, 10) || 0;
+
+      // Fora do período restrito (antes das 07:00 ou após 14:00), sempre permite
+      if (timeAsNumber < 700 || timeAsNumber >= 1400) {
+        return { allowed: true, reason: '' };
+      }
+
+      // Está entre 07:00 e 14:00 - aplicar regras especiais
+      const hasCake = cartItems.some(item => {
+        // Buscar produto original para obter categoria
+        const product = products.find(p => p.id === item.id);
+        const productName = (item.name || '').toLowerCase();
+        const productCategory = (product?.category || '').toLowerCase();
+        // Verifica se é bolo pela categoria ou pelo nome
+        return productCategory === 'bolos' || productName.includes('bolo');
+      });
+
+      const meetsMinimumValue = cartTotal >= 30.00;
+
+      if (hasCake || meetsMinimumValue) {
+        return { allowed: true, reason: '' };
+      }
+
+      // Não atende nenhum dos critérios
+      return {
+        allowed: false,
+        reason: 'Entre 7h e 14h, só aceitamos pedidos de bolos ou pedidos acima de R$ 30,00.'
+      };
+    }
+
+    /**
+     * Gera código de pedido no formato FAST-0001
+     * @param {string|number} orderId - ID do pedido (timestamp ou número)
+     * @returns {string} Código formatado (ex: "FAST-0001")
+     */
+    function formatOrderCode(orderId) {
+      if (!orderId) return 'FAST-0000';
+      
+      // Pega os últimos 4 dígitos do ID e completa com zeros à esquerda
+      const numericId = String(orderId).slice(-4);
+      const paddedId = numericId.padStart(4, '0');
+      
+      return `FAST-${paddedId}`;
+    }
+
     // Using character range instead of \p{Diacritic} for iOS/Safari compatibility
     function norm(s) { return (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim(); }
     function isFastDeliveryAllowed(nei) {
@@ -4184,6 +4473,25 @@
       document.getElementById('reference').value = '';
     });
 
+    // Normalização e validação do telefone do cliente
+    const customerPhoneInput = document.getElementById('customerPhone');
+
+    if (customerPhoneInput) {
+      // Bloqueia caracteres que não sejam dígitos
+      customerPhoneInput.addEventListener('keypress', (e) => {
+        const char = String.fromCharCode(e.which || e.keyCode);
+        if (!/[0-9]/.test(char)) {
+          e.preventDefault();
+        }
+      });
+
+      // Ao digitar/colar, mantém apenas dígitos
+      customerPhoneInput.addEventListener('input', (e) => {
+        const onlyDigits = e.target.value.replace(/\D/g, '');
+        e.target.value = onlyDigits;
+      });
+    }
+
     // Event: Ao mudar o telefone do cliente, recarregar endereços
     document.getElementById('customerPhone')?.addEventListener('blur', () => {
       const phone = document.getElementById('customerPhone').value.trim();
@@ -4347,6 +4655,14 @@
         showWarning('Preencha seu nome e telefone.'); return;
       }
 
+      // Normaliza telefone para 11 dígitos
+      const normalizedPhone = customerPhone.replace(/\D/g, '');
+      if (normalizedPhone.length !== 11) {
+        showWarning('Informe um telefone válido com DDD e 9 dígitos. Ex: 73999348552.');
+        document.getElementById('customerPhone')?.focus();
+        return;
+      }
+
       if (!payment) { showWarning('Selecione uma forma de pagamento.'); return; }
       const minOrder = delivery && delivery.value === 'entrega' ? 15 : 8;
       if (cartTotal < minOrder) { showWarning(`Pedido mínimo: R$ ${minOrder.toFixed(2).replace('.', ',')}`); return; }
@@ -4369,8 +4685,22 @@
         // Validate time slot selection
         const orderTimeSlot = document.getElementById('orderTimeSlot').value;
         if (!orderTimeSlot) { showWarning('Selecione um horário desejado.'); return; }
-        if (delivery && delivery.value === 'entrega') {
-          if (orderTimeSlot < '07:00' || orderTimeSlot > '18:00') { showWarning('Para entrega, o horário permitido é das 07:00 às 18:00.'); return; }
+
+        // Validação de horário PARA ENTREGA E RETIRADA (faixa geral 07:00–18:00)
+        const normalizedTimeSlot = orderTimeSlot.replace(/:/g, '');
+        const timeAsNumber = parseInt(normalizedTimeSlot, 10);
+
+        if (timeAsNumber < 700 || timeAsNumber > 1800) {
+          const tipoMsg = delivery && delivery.value === 'entrega' ? 'entrega' : 'retirada';
+          showWarning(`Para ${tipoMsg}, o horário permitido é das 07:00 às 18:00.`);
+          return;
+        }
+
+        // Validação de regras especiais para horário entre 7h–14h (delivery e retirada)
+        const timeValidation = isOrderAllowedAtTime(orderTimeSlot, cartTotal, cart);
+        if (!timeValidation.allowed) {
+          showWarning(timeValidation.reason);
+          return;
         }
       }
       function showWarning(txt) { const w = document.getElementById('validationWarnings'); w.innerHTML = `<div class='p-3 bg-red-100 border border-red-400 text-red-900 rounded-lg text-sm'>${txt}</div>`; w.classList.remove('hidden'); }
@@ -4469,7 +4799,7 @@
       // Aviso especial para pagamento em cartão
       if (payment.value === 'cartao1x') {
         msg += `\n💳 *IMPORTANTE:* O link de pagamento em cartão será enviado após a Fast Savory's aceitar seu pedido.\n`;
-        msg += `Aguarde nosso retorno com o link de pagamento. Mínimo de 50% de entrada.\n`;
+        msg += `Aguarde nosso retorno com o link de pagamento.\n`;
       }
       if (payment.value === 'dinheiro') { const ch = parseFloat(document.getElementById('moneyChangeValue').value || '0'); if (ch > 0) { msg += `*Troco para:* R$ ${ch.toFixed(2).replace('.', ',')}\n`; } }
       if (delivery.value === 'retirada') { msg += `*Entrega:* 🏪 Retirada na loja\n`; }
@@ -4664,17 +4994,26 @@
       const noAddressSection = document.getElementById('noAddressSection');
       const savedAddressText = document.getElementById('savedAddressText');
 
-      if (!client) return;
+      // Guard clause: se os elementos não existirem nesse contexto, não faz nada
+      if (!savedAddressSection || !noAddressSection || !savedAddressText) {
+        return;
+      }
 
-      const addresses = client.addresses || [];
-      const defaultAddress = addresses[0]; // First address is default
+      const hasAddresses = client && Array.isArray(client.addresses) && client.addresses.length > 0;
 
-      if (defaultAddress) {
-        // Show saved address with confirmation buttons
-        savedAddressText.textContent = `${defaultAddress.street}, ${defaultAddress.number} - ${defaultAddress.neighborhood}${defaultAddress.reference ? ` (Ref: ${defaultAddress.reference})` : ''}`;
+      if (hasAddresses) {
+        const addr = client.addresses[0];
+
+        const street = addr.street || '';
+        const number = addr.number || '';
+        const neighborhood = addr.neighborhood || '';
+        const reference = addr.reference || '';
+
+        const addressText = `${street}, ${number} - ${neighborhood}${reference ? ` (Ref: ${reference})` : ''}`.trim();
+        savedAddressText.textContent = addressText;
         savedAddressSection.classList.remove('hidden');
         noAddressSection.classList.add('hidden');
-      } else if (client.address) {
+      } else if (client && client.address) {
         // Old format: single address string
         savedAddressText.textContent = client.address;
         savedAddressSection.classList.remove('hidden');
@@ -5142,7 +5481,7 @@
           <div class="bg-white border rounded-lg p-4 shadow-sm ${isCardPayment ? 'border-l-4 border-l-purple-500' : ''}">
             <div class="flex flex-wrap items-start justify-between gap-2 mb-3">
               <div>
-                <p class="text-sm text-gray-500">${date} às ${time}</p>
+                <p class="text-sm text-gray-500">${date} às ${time} - <strong class="text-rose-600">${formatOrderCode(order.id)}</strong></p>
                 <p class="font-semibold text-gray-800">${order.client_name || 'Cliente'}</p>
                 <p class="text-sm text-gray-600">📱 ${order.client_phone || '-'}</p>
               </div>
@@ -5306,10 +5645,11 @@
       generatePaymentMessage(order, paymentLink) {
         const greeting = this.getGreeting();
         const firstName = MsgTemplateService.getFirstName(order.client_name);
+        const orderCode = formatOrderCode(order.id);
         
         return `${greeting}, ${firstName}! 🎉
 
-Seu pedido #${order.id} foi *ACEITO* pela Fast Savory's!
+Seu pedido ${orderCode} foi *ACEITO* pela Fast Savory's!
 
 Para confirmar sua encomenda, realize o pagamento pelo link abaixo:
 ${paymentLink}
@@ -5473,49 +5813,135 @@ Obrigado pela preferência! ❤️`;
       window.open(url, '_blank');
     }
 
-    async function deleteTestOrders() {
-      try {
-        const ok1 = confirm('⚠️ ATENÇÃO!\n\nIsso vai EXCLUIR pedidos do Supabase e pode ser irreversível.\n\nDeseja continuar?');
-        if (!ok1) return;
+    // Variáveis para modal de exclusão de pedidos
+    let pendingOrderCodesToDelete = [];
 
-        const fromDate = prompt('Opcional: apagar pedidos a partir de qual data?\nFormato: AAAA-MM-DD\n\nDeixe vazio para apagar TODOS os pedidos.');
-        const ok2 = prompt('Para confirmar, digite APAGAR');
-        if (ok2 !== 'APAGAR') {
-          alert('Operação cancelada.');
+    // Excluir pedidos por código (FAST-0001, etc) - abre modal de confirmação
+    function deleteOrdersByCodes() {
+      const orderCodesToDeleteInput = document.getElementById('orderCodesToDelete');
+      const deleteOrdersResult = document.getElementById('deleteOrdersResult');
+      
+      if (!orderCodesToDeleteInput || !deleteOrdersResult) return;
+      
+      const inputValue = orderCodesToDeleteInput.value.trim();
+      
+      if (!inputValue) {
+        deleteOrdersResult.textContent = '⚠️ Digite ao menos um código de pedido.';
+        deleteOrdersResult.style.color = '#856404';
+        return;
+      }
+
+      // Extrai os códigos (separa por vírgula, remove espaços e filtra vazios)
+      const codes = inputValue.split(',').map(c => c.trim().toUpperCase()).filter(c => c);
+      
+      if (codes.length === 0) {
+        deleteOrdersResult.textContent = '⚠️ Nenhum código válido encontrado.';
+        deleteOrdersResult.style.color = '#856404';
+        return;
+      }
+
+      // Armazena códigos e abre modal de confirmação
+      pendingOrderCodesToDelete = codes;
+      const deleteOrdersModal = document.getElementById('deleteOrdersModal');
+      const deleteOrdersModalText = document.getElementById('deleteOrdersModalText');
+      
+      deleteOrdersModalText.textContent = `Tem certeza que deseja excluir ${codes.length} pedido(s)?\n\n${codes.join(', ')}`;
+      deleteOrdersModal.classList.remove('hidden');
+    }
+
+    // Executa exclusão de pedidos após confirmação no modal
+    async function executeDeleteOrders() {
+      const orderCodesToDeleteInput = document.getElementById('orderCodesToDelete');
+      const deleteOrdersResult = document.getElementById('deleteOrdersResult');
+      const deleteOrdersModal = document.getElementById('deleteOrdersModal');
+      
+      deleteOrdersModal.classList.add('hidden');
+      
+      const codes = pendingOrderCodesToDelete;
+      if (codes.length === 0) return;
+
+      try {
+        deleteOrdersResult.textContent = '⏳ Excluindo...';
+        deleteOrdersResult.style.color = '#007bff';
+
+        // Busca todos os pedidos
+        const { data: allOrders, error } = await window.supabaseClient
+          .from('fast_orders')
+          .select('*');
+
+        if (error) throw error;
+
+        // Filtra os pedidos cujo código formatado está na lista
+        const ordersToDelete = (allOrders || []).filter(order => {
+          const orderCode = formatOrderCode(order.id);
+          return codes.includes(orderCode);
+        });
+
+        if (ordersToDelete.length === 0) {
+          deleteOrdersResult.textContent = `⚠️ Nenhum pedido encontrado com os códigos informados.`;
+          deleteOrdersResult.style.color = '#856404';
+          pendingOrderCodesToDelete = [];
           return;
         }
 
-        let query = window.supabaseClient.from('fast_orders').delete();
-        if (fromDate && /^\d{4}-\d{2}-\d{2}$/.test(fromDate)) {
-          query = query.gte('created_at', `${fromDate}T00:00:00.000Z`);
-        } else {
-          // Supabase exige filtro no delete; usa um filtro neutro
-          query = query.neq('id', 0);
-        }
+        // Exclui os pedidos encontrados
+        const idsToDelete = ordersToDelete.map(o => o.id);
+        const { error: deleteError } = await window.supabaseClient
+          .from('fast_orders')
+          .delete()
+          .in('id', idsToDelete);
 
-        const { error } = await query;
-        if (error) throw error;
+        if (deleteError) throw deleteError;
 
-        // Limpa cache local usado como fallback de pedidos
+        deleteOrdersResult.textContent = `✅ ${ordersToDelete.length} pedido(s) excluído(s) com sucesso!`;
+        deleteOrdersResult.style.color = '#28a745';
+
+        // Limpa o input e recarrega os pedidos
+        orderCodesToDeleteInput.value = '';
+        pendingOrderCodesToDelete = [];
+        
+        // Limpa cache local
         try { localStorage.removeItem('fastOrders'); } catch (e) {}
-
+        
         // Recarrega listas
         await loadOrders().catch(function() {});
         try { renderReportsData(); } catch (e) {}
         try { loadDashboardOrders(); } catch (e) {}
 
-        alert('✅ Pedidos apagados com sucesso.');
-      } catch (e) {
-        console.error('Erro ao excluir pedidos:', e);
-        alert('❌ Erro ao excluir pedidos.');
+      } catch (error) {
+        console.error('Erro ao excluir pedidos:', error);
+        deleteOrdersResult.textContent = `❌ Erro: ${error.message}`;
+        deleteOrdersResult.style.color = '#dc3545';
+        pendingOrderCodesToDelete = [];
       }
     }
+
+    // Event listeners para modal de exclusão de pedidos
+    document.getElementById('cancelDeleteOrdersModalBtn')?.addEventListener('click', () => {
+      document.getElementById('deleteOrdersModal').classList.add('hidden');
+      const deleteOrdersResult = document.getElementById('deleteOrdersResult');
+      if (deleteOrdersResult) {
+        deleteOrdersResult.textContent = '❌ Exclusão cancelada.';
+        deleteOrdersResult.style.color = '#dc3545';
+      }
+      pendingOrderCodesToDelete = [];
+    });
+
+    document.getElementById('confirmDeleteOrdersModalBtn')?.addEventListener('click', executeDeleteOrders);
+
+    // Fechar modal ao clicar fora
+    document.getElementById('deleteOrdersModal')?.addEventListener('click', (e) => {
+      if (e.target.id === 'deleteOrdersModal') {
+        e.target.classList.add('hidden');
+        pendingOrderCodesToDelete = [];
+      }
+    });
 
     // Order filters events
     document.getElementById('ordersFilterDate')?.addEventListener('change', loadDashboardOrders);
     document.getElementById('ordersFilterStatus')?.addEventListener('change', loadDashboardOrders);
     document.getElementById('refreshOrders')?.addEventListener('click', loadDashboardOrders);
-    document.getElementById('deleteTestOrdersBtn')?.addEventListener('click', deleteTestOrders);
+    document.getElementById('confirmDeleteOrdersBtn')?.addEventListener('click', deleteOrdersByCodes);
 
     // Desktop buttons
     document.getElementById('showProductsPanelFast')?.addEventListener('click', () => {
@@ -6053,7 +6479,7 @@ Obrigado pela preferência! ❤️`;
 
         return tpl
           .replace(/{{nome}}/g, firstName)
-          .replace(/{{pedido}}/g, order.id || '')
+          .replace(/{{pedido}}/g, formatOrderCode(order.id))
           .replace(/{{total}}/g, (order.total || 0).toFixed(2).replace('.', ','))
           .replace(/{{itens}}/g, itemsSummary || 'Itens do pedido')
           .replace(/{{endereco}}/g, address)
