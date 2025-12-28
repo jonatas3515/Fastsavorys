@@ -83,35 +83,58 @@
     textarea {
       color: #111 !important;
     }
+    
+    /* Hide scrollbar for carousel */
+    .scrollbar-hide::-webkit-scrollbar {
+      display: none;
+    }
+    .scrollbar-hide {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    
+    /* Line clamp for text truncation */
+    .line-clamp-2 {
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
   </style>
 </head>
 
 <body class="bg-white">
   <!-- Welcome Screen with Gradient Background -->
-  <div id="welcomeScreen" class="fixed inset-0 z-[100]"
+  <div id="welcomeScreen" class="fixed inset-0 z-[100] overflow-hidden"
     style="background: linear-gradient(135deg, #9e0b5a 0%, #7a0945 25%, #5a0733 50%, #1f2937 75%, #000000 100%);">
 
-    <!-- Centered Logo Image -->
-    <div class="absolute inset-0 flex items-center justify-center">
-      <img src="../assets/img/capa-logo.png" alt="Fast Savory's"
-        class="max-w-[85%] max-h-[75%] sm:max-w-[80%] sm:max-h-[80%] md:max-w-[85%] md:max-h-[85%] object-contain drop-shadow-2xl" />
+    <!-- Mobile layout (sem absolute para não sobrepor) -->
+    <div class="sm:hidden flex flex-col h-full p-4">
+      <div class="text-center pt-2">
+        <h1 class="text-lg font-bold text-white drop-shadow-lg">
+          Bem-vindo à <span class="text-yellow-400">FastSavory's</span>
+        </h1>
+        <p class="text-xs text-white mt-1 drop-shadow-lg">
+          Faça agora mesmo a sua encomenda!
+        </p>
+      </div>
+      <div class="flex-1 flex items-center justify-center py-2">
+        <img src="../assets/img/capa-logo.png" alt="Fast Savory's"
+          class="max-w-full max-h-[55vh] object-contain drop-shadow-2xl" />
+      </div>
+      <div class="text-center pb-6">
+        <button id="enterStoreBtnMobile"
+          class="px-6 py-3 bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-black font-bold text-base rounded-full shadow-2xl animate-pulse">
+          🛒 Fazer Pedido
+        </button>
+      </div>
     </div>
 
-    <!-- Mobile: Text at TOP, Button at BOTTOM (below logo) -->
-    <div class="sm:hidden absolute top-6 left-0 right-0 z-10 text-center px-4">
-      <h1 class="text-xl font-bold text-white drop-shadow-lg">
-        Bem-vindo à <span class="text-yellow-400">FastSavory's</span>
-      </h1>
-      <p class="text-sm text-white mt-1 drop-shadow-lg">
-        Faça agora mesmo a sua encomenda!
-      </p>
-    </div>
-    <!-- Mobile Button below logo -->
-    <div class="sm:hidden absolute bottom-12 left-0 right-0 z-10 text-center px-4">
-      <button id="enterStoreBtnMobile"
-        class="px-6 py-3 bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-black font-bold text-base rounded-full shadow-2xl animate-pulse">
-        🛒 Fazer Pedido
-      </button>
+    <!-- Centered Logo Image (Desktop/Tablet) -->
+    <div class="hidden sm:flex absolute inset-0 items-center justify-center p-4">
+      <img src="../assets/img/capa-logo.png" alt="Fast Savory's"
+        class="max-w-full max-h-[50vh] sm:max-w-[70%] sm:max-h-[60vh] md:max-w-[60%] md:max-h-[70vh] object-contain drop-shadow-2xl" />
     </div>
 
     <!-- Desktop: Text at top left with larger size -->
@@ -231,10 +254,10 @@
     </header>
 
 
-    <main id="productsPanelFast" class="container mx-auto px-4 py-6">
-      <div class="grid lg:grid-cols-3 gap-6">
-        <div class="lg:col-span-1 space-y-6">
-          <div class="bg-white rounded-xl shadow p-6">
+    <main id="productsPanelFast" class="container mx-auto px-2 py-4">
+      <div class="grid xl:grid-cols-3 lg:grid-cols-2 gap-4">
+        <div class="xl:col-span-1 lg:col-span-2 space-y-4">
+          <div class="bg-white rounded-xl shadow p-4">
             <h3 class="text-xl font-bold text-gray-800 mb-4">Adicionar Produto</h3>
             <form id="productForm" class="space-y-4">
               <div>
@@ -474,6 +497,31 @@
 
 
 
+      <!-- Seção de Entregadores -->
+      <div class="bg-white rounded-xl shadow-lg p-6">
+        <h2 class="text-2xl font-bold text-gray-800 mb-6">🏍️ Entregadores</h2>
+        <form id="courierForm" class="space-y-4 mb-6">
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Nome</label>
+              <input type="text" id="courierName" class="w-full px-3 py-2 border rounded-lg" placeholder="Nome do entregador" required>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Telefone</label>
+              <input type="tel" id="courierPhone" class="w-full px-3 py-2 border rounded-lg" placeholder="(73) 99999-9999">
+            </div>
+          </div>
+          <input type="hidden" id="courierEditId" value="">
+          <button type="submit" class="w-full bg-rose-600 hover:bg-rose-700 text-white py-2 rounded-lg font-medium">
+            Adicionar Entregador
+          </button>
+        </form>
+        <h3 class="font-semibold text-gray-800 mb-3">Entregadores Cadastrados</h3>
+        <div id="couriersList" class="space-y-2 max-h-48 overflow-y-auto">
+          <p class="text-gray-400 text-sm text-center py-4">Nenhum entregador cadastrado</p>
+        </div>
+      </div>
+
       <!-- Seção de Toggle de Delivery -->
       <div class="bg-white rounded-xl shadow-lg p-6">
         <h2 class="text-2xl font-bold text-gray-800 mb-6">🚚 Controle de Entregas</h2>
@@ -518,8 +566,23 @@
           </div>
           <p class="text-xs text-gray-500 mt-2">Essas estimativas aparecerão no cabeçalho da loja.</p>
         </div>
+        <div class="mt-4 border-t pt-4">
+          <h4 class="font-semibold text-gray-800 mb-3">📊 Controle de Capacidade</h4>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Capacidade simultânea</label>
+              <input type="number" id="maxConcurrentOrders" placeholder="10" class="w-full px-2 py-1 border rounded" min="1">
+              <p class="text-xs text-gray-400 mt-1">Pedidos em preparo ao mesmo tempo</p>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Acréscimo (min)</label>
+              <input type="number" id="highDemandExtraTime" placeholder="15" class="w-full px-2 py-1 border rounded" min="0">
+              <p class="text-xs text-gray-400 mt-1">Tempo extra em alta demanda</p>
+            </div>
+          </div>
+        </div>
         <button type="button" id="saveDeliverySettings"
-          class="w-full bg-rose-600 hover:bg-rose-700 text-white py-2 rounded-lg font-medium">
+          class="w-full bg-rose-600 hover:bg-rose-700 text-white py-2 rounded-lg font-medium mt-4">
           💾 Salvar Configuração de Entrega
         </button>
       </div>
@@ -889,6 +952,32 @@
     <div class="bg-white rounded-xl shadow-lg p-6">
       <h2 class="text-2xl font-bold text-gray-800 mb-6">📋 Painel de Pedidos</h2>
 
+      <!-- Dashboard KPIs -->
+      <div id="ordersDashboard" class="mb-6">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+          <div class="bg-gradient-to-br from-green-50 to-green-100 p-4 rounded-xl border border-green-200">
+            <p class="text-xs text-green-600 font-medium mb-1">💰 Faturamento</p>
+            <p class="text-xl font-bold text-green-700" id="kpiFaturamento">R$ 0,00</p>
+            <p class="text-xs text-green-500" id="kpiFaturamentoLabel">no período</p>
+          </div>
+          <div class="bg-gradient-to-br from-blue-50 to-blue-100 p-4 rounded-xl border border-blue-200">
+            <p class="text-xs text-blue-600 font-medium mb-1">📦 Pedidos</p>
+            <p class="text-xl font-bold text-blue-700" id="kpiTotalPedidos">0</p>
+            <p class="text-xs text-blue-500" id="kpiPedidosLabel">no período</p>
+          </div>
+          <div class="bg-gradient-to-br from-purple-50 to-purple-100 p-4 rounded-xl border border-purple-200">
+            <p class="text-xs text-purple-600 font-medium mb-1">🎯 Ticket Médio</p>
+            <p class="text-xl font-bold text-purple-700" id="kpiTicketMedio">R$ 0,00</p>
+            <p class="text-xs text-purple-500">por pedido</p>
+          </div>
+          <div class="bg-gradient-to-br from-orange-50 to-orange-100 p-4 rounded-xl border border-orange-200">
+            <p class="text-xs text-orange-600 font-medium mb-1">🏆 Pedido Recorde</p>
+            <p class="text-xl font-bold text-orange-700" id="kpiMaiorPedido">R$ 0,00</p>
+            <p class="text-xs text-orange-500">maior valor</p>
+          </div>
+        </div>
+      </div>
+
       <!-- Filters -->
       <div class="grid md:grid-cols-3 gap-4 mb-6">
         <div>
@@ -897,6 +986,8 @@
             <option value="today">Hoje</option>
             <option value="yesterday">Ontem</option>
             <option value="week">Última semana</option>
+            <option value="month">Este mês</option>
+            <option value="all">Todos</option>
           </select>
         </div>
         <div>
@@ -1038,6 +1129,14 @@
     <nav class="shadow-sm sticky top-0 z-10 bg-white">
       <div class="container mx-auto px-3 sm:px-4">
         <div id="openNotice" class="text-sm py-2 px-3 rounded-lg my-2 text-center"></div>
+        <div id="deliveryStatusBanner" class="hidden text-sm py-2 px-3 rounded-lg mb-2 text-center"></div>
+
+        <div class="flex justify-center mb-2">
+          <button id="openTrackingModalBtn" type="button"
+            class="text-xs sm:text-sm bg-gray-100 hover:bg-gray-200 text-gray-800 px-3 py-2 rounded-lg font-medium w-full sm:w-auto">
+            🔎 Acompanhar pedido
+          </button>
+        </div>
 
         <!-- Mobile: Grid 3 columns -->
         <div class="sm:hidden grid grid-cols-3 gap-2 py-3">
@@ -1105,8 +1204,44 @@
     </nav>
 
     <main class="container mx-auto px-3 sm:px-4 py-4 sm:py-6">
+      <!-- Botão Pedir de Novo (atalho rápido) -->
+      <div id="repeatLastOrderSection" class="mb-4 hidden">
+        <button id="repeatLastOrderBtn" type="button"
+          class="w-full bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 text-white py-3 px-4 rounded-xl font-semibold shadow-lg flex items-center justify-center gap-2 transition-all">
+          <span class="text-xl">🔄</span>
+          <span>Pedir o último pedido de novo</span>
+        </button>
+      </div>
+
       <!-- Seção de Últimos Pedidos (para clientes que retornam) -->
       <div id="recentOrdersSection" class="mb-6 hidden"></div>
+
+      <!-- Seção de Promoções do Dia -->
+      <div id="promosSection" class="mb-6 hidden">
+        <div class="bg-gradient-to-r from-yellow-50 to-orange-50 rounded-xl p-4 border border-yellow-200">
+          <div class="flex items-center justify-between mb-3">
+            <h2 class="text-lg font-bold text-gray-800 flex items-center">
+              <span class="mr-2">🏷️</span> Promoções do Dia
+            </h2>
+            <span class="text-xs bg-yellow-400 text-yellow-900 px-2 py-1 rounded-full font-semibold animate-pulse">OFERTAS</span>
+          </div>
+          <div id="promosContainer" class="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-hide" style="scroll-behavior: smooth;"></div>
+        </div>
+      </div>
+
+      <!-- Seção Mais Pedidos -->
+      <div id="topProductsSection" class="mb-6 hidden">
+        <div class="bg-gradient-to-r from-rose-50 to-pink-50 rounded-xl p-4 border border-rose-200">
+          <div class="flex items-center justify-between mb-3">
+            <h2 class="text-lg font-bold text-gray-800 flex items-center">
+              <span class="mr-2">🔥</span> Mais Pedidos
+            </h2>
+            <span class="text-xs bg-rose-500 text-white px-2 py-1 rounded-full font-semibold">TOP</span>
+          </div>
+          <div id="topProductsContainer" class="grid grid-cols-2 gap-3">
+            <!-- Top products will be rendered here -->
+        </div>
+      </div>
 
       <div class="grid lg:grid-cols-3 gap-4 sm:gap-6">
         <div class="lg:col-span-2 space-y-12">
@@ -1204,6 +1339,17 @@
     </footer>
   </div>
 
+  <!-- Floating Cart Button (Mobile Only) -->
+  <div id="floatingCartButton" 
+    class="fixed bottom-4 right-4 lg:hidden hidden bg-rose-600 hover:bg-rose-700 text-white rounded-full shadow-lg flex items-center px-4 py-3 space-x-2 z-40 cursor-pointer transition-all duration-300 active:scale-95"
+    onclick="document.getElementById('cartModal').classList.remove('hidden')">
+    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path>
+    </svg>
+    <span id="floatingCartCount" class="bg-white text-rose-600 rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">0</span>
+    <span id="floatingCartTotal" class="font-semibold text-sm">R$ 0,00</span>
+  </div>
+
   <!-- Mobile Cart Modal -->
   <div id="cartModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden lg:hidden">
     <div class="fixed bottom-0 left-0 right-0 bg-white rounded-t-xl p-6 max-h-[80vh] overflow-y-auto text-gray-800">
@@ -1213,6 +1359,11 @@
       </div>
       <div id="mobileCartItems" class="space-y-3 mb-4">
         <p class="text-gray-500 text-center py-8">Carrinho vazio</p>
+      </div>
+      <!-- Upsell suggestions -->
+      <div id="upsellSection" class="hidden mb-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
+        <p class="text-xs text-blue-700 font-semibold mb-2">💡 Combina com seu pedido:</p>
+        <div id="upsellContainer" class="flex gap-2 overflow-x-auto scrollbar-hide"></div>
       </div>
       <div class="border-t pt-4">
         <div class="flex justify-between items-center mb-4"><span class="font-semibold text-gray-800">Total:</span><span
@@ -1387,6 +1538,18 @@
         </div>
       </div>
 
+      <div id="couponBox" class="mb-6">
+        <h4 class="font-semibold text-gray-800 mb-3">Cupom de desconto</h4>
+        <div class="flex gap-2">
+          <input id="couponInput" placeholder="Ex: PROMO10" class="flex-1 px-3 py-2 border rounded-lg uppercase" />
+          <button id="applyCouponBtn" type="button"
+            class="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-lg font-medium">Aplicar</button>
+          <button id="removeCouponBtn" type="button"
+            class="hidden bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg font-medium">Remover</button>
+        </div>
+        <div id="couponMessage" class="hidden mt-2 text-sm"></div>
+      </div>
+
       <div class="mb-6 p-4 bg-gray-50 rounded-lg text-gray-800">
         <h4 class="font-semibold text-gray-800 mb-2">Resumo do Pedido</h4>
         <div id="checkoutItems" class="space-y-1 text-sm">
@@ -1408,11 +1571,102 @@
         <!-- Warnings will appear here -->
       </div>
 
+      <div id="loyaltyInfoBox" class="mb-4 hidden">
+        <div class="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <p id="loyaltyInfoText" class="text-sm text-blue-900"></p>
+        </div>
+      </div>
+
       <div class="flex gap-3">
         <button id="cancelCheckout"
           class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 py-2 rounded-lg font-medium">Cancelar</button>
         <button id="confirmOrder"
           class="flex-1 bg-rose-600 hover:bg-rose-700 text-black py-2 rounded-lg font-medium">Confirmar Pedido</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="trackingModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center">
+    <div class="bg-white rounded-xl p-6 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto text-gray-800">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-xl font-bold text-gray-800">Acompanhar pedido</h3>
+        <button id="closeTrackingModalBtn" class="text-gray-500 hover:text-gray-700"><span class="text-2xl">×</span></button>
+      </div>
+
+      <div class="space-y-3 mb-4">
+        <input id="trackingOrderCode" placeholder="Código do pedido (ex: FAST-0001)" class="w-full px-3 py-2 border rounded-lg uppercase">
+        <input id="trackingPhone" placeholder="Telefone (WhatsApp)" class="w-full px-3 py-2 border rounded-lg">
+        <button id="trackOrderBtn" type="button" class="w-full bg-rose-600 hover:bg-rose-700 text-white py-3 rounded-lg font-semibold">Buscar pedido</button>
+        <div id="trackingMessage" class="hidden text-sm"></div>
+      </div>
+
+      <div id="trackingResult" class="hidden">
+        <div class="bg-gray-50 border rounded-lg p-4 mb-4">
+          <p class="text-sm text-gray-700"><strong>Código:</strong> <span id="trackingCodeLabel"></span></p>
+          <p class="text-sm text-gray-700"><strong>Status:</strong> <span id="trackingStatusLabel"></span></p>
+          <p class="text-sm text-gray-700"><strong>Estimativa:</strong> <span id="trackingEstimateLabel"></span></p>
+        </div>
+        <div id="trackingTimeline" class="space-y-2"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Rating Modal -->
+  <div id="ratingModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center">
+    <div class="bg-white rounded-xl p-6 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto text-gray-800">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="text-xl font-bold text-gray-800">⭐ Avaliar Pedido</h3>
+        <button id="closeRatingModalBtn" class="text-gray-500 hover:text-gray-700"><span class="text-2xl">×</span></button>
+      </div>
+
+      <!-- Rating Form -->
+      <div id="ratingForm">
+        <div class="bg-gray-50 border rounded-lg p-4 mb-4">
+          <p class="text-sm text-gray-700"><strong>Pedido:</strong> <span id="ratingOrderCode">-</span></p>
+        </div>
+
+        <p class="text-sm text-gray-600 mb-3 text-center">Como foi sua experiência?</p>
+        
+        <!-- Star Rating -->
+        <div id="starRating" class="flex justify-center gap-2 mb-4">
+          <button type="button" data-star="1" class="star-btn text-4xl text-gray-300 hover:text-yellow-400 transition-colors">★</button>
+          <button type="button" data-star="2" class="star-btn text-4xl text-gray-300 hover:text-yellow-400 transition-colors">★</button>
+          <button type="button" data-star="3" class="star-btn text-4xl text-gray-300 hover:text-yellow-400 transition-colors">★</button>
+          <button type="button" data-star="4" class="star-btn text-4xl text-gray-300 hover:text-yellow-400 transition-colors">★</button>
+          <button type="button" data-star="5" class="star-btn text-4xl text-gray-300 hover:text-yellow-400 transition-colors">★</button>
+        </div>
+        <input type="hidden" id="ratingValue" value="0">
+
+        <textarea id="ratingComment" rows="3" placeholder="Deixe um comentário (opcional)" 
+          class="w-full px-3 py-2 border rounded-lg resize-none mb-4"></textarea>
+
+        <button id="submitRatingBtn" type="button" 
+          class="w-full bg-rose-600 hover:bg-rose-700 text-white py-3 rounded-lg font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed" disabled>
+          Enviar Avaliação
+        </button>
+        <div id="ratingMessage" class="hidden mt-3 text-sm text-center"></div>
+      </div>
+
+      <!-- Already Rated View -->
+      <div id="ratingAlreadyDone" class="hidden">
+        <div class="text-center py-4">
+          <p class="text-5xl mb-3">✅</p>
+          <p class="font-semibold text-gray-800 mb-2">Você já avaliou este pedido!</p>
+          <div class="bg-gray-50 border rounded-lg p-4 mt-4">
+            <p class="text-sm text-gray-600 mb-2">Sua avaliação:</p>
+            <div id="existingRatingStars" class="text-2xl text-yellow-400 mb-2"></div>
+            <p id="existingRatingComment" class="text-sm text-gray-700 italic"></p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Thank You View -->
+      <div id="ratingThankYou" class="hidden">
+        <div class="text-center py-8">
+          <p class="text-5xl mb-3">🙏</p>
+          <p class="text-xl font-bold text-gray-800 mb-2">Obrigado pela avaliação!</p>
+          <p class="text-sm text-gray-600">Sua opinião é muito importante para nós.</p>
+        </div>
       </div>
     </div>
   </div>
@@ -1472,19 +1726,155 @@
     let users = [];
     let currentUserRole = null;
     let clients = [];
+    let couriers = []; // Entregadores
     let promotions = [];
     let clientDiscounts = {};
     let currentSelectedClient = null;
     let coupons = [];
+
+    let appliedCoupon = null;
 
     // Store configuration
     let storeConfig = {
       card_fee_1x: 5,
       card_fee_2x: 5,
       delivery_enabled: true,
-      delivery_disabled_reason: ''
+      delivery_disabled_reason: '',
+      max_concurrent_orders: 10,
+      high_demand_extra_time: 15
     };
     let businessHours = [];
+
+    // ========================================
+    // OFFLINE SYNC QUEUE SERVICE
+    // ========================================
+    const OfflineSyncService = {
+      QUEUE_KEY: 'fastOfflineQueue',
+
+      isOnline: function() {
+        return navigator.onLine;
+      },
+
+      getQueue: function() {
+        try {
+          return JSON.parse(localStorage.getItem(this.QUEUE_KEY) || '[]');
+        } catch (e) {
+          return [];
+        }
+      },
+
+      addToQueue: function(type, data) {
+        try {
+          const queue = this.getQueue();
+          queue.push({
+            id: Date.now(),
+            type: type, // 'order', 'status_update', 'rating'
+            data: data,
+            created_at: new Date().toISOString(),
+            retries: 0
+          });
+          localStorage.setItem(this.QUEUE_KEY, JSON.stringify(queue));
+          console.log('[OfflineSync] Added to queue:', type);
+          return true;
+        } catch (e) {
+          console.error('[OfflineSync] Error adding to queue:', e);
+          return false;
+        }
+      },
+
+      removeFromQueue: function(itemId) {
+        try {
+          const queue = this.getQueue().filter(item => item.id !== itemId);
+          localStorage.setItem(this.QUEUE_KEY, JSON.stringify(queue));
+        } catch (e) {
+          console.error('[OfflineSync] Error removing from queue:', e);
+        }
+      },
+
+      syncAll: async function() {
+        if (!this.isOnline()) {
+          console.log('[OfflineSync] Still offline, skipping sync');
+          return;
+        }
+
+        const queue = this.getQueue();
+        if (queue.length === 0) return;
+
+        console.log(`[OfflineSync] Syncing ${queue.length} items...`);
+        
+        for (const item of queue) {
+          try {
+            let success = false;
+            
+            if (item.type === 'order') {
+              const { error } = await window.supabaseClient
+                .from('fast_orders')
+                .insert(item.data);
+              success = !error;
+            } else if (item.type === 'status_update') {
+              const { error } = await window.supabaseClient
+                .from('fast_orders')
+                .update({ status: item.data.status })
+                .eq('id', item.data.order_id);
+              success = !error;
+            } else if (item.type === 'rating') {
+              const { error } = await window.supabaseClient
+                .from('fast_orders')
+                .update({ rating: item.data.rating, rating_comment: item.data.comment })
+                .eq('id', item.data.order_id);
+              success = !error;
+            }
+
+            if (success) {
+              this.removeFromQueue(item.id);
+              console.log(`[OfflineSync] Synced item ${item.id}`);
+            } else {
+              item.retries++;
+              if (item.retries >= 3) {
+                this.removeFromQueue(item.id);
+                console.warn(`[OfflineSync] Removed item ${item.id} after 3 retries`);
+              }
+            }
+          } catch (e) {
+            console.error(`[OfflineSync] Error syncing item ${item.id}:`, e);
+          }
+        }
+      },
+
+      getPendingCount: function() {
+        return this.getQueue().length;
+      },
+
+      showPendingBadge: function() {
+        const count = this.getPendingCount();
+        const badge = document.getElementById('offlinePendingBadge');
+        if (badge) {
+          if (count > 0) {
+            badge.textContent = count;
+            badge.classList.remove('hidden');
+          } else {
+            badge.classList.add('hidden');
+          }
+        }
+      }
+    };
+
+    // Listen for online/offline events
+    window.addEventListener('online', () => {
+      console.log('[OfflineSync] Back online, starting sync...');
+      OfflineSyncService.syncAll();
+    });
+
+    window.addEventListener('offline', () => {
+      console.log('[OfflineSync] Gone offline');
+    });
+
+    // Periodic sync attempt (every 30 seconds)
+    setInterval(() => {
+      if (OfflineSyncService.isOnline() && OfflineSyncService.getPendingCount() > 0) {
+        OfflineSyncService.syncAll();
+      }
+    }, 30000);
 
     // ========================================
     // ORDER HISTORY SERVICE (localStorage + Supabase)
@@ -1719,45 +2109,67 @@
     function renderRecentOrders() {
       const phone = localStorage.getItem('fastLastPhone');
       const container = document.getElementById('recentOrdersSection');
+      const repeatSection = document.getElementById('repeatLastOrderSection');
       if (!container) return;
 
       if (!phone) {
         container.classList.add('hidden');
+        repeatSection?.classList.add('hidden');
         return;
       }
 
       const history = loadOrderHistory(phone);
       if (!history.length) {
         container.classList.add('hidden');
+        repeatSection?.classList.add('hidden');
         return;
       }
 
+      // Mostrar botão "Pedir de novo" se tiver histórico
+      repeatSection?.classList.remove('hidden');
+      
       container.classList.remove('hidden');
-      container.innerHTML = `
-        <div class="bg-gradient-to-r from-rose-50 to-orange-50 rounded-xl p-4 border border-rose-100">
-          <h2 class="text-lg font-bold text-gray-800 mb-3 flex items-center">
-            <span class="mr-2">🔄</span> Seus últimos pedidos
-          </h2>
-          <div class="space-y-2">
-            ${history.slice(0, 3).map((order, idx) => {
+      
+      // Build order cards
+      const orderCards = history.slice(0, 3).map((order, idx) => {
         const resumo = order.items.slice(0, 2).map(i => `${i.quantity}x ${i.name}`).join(', ');
         const more = order.items.length > 2 ? ` +${order.items.length - 2}` : '';
         const data = safeDate(order.createdAt).toLocaleDateString('pt-BR');
         const total = (order.total || 0).toFixed(2).replace('.', ',');
         return `
-                <div class="p-3 rounded-lg bg-white border flex justify-between items-center gap-2">
-                  <div class="flex-1 min-w-0">
-                    <p class="text-xs text-gray-500">${data}</p>
-                    <p class="text-sm text-gray-800 truncate">${resumo}${more}</p>
-                    <p class="text-sm font-semibold text-rose-600">R$ ${total}</p>
-                  </div>
-                  <button onclick="repeatOrderFromHistory(${idx})" 
-                    class="bg-rose-600 hover:bg-rose-700 text-white px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap flex-shrink-0">
-                    🔄 Repetir
-                  </button>
-                </div>
-              `;
-      }).join('')}
+          <div class="flex-shrink-0 w-[280px] sm:w-auto sm:flex-1 p-3 rounded-lg bg-white border border-rose-200 shadow-sm">
+            <div class="flex flex-col h-full">
+              <div class="flex-1 min-w-0 mb-2">
+                <p class="text-xs text-gray-500 mb-1">${data}</p>
+                <p class="text-sm text-gray-800 line-clamp-2">${resumo}${more}</p>
+              </div>
+              <div class="flex items-center justify-between gap-2">
+                <p class="text-base font-bold text-rose-600">R$ ${total}</p>
+                <button onclick="repeatOrderFromHistory(${idx})" 
+                  class="bg-rose-600 hover:bg-rose-700 text-white px-3 py-2 rounded-lg text-xs font-medium whitespace-nowrap flex items-center gap-1 shadow-sm">
+                  🔄 Repetir
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+      
+      container.innerHTML = `
+        <div class="bg-gradient-to-r from-rose-50 to-orange-50 rounded-xl p-4 border border-rose-100 shadow-sm">
+          <div class="flex items-center justify-between mb-3">
+            <h2 class="text-lg font-bold text-gray-800 flex items-center">
+              <span class="mr-2">🔄</span> Peça novamente
+            </h2>
+            <span class="text-xs text-gray-500 bg-white px-2 py-1 rounded-full">Olá de volta! 👋</span>
+          </div>
+          <!-- Mobile: Horizontal scroll carousel -->
+          <div class="sm:hidden flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 snap-x snap-mandatory scrollbar-hide" style="scroll-behavior: smooth;">
+            ${orderCards}
+          </div>
+          <!-- Desktop: Vertical stack -->
+          <div class="hidden sm:flex sm:flex-col gap-2">
+            ${orderCards}
           </div>
         </div>
       `;
@@ -1871,6 +2283,32 @@
           console.warn('[Stripe] Erro ao sincronizar pagamento no retorno do Checkout:', e);
         }
         console.log('[INIT] Painel exibido com sucesso');
+
+        // Deep-link: auto-open tracking modal if ?track=FAST-xxxx&phone=...
+        try {
+          const params = new URLSearchParams(window.location.search);
+          const trackCode = params.get('track');
+          const trackPhone = params.get('phone');
+          if (trackCode && trackPhone) {
+            openTrackingModal();
+            const codeEl = document.getElementById('trackingOrderCode');
+            const phoneEl = document.getElementById('trackingPhone');
+            if (codeEl) codeEl.value = String(trackCode).toUpperCase();
+            if (phoneEl) phoneEl.value = normalizePhoneDigits(trackPhone);
+            setTimeout(() => handleTrackOrder(), 300);
+          }
+        } catch (e) { console.warn('[Tracking] Deep-link error:', e); }
+
+        // Deep-link: auto-open rating modal if ?rate=FAST-xxxx&phone=...
+        try {
+          const params = new URLSearchParams(window.location.search);
+          const rateCode = params.get('rate');
+          const ratePhone = params.get('phone');
+          if (rateCode && ratePhone) {
+            setTimeout(() => initRatingModal(rateCode, ratePhone), 500);
+          }
+        } catch (e) { console.warn('[Rating] Deep-link error:', e); }
+
       } catch (e) {
         console.error('[INIT] Erro crítico na inicialização:', e);
         // Tentar mostrar a loja pública mesmo com erro
@@ -2064,6 +2502,137 @@
         localStorage.setItem('fastClients', JSON.stringify(clients));
       }
     }
+
+    // ========================================
+    // COURIER (ENTREGADOR) MANAGEMENT
+    // ========================================
+    async function loadCouriers() {
+      try {
+        const { data, error } = await window.supabaseClient
+          .from('fast_couriers')
+          .select('*')
+          .order('name');
+        if (error) throw error;
+        couriers = data || [];
+      } catch (e) {
+        console.warn('[Couriers] Erro ao carregar do Supabase:', e);
+        const saved = localStorage.getItem('fastCouriers');
+        couriers = saved ? JSON.parse(saved) : [];
+      }
+      renderCouriersList();
+    }
+
+    async function saveCourier(courier) {
+      try {
+        const { error } = await window.supabaseClient
+          .from('fast_couriers')
+          .upsert(courier, { onConflict: 'id' });
+        if (error) throw error;
+      } catch (e) {
+        console.warn('[Couriers] Erro ao salvar no Supabase:', e);
+      }
+      localStorage.setItem('fastCouriers', JSON.stringify(couriers));
+    }
+
+    async function deleteCourier(courierId) {
+      try {
+        await window.supabaseClient
+          .from('fast_couriers')
+          .update({ active: false })
+          .eq('id', courierId);
+      } catch (e) {
+        console.warn('[Couriers] Erro ao desativar:', e);
+      }
+      couriers = couriers.filter(c => c.id !== courierId);
+      localStorage.setItem('fastCouriers', JSON.stringify(couriers));
+      renderCouriersList();
+    }
+
+    function renderCouriersList() {
+      const container = document.getElementById('couriersList');
+      if (!container) return;
+
+      const activeCouriers = couriers.filter(c => c.active !== false);
+      
+      if (activeCouriers.length === 0) {
+        container.innerHTML = '<p class="text-gray-400 text-sm text-center py-4">Nenhum entregador cadastrado</p>';
+        return;
+      }
+
+      container.innerHTML = activeCouriers.map(c => `
+        <div class="flex items-center justify-between p-2 bg-gray-50 rounded-lg border">
+          <div class="flex items-center gap-2">
+            <span class="text-lg">🏍️</span>
+            <div>
+              <p class="font-medium text-gray-800 text-sm">${c.name}</p>
+              <p class="text-xs text-gray-500">${c.phone || 'Sem telefone'}</p>
+            </div>
+          </div>
+          <div class="flex gap-1">
+            <button onclick="editCourier(${c.id})" class="text-blue-600 hover:text-blue-800 text-xs px-2 py-1">✏️</button>
+            <button onclick="confirmDeleteCourier(${c.id})" class="text-red-600 hover:text-red-800 text-xs px-2 py-1">🗑️</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function editCourier(courierId) {
+      const courier = couriers.find(c => c.id === courierId);
+      if (!courier) return;
+      document.getElementById('courierName').value = courier.name;
+      document.getElementById('courierPhone').value = courier.phone || '';
+      document.getElementById('courierEditId').value = courierId;
+    }
+
+    function confirmDeleteCourier(courierId) {
+      const courier = couriers.find(c => c.id === courierId);
+      if (confirm(`Deseja remover o entregador "${courier?.name}"?`)) {
+        deleteCourier(courierId);
+      }
+    }
+
+    function getActiveCouriers() {
+      return couriers.filter(c => c.active !== false);
+    }
+
+    // Courier form handler
+    document.getElementById('courierForm')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('courierName').value.trim();
+      const phone = document.getElementById('courierPhone').value.trim();
+      const editId = document.getElementById('courierEditId').value;
+
+      if (!name) {
+        alert('Informe o nome do entregador.');
+        return;
+      }
+
+      if (editId) {
+        // Editar existente
+        const idx = couriers.findIndex(c => c.id === parseInt(editId));
+        if (idx !== -1) {
+          couriers[idx].name = name;
+          couriers[idx].phone = phone;
+          await saveCourier(couriers[idx]);
+        }
+      } else {
+        // Novo entregador
+        const newCourier = {
+          id: Date.now(),
+          name,
+          phone,
+          active: true
+        };
+        couriers.push(newCourier);
+        await saveCourier(newCourier);
+      }
+
+      // Reset form
+      document.getElementById('courierForm').reset();
+      document.getElementById('courierEditId').value = '';
+      renderCouriersList();
+      showInlineMessage('configPanelFast', '✅ Entregador salvo!', 'success');
+    });
 
     // Função para buscar cliente – SOMENTE POR TELEFONE VÁLIDO
     function searchClient(name, phone) {
@@ -3425,6 +3994,13 @@
       hideAllAdminPanels();
       document.getElementById('loginModal').classList.remove('hidden');
       document.getElementById('publicStore').classList.add('hidden');
+      
+      // Esconder carrinho na tela de login
+      document.getElementById('cartBtn')?.classList.add('hidden');
+      document.getElementById('cartBtnDesktop')?.classList.add('hidden');
+      document.getElementById('floatingCartButton')?.classList.add('hidden');
+      document.getElementById('cartModal')?.classList.add('hidden');
+      
       const f = document.getElementById('loginForm'); if (f) { f.reset(); }
       const loginError = document.getElementById('loginError');
       if (loginError) loginError.classList.add('hidden');
@@ -3439,6 +4015,13 @@
       document.getElementById('loginModal').classList.add('hidden');
       document.getElementById('adminPanel').classList.remove('hidden');
       document.getElementById('publicStore').classList.add('hidden');
+      
+      // Esconder carrinho no painel admin
+      document.getElementById('cartBtn')?.classList.add('hidden');
+      document.getElementById('cartBtnDesktop')?.classList.add('hidden');
+      document.getElementById('floatingCartButton')?.classList.add('hidden');
+      document.getElementById('cartModal')?.classList.add('hidden');
+      
       const role = currentUserRole || sessionStorage.getItem('fastRole') || 'admin';
       // Bloquear apenas 'caixa' de acessar admin
       if (role === 'caixa') {
@@ -3451,11 +4034,23 @@
       if (usersCard) usersCard.style.display = (role === 'admin') ? 'block' : 'none';
       loadProductsAdmin();
       renderUsers();
+      
+      // Mostrar aba de Pedidos automaticamente após login
+      showPanel('ordersPanelFast');
+      loadDashboardOrders();
     }
     function showPublicStore() {
       hideAllAdminPanels();
       document.getElementById('loginModal').classList.add('hidden');
       document.getElementById('publicStore').classList.remove('hidden');
+      
+      // Mostrar carrinho na loja pública
+      document.getElementById('cartBtn')?.classList.remove('hidden');
+      document.getElementById('cartBtnDesktop')?.classList.remove('hidden');
+      
+      // Forçar atualização do FAB ao mostrar a loja
+      updateCart();
+      
       // Toggle header buttons
       const isLogged = sessionStorage.getItem('fastAdmin') === '1';
       const role = sessionStorage.getItem('fastRole');
@@ -3647,17 +4242,70 @@
 
     /**
      * Gera código de pedido no formato FAST-0001
-     * @param {string|number} orderId - ID do pedido (timestamp ou número)
+     * @param {string|number} orderIdOrSeq - ID do pedido (timestamp) ou número sequencial
      * @returns {string} Código formatado (ex: "FAST-0001")
      */
-    function formatOrderCode(orderId) {
-      if (!orderId) return 'FAST-0000';
+    function formatOrderCode(orderIdOrSeq) {
+      if (!orderIdOrSeq) return 'FAST-0000';
       
-      // Pega os últimos 4 dígitos do ID e completa com zeros à esquerda
-      const numericId = String(orderId).slice(-4);
+      // Se já é um código FAST-XXXX, retorna como está
+      if (String(orderIdOrSeq).startsWith('FAST-')) return orderIdOrSeq;
+      
+      // Se é um número sequencial pequeno (< 100000), usa diretamente
+      const num = parseInt(orderIdOrSeq, 10);
+      if (!isNaN(num) && num < 100000) {
+        return `FAST-${String(num).padStart(4, '0')}`;
+      }
+      
+      // Fallback: pega os últimos 4 dígitos do ID (timestamp)
+      const numericId = String(orderIdOrSeq).slice(-4);
       const paddedId = numericId.padStart(4, '0');
-      
       return `FAST-${paddedId}`;
+    }
+
+    /**
+     * Busca o próximo número sequencial de pedido do Supabase
+     * @returns {Promise<number>} Próximo número sequencial
+     */
+    async function getNextOrderSequence() {
+      try {
+        // Tenta buscar o maior order_sequence existente
+        const { data, error } = await window.supabaseClient
+          .from('fast_orders')
+          .select('order_sequence')
+          .not('order_sequence', 'is', null)
+          .order('order_sequence', { ascending: false })
+          .limit(1);
+
+        if (error) throw error;
+
+        const lastSeq = (data && data.length > 0 && data[0].order_sequence) ? data[0].order_sequence : 0;
+        return lastSeq + 1;
+      } catch (e) {
+        console.warn('[OrderSequence] Erro ao buscar sequência, usando fallback:', e);
+        // Fallback: usa contagem total de pedidos + 1
+        try {
+          const { count, error: countError } = await window.supabaseClient
+            .from('fast_orders')
+            .select('*', { count: 'exact', head: true });
+          
+          if (countError) throw countError;
+          return (count || 0) + 1;
+        } catch (e2) {
+          // Último fallback: usa timestamp reduzido
+          return Math.floor(Date.now() / 1000) % 10000;
+        }
+      }
+    }
+
+    /**
+     * Gera código de pedido sequencial formatado (FAST-0001, FAST-0002...)
+     * @returns {Promise<{sequence: number, code: string}>}
+     */
+    async function generateOrderCode() {
+      const sequence = await getNextOrderSequence();
+      const code = formatOrderCode(sequence);
+      return { sequence, code };
     }
 
     // Using character range instead of \p{Diacritic} for iOS/Safari compatibility
@@ -3757,18 +4405,88 @@
       }
     }
 
-    // Upload de imagem para Supabase Storage
+    // ========================================
+    // IMAGE COMPRESSION SERVICE
+    // ========================================
+    async function compressImage(file, maxWidth = 800, maxHeight = 800, quality = 0.8) {
+      return new Promise((resolve, reject) => {
+        // Se não for imagem, retornar o arquivo original
+        if (!file.type.startsWith('image/')) {
+          resolve(file);
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const img = new Image();
+          img.onload = () => {
+            // Calcular novas dimensões mantendo aspect ratio
+            let width = img.width;
+            let height = img.height;
+
+            if (width > maxWidth) {
+              height = (height * maxWidth) / width;
+              width = maxWidth;
+            }
+            if (height > maxHeight) {
+              width = (width * maxHeight) / height;
+              height = maxHeight;
+            }
+
+            // Criar canvas para redimensionar
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+
+            // Converter para blob
+            canvas.toBlob(
+              (blob) => {
+                if (blob) {
+                  const compressedFile = new File([blob], file.name, {
+                    type: 'image/jpeg',
+                    lastModified: Date.now()
+                  });
+                  
+                  const originalSize = (file.size / 1024).toFixed(1);
+                  const newSize = (compressedFile.size / 1024).toFixed(1);
+                  console.log(`[ImageCompress] ${originalSize}KB -> ${newSize}KB (${Math.round((1 - compressedFile.size / file.size) * 100)}% redução)`);
+                  
+                  resolve(compressedFile);
+                } else {
+                  resolve(file); // Fallback para original
+                }
+              },
+              'image/jpeg',
+              quality
+            );
+          };
+          img.onerror = () => resolve(file);
+          img.src = e.target.result;
+        };
+        reader.onerror = () => resolve(file);
+        reader.readAsDataURL(file);
+      });
+    }
+
+    // Upload de imagem para Supabase Storage (com compressão)
     async function uploadImageToStorage(file) {
       try {
-        const fileExt = file.name.split('.').pop();
+        // Comprimir imagem antes do upload
+        const compressedFile = await compressImage(file, 800, 800, 0.8);
+        
+        const fileExt = 'jpg'; // Sempre JPEG após compressão
         const fileName = `product_${Date.now()}.${fileExt}`;
         const filePath = `products/${fileName}`;
 
         const { data, error } = await window.supabaseClient.storage
           .from('fast-images')
-          .upload(filePath, file, {
+          .upload(filePath, compressedFile, {
             cacheControl: '3600',
-            upsert: false
+            upsert: false,
+            contentType: 'image/jpeg'
           });
 
         if (error) throw error;
@@ -4001,6 +4719,10 @@
       loadFavoritosSection();
       // Carregar últimos pedidos para clientes que retornam
       renderRecentOrders();
+      // Carregar promoções do dia
+      renderPromosSection();
+      // Carregar produtos mais pedidos (assíncrono)
+      renderTopProductsSection();
     }
 
     function loadFavoritosSection() {
@@ -4032,6 +4754,148 @@
           </div>
         </div>`;
       }).join('');
+    }
+
+    // Render promotions section in public store
+    function renderPromosSection() {
+      const section = document.getElementById('promosSection');
+      const container = document.getElementById('promosContainer');
+      if (!section || !container) return;
+
+      // Filter products with active promotions
+      const promoProducts = products.filter(p => 
+        p.promo && p.promo.active && 
+        isProductAvailableToday(p) && 
+        p.visible !== false
+      );
+
+      if (promoProducts.length === 0) {
+        section.classList.add('hidden');
+        return;
+      }
+
+      section.classList.remove('hidden');
+      
+      container.innerHTML = promoProducts.map(product => {
+        const originalPrice = product.price;
+        let discountedPrice = originalPrice;
+        let discountBadge = '';
+        
+        if (product.promo.type === 'percent') {
+          discountedPrice = originalPrice * (1 - product.promo.value / 100);
+          discountBadge = `-${product.promo.value}%`;
+        } else if (product.promo.type === 'value') {
+          discountedPrice = originalPrice - product.promo.value;
+          discountBadge = `-R$${product.promo.value.toFixed(0)}`;
+        }
+        
+        const originalDisplay = `R$ ${originalPrice.toFixed(2).replace('.', ',')}`;
+        const discountedDisplay = `R$ ${discountedPrice.toFixed(2).replace('.', ',')}`;
+        const isFav = FavoritesService.isFavorite(currentClientPhone, product.id);
+        const heartIcon = isFav ? '❤️' : '🤍';
+        
+        return `
+          <div class="flex-shrink-0 w-[200px] bg-white rounded-xl shadow-sm border border-yellow-200 p-3 snap-start relative">
+            <div class="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full shadow">${discountBadge}</div>
+            <div class="flex items-center mb-2">
+              ${product.image ? `<img src="${product.image}" class="w-12 h-12 object-cover rounded mr-2">` : `<span class="text-2xl mr-2">${product.emoji}</span>`}
+              <div class="flex-1 min-w-0">
+                <h3 class="font-semibold text-gray-800 text-sm truncate">${product.name}</h3>
+              </div>
+            </div>
+            <div class="flex items-center justify-between gap-2">
+              <div class="flex flex-col">
+                <span class="text-xs text-gray-400 line-through">${originalDisplay}</span>
+                <span class="text-rose-600 text-base font-bold">${discountedDisplay}</span>
+              </div>
+              <button class="add-to-cart bg-rose-600 hover:bg-rose-700 text-white px-2 py-1 rounded-lg text-xs font-medium" 
+                data-id="${product.id}" data-name="${product.name}" data-description="${product.description}" data-price="${discountedPrice}">
+                +
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Calcular e renderizar produtos mais pedidos
+    async function renderTopProductsSection() {
+      const section = document.getElementById('topProductsSection');
+      const container = document.getElementById('topProductsContainer');
+      if (!section || !container) return;
+
+      try {
+        // Buscar pedidos dos últimos 30 dias para calcular ranking
+        const now = new Date();
+        const startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 30).toISOString();
+
+        const { data: orders, error } = await window.supabaseClient
+          .from('fast_orders')
+          .select('items')
+          .gte('created_at', startDate)
+          .neq('status', 'cancelled');
+
+        if (error) throw error;
+
+        // Contabilizar produtos pedidos
+        const productCounts = {};
+        (orders || []).forEach(order => {
+          (order.items || []).forEach(item => {
+            const productId = item.id;
+            if (productId) {
+              productCounts[productId] = (productCounts[productId] || 0) + (item.quantity || 1);
+            }
+          });
+        });
+
+        // Ordenar por quantidade e pegar top 5
+        const topProductIds = Object.entries(productCounts)
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 5)
+          .map(([id]) => parseInt(id, 10) || id);
+
+        // Buscar dados dos produtos
+        const topProducts = topProductIds
+          .map(id => products.find(p => p.id === id || p.id === String(id)))
+          .filter(p => p && p.visible !== false && isProductAvailableToday(p));
+
+        if (topProducts.length < 3) {
+          section.classList.add('hidden');
+          return;
+        }
+
+        section.classList.remove('hidden');
+
+        container.innerHTML = topProducts.map((product, index) => {
+          const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
+          const medal = medals[index] || '';
+          const priceDisplay = `R$ ${product.price.toFixed(2).replace('.', ',')}`;
+          const isFav = FavoritesService.isFavorite(currentClientPhone, product.id);
+          const heartIcon = isFav ? '❤️' : '🤍';
+
+          return `
+            <div class="bg-white rounded-xl shadow-sm border border-rose-200 p-3 relative">
+              <div class="absolute -top-2 -left-2 text-2xl">${medal}</div>
+              <div class="flex items-center mb-2">
+                ${product.image ? `<img src="${product.image}" class="w-12 h-12 object-cover rounded mr-2">` : `<span class="text-2xl mr-2">${product.emoji}</span>`}
+                <div class="flex-1 min-w-0">
+                  <h3 class="font-semibold text-gray-800 text-sm truncate">${product.name}</h3>
+                </div>
+              </div>
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-rose-600 text-base font-bold">${priceDisplay}</span>
+                <button class="add-to-cart bg-rose-600 hover:bg-rose-700 text-white px-2 py-1 rounded-lg text-xs font-medium" 
+                  data-id="${product.id}" data-name="${product.name}" data-description="${product.description}" data-price="${product.price}">
+                  +
+                </button>
+              </div>
+            </div>
+          `;
+        }).join('');
+      } catch (e) {
+        console.warn('[TopProducts] Erro ao carregar:', e);
+        section.classList.add('hidden');
+      }
     }
 
     function loadFilteredProducts(filter) {
@@ -4260,7 +5124,120 @@
         setTimeout(() => { e.target.textContent = 'Adicionar'; e.target.classList.remove('bg-green-600'); e.target.classList.add('bg-rose-600'); }, 1000);
       }
     });
-    function updateCart() { cartTotal = cart.reduce((t, i) => t + i.price * i.quantity, 0); const count = cart.reduce((t, i) => t + i.quantity, 0); document.getElementById('cartCount').textContent = count; const desktopCount = document.getElementById('cartCountDesktop'); if (desktopCount) desktopCount.textContent = count; const total = `R$ ${cartTotal.toFixed(2).replace('.', ',')}`; document.getElementById('cartTotal').textContent = total; document.getElementById('mobileCartTotal').textContent = total; updateCartItems('cartItems'); updateCartItems('mobileCartItems'); const has = cart.length > 0; document.getElementById('checkoutBtn').disabled = !has; document.getElementById('mobileCheckoutBtn').disabled = !has; }
+    function updateCart() { 
+      cartTotal = cart.reduce((t, i) => t + i.price * i.quantity, 0); 
+      const count = cart.reduce((t, i) => t + i.quantity, 0); 
+      document.getElementById('cartCount').textContent = count; 
+      const desktopCount = document.getElementById('cartCountDesktop'); 
+      if (desktopCount) desktopCount.textContent = count; 
+      const total = `R$ ${cartTotal.toFixed(2).replace('.', ',')}`; 
+      document.getElementById('cartTotal').textContent = total; 
+      document.getElementById('mobileCartTotal').textContent = total; 
+      updateCartItems('cartItems'); 
+      updateCartItems('mobileCartItems'); 
+      const has = cart.length > 0; 
+      document.getElementById('checkoutBtn').disabled = !has; 
+      document.getElementById('mobileCheckoutBtn').disabled = !has;
+      
+      // Update floating cart button (mobile)
+      const floatingBtn = document.getElementById('floatingCartButton');
+      if (floatingBtn) {
+        const hasItems = cart.length > 0;
+
+        if (hasItems) {
+          floatingBtn.classList.remove('hidden');
+          floatingBtn.style.display = 'flex';
+          const countEl = document.getElementById('floatingCartCount');
+          const totalEl = document.getElementById('floatingCartTotal');
+
+          if (countEl) countEl.textContent = count;
+          if (totalEl) totalEl.textContent = total;
+        } else {
+          floatingBtn.classList.add('hidden');
+          floatingBtn.style.display = 'none';
+        }
+      }
+      
+      // Persist cart to localStorage
+      try { localStorage.setItem('fastCart', JSON.stringify(cart)); } catch(e) {}
+      
+      // Update upsell suggestions
+      renderUpsellSuggestions();
+    }
+    
+    // Render upsell suggestions based on cart contents
+    function renderUpsellSuggestions() {
+      const section = document.getElementById('upsellSection');
+      const container = document.getElementById('upsellContainer');
+      if (!section || !container) return;
+      
+      if (cart.length === 0) {
+        section.classList.add('hidden');
+        return;
+      }
+      
+      // Get categories in cart
+      const cartProductIds = cart.map(item => item.id);
+      const cartProducts = products.filter(p => cartProductIds.includes(p.id));
+      const cartCategories = [...new Set(cartProducts.map(p => p.category))];
+      
+      // Define complementary categories
+      const complementMap = {
+        'salgados': ['bebidas', 'adicionais'],
+        'mini': ['bebidas', 'adicionais'],
+        'kits': ['bebidas', 'adicionais'],
+        'bolos': ['bebidas'],
+        'bebidas': ['salgados', 'adicionais'],
+        'adicionais': ['bebidas']
+      };
+      
+      // Find complementary products not in cart
+      let suggestCategories = [];
+      cartCategories.forEach(cat => {
+        if (complementMap[cat]) {
+          suggestCategories.push(...complementMap[cat]);
+        }
+      });
+      suggestCategories = [...new Set(suggestCategories)].filter(cat => !cartCategories.includes(cat));
+      
+      if (suggestCategories.length === 0) {
+        section.classList.add('hidden');
+        return;
+      }
+      
+      // Get up to 3 suggestions from complementary categories
+      const suggestions = products
+        .filter(p => 
+          suggestCategories.includes(p.category) && 
+          !cartProductIds.includes(p.id) && 
+          isProductAvailableToday(p) && 
+          p.visible !== false
+        )
+        .slice(0, 3);
+      
+      if (suggestions.length === 0) {
+        section.classList.add('hidden');
+        return;
+      }
+      
+      section.classList.remove('hidden');
+      container.innerHTML = suggestions.map(product => {
+        const priceDisplay = `R$ ${product.price.toFixed(2).replace('.', ',')}`;
+        return `
+          <div class="flex-shrink-0 bg-white rounded-lg p-2 border shadow-sm min-w-[120px]">
+            <div class="flex items-center gap-2 mb-1">
+              ${product.image ? `<img src="${product.image}" class="w-8 h-8 object-cover rounded">` : `<span class="text-lg">${product.emoji}</span>`}
+              <span class="text-xs font-medium text-gray-800 truncate flex-1">${product.name}</span>
+            </div>
+            <div class="flex items-center justify-between">
+              <span class="text-xs text-rose-600 font-bold">${priceDisplay}</span>
+              <button class="add-to-cart bg-blue-500 hover:bg-blue-600 text-white px-2 py-1 rounded text-xs" 
+                data-id="${product.id}" data-name="${product.name}" data-description="${product.description || ''}" data-price="${product.price}">+</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
     function updateCartItems(containerId) {
       const container = document.getElementById(containerId);
 
@@ -4497,6 +5474,7 @@
       const phone = document.getElementById('customerPhone').value.trim();
       if (phone && phone.length >= 10) {
         renderSavedAddresses(phone);
+        updateLoyaltyUI(phone);
       }
     });
 
@@ -4569,7 +5547,536 @@
       } catch (e) {}
       updateCheckoutFeeAndTotalFast();
       showLastOrders(); // Mostrar últimos pedidos para recompra rápida
+      updateLoyaltyUI(document.getElementById('customerPhone')?.value);
       document.getElementById('checkoutModal').classList.remove('hidden');
+    }
+
+    // ========================================
+    // TRACKING ORDER MODAL LOGIC
+    // ========================================
+    function normalizePhoneDigits(phone) {
+      const digits = String(phone || '').replace(/\D/g, '');
+      if (digits.length === 13 && digits.startsWith('55')) return digits.slice(2);
+      return digits;
+    }
+
+    function openTrackingModal() {
+      document.getElementById('trackingModal')?.classList.remove('hidden');
+    }
+
+    function closeTrackingModal() {
+      document.getElementById('trackingModal')?.classList.add('hidden');
+    }
+
+    function setTrackingMessage(text, type) {
+      const box = document.getElementById('trackingMessage');
+      if (!box) return;
+      box.classList.remove('hidden');
+      box.textContent = text;
+      box.className = 'mt-2 text-sm';
+      if (type === 'success') box.classList.add('text-green-700');
+      else if (type === 'error') box.classList.add('text-red-700');
+      else box.classList.add('text-gray-700');
+    }
+
+    function hideTrackingMessage() {
+      const box = document.getElementById('trackingMessage');
+      if (!box) return;
+      box.classList.add('hidden');
+      box.textContent = '';
+    }
+
+    function buildTrackingLink(orderId, phone) {
+      const code = formatOrderCode(orderId);
+      const phoneDigits = normalizePhoneDigits(phone);
+      const baseUrl = `${window.location.origin}${window.location.pathname}`;
+      return `${baseUrl}?track=${encodeURIComponent(code)}&phone=${encodeURIComponent(phoneDigits)}`;
+    }
+
+    function getTrackingStepIndex(status) {
+      const st = String(status || '').toLowerCase();
+      if (st === 'cancelled' || st === 'cancelado') return -1;
+      const mapped = (typeof MsgTemplateService !== 'undefined' && MsgTemplateService?.statusMap && MsgTemplateService.statusMap[st]) ? MsgTemplateService.statusMap[st] : st;
+      const pt = String(mapped || '').toLowerCase();
+      if (pt === 'recebido' || st === 'pending') return 0;
+      if (pt === 'em_preparo' || st === 'preparing' || pt === 'aceito' || st === 'accepted') return 1;
+      if (pt === 'pronto' || st === 'confirmed') return 2;
+      if (pt === 'saiu_entrega' || st === 'out_for_delivery') return 3;
+      if (pt === 'entregue' || st === 'delivered') return 4;
+      return 0;
+    }
+
+    function getTrackingStatusLabel(status) {
+      const st = String(status || '').toLowerCase();
+      if (typeof STATUS_LABELS !== 'undefined' && STATUS_LABELS[st]) {
+        return `${STATUS_LABELS[st].emoji} ${STATUS_LABELS[st].label}`;
+      }
+      const mapped = (typeof MsgTemplateService !== 'undefined' && MsgTemplateService?.statusMap && MsgTemplateService.statusMap[st]) ? MsgTemplateService.statusMap[st] : st;
+      const pt = String(mapped || '').toLowerCase();
+      const labelsPt = {
+        recebido: '🆕 Recebido',
+        aceito: '✅ Aceito',
+        em_preparo: '🍳 Em Preparo',
+        pronto: '✅ Pronto',
+        saiu_entrega: '🚚 Saiu para entrega',
+        entregue: '✔️ Entregue',
+        cancelado: '❌ Cancelado'
+      };
+      return labelsPt[pt] || (status || 'Recebido');
+    }
+
+    function getTrackingEstimate(order) {
+      const prepMin = storeConfig.prep_time_min || storeConfig.prepTimeMin || 20;
+      const prepMax = storeConfig.prep_time_max || storeConfig.prepTimeMax || 40;
+      const delMin = storeConfig.delivery_time_min || storeConfig.deliveryTimeMin || 0;
+      const delMax = storeConfig.delivery_time_max || storeConfig.deliveryTimeMax || 0;
+      const isDelivery = (order?.delivery_type || '') === 'entrega';
+      if (!isDelivery) return `${prepMin}-${prepMax} min`;
+      if (!delMin && !delMax) return `${prepMin}-${prepMax} min`;
+      return `Preparo: ${prepMin}-${prepMax} min | Entrega: ${delMin}-${delMax} min`;
+    }
+
+    function renderTrackingTimeline(status) {
+      const steps = [
+        { label: 'Recebido' },
+        { label: 'Em preparo' },
+        { label: 'Pronto' },
+        { label: 'Saiu para entrega' },
+        { label: 'Entregue' }
+      ];
+      const idx = getTrackingStepIndex(status);
+      const container = document.getElementById('trackingTimeline');
+      if (!container) return;
+
+      if (idx < 0) {
+        container.innerHTML = '<div class="p-3 rounded-lg bg-red-50 border border-red-200 text-red-800 text-sm">❌ Pedido cancelado</div>';
+        return;
+      }
+
+      container.innerHTML = steps.map((s, i) => {
+        const done = i < idx;
+        const current = i === idx;
+        const base = 'flex items-center gap-3 p-3 rounded-lg border';
+        const cls = done ? 'bg-green-50 border-green-200 text-green-800' : current ? 'bg-yellow-50 border-yellow-200 text-yellow-900' : 'bg-gray-50 border-gray-200 text-gray-600';
+        const icon = done ? '✅' : current ? '🟡' : '⚪';
+        return `<div class="${base} ${cls}"><span class="text-lg">${icon}</span><span class="font-medium">${s.label}</span></div>`;
+      }).join('');
+    }
+
+    async function fetchOrderForTracking(orderCode, phoneDigits) {
+      const code = String(orderCode || '').trim().toUpperCase();
+      const phone = normalizePhoneDigits(phoneDigits);
+      if (!code || !phone) return null;
+
+      if (window.supabaseClient) {
+        try {
+          const { data, error } = await window.supabaseClient
+            .from('fast_orders')
+            .select('*')
+            .eq('client_phone', phone)
+            .order('created_at', { ascending: false })
+            .limit(50);
+
+          if (error) throw error;
+          
+          // Busca por order_code (sequencial) ou por formatOrderCode (timestamp)
+          const found = (data || []).find(o => 
+            o.order_code === code || 
+            formatOrderCode(o.order_sequence || o.id) === code
+          );
+          if (found) return found;
+        } catch (e) {
+          console.warn('[Tracking] Falha ao buscar no Supabase:', e);
+        }
+      }
+
+      try {
+        const history = loadOrderHistory(phone);
+        const foundLocal = (history || []).find(o => 
+          o.orderCode === code || 
+          formatOrderCode(o.orderSequence || o.id) === code
+        );
+        if (foundLocal) {
+          return {
+            id: foundLocal.id,
+            order_code: foundLocal.orderCode,
+            order_sequence: foundLocal.orderSequence,
+            client_phone: phone,
+            delivery_type: foundLocal.deliveryType || 'retirada',
+            status: 'pending',
+            created_at: foundLocal.createdAt || new Date().toISOString()
+          };
+        }
+      } catch (e2) {}
+
+      return null;
+    }
+
+    async function handleTrackOrder() {
+      hideTrackingMessage();
+      document.getElementById('trackingResult')?.classList.add('hidden');
+
+      const code = document.getElementById('trackingOrderCode')?.value?.trim();
+      const phoneRaw = document.getElementById('trackingPhone')?.value?.trim();
+      const phone = normalizePhoneDigits(phoneRaw);
+
+      if (!code) {
+        setTrackingMessage('Informe o código do pedido.', 'error');
+        return;
+      }
+
+      if (!phone || phone.length !== 11) {
+        setTrackingMessage('Informe um telefone válido com 11 dígitos (DDD + 9).', 'error');
+        return;
+      }
+
+      setTrackingMessage('Buscando pedido...', 'info');
+      const order = await fetchOrderForTracking(code, phone);
+
+      if (!order) {
+        setTrackingMessage('Pedido não encontrado. Verifique o código e o telefone.', 'error');
+        return;
+      }
+
+      setTrackingMessage('Pedido encontrado!', 'success');
+      const codeLabel = document.getElementById('trackingCodeLabel');
+      const statusLabel = document.getElementById('trackingStatusLabel');
+      const estLabel = document.getElementById('trackingEstimateLabel');
+
+      if (codeLabel) codeLabel.textContent = order.order_code || formatOrderCode(order.order_sequence || order.id);
+      if (statusLabel) statusLabel.textContent = getTrackingStatusLabel(order.status);
+      if (estLabel) estLabel.textContent = getTrackingEstimate(order);
+
+      renderTrackingTimeline(order.status);
+      document.getElementById('trackingResult')?.classList.remove('hidden');
+    }
+
+    document.getElementById('openTrackingModalBtn')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      openTrackingModal();
+    });
+
+    // Botão "Pedir de novo" - repete último pedido
+    document.getElementById('repeatLastOrderBtn')?.addEventListener('click', () => {
+      repeatOrderFromHistory(0);
+      // Abrir modal do carrinho após carregar itens
+      setTimeout(() => {
+        document.getElementById('cartModal')?.classList.remove('hidden');
+      }, 100);
+    });
+
+    document.getElementById('closeTrackingModalBtn')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      closeTrackingModal();
+    });
+
+    document.getElementById('trackOrderBtn')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      handleTrackOrder();
+    });
+
+    document.getElementById('trackingPhone')?.addEventListener('input', (e) => {
+      e.target.value = normalizePhoneDigits(e.target.value);
+    });
+
+    // ========================================
+    // RATING SYSTEM
+    // ========================================
+    let currentRatingOrderId = null;
+    let currentRatingPhone = null;
+
+    function openRatingModal() {
+      document.getElementById('ratingModal')?.classList.remove('hidden');
+    }
+
+    function closeRatingModal() {
+      document.getElementById('ratingModal')?.classList.add('hidden');
+      resetRatingModal();
+    }
+
+    function resetRatingModal() {
+      document.getElementById('ratingForm')?.classList.remove('hidden');
+      document.getElementById('ratingAlreadyDone')?.classList.add('hidden');
+      document.getElementById('ratingThankYou')?.classList.add('hidden');
+      document.getElementById('ratingValue').value = '0';
+      document.getElementById('ratingComment').value = '';
+      document.getElementById('submitRatingBtn').disabled = true;
+      document.getElementById('ratingMessage')?.classList.add('hidden');
+      updateStarDisplay(0);
+      currentRatingOrderId = null;
+      currentRatingPhone = null;
+    }
+
+    function updateStarDisplay(rating) {
+      document.querySelectorAll('#starRating .star-btn').forEach((btn, i) => {
+        btn.classList.toggle('text-yellow-400', i < rating);
+        btn.classList.toggle('text-gray-300', i >= rating);
+      });
+    }
+
+    function setRatingMessage(text, type) {
+      const box = document.getElementById('ratingMessage');
+      if (!box) return;
+      box.classList.remove('hidden');
+      box.textContent = text;
+      box.className = 'mt-3 text-sm text-center';
+      if (type === 'success') box.classList.add('text-green-700');
+      else if (type === 'error') box.classList.add('text-red-700');
+      else box.classList.add('text-gray-600');
+    }
+
+    async function loadOrderForRating(orderCode, phone) {
+      const code = String(orderCode || '').trim().toUpperCase();
+      const phoneDigits = normalizePhoneDigits(phone);
+      
+      if (!code || !phoneDigits) {
+        setRatingMessage('Código do pedido ou telefone inválido.', 'error');
+        return null;
+      }
+
+      try {
+        const { data, error } = await window.supabaseClient
+          .from('fast_orders')
+          .select('*')
+          .eq('client_phone', phoneDigits)
+          .order('created_at', { ascending: false })
+          .limit(50);
+
+        if (error) throw error;
+
+        const order = (data || []).find(o => 
+          o.order_code === code || 
+          formatOrderCode(o.order_sequence || o.id) === code
+        );
+
+        return order || null;
+      } catch (e) {
+        console.error('[Rating] Erro ao buscar pedido:', e);
+        return null;
+      }
+    }
+
+    async function initRatingModal(orderCode, phone) {
+      openRatingModal();
+      setRatingMessage('Buscando pedido...', 'info');
+
+      const order = await loadOrderForRating(orderCode, phone);
+
+      if (!order) {
+        setRatingMessage('Pedido não encontrado. Verifique o código e telefone.', 'error');
+        return;
+      }
+
+      currentRatingOrderId = order.id;
+      currentRatingPhone = phone;
+      
+      const displayCode = order.order_code || formatOrderCode(order.order_sequence || order.id);
+      document.getElementById('ratingOrderCode').textContent = displayCode;
+
+      // Check if already rated
+      if (order.rating && order.rating > 0) {
+        showExistingRating(order.rating, order.rating_comment);
+        return;
+      }
+
+      document.getElementById('ratingMessage')?.classList.add('hidden');
+    }
+
+    function showExistingRating(rating, comment) {
+      document.getElementById('ratingForm')?.classList.add('hidden');
+      document.getElementById('ratingAlreadyDone')?.classList.remove('hidden');
+      document.getElementById('existingRatingStars').textContent = '★'.repeat(rating) + '☆'.repeat(5 - rating);
+      document.getElementById('existingRatingComment').textContent = comment || 'Sem comentário';
+    }
+
+    async function submitRating() {
+      const rating = parseInt(document.getElementById('ratingValue').value, 10);
+      const comment = document.getElementById('ratingComment').value.trim();
+
+      if (!rating || rating < 1 || rating > 5) {
+        setRatingMessage('Selecione uma nota de 1 a 5 estrelas.', 'error');
+        return;
+      }
+
+      if (!currentRatingOrderId) {
+        setRatingMessage('Pedido não identificado.', 'error');
+        return;
+      }
+
+      try {
+        const { error } = await window.supabaseClient
+          .from('fast_orders')
+          .update({ rating, rating_comment: comment })
+          .eq('id', currentRatingOrderId);
+
+        if (error) throw error;
+
+        document.getElementById('ratingForm')?.classList.add('hidden');
+        document.getElementById('ratingThankYou')?.classList.remove('hidden');
+      } catch (e) {
+        console.error('[Rating] Erro ao salvar:', e);
+        setRatingMessage('Erro ao salvar avaliação. Tente novamente.', 'error');
+      }
+    }
+
+    // Star rating click handlers
+    document.querySelectorAll('#starRating .star-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const star = parseInt(btn.dataset.star, 10);
+        document.getElementById('ratingValue').value = star;
+        updateStarDisplay(star);
+        document.getElementById('submitRatingBtn').disabled = false;
+      });
+    });
+
+    document.getElementById('closeRatingModalBtn')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      closeRatingModal();
+    });
+
+    document.getElementById('submitRatingBtn')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      submitRating();
+    });
+
+    // Build rating link
+    function buildRatingLink(orderCode, phone) {
+      const phoneDigits = normalizePhoneDigits(phone);
+      const baseUrl = `${window.location.origin}${window.location.pathname}`;
+      return `${baseUrl}?rate=${encodeURIComponent(orderCode)}&phone=${encodeURIComponent(phoneDigits)}`;
+    }
+
+    // ========================================
+    // COUPON LOGIC (CHECKOUT)
+    // ========================================
+    function setCouponMessage(text, type) {
+      const box = document.getElementById('couponMessage');
+      if (!box) return;
+      box.classList.remove('hidden');
+      box.textContent = text;
+      box.className = 'mt-2 text-sm';
+      if (type === 'success') box.classList.add('text-green-700');
+      else if (type === 'error') box.classList.add('text-red-700');
+      else box.classList.add('text-gray-700');
+    }
+
+    function hideCouponMessage() {
+      const box = document.getElementById('couponMessage');
+      if (!box) return;
+      box.classList.add('hidden');
+      box.textContent = '';
+    }
+
+    function findValidCouponByCode(code) {
+      const c = String(code || '').trim().toUpperCase();
+      if (!c) return null;
+      const coupon = (coupons || []).find(x => String(x.code || '').toUpperCase() === c);
+      if (!coupon) return null;
+      if (coupon.active === false) return null;
+      if (typeof isCouponExpired === 'function' && isCouponExpired(coupon)) return null;
+      if (typeof isCouponExhausted === 'function' && isCouponExhausted(coupon)) return null;
+      return coupon;
+    }
+
+    function computeCouponDiscount(baseAmount, coupon) {
+      if (!coupon) return 0;
+      const base = Math.max(0, Number(baseAmount || 0));
+      if (base <= 0) return 0;
+      let discount = 0;
+      if (coupon.type === 'percentage') discount = base * (Number(coupon.value || 0) / 100);
+      else if (coupon.type === 'fixed') discount = Number(coupon.value || 0);
+      if (coupon.maxValue != null && !isNaN(coupon.maxValue)) {
+        discount = Math.min(discount, Number(coupon.maxValue));
+      }
+      discount = Math.min(discount, base);
+      discount = Math.max(0, discount);
+      return discount;
+    }
+
+    function clearAppliedCoupon() {
+      appliedCoupon = null;
+      const input = document.getElementById('couponInput');
+      const removeBtn = document.getElementById('removeCouponBtn');
+      const applyBtn = document.getElementById('applyCouponBtn');
+      if (input) input.value = '';
+      if (removeBtn) removeBtn.classList.add('hidden');
+      if (applyBtn) applyBtn.classList.remove('hidden');
+      hideCouponMessage();
+      const row = document.getElementById('couponDiscountRow');
+      if (row) row.remove();
+    }
+
+    function applyCouponFromInput() {
+      hideCouponMessage();
+      const input = document.getElementById('couponInput');
+      const code = input?.value?.trim()?.toUpperCase();
+
+      if (!code) {
+        setCouponMessage('Digite um cupom para aplicar.', 'error');
+        return;
+      }
+
+      const coupon = findValidCouponByCode(code);
+      if (!coupon) {
+        setCouponMessage('Cupom inválido, vencido ou indisponível.', 'error');
+        return;
+      }
+
+      if (coupon.minOrder && cartTotal < coupon.minOrder) {
+        setCouponMessage(`Este cupom exige pedido mínimo de R$ ${Number(coupon.minOrder).toFixed(2).replace('.', ',')}.`, 'error');
+        return;
+      }
+
+      appliedCoupon = coupon;
+      const removeBtn = document.getElementById('removeCouponBtn');
+      const applyBtn = document.getElementById('applyCouponBtn');
+      if (removeBtn) removeBtn.classList.remove('hidden');
+      if (applyBtn) applyBtn.classList.add('hidden');
+      setCouponMessage(`Cupom ${coupon.code} aplicado!`, 'success');
+      updateCheckoutFeeAndTotalFast();
+    }
+
+    function removeAppliedCoupon() {
+      clearAppliedCoupon();
+      updateCheckoutFeeAndTotalFast();
+    }
+
+    document.getElementById('applyCouponBtn')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      applyCouponFromInput();
+    });
+
+    document.getElementById('removeCouponBtn')?.addEventListener('click', (e) => {
+      e.preventDefault();
+      removeAppliedCoupon();
+    });
+
+    // ========================================
+    // LOYALTY UI (CHECKOUT)
+    // ========================================
+    function updateLoyaltyUI(phone) {
+      const box = document.getElementById('loyaltyInfoBox');
+      const textEl = document.getElementById('loyaltyInfoText');
+      if (!box || !textEl) return;
+
+      const digits = normalizePhoneDigits(phone);
+      if (!digits || digits.length !== 11) {
+        box.classList.add('hidden');
+        return;
+      }
+
+      const history = loadOrderHistory(digits);
+      const count = Array.isArray(history) ? history.length : 0;
+
+      let text = `Você já fez ${count} pedido${count !== 1 ? 's' : ''} conosco.`;
+      if (count < 10) {
+        text += ` Faltam ${10 - count} pedidos para desbloquear um desconto especial!`;
+      } else {
+        text += ' 🌟 Você faz parte do nosso grupo de clientes VIP!';
+      }
+
+      textEl.textContent = text;
+      box.classList.remove('hidden');
     }
 
     document.addEventListener('change', (e) => {
@@ -4643,7 +6150,7 @@
       }
     });
     document.getElementById('cancelCheckout')?.addEventListener('click', () => document.getElementById('checkoutModal').classList.add('hidden'));
-    document.getElementById('confirmOrder')?.addEventListener('click', () => {
+    document.getElementById('confirmOrder')?.addEventListener('click', async () => {
       const warnings = document.getElementById('validationWarnings'); warnings.innerHTML = ''; warnings.classList.add('hidden');
       const payment = document.querySelector('input[name="payment"]:checked'); const delivery = document.querySelector('input[name="delivery"]:checked');
 
@@ -4705,7 +6212,12 @@
       }
       function showWarning(txt) { const w = document.getElementById('validationWarnings'); w.innerHTML = `<div class='p-3 bg-red-100 border border-red-400 text-red-900 rounded-lg text-sm'>${txt}</div>`; w.classList.remove('hidden'); }
 
+      // Gerar código sequencial do pedido
+      const { sequence: orderSequence, code: orderCode } = await generateOrderCode();
+      const orderId = Date.now();
+      
       let msg = `🥟 *Pedido Fast Savory's*\n\n`;
+      msg += `🧾 *Código:* ${orderCode}\n`;
       msg += `👤 *Cliente:* ${customerName}\n`;
       msg += `📱 *Telefone:* ${customerPhone}\n\n`;
 
@@ -4793,7 +6305,22 @@
         msg += `🎂 Desconto Aniversariante (10%): -R$ ${birthdayDiscount.toFixed(2).replace('.', ',')}\n`;
       }
 
-      const totalWithFees = cartTotal + deliveryFeeMsg + cardFeeMsg - productDiscount - clientDiscount - birthdayDiscount;
+      // Coupon discount
+      let couponDiscountMsg = 0;
+      let appliedCouponCode = null;
+      if (appliedCoupon) {
+        const validCoupon = findValidCouponByCode(appliedCoupon.code);
+        if (validCoupon && (!validCoupon.minOrder || cartTotal >= validCoupon.minOrder)) {
+          const baseForCoupon = cartTotal - productDiscount - clientDiscount - birthdayDiscount;
+          couponDiscountMsg = computeCouponDiscount(baseForCoupon, validCoupon);
+          appliedCouponCode = validCoupon.code;
+          if (couponDiscountMsg > 0) {
+            msg += `🎟️ Cupom (${validCoupon.code}): -R$ ${couponDiscountMsg.toFixed(2).replace('.', ',')}\n`;
+          }
+        }
+      }
+
+      const totalWithFees = cartTotal + deliveryFeeMsg + cardFeeMsg - productDiscount - clientDiscount - birthdayDiscount - couponDiscountMsg;
       msg += `\n*Total: R$ ${totalWithFees.toFixed(2).replace('.', ',')}*\n\n`;
       const paymentMap = { dinheiro: '💵 Dinheiro', cartao1x: '💳 Cartão 1x', pix: '📱 PIX' }; msg += `*Pagamento:* ${paymentMap[payment.value] || payment.value}\n`;
       // Aviso especial para pagamento em cartão
@@ -4816,6 +6343,7 @@
         msg += `\n\u26a0\ufe0f *Encomenda:* Pedido fora do hor\u00e1rio. Antec\u00eadencia m\u00ednima de 1 dia e 50% de entrada.\n*Data da encomenda:* ${od}\n*Hor\u00e1rio:* ${ot}\n`;
       }
       msg += `\n⚠️ *Este pedido só será válido após a confirmação da Fast Savory's.*\n\n`;
+      msg += `🔍 *Acompanhar pedido:* ${buildTrackingLink(orderCode, customerPhone)}\n\n`;
       msg += `📞 *Contato:* (73) 99936-6554\n\nObrigado pelo seu pedido! 😊`;
 
       // Save client if not exists
@@ -4870,7 +6398,9 @@
 
       // Save order to Supabase for analytics
       const orderData = {
-        id: Date.now(),
+        id: orderId,
+        order_sequence: orderSequence,
+        order_code: orderCode,
         client_name: customerName,
         client_phone: customerPhone,
         items: cart.map(i => ({
@@ -4882,7 +6412,9 @@
         subtotal: cartTotal,
         delivery_fee: deliveryFeeMsg,
         card_fee: cardFeeMsg,
-        discount: productDiscount + clientDiscount + birthdayDiscount,
+        discount: productDiscount + clientDiscount + birthdayDiscount + couponDiscountMsg,
+        coupon_code: appliedCouponCode,
+        coupon_discount: couponDiscountMsg,
         total: totalWithFees,
         payment_method: payment.value,
         delivery_type: delivery.value,
@@ -4943,6 +6475,7 @@
 
         // Limpar dados do checkout após envio
         clearCheckoutData();
+        clearAppliedCoupon();
 
         cart = []; updateCart(); document.getElementById('checkoutModal').classList.add('hidden');
         showInlineMessage('publicStore', '✅ Pedido enviado para o WhatsApp!', 'success');
@@ -5104,6 +6637,7 @@
 
       // Clear checkout
       clearCheckoutData();
+      clearAppliedCoupon();
       cart = [];
       updateCart();
       document.getElementById('checkoutModal').classList.add('hidden');
@@ -5318,7 +6852,41 @@
         clientDiscountRow.remove();
       }
 
-      const total = cartTotal + (isNaN(deliveryFee) ? 0 : deliveryFee) + cardFee - productDiscount - clientDiscount;
+      // Calculate coupon discount
+      let couponDiscount = 0;
+      const couponDiscountRow = document.getElementById('couponDiscountRow');
+      if (appliedCoupon) {
+        const validCoupon = findValidCouponByCode(appliedCoupon.code);
+        if (!validCoupon) {
+          clearAppliedCoupon();
+          setCouponMessage('O cupom ficou indisponível.', 'error');
+        } else if (validCoupon.minOrder && cartTotal < validCoupon.minOrder) {
+          clearAppliedCoupon();
+          setCouponMessage('Cupom removido: pedido abaixo do mínimo.', 'error');
+        } else {
+          appliedCoupon = validCoupon;
+          const baseForCoupon = cartTotal - productDiscount - clientDiscount;
+          couponDiscount = computeCouponDiscount(baseForCoupon, appliedCoupon);
+
+          if (couponDiscount > 0) {
+            if (!couponDiscountRow) {
+              const checkoutTotal = document.getElementById('checkoutTotal').parentElement;
+              const totalRow = checkoutTotal.querySelector('.font-semibold');
+              const newRow = document.createElement('div');
+              newRow.id = 'couponDiscountRow';
+              newRow.className = 'flex justify-between text-sm mb-1 text-green-600';
+              newRow.innerHTML = '<span>Desconto cupom:</span><span id="couponDiscountValue">R$ 0,00</span>';
+              if (totalRow) checkoutTotal.insertBefore(newRow, totalRow);
+              else checkoutTotal.appendChild(newRow);
+            }
+            document.getElementById('couponDiscountValue').textContent = `-R$ ${couponDiscount.toFixed(2).replace('.', ',')}`;
+          }
+        }
+      } else if (couponDiscountRow) {
+        couponDiscountRow.remove();
+      }
+
+      const total = cartTotal + (isNaN(deliveryFee) ? 0 : deliveryFee) + cardFee - productDiscount - clientDiscount - couponDiscount;
       document.getElementById('checkoutTotal').textContent = `R$ ${total.toFixed(2).replace('.', ',')}`;
     }
 
@@ -5383,7 +6951,7 @@
       try {
         // Calculate date range
         const now = new Date();
-        let startDate, endDate;
+        let startDate = null, endDate = null;
 
         if (dateFilter === 'today') {
           startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
@@ -5391,18 +6959,25 @@
         } else if (dateFilter === 'yesterday') {
           startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1).toISOString();
           endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-        } else {
+        } else if (dateFilter === 'week') {
           startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7).toISOString();
           endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString();
+        } else if (dateFilter === 'month') {
+          startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+          endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).toISOString();
         }
+        // dateFilter === 'all' -> startDate e endDate ficam null
 
         // Fetch from Supabase
         let query = window.supabaseClient
           .from('fast_orders')
           .select('*')
-          .gte('created_at', startDate)
-          .lt('created_at', endDate)
           .order('created_at', { ascending: false });
+
+        // Aplicar filtro de data apenas se não for "all"
+        if (startDate && endDate) {
+          query = query.gte('created_at', startDate).lt('created_at', endDate);
+        }
 
         if (statusFilter !== 'all') {
           query = query.eq('status', statusFilter);
@@ -5413,6 +6988,9 @@
 
         // Update stats
         updateOrderStats(orders || []);
+        
+        // Update KPIs dashboard
+        updateKPIsDashboard(orders || [], dateFilter);
 
         // Render orders
         renderDashboardOrders(orders || []);
@@ -5442,6 +7020,56 @@
       document.getElementById('ordersCountDelivery').textContent = 0;
       document.getElementById('ordersCountDelivered').textContent = counts.delivered;
       document.getElementById('ordersCountCanceled').textContent = counts.cancelled;
+    }
+
+    function updateKPIsDashboard(orders, dateFilter) {
+      try {
+        // Filtrar apenas pedidos pagos/entregues para faturamento
+        // Status válidos: delivered (entregue) ou com payment_status pago
+        const paidOrders = orders.filter(o => 
+          o.status === 'delivered' || 
+          o.payment_status === 'paid' || 
+          o.payment_status === 'paid_full'
+        );
+        
+        // Pedidos válidos (não cancelados) para outras métricas
+        const validOrders = orders.filter(o => o.status !== 'cancelled');
+        
+        // Faturamento total (apenas pedidos pagos/entregues)
+        const faturamento = paidOrders.reduce((sum, o) => sum + (o.total || 0), 0);
+        document.getElementById('kpiFaturamento').textContent = `R$ ${faturamento.toFixed(2).replace('.', ',')}`;
+        
+        // Total de pedidos
+        document.getElementById('kpiTotalPedidos').textContent = orders.length;
+        
+        // Ticket médio
+        const ticketMedio = validOrders.length > 0 ? faturamento / validOrders.length : 0;
+        document.getElementById('kpiTicketMedio').textContent = `R$ ${ticketMedio.toFixed(2).replace('.', ',')}`;
+        
+        // Maior pedido
+        const maiorPedido = validOrders.length > 0 ? Math.max(...validOrders.map(o => o.total || 0)) : 0;
+        document.getElementById('kpiMaiorPedido').textContent = `R$ ${maiorPedido.toFixed(2).replace('.', ',')}`;
+        
+        // Label do período
+        const periodLabels = {
+          today: 'hoje',
+          yesterday: 'ontem',
+          week: 'na semana',
+          month: 'no mês',
+          all: 'total'
+        };
+        const periodLabel = periodLabels[dateFilter] || 'no período';
+        document.getElementById('kpiFaturamentoLabel')?.setAttribute('textContent', periodLabel);
+        document.getElementById('kpiPedidosLabel')?.setAttribute('textContent', periodLabel);
+        if (document.getElementById('kpiFaturamentoLabel')) {
+          document.getElementById('kpiFaturamentoLabel').textContent = periodLabel;
+        }
+        if (document.getElementById('kpiPedidosLabel')) {
+          document.getElementById('kpiPedidosLabel').textContent = periodLabel;
+        }
+      } catch (e) {
+        console.warn('[KPIs] Erro ao atualizar dashboard:', e);
+      }
     }
 
     function renderDashboardOrders(orders) {
@@ -5481,7 +7109,7 @@
           <div class="bg-white border rounded-lg p-4 shadow-sm ${isCardPayment ? 'border-l-4 border-l-purple-500' : ''}">
             <div class="flex flex-wrap items-start justify-between gap-2 mb-3">
               <div>
-                <p class="text-sm text-gray-500">${date} às ${time} - <strong class="text-rose-600">${formatOrderCode(order.id)}</strong></p>
+                <p class="text-sm text-gray-500">${date} às ${time} - <strong class="text-rose-600">${order.order_code || formatOrderCode(order.order_sequence || order.id)}</strong></p>
                 <p class="font-semibold text-gray-800">${order.client_name || 'Cliente'}</p>
                 <p class="text-sm text-gray-600">📱 ${order.client_phone || '-'}</p>
               </div>
@@ -5538,16 +7166,164 @@
       }).join('');
     }
 
+    // ========================================
+    // ORDER ARCHIVING SERVICE
+    // ========================================
+    async function archiveOldOrders(daysOld = 90) {
+      try {
+        const cutoffDate = new Date();
+        cutoffDate.setDate(cutoffDate.getDate() - daysOld);
+        const cutoffISO = cutoffDate.toISOString();
+
+        // Buscar pedidos antigos finalizados (delivered ou cancelled)
+        // Nota: order_code pode não existir em bancos antigos
+        const { data: oldOrders, error: fetchError } = await window.supabaseClient
+          .from('fast_orders')
+          .select('id, created_at, status')
+          .in('status', ['delivered', 'cancelled'])
+          .lt('created_at', cutoffISO);
+
+        if (fetchError) throw fetchError;
+
+        if (!oldOrders || oldOrders.length === 0) {
+          console.log('[Archive] Nenhum pedido antigo para arquivar');
+          return { archived: 0 };
+        }
+
+        console.log(`[Archive] Arquivando ${oldOrders.length} pedidos com mais de ${daysOld} dias...`);
+
+        // Marcar pedidos como arquivados (adicionar campo archived = true)
+        const orderIds = oldOrders.map(o => o.id);
+        const { error: updateError } = await window.supabaseClient
+          .from('fast_orders')
+          .update({ archived: true })
+          .in('id', orderIds);
+
+        if (updateError) throw updateError;
+
+        // Salvar resumo no localStorage para backup
+        const archiveLog = JSON.parse(localStorage.getItem('fastArchiveLog') || '[]');
+        archiveLog.push({
+          date: new Date().toISOString(),
+          count: oldOrders.length,
+          cutoff: cutoffISO
+        });
+        localStorage.setItem('fastArchiveLog', JSON.stringify(archiveLog.slice(-50)));
+
+        console.log(`[Archive] ${oldOrders.length} pedidos arquivados com sucesso`);
+        return { archived: oldOrders.length };
+      } catch (e) {
+        console.error('[Archive] Erro ao arquivar pedidos:', e);
+        return { archived: 0, error: e.message };
+      }
+    }
+
+    async function getArchiveStats() {
+      try {
+        const { data: archivedCount } = await window.supabaseClient
+          .from('fast_orders')
+          .select('id', { count: 'exact', head: true })
+          .eq('archived', true);
+
+        const { data: activeCount } = await window.supabaseClient
+          .from('fast_orders')
+          .select('id', { count: 'exact', head: true })
+          .or('archived.is.null,archived.eq.false');
+
+        return {
+          archived: archivedCount?.length || 0,
+          active: activeCount?.length || 0
+        };
+      } catch (e) {
+        console.warn('[Archive] Erro ao buscar estatísticas:', e);
+        return { archived: 0, active: 0 };
+      }
+    }
+
+    // Auto-archive check (runs daily)
+    async function checkAutoArchive() {
+      const lastArchive = localStorage.getItem('fastLastAutoArchive');
+      const today = new Date().toDateString();
+      
+      if (lastArchive !== today) {
+        console.log('[Archive] Verificando pedidos para arquivamento automático...');
+        const result = await archiveOldOrders(90);
+        if (result.archived > 0) {
+          console.log(`[Archive] Auto-arquivados ${result.archived} pedidos`);
+        }
+        localStorage.setItem('fastLastAutoArchive', today);
+      }
+    }
+
+    // Run auto-archive check on load (delayed)
+    setTimeout(checkAutoArchive, 10000);
+
+    // ========================================
+    // ORDER LOG (AUDITORIA)
+    // ========================================
+    async function logOrderChange(orderId, orderCode, oldStatus, newStatus, notes = '') {
+      try {
+        const currentUser = sessionStorage.getItem('fastAdmin') || 'Sistema';
+        const logEntry = {
+          order_id: orderId,
+          order_code: orderCode,
+          old_status: oldStatus,
+          new_status: newStatus,
+          changed_by: currentUser,
+          changed_at: new Date().toISOString(),
+          notes: notes
+        };
+
+        // Tentar salvar no Supabase
+        try {
+          await window.supabaseClient
+            .from('fast_order_logs')
+            .insert(logEntry);
+        } catch (e) {
+          console.warn('[OrderLog] Supabase error, saving locally:', e);
+        }
+
+        // Salvar também localmente como backup
+        const localLogs = JSON.parse(localStorage.getItem('fastOrderLogs') || '[]');
+        localLogs.push(logEntry);
+        // Manter apenas últimos 500 logs localmente
+        if (localLogs.length > 500) localLogs.shift();
+        localStorage.setItem('fastOrderLogs', JSON.stringify(localLogs));
+      } catch (e) {
+        console.error('[OrderLog] Erro ao registrar log:', e);
+      }
+    }
+
+    async function getOrderLogs(orderId) {
+      try {
+        const { data, error } = await window.supabaseClient
+          .from('fast_order_logs')
+          .select('*')
+          .eq('order_id', orderId)
+          .order('changed_at', { ascending: true });
+        
+        if (error) throw error;
+        return data || [];
+      } catch (e) {
+        // Fallback para logs locais
+        const localLogs = JSON.parse(localStorage.getItem('fastOrderLogs') || '[]');
+        return localLogs.filter(l => l.order_id === orderId);
+      }
+    }
+
     async function updateOrderStatus(orderId, newStatus) {
       try {
+        // Buscar dados do pedido
+        const { data: order } = await window.supabaseClient
+          .from('fast_orders')
+          .select('*')
+          .eq('id', orderId)
+          .single();
+
+        const oldStatus = order?.status || 'unknown';
+
         // Validação para entrega: só permite se pagamento completo para cartão
         if (newStatus === 'delivered') {
-          const { data: order } = await window.supabaseClient
-            .from('fast_orders')
-            .select('payment_method, payment_status')
-            .eq('id', orderId)
-            .single();
-          
           if (order && (order.payment_method === 'cartao1x' || order.payment_method === 'cartao2x' || order.payment_method === 'card_stripe')) {
             if (order.payment_status !== 'paid_full') {
               alert('⚠️ Pagamento em cartão não está completo!\nO cliente precisa pagar 100% antes de marcar como entregue.');
@@ -5562,6 +7338,24 @@
           .eq('id', orderId);
 
         if (error) throw error;
+
+        // Registrar log de auditoria
+        const orderCode = order?.order_code || formatOrderCode(order?.order_sequence || order?.id);
+        await logOrderChange(orderId, orderCode, oldStatus, newStatus);
+
+        // Se marcou como entregue, oferecer enviar link de avaliação
+        if (newStatus === 'delivered' && order && order.client_phone) {
+          const ratingLink = buildRatingLink(orderCode, order.client_phone);
+          const firstName = (order.client_name || 'Cliente').split(' ')[0];
+          
+          const sendRating = confirm(`✅ Pedido marcado como entregue!\n\nDeseja enviar link de avaliação para ${firstName}?`);
+          if (sendRating) {
+            const msg = `Olá, ${firstName}! 😊\n\nSeu pedido *${orderCode}* foi entregue!\n\nNos ajude a melhorar: avalie sua experiência:\n${ratingLink}\n\nObrigado por escolher a Fast Savory's! 🥟`;
+            const whatsappUrl = `https://wa.me/55${normalizePhoneDigits(order.client_phone)}?text=${encodeURIComponent(msg)}`;
+            window.open(whatsappUrl, '_blank');
+          }
+        }
+
         loadDashboardOrders(); // Refresh list
       } catch (error) {
         console.error('Erro ao atualizar status:', error);
@@ -5968,6 +7762,7 @@ Obrigado pela preferência! ❤️`;
       showPanel('configPanelFast');
       renderUsers();
       renderFastFeesListPanel();
+      loadCouriers();
     });
     document.getElementById('showOrdersPanelFast')?.addEventListener('click', () => {
       showPanel('ordersPanelFast');
@@ -5998,6 +7793,7 @@ Obrigado pela preferência! ❤️`;
       showPanel('configPanelFast');
       renderUsers();
       renderFastFeesListPanel();
+      loadCouriers();
     });
     document.getElementById('showOrdersPanelFastMobile')?.addEventListener('click', () => {
       showPanel('ordersPanelFast');
@@ -6609,6 +8405,82 @@ Obrigado pela preferência! ❤️`;
 
       notice.textContent = text;
       notice.className = `text-sm py-2 px-3 rounded-lg my-2 text-center font-medium ${colorClass}`;
+      
+      // Update delivery status banner
+      updateDeliveryStatusBanner();
+    }
+
+    // Verificar se há alta demanda (muitos pedidos em preparo)
+    async function checkHighDemand() {
+      try {
+        const maxConcurrent = storeConfig.max_concurrent_orders || 10;
+        
+        // Contar pedidos em preparo (status: pending, preparing, accepted, confirmed)
+        const { data, error } = await window.supabaseClient
+          .from('fast_orders')
+          .select('id')
+          .in('status', ['pending', 'preparing', 'accepted', 'confirmed'])
+          .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+
+        if (error) throw error;
+        
+        const inProgressCount = (data || []).length;
+        return inProgressCount >= maxConcurrent;
+      } catch (e) {
+        console.warn('[HighDemand] Erro ao verificar:', e);
+        return false;
+      }
+    }
+
+    // Delivery status banner for public store
+    async function updateDeliveryStatusBanner() {
+      const banner = document.getElementById('deliveryStatusBanner');
+      if (!banner) return;
+      
+      const isOpen = isFastOpen() && !storeIsClosed;
+      
+      // Only show delivery banner when store is open
+      if (!isOpen) {
+        banner.classList.add('hidden');
+        return;
+      }
+      
+      banner.classList.remove('hidden');
+      
+      // Verificar alta demanda
+      const isHighDemand = await checkHighDemand();
+      const extraTime = isHighDemand ? (storeConfig.high_demand_extra_time || 15) : 0;
+      
+      if (storeConfig.delivery_enabled) {
+        // Delivery available
+        let deliveryText = '🛵 Entregas disponíveis';
+        
+        // Add time estimates if configured (com ajuste de alta demanda)
+        if (storeConfig.delivery_time_min && storeConfig.delivery_time_max) {
+          const minTime = parseInt(storeConfig.delivery_time_min) + extraTime;
+          const maxTime = parseInt(storeConfig.delivery_time_max) + extraTime;
+          deliveryText += ` • Tempo estimado: ${minTime}-${maxTime} min`;
+        }
+        if (storeConfig.prep_time_min && storeConfig.prep_time_max) {
+          const minPrep = parseInt(storeConfig.prep_time_min) + extraTime;
+          const maxPrep = parseInt(storeConfig.prep_time_max) + extraTime;
+          deliveryText += ` • Preparo: ${minPrep}-${maxPrep} min`;
+        }
+        
+        // Aviso de alta demanda
+        if (isHighDemand) {
+          deliveryText += ' • ⚠️ Alta demanda';
+        }
+        
+        banner.innerHTML = deliveryText;
+        const demandClass = isHighDemand ? 'bg-yellow-50 text-yellow-700 border-yellow-200' : 'bg-green-50 text-green-700 border-green-200';
+        banner.className = `text-sm py-2 px-3 rounded-lg mb-2 text-center font-medium ${demandClass} border`;
+      } else {
+        // Delivery disabled
+        const reason = storeConfig.delivery_disabled_reason || 'No momento, apenas retirada na loja';
+        banner.innerHTML = `🚫 Entregas suspensas: <span class="font-semibold">${reason}</span>`;
+        banner.className = 'text-sm py-2 px-3 rounded-lg mb-2 text-center font-medium bg-orange-50 text-orange-700 border border-orange-200';
+      }
     }
 
     // Initial update
