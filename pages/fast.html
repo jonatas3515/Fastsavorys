@@ -9,7 +9,7 @@
   <script>
     // Error handlers para debug iOS (tela branca)
     window._debugErrors = [];
-    window.addEventListener('error', function(e) {
+    window.addEventListener('error', function (e) {
       var msg = '[GLOBAL ERROR] ' + e.message + ' at ' + e.filename + ':' + e.lineno;
       console.error(msg);
       window._debugErrors.push(msg);
@@ -21,7 +21,7 @@
         document.body && document.body.appendChild(div);
       }
     });
-    window.addEventListener('unhandledrejection', function(e) {
+    window.addEventListener('unhandledrejection', function (e) {
       var msg = '[PROMISE ERROR] ' + (e.reason ? (e.reason.message || e.reason) : 'unknown');
       console.error(msg);
       window._debugErrors.push(msg);
@@ -41,25 +41,25 @@
     };
 
     // Service Worker: desregistrar em ambiente local para evitar cache antigo
-    (function() {
+    (function () {
       try {
         var hostname = location.hostname;
         var isLocal = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
-        var isPrivateIP = hostname.indexOf('192.168.') === 0 || hostname.indexOf('10.') === 0 || 
-                          (hostname.indexOf('172.') === 0 && parseInt(hostname.split('.')[1]) >= 16 && parseInt(hostname.split('.')[1]) <= 31);
+        var isPrivateIP = hostname.indexOf('192.168.') === 0 || hostname.indexOf('10.') === 0 ||
+          (hostname.indexOf('172.') === 0 && parseInt(hostname.split('.')[1]) >= 16 && parseInt(hostname.split('.')[1]) <= 31);
         if ((isLocal || isPrivateIP) && 'serviceWorker' in navigator) {
-          navigator.serviceWorker.getRegistrations().then(function(regs) {
-            regs.forEach(function(reg) {
+          navigator.serviceWorker.getRegistrations().then(function (regs) {
+            regs.forEach(function (reg) {
               reg.unregister();
               console.log('[SW] Desregistrado automaticamente em ambiente local');
             });
-          }).catch(function(e) { console.log('[SW] Erro ao desregistrar:', e); });
+          }).catch(function (e) { console.log('[SW] Erro ao desregistrar:', e); });
           // Limpar caches antigos
           if ('caches' in window) {
-            caches.keys().then(function(names) {
-              names.forEach(function(name) { caches.delete(name); });
+            caches.keys().then(function (names) {
+              names.forEach(function (name) { caches.delete(name); });
               if (names.length) console.log('[CACHE] Limpo automaticamente em ambiente local');
-            }).catch(function(e) { console.log('[CACHE] Erro ao limpar:', e); });
+            }).catch(function (e) { console.log('[CACHE] Erro ao limpar:', e); });
           }
         }
       } catch (e) {
@@ -83,16 +83,17 @@
     textarea {
       color: #111 !important;
     }
-    
+
     /* Hide scrollbar for carousel */
     .scrollbar-hide::-webkit-scrollbar {
       display: none;
     }
+
     .scrollbar-hide {
       -ms-overflow-style: none;
       scrollbar-width: none;
     }
-    
+
     /* Line clamp for text truncation */
     .line-clamp-2 {
       display: -webkit-box;
@@ -104,7 +105,7 @@
   </style>
 </head>
 
-<body class="bg-white">
+<body class="bg-white overflow-hidden">
   <!-- Welcome Screen with Gradient Background -->
   <div id="welcomeScreen" class="fixed inset-0 z-[100] overflow-hidden"
     style="background: linear-gradient(135deg, #9e0b5a 0%, #7a0945 25%, #5a0733 50%, #1f2937 75%, #000000 100%);">
@@ -131,24 +132,26 @@
       </div>
     </div>
 
-    <!-- Centered Logo Image (Desktop/Tablet) -->
-    <div class="hidden sm:flex absolute inset-0 items-center justify-center p-4">
-      <img src="../assets/img/capa-logo.png" alt="Fast Savory's"
-        class="max-w-full max-h-[50vh] sm:max-w-[70%] sm:max-h-[60vh] md:max-w-[60%] md:max-h-[70vh] object-contain drop-shadow-2xl" />
-    </div>
-
-    <!-- Desktop: Text at top left with larger size -->
-    <div class="hidden sm:block absolute top-8 left-8 md:top-12 md:left-12 z-10 max-w-2xl">
-      <h1 class="text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold text-white drop-shadow-lg">
-        Bem-vindo à <span class="text-yellow-400" style="-webkit-text-stroke: 1px black;">FastSavory's</span>
-      </h1>
-      <p class="text-xl md:text-2xl text-white mt-4 mb-10 drop-shadow-lg whitespace-nowrap">
-        Faça agora mesmo a sua encomenda!
-      </p>
-      <button id="enterStoreBtn"
-        class="px-8 py-4 bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-black font-bold text-xl md:text-2xl rounded-full shadow-2xl transform hover:scale-105 transition-all duration-300 animate-pulse">
-        🛒 Fazer Pedido
-      </button>
+    <!-- Desktop/Tablet: Text at top-left, Image centered -->
+    <div class="hidden sm:block absolute inset-0 overflow-hidden">
+      <!-- Text at top-left margin -->
+      <div class="absolute top-8 left-8 md:top-12 md:left-12 z-10 max-w-2xl">
+        <h1 class="text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold text-white drop-shadow-lg">
+          Bem-vindo à <span class="text-yellow-400" style="-webkit-text-stroke: 1px black;">FastSavory's</span>
+        </h1>
+        <p class="text-xl md:text-2xl text-white drop-shadow-lg" style="margin-top: 1rem; margin-bottom: 3rem;">
+          Faça agora mesmo a sua encomenda!
+        </p>
+        <button id="enterStoreBtn"
+          class="px-6 py-3 bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-black font-bold text-lg rounded-full shadow-2xl transform hover:scale-105 transition-all duration-300">
+          🛒 Fazer Pedido
+        </button>
+      </div>
+      <!-- Image centered on screen -->
+      <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <img src="../assets/img/capa-logo.png" alt="Fast Savory's" class="object-contain drop-shadow-2xl"
+          style="max-width: 60vw; max-height: 80vh; width: auto; height: auto;" />
+      </div>
     </div>
   </div>
 
@@ -504,11 +507,13 @@
           <div class="grid grid-cols-2 gap-3">
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">Nome</label>
-              <input type="text" id="courierName" class="w-full px-3 py-2 border rounded-lg" placeholder="Nome do entregador" required>
+              <input type="text" id="courierName" class="w-full px-3 py-2 border rounded-lg"
+                placeholder="Nome do entregador" required>
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-2">Telefone</label>
-              <input type="tel" id="courierPhone" class="w-full px-3 py-2 border rounded-lg" placeholder="(73) 99999-9999">
+              <input type="tel" id="courierPhone" class="w-full px-3 py-2 border rounded-lg"
+                placeholder="(73) 99999-9999">
             </div>
           </div>
           <input type="hidden" id="courierEditId" value="">
@@ -571,12 +576,14 @@
           <div class="grid grid-cols-2 gap-4">
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Capacidade simultânea</label>
-              <input type="number" id="maxConcurrentOrders" placeholder="10" class="w-full px-2 py-1 border rounded" min="1">
+              <input type="number" id="maxConcurrentOrders" placeholder="10" class="w-full px-2 py-1 border rounded"
+                min="1">
               <p class="text-xs text-gray-400 mt-1">Pedidos em preparo ao mesmo tempo</p>
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700 mb-1">Acréscimo (min)</label>
-              <input type="number" id="highDemandExtraTime" placeholder="15" class="w-full px-2 py-1 border rounded" min="0">
+              <input type="number" id="highDemandExtraTime" placeholder="15" class="w-full px-2 py-1 border rounded"
+                min="0">
               <p class="text-xs text-gray-400 mt-1">Tempo extra em alta demanda</p>
             </div>
           </div>
@@ -675,7 +682,7 @@
       <div class="lg:col-span-2">
         <div class="bg-white rounded-xl shadow p-6">
           <h3 class="text-xl font-bold text-gray-800 mb-4">Clientes Cadastrados</h3>
-          
+
           <!-- Filtros de Clientes -->
           <div class="grid grid-cols-1 md:grid-cols-4 gap-3 mb-4">
             <div>
@@ -685,36 +692,60 @@
             <div>
               <select id="filterNameInitial" class="w-full px-3 py-2 border rounded-lg text-sm">
                 <option value="">Inicial: Todas</option>
-                <option value="A">A</option><option value="B">B</option><option value="C">C</option>
-                <option value="D">D</option><option value="E">E</option><option value="F">F</option>
-                <option value="G">G</option><option value="H">H</option><option value="I">I</option>
-                <option value="J">J</option><option value="K">K</option><option value="L">L</option>
-                <option value="M">M</option><option value="N">N</option><option value="O">O</option>
-                <option value="P">P</option><option value="Q">Q</option><option value="R">R</option>
-                <option value="S">S</option><option value="T">T</option><option value="U">U</option>
-                <option value="V">V</option><option value="W">W</option><option value="X">X</option>
-                <option value="Y">Y</option><option value="Z">Z</option>
+                <option value="A">A</option>
+                <option value="B">B</option>
+                <option value="C">C</option>
+                <option value="D">D</option>
+                <option value="E">E</option>
+                <option value="F">F</option>
+                <option value="G">G</option>
+                <option value="H">H</option>
+                <option value="I">I</option>
+                <option value="J">J</option>
+                <option value="K">K</option>
+                <option value="L">L</option>
+                <option value="M">M</option>
+                <option value="N">N</option>
+                <option value="O">O</option>
+                <option value="P">P</option>
+                <option value="Q">Q</option>
+                <option value="R">R</option>
+                <option value="S">S</option>
+                <option value="T">T</option>
+                <option value="U">U</option>
+                <option value="V">V</option>
+                <option value="W">W</option>
+                <option value="X">X</option>
+                <option value="Y">Y</option>
+                <option value="Z">Z</option>
               </select>
             </div>
             <div>
               <select id="filterBirthMonth" class="w-full px-3 py-2 border rounded-lg text-sm">
                 <option value="">Aniversário: Todos</option>
-                <option value="01">Janeiro</option><option value="02">Fevereiro</option>
-                <option value="03">Março</option><option value="04">Abril</option>
-                <option value="05">Maio</option><option value="06">Junho</option>
-                <option value="07">Julho</option><option value="08">Agosto</option>
-                <option value="09">Setembro</option><option value="10">Outubro</option>
-                <option value="11">Novembro</option><option value="12">Dezembro</option>
+                <option value="01">Janeiro</option>
+                <option value="02">Fevereiro</option>
+                <option value="03">Março</option>
+                <option value="04">Abril</option>
+                <option value="05">Maio</option>
+                <option value="06">Junho</option>
+                <option value="07">Julho</option>
+                <option value="08">Agosto</option>
+                <option value="09">Setembro</option>
+                <option value="10">Outubro</option>
+                <option value="11">Novembro</option>
+                <option value="12">Dezembro</option>
                 <option value="no-date">Sem data</option>
               </select>
             </div>
             <div>
-              <button id="clearClientFilters" class="w-full px-3 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg text-sm font-medium">
+              <button id="clearClientFilters"
+                class="w-full px-3 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg text-sm font-medium">
                 🔄 Limpar Filtros
               </button>
             </div>
           </div>
-          
+
           <div id="clientsList" class="space-y-3"></div>
         </div>
       </div>
@@ -1015,20 +1046,14 @@
       <div class="bg-amber-50 border border-amber-300 rounded-lg p-4 mb-6">
         <h4 class="font-semibold text-amber-800 mb-2">🗑️ Excluir Pedidos de Teste</h4>
         <p class="text-sm text-amber-700 mb-3">
-          Digite o código do pedido que deseja excluir (ex: FAST-0001). 
+          Digite o código do pedido que deseja excluir (ex: FAST-0001).
           Para excluir vários, separe por vírgula.
         </p>
         <div class="flex gap-2 items-center flex-wrap">
-          <input 
-            type="text" 
-            id="orderCodesToDelete" 
-            placeholder="FAST-0001, FAST-0002, ..."
-            class="flex-1 min-w-[200px] px-3 py-2 border border-amber-300 rounded-lg text-sm"
-          />
-          <button 
-            id="confirmDeleteOrdersBtn" 
-            class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap"
-          >
+          <input type="text" id="orderCodesToDelete" placeholder="FAST-0001, FAST-0002, ..."
+            class="flex-1 min-w-[200px] px-3 py-2 border border-amber-300 rounded-lg text-sm" />
+          <button id="confirmDeleteOrdersBtn"
+            class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap">
             🗑️ Excluir
           </button>
         </div>
@@ -1205,13 +1230,7 @@
 
     <main class="container mx-auto px-3 sm:px-4 py-4 sm:py-6">
       <!-- Botão Pedir de Novo (atalho rápido) -->
-      <div id="repeatLastOrderSection" class="mb-4 hidden">
-        <button id="repeatLastOrderBtn" type="button"
-          class="w-full bg-gradient-to-r from-rose-500 to-pink-500 hover:from-rose-600 hover:to-pink-600 text-white py-3 px-4 rounded-xl font-semibold shadow-lg flex items-center justify-center gap-2 transition-all">
-          <span class="text-xl">🔄</span>
-          <span>Pedir o último pedido de novo</span>
-        </button>
-      </div>
+      <!-- Botão Pedir de Novo (removido) -->
 
       <!-- Seção de Últimos Pedidos (para clientes que retornam) -->
       <div id="recentOrdersSection" class="mb-6 hidden"></div>
@@ -1223,9 +1242,11 @@
             <h2 class="text-lg font-bold text-gray-800 flex items-center">
               <span class="mr-2">🏷️</span> Promoções do Dia
             </h2>
-            <span class="text-xs bg-yellow-400 text-yellow-900 px-2 py-1 rounded-full font-semibold animate-pulse">OFERTAS</span>
+            <span
+              class="text-xs bg-yellow-400 text-yellow-900 px-2 py-1 rounded-full font-semibold animate-pulse">OFERTAS</span>
           </div>
-          <div id="promosContainer" class="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-hide" style="scroll-behavior: smooth;"></div>
+          <div id="promosContainer" class="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-hide"
+            style="scroll-behavior: smooth;"></div>
         </div>
       </div>
 
@@ -1240,6 +1261,7 @@
           </div>
           <div id="topProductsContainer" class="grid grid-cols-2 gap-3">
             <!-- Top products will be rendered here -->
+          </div>
         </div>
       </div>
 
@@ -1299,7 +1321,8 @@
               <span class="mr-3">❤️</span> Seus Favoritos
             </h2>
             <div id="favoritosContainer" class="grid md:grid-cols-2 gap-4">
-              <p class="text-gray-500 text-center py-8 col-span-2">Você ainda não marcou nenhum item como favorito.</p>
+              <p class="text-gray-500 text-center py-8 col-span-2">Você ainda não marcou nenhum item como favorito.
+              </p>
             </div>
           </section>
         </div>
@@ -1340,13 +1363,17 @@
   </div>
 
   <!-- Floating Cart Button (Mobile Only) -->
-  <div id="floatingCartButton" 
-    class="fixed bottom-4 right-4 lg:hidden hidden bg-rose-600 hover:bg-rose-700 text-white rounded-full shadow-lg flex items-center px-4 py-3 space-x-2 z-40 cursor-pointer transition-all duration-300 active:scale-95"
-    onclick="document.getElementById('cartModal').classList.remove('hidden')">
+  <div id="floatingCartButton"
+    class="fixed lg:hidden hidden bg-rose-600 hover:bg-rose-700 text-white rounded-full shadow-lg items-center px-4 py-3 space-x-2 cursor-pointer transition-all duration-300 active:scale-95"
+    style="z-index: 9999; bottom: 1rem; right: 1rem;"
+    onclick="this.style.display='none'; document.getElementById('cartModal').classList.remove('hidden')">
     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path>
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+        d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z">
+      </path>
     </svg>
-    <span id="floatingCartCount" class="bg-white text-rose-600 rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">0</span>
+    <span id="floatingCartCount"
+      class="bg-white text-rose-600 rounded-full w-6 h-6 flex items-center justify-center text-sm font-bold">0</span>
     <span id="floatingCartTotal" class="font-semibold text-sm">R$ 0,00</span>
   </div>
 
@@ -1363,7 +1390,7 @@
       <!-- Upsell suggestions -->
       <div id="upsellSection" class="hidden mb-4 p-3 bg-blue-50 rounded-lg border border-blue-100">
         <p class="text-xs text-blue-700 font-semibold mb-2">💡 Combina com seu pedido:</p>
-        <div id="upsellContainer" class="flex gap-2 overflow-x-auto scrollbar-hide"></div>
+        <div id="upsellContainer" class="grid grid-cols-2 gap-2"></div>
       </div>
       <div class="border-t pt-4">
         <div class="flex justify-between items-center mb-4"><span class="font-semibold text-gray-800">Total:</span><span
@@ -1381,8 +1408,10 @@
       <h3 class="text-xl font-bold text-amber-700 mb-4">⚠️ Confirmar Exclusão de Pedidos</h3>
       <p id="deleteOrdersModalText" class="text-gray-700 mb-4"></p>
       <div class="flex gap-3 justify-end">
-        <button id="cancelDeleteOrdersModalBtn" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg font-medium">Cancelar</button>
-        <button id="confirmDeleteOrdersModalBtn" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium">Excluir</button>
+        <button id="cancelDeleteOrdersModalBtn"
+          class="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg font-medium">Cancelar</button>
+        <button id="confirmDeleteOrdersModalBtn"
+          class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium">Excluir</button>
       </div>
     </div>
   </div>
@@ -1393,15 +1422,19 @@
       <h3 class="text-xl font-bold text-amber-700 mb-4">⚠️ Confirmar Exclusão de Cliente</h3>
       <div id="deleteClientModalText" class="text-gray-700 mb-4"></div>
       <div class="flex gap-3 justify-end">
-        <button id="cancelDeleteClientModalBtn" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg font-medium">Cancelar</button>
-        <button id="confirmDeleteClientModalBtn" class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium">Excluir Cliente</button>
+        <button id="cancelDeleteClientModalBtn"
+          class="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg font-medium">Cancelar</button>
+        <button id="confirmDeleteClientModalBtn"
+          class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium">Excluir Cliente</button>
       </div>
     </div>
   </div>
 
   <!-- Checkout Modal -->
-  <div id="checkoutModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center">
-    <div class="bg-white rounded-xl p-6 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto text-gray-800">
+  <div id="checkoutModal"
+    class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-start sm:items-center justify-center overflow-y-auto py-2 sm:py-4">
+    <div
+      class="bg-white rounded-xl p-4 sm:p-6 max-w-md w-[calc(100%-1rem)] sm:w-full sm:mx-4 max-h-[calc(100vh-1rem)] overflow-y-auto text-gray-800 my-2 sm:my-auto">
       <h3 class="text-xl font-bold text-gray-800 mb-4">Finalizar Pedido</h3>
 
       <!-- Dados do Cliente - Primeiro -->
@@ -1523,7 +1556,8 @@
 
       <div id="orderDateBox" class="mb-6 hidden">
         <div class="p-3 rounded-md bg-blue-100 border border-blue-300 text-blue-900 text-sm font-semibold mb-2">Fora do
-          horário, aceitamos encomendas. Até 07:00, pode agendar para hoje. A partir de 07:01, apenas para o próximo dia.</div>
+          horário, aceitamos encomendas. Até 07:00, pode agendar para hoje. A partir de 07:01, apenas para o próximo
+          dia.</div>
         <label class="block text-sm font-semibold text-gray-800 mb-2">Data da encomenda</label>
         <input type="date" id="orderDate" class="w-full px-3 py-2 border rounded-lg" />
 
@@ -1590,13 +1624,16 @@
     <div class="bg-white rounded-xl p-6 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto text-gray-800">
       <div class="flex items-center justify-between mb-4">
         <h3 class="text-xl font-bold text-gray-800">Acompanhar pedido</h3>
-        <button id="closeTrackingModalBtn" class="text-gray-500 hover:text-gray-700"><span class="text-2xl">×</span></button>
+        <button id="closeTrackingModalBtn" class="text-gray-500 hover:text-gray-700"><span
+            class="text-2xl">×</span></button>
       </div>
 
       <div class="space-y-3 mb-4">
-        <input id="trackingOrderCode" placeholder="Código do pedido (ex: FAST-0001)" class="w-full px-3 py-2 border rounded-lg uppercase">
+        <input id="trackingOrderCode" placeholder="Código do pedido (ex: FAST-0001)"
+          class="w-full px-3 py-2 border rounded-lg uppercase">
         <input id="trackingPhone" placeholder="Telefone (WhatsApp)" class="w-full px-3 py-2 border rounded-lg">
-        <button id="trackOrderBtn" type="button" class="w-full bg-rose-600 hover:bg-rose-700 text-white py-3 rounded-lg font-semibold">Buscar pedido</button>
+        <button id="trackOrderBtn" type="button"
+          class="w-full bg-rose-600 hover:bg-rose-700 text-white py-3 rounded-lg font-semibold">Buscar pedido</button>
         <div id="trackingMessage" class="hidden text-sm"></div>
       </div>
 
@@ -1616,7 +1653,8 @@
     <div class="bg-white rounded-xl p-6 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto text-gray-800">
       <div class="flex items-center justify-between mb-4">
         <h3 class="text-xl font-bold text-gray-800">⭐ Avaliar Pedido</h3>
-        <button id="closeRatingModalBtn" class="text-gray-500 hover:text-gray-700"><span class="text-2xl">×</span></button>
+        <button id="closeRatingModalBtn" class="text-gray-500 hover:text-gray-700"><span
+            class="text-2xl">×</span></button>
       </div>
 
       <!-- Rating Form -->
@@ -1626,22 +1664,28 @@
         </div>
 
         <p class="text-sm text-gray-600 mb-3 text-center">Como foi sua experiência?</p>
-        
+
         <!-- Star Rating -->
         <div id="starRating" class="flex justify-center gap-2 mb-4">
-          <button type="button" data-star="1" class="star-btn text-4xl text-gray-300 hover:text-yellow-400 transition-colors">★</button>
-          <button type="button" data-star="2" class="star-btn text-4xl text-gray-300 hover:text-yellow-400 transition-colors">★</button>
-          <button type="button" data-star="3" class="star-btn text-4xl text-gray-300 hover:text-yellow-400 transition-colors">★</button>
-          <button type="button" data-star="4" class="star-btn text-4xl text-gray-300 hover:text-yellow-400 transition-colors">★</button>
-          <button type="button" data-star="5" class="star-btn text-4xl text-gray-300 hover:text-yellow-400 transition-colors">★</button>
+          <button type="button" data-star="1"
+            class="star-btn text-4xl text-gray-300 hover:text-yellow-400 transition-colors">★</button>
+          <button type="button" data-star="2"
+            class="star-btn text-4xl text-gray-300 hover:text-yellow-400 transition-colors">★</button>
+          <button type="button" data-star="3"
+            class="star-btn text-4xl text-gray-300 hover:text-yellow-400 transition-colors">★</button>
+          <button type="button" data-star="4"
+            class="star-btn text-4xl text-gray-300 hover:text-yellow-400 transition-colors">★</button>
+          <button type="button" data-star="5"
+            class="star-btn text-4xl text-gray-300 hover:text-yellow-400 transition-colors">★</button>
         </div>
         <input type="hidden" id="ratingValue" value="0">
 
-        <textarea id="ratingComment" rows="3" placeholder="Deixe um comentário (opcional)" 
+        <textarea id="ratingComment" rows="3" placeholder="Deixe um comentário (opcional)"
           class="w-full px-3 py-2 border rounded-lg resize-none mb-4"></textarea>
 
-        <button id="submitRatingBtn" type="button" 
-          class="w-full bg-rose-600 hover:bg-rose-700 text-white py-3 rounded-lg font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed" disabled>
+        <button id="submitRatingBtn" type="button"
+          class="w-full bg-rose-600 hover:bg-rose-700 text-white py-3 rounded-lg font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed"
+          disabled>
           Enviar Avaliação
         </button>
         <div id="ratingMessage" class="hidden mt-3 text-sm text-center"></div>
@@ -1751,11 +1795,11 @@
     const OfflineSyncService = {
       QUEUE_KEY: 'fastOfflineQueue',
 
-      isOnline: function() {
+      isOnline: function () {
         return navigator.onLine;
       },
 
-      getQueue: function() {
+      getQueue: function () {
         try {
           return JSON.parse(localStorage.getItem(this.QUEUE_KEY) || '[]');
         } catch (e) {
@@ -1763,7 +1807,7 @@
         }
       },
 
-      addToQueue: function(type, data) {
+      addToQueue: function (type, data) {
         try {
           const queue = this.getQueue();
           queue.push({
@@ -1782,7 +1826,7 @@
         }
       },
 
-      removeFromQueue: function(itemId) {
+      removeFromQueue: function (itemId) {
         try {
           const queue = this.getQueue().filter(item => item.id !== itemId);
           localStorage.setItem(this.QUEUE_KEY, JSON.stringify(queue));
@@ -1791,7 +1835,7 @@
         }
       },
 
-      syncAll: async function() {
+      syncAll: async function () {
         if (!this.isOnline()) {
           console.log('[OfflineSync] Still offline, skipping sync');
           return;
@@ -1801,11 +1845,11 @@
         if (queue.length === 0) return;
 
         console.log(`[OfflineSync] Syncing ${queue.length} items...`);
-        
+
         for (const item of queue) {
           try {
             let success = false;
-            
+
             if (item.type === 'order') {
               const { error } = await window.supabaseClient
                 .from('fast_orders')
@@ -1841,11 +1885,11 @@
         }
       },
 
-      getPendingCount: function() {
+      getPendingCount: function () {
         return this.getQueue().length;
       },
 
-      showPendingBadge: function() {
+      showPendingBadge: function () {
         const count = this.getPendingCount();
         const badge = document.getElementById('offlinePendingBadge');
         if (badge) {
@@ -2127,9 +2171,9 @@
 
       // Mostrar botão "Pedir de novo" se tiver histórico
       repeatSection?.classList.remove('hidden');
-      
+
       container.classList.remove('hidden');
-      
+
       // Build order cards
       const orderCards = history.slice(0, 3).map((order, idx) => {
         const resumo = order.items.slice(0, 2).map(i => `${i.quantity}x ${i.name}`).join(', ');
@@ -2137,7 +2181,7 @@
         const data = safeDate(order.createdAt).toLocaleDateString('pt-BR');
         const total = (order.total || 0).toFixed(2).replace('.', ',');
         return `
-          <div class="flex-shrink-0 w-[280px] sm:w-auto sm:flex-1 p-3 rounded-lg bg-white border border-rose-200 shadow-sm">
+          <div class="w-full sm:flex-1 p-3 rounded-lg bg-white border border-rose-200 shadow-sm">
             <div class="flex flex-col h-full">
               <div class="flex-1 min-w-0 mb-2">
                 <p class="text-xs text-gray-500 mb-1">${data}</p>
@@ -2154,7 +2198,7 @@
           </div>
         `;
       }).join('');
-      
+
       container.innerHTML = `
         <div class="bg-gradient-to-r from-rose-50 to-orange-50 rounded-xl p-4 border border-rose-100 shadow-sm">
           <div class="flex items-center justify-between mb-3">
@@ -2163,8 +2207,8 @@
             </h2>
             <span class="text-xs text-gray-500 bg-white px-2 py-1 rounded-full">Olá de volta! 👋</span>
           </div>
-          <!-- Mobile: Horizontal scroll carousel -->
-          <div class="sm:hidden flex gap-3 overflow-x-auto pb-2 -mx-1 px-1 snap-x snap-mandatory scrollbar-hide" style="scroll-behavior: smooth;">
+          <!-- Mobile: Vertical stack -->
+          <div class="sm:hidden flex flex-col gap-3 pb-2">
             ${orderCards}
           </div>
           <!-- Desktop: Vertical stack -->
@@ -2210,28 +2254,28 @@
       showInlineMessage('publicStore', '✅ Itens carregados no carrinho!', 'success');
     }
 
-    document.addEventListener('DOMContentLoaded', async function() {
+    document.addEventListener('DOMContentLoaded', async function () {
       console.log('[INIT] DOMContentLoaded iniciado');
       try {
         // Verificar se Supabase está disponível
         if (!window.supabaseClient) {
           console.error('[INIT] Supabase client não disponível - usando dados locais');
         }
-        
+
         // Load all data in parallel for faster page load
         // Funções síncronas são wrappadas em Promise.resolve()
         await Promise.all([
-          seedDefaultUsers().catch(function(e) { console.error('[INIT] seedDefaultUsers erro:', e); }),
-          loadProducts().catch(function(e) { console.error('[INIT] loadProducts erro:', e); }),
-          loadClients().catch(function(e) { console.error('[INIT] loadClients erro:', e); }),
-          Promise.resolve().then(function() { loadPromotions(); }).catch(function(e) { console.error('[INIT] loadPromotions erro:', e); }),
-          loadCoupons().catch(function(e) { console.error('[INIT] loadCoupons erro:', e); }),
-          loadStoreConfig().catch(function(e) { console.error('[INIT] loadStoreConfig erro:', e); }),
-          loadBusinessHours().catch(function(e) { console.error('[INIT] loadBusinessHours erro:', e); })
+          seedDefaultUsers().catch(function (e) { console.error('[INIT] seedDefaultUsers erro:', e); }),
+          loadProducts().catch(function (e) { console.error('[INIT] loadProducts erro:', e); }),
+          loadClients().catch(function (e) { console.error('[INIT] loadClients erro:', e); }),
+          Promise.resolve().then(function () { loadPromotions(); }).catch(function (e) { console.error('[INIT] loadPromotions erro:', e); }),
+          loadCoupons().catch(function (e) { console.error('[INIT] loadCoupons erro:', e); }),
+          loadStoreConfig().catch(function (e) { console.error('[INIT] loadStoreConfig erro:', e); }),
+          loadBusinessHours().catch(function (e) { console.error('[INIT] loadBusinessHours erro:', e); })
         ]);
 
         console.log('[INIT] Dados carregados, mostrando painel');
-        
+
         // Now show the appropriate panel
         if (sessionStorage.getItem('fastAdmin') === '1') {
           isAdmin = true;
@@ -2256,24 +2300,24 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ sessionId: sessionId })
               });
-              const data = await resp.json().catch(function() { return {}; });
+              const data = await resp.json().catch(function () { return {}; });
               if (!resp.ok) {
                 console.warn('[Stripe] Falha ao sincronizar Checkout:', data);
               } else {
                 console.log('[Stripe] Sincronização concluída:', data);
                 syncedOrderId = data.orderId;
-                try { loadDashboardOrders(); } catch (e) {}
+                try { loadDashboardOrders(); } catch (e) { }
               }
             }
-            
+
             // Redirecionar para WhatsApp após pagamento bem-sucedido
             if (syncedOrderId) {
               const waMessage = `Olá! Acabei de realizar o pagamento do pedido #${syncedOrderId} pelo cartão. Aguardo confirmação!`;
               const waUrl = `https://wa.me/5573999366554?text=${encodeURIComponent(waMessage)}`;
-              
+
               // Limpar URL params e redirecionar para WhatsApp
               window.history.replaceState({}, document.title, window.location.pathname);
-              
+
               // Mostrar confirmação e abrir WhatsApp
               alert('✅ Pagamento confirmado!\n\nVocê será redirecionado para o WhatsApp para confirmar seu pedido.');
               window.open(waUrl, '_blank');
@@ -2553,7 +2597,7 @@
       if (!container) return;
 
       const activeCouriers = couriers.filter(c => c.active !== false);
-      
+
       if (activeCouriers.length === 0) {
         container.innerHTML = '<p class="text-gray-400 text-sm text-center py-4">Nenhum entregador cadastrado</p>';
         return;
@@ -2748,7 +2792,7 @@
 
     function renderClients(searchTerm = '') {
       const box = document.getElementById('clientsList'); if (!box) return;
-      
+
       // Filtra por texto de busca (nome/telefone)
       let filtered = clients.filter(c =>
         c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -2820,13 +2864,13 @@
     function deleteClient(i) {
       const client = clients[i];
       if (!client) return;
-      
+
       clientToDelete = client;
       clientToDeleteIndex = i;
-      
+
       // Conta pedidos do cliente
       const ordersCount = orders.filter(o => o.client_phone === client.phone).length;
-      
+
       // Monta texto do modal
       const deleteClientModalText = document.getElementById('deleteClientModalText');
       deleteClientModalText.innerHTML = `
@@ -2839,7 +2883,7 @@
         </div>
         <p class="mt-3">Deseja realmente excluir este cliente?</p>
       `;
-      
+
       // Abre o modal
       document.getElementById('deleteClientModal').classList.remove('hidden');
     }
@@ -2847,41 +2891,41 @@
     // Executa exclusão de cliente após confirmação no modal
     async function executeDeleteClient() {
       if (!clientToDelete) return;
-      
+
       const deleteClientModal = document.getElementById('deleteClientModal');
       deleteClientModal.classList.add('hidden');
-      
+
       try {
         // Exclui do Supabase
         const { error } = await window.supabaseClient
           .from('fast_clients')
           .delete()
           .eq('phone', clientToDelete.phone);
-        
+
         if (error) throw error;
-        
+
         // Remove da lista local
         const phone = clientToDelete.phone;
         clients = clients.filter(c => c.phone !== phone);
         delete clientDiscounts[phone];
-        
+
         // Salva no localStorage como backup
         saveClients();
         saveClientDiscounts();
-        
+
         // Recarrega lista
         renderClients();
-        
+
         // Limpa variáveis
         clientToDelete = null;
         clientToDeleteIndex = null;
-        
+
         // Feedback visual
         showInlineMessage('clientsPanelFast', '✅ Cliente excluído com sucesso!', 'success');
-        
+
       } catch (error) {
         console.error('Erro ao excluir cliente:', error);
-        
+
         // Mesmo com erro no Supabase, tenta excluir localmente
         if (clientToDeleteIndex !== null && clients[clientToDeleteIndex]) {
           const phone = clients[clientToDeleteIndex].phone;
@@ -2891,10 +2935,10 @@
           saveClientDiscounts();
           renderClients();
         }
-        
+
         clientToDelete = null;
         clientToDeleteIndex = null;
-        
+
         showInlineMessage('clientsPanelFast', `⚠️ Cliente removido localmente. Erro no servidor: ${error.message}`, 'warning');
       }
     }
@@ -3104,9 +3148,9 @@
       // Filtra apenas pedidos pagos/entregues/prontos (exclui pendentes e cancelados)
       const validOrders = periodOrders.filter(order => {
         const status = (order.status || '').toLowerCase();
-        return status.includes('paid') || status.includes('delivered') || status.includes('confirmed') || 
-               status.includes('pago') || status.includes('entregue') || status.includes('pronto') ||
-               status === 'preparing' || status === 'out_for_delivery';
+        return status.includes('paid') || status.includes('delivered') || status.includes('confirmed') ||
+          status.includes('pago') || status.includes('entregue') || status.includes('pronto') ||
+          status === 'preparing' || status === 'out_for_delivery';
       });
 
       const clientTotals = {};
@@ -3270,9 +3314,16 @@
       }
 
       // Summary Cards
-      const totalRevenue = periodOrders.reduce((sum, o) => sum + parseFloat(o.total || 0), 0);
+      // Filtrar apenas pedidos pagos/entregues para faturamento (excluir pending/accepted)
+      const paidOrders = periodOrders.filter(o => {
+        const status = (o.status || '').toLowerCase();
+        return status === 'delivered' || status === 'confirmed' ||
+          status === 'preparing' || status === 'out_for_delivery' ||
+          o.payment_status === 'paid' || o.payment_status === 'paid_full';
+      });
+      const totalRevenue = paidOrders.reduce((sum, o) => sum + parseFloat(o.total || 0), 0);
       const totalOrders = periodOrders.length;
-      const avgOrder = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+      const avgOrder = paidOrders.length > 0 ? totalRevenue / paidOrders.length : 0;
       const uniqueClients = new Set(periodOrders.map(o => o.client_phone || o.client_name)).size;
 
       document.getElementById('totalRevenueCard').textContent = `R$ ${totalRevenue.toFixed(2).replace('.', ',')}`;
@@ -3420,7 +3471,7 @@
       try {
         // Always save to localStorage as backup
         localStorage.setItem('fastStoreConfig', JSON.stringify(storeConfig));
-        
+
         // Sync to Supabase
         const { error } = await window.supabaseClient
           .from('fast_store_config')
@@ -3983,24 +4034,28 @@
 
     function hideAllAdminPanels() {
       // Esconde todos os painéis do admin
-      ['adminPanel', 'productsPanelFast', 'configPanelFast', 'clientsPanelFast', 
-       'promotionsPanelFast', 'reportsPanelFast', 'ordersPanelFast'].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) el.classList.add('hidden');
-      });
+      ['adminPanel', 'productsPanelFast', 'configPanelFast', 'clientsPanelFast',
+        'promotionsPanelFast', 'reportsPanelFast', 'ordersPanelFast'].forEach(id => {
+          const el = document.getElementById(id);
+          if (el) el.classList.add('hidden');
+        });
     }
 
     function showLoginModal() {
       hideAllAdminPanels();
       document.getElementById('loginModal').classList.remove('hidden');
       document.getElementById('publicStore').classList.add('hidden');
-      
+
       // Esconder carrinho na tela de login
       document.getElementById('cartBtn')?.classList.add('hidden');
       document.getElementById('cartBtnDesktop')?.classList.add('hidden');
-      document.getElementById('floatingCartButton')?.classList.add('hidden');
+      const floatingBtn = document.getElementById('floatingCartButton');
+      if (floatingBtn) {
+        floatingBtn.classList.add('hidden');
+        floatingBtn.style.display = 'none';
+      }
       document.getElementById('cartModal')?.classList.add('hidden');
-      
+
       const f = document.getElementById('loginForm'); if (f) { f.reset(); }
       const loginError = document.getElementById('loginError');
       if (loginError) loginError.classList.add('hidden');
@@ -4015,13 +4070,13 @@
       document.getElementById('loginModal').classList.add('hidden');
       document.getElementById('adminPanel').classList.remove('hidden');
       document.getElementById('publicStore').classList.add('hidden');
-      
+
       // Esconder carrinho no painel admin
       document.getElementById('cartBtn')?.classList.add('hidden');
       document.getElementById('cartBtnDesktop')?.classList.add('hidden');
       document.getElementById('floatingCartButton')?.classList.add('hidden');
       document.getElementById('cartModal')?.classList.add('hidden');
-      
+
       const role = currentUserRole || sessionStorage.getItem('fastRole') || 'admin';
       // Bloquear apenas 'caixa' de acessar admin
       if (role === 'caixa') {
@@ -4034,7 +4089,7 @@
       if (usersCard) usersCard.style.display = (role === 'admin') ? 'block' : 'none';
       loadProductsAdmin();
       renderUsers();
-      
+
       // Mostrar aba de Pedidos automaticamente após login
       showPanel('ordersPanelFast');
       loadDashboardOrders();
@@ -4043,14 +4098,20 @@
       hideAllAdminPanels();
       document.getElementById('loginModal').classList.add('hidden');
       document.getElementById('publicStore').classList.remove('hidden');
-      
+
       // Mostrar carrinho na loja pública
       document.getElementById('cartBtn')?.classList.remove('hidden');
       document.getElementById('cartBtnDesktop')?.classList.remove('hidden');
-      
-      // Forçar atualização do FAB ao mostrar a loja
+
+      // Forçar atualização e exibição do FAB ao mostrar a loja
       updateCart();
-      
+      // Se tem itens no carrinho, mostrar FAB explicitamente
+      const floatingBtn = document.getElementById('floatingCartButton');
+      if (floatingBtn && cart.length > 0) {
+        floatingBtn.classList.remove('hidden');
+        floatingBtn.style.display = 'flex';
+      }
+
       // Toggle header buttons
       const isLogged = sessionStorage.getItem('fastAdmin') === '1';
       const role = sessionStorage.getItem('fastRole');
@@ -4247,16 +4308,16 @@
      */
     function formatOrderCode(orderIdOrSeq) {
       if (!orderIdOrSeq) return 'FAST-0000';
-      
+
       // Se já é um código FAST-XXXX, retorna como está
       if (String(orderIdOrSeq).startsWith('FAST-')) return orderIdOrSeq;
-      
+
       // Se é um número sequencial pequeno (< 100000), usa diretamente
       const num = parseInt(orderIdOrSeq, 10);
       if (!isNaN(num) && num < 100000) {
         return `FAST-${String(num).padStart(4, '0')}`;
       }
-      
+
       // Fallback: pega os últimos 4 dígitos do ID (timestamp)
       const numericId = String(orderIdOrSeq).slice(-4);
       const paddedId = numericId.padStart(4, '0');
@@ -4288,7 +4349,7 @@
           const { count, error: countError } = await window.supabaseClient
             .from('fast_orders')
             .select('*', { count: 'exact', head: true });
-          
+
           if (countError) throw countError;
           return (count || 0) + 1;
         } catch (e2) {
@@ -4449,11 +4510,11 @@
                     type: 'image/jpeg',
                     lastModified: Date.now()
                   });
-                  
+
                   const originalSize = (file.size / 1024).toFixed(1);
                   const newSize = (compressedFile.size / 1024).toFixed(1);
                   console.log(`[ImageCompress] ${originalSize}KB -> ${newSize}KB (${Math.round((1 - compressedFile.size / file.size) * 100)}% redução)`);
-                  
+
                   resolve(compressedFile);
                 } else {
                   resolve(file); // Fallback para original
@@ -4476,7 +4537,7 @@
       try {
         // Comprimir imagem antes do upload
         const compressedFile = await compressImage(file, 800, 800, 0.8);
-        
+
         const fileExt = 'jpg'; // Sempre JPEG após compressão
         const fileName = `product_${Date.now()}.${fileExt}`;
         const filePath = `products/${fileName}`;
@@ -4693,6 +4754,7 @@
         adicionais: document.getElementById('adicionaisContainer'),
         bebidas: document.getElementById('bebidasContainer')
       };
+
       Object.values(map).forEach(el => { if (el) el.innerHTML = ''; });
       products.filter(p => isProductAvailableToday(p)).forEach(product => {
         const isAdditional = product.category === 'adicionais';
@@ -4763,9 +4825,9 @@
       if (!section || !container) return;
 
       // Filter products with active promotions
-      const promoProducts = products.filter(p => 
-        p.promo && p.promo.active && 
-        isProductAvailableToday(p) && 
+      const promoProducts = products.filter(p =>
+        p.promo && p.promo.active &&
+        isProductAvailableToday(p) &&
         p.visible !== false
       );
 
@@ -4775,12 +4837,12 @@
       }
 
       section.classList.remove('hidden');
-      
+
       container.innerHTML = promoProducts.map(product => {
         const originalPrice = product.price;
         let discountedPrice = originalPrice;
         let discountBadge = '';
-        
+
         if (product.promo.type === 'percent') {
           discountedPrice = originalPrice * (1 - product.promo.value / 100);
           discountBadge = `-${product.promo.value}%`;
@@ -4788,12 +4850,12 @@
           discountedPrice = originalPrice - product.promo.value;
           discountBadge = `-R$${product.promo.value.toFixed(0)}`;
         }
-        
+
         const originalDisplay = `R$ ${originalPrice.toFixed(2).replace('.', ',')}`;
         const discountedDisplay = `R$ ${discountedPrice.toFixed(2).replace('.', ',')}`;
         const isFav = FavoritesService.isFavorite(currentClientPhone, product.id);
         const heartIcon = isFav ? '❤️' : '🤍';
-        
+
         return `
           <div class="flex-shrink-0 w-[200px] bg-white rounded-xl shadow-sm border border-yellow-200 p-3 snap-start relative">
             <div class="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full shadow">${discountBadge}</div>
@@ -5124,29 +5186,35 @@
         setTimeout(() => { e.target.textContent = 'Adicionar'; e.target.classList.remove('bg-green-600'); e.target.classList.add('bg-rose-600'); }, 1000);
       }
     });
-    function updateCart() { 
-      cartTotal = cart.reduce((t, i) => t + i.price * i.quantity, 0); 
-      const count = cart.reduce((t, i) => t + i.quantity, 0); 
-      document.getElementById('cartCount').textContent = count; 
-      const desktopCount = document.getElementById('cartCountDesktop'); 
-      if (desktopCount) desktopCount.textContent = count; 
-      const total = `R$ ${cartTotal.toFixed(2).replace('.', ',')}`; 
-      document.getElementById('cartTotal').textContent = total; 
-      document.getElementById('mobileCartTotal').textContent = total; 
-      updateCartItems('cartItems'); 
-      updateCartItems('mobileCartItems'); 
-      const has = cart.length > 0; 
-      document.getElementById('checkoutBtn').disabled = !has; 
+    function updateCart() {
+      cartTotal = cart.reduce((t, i) => t + i.price * i.quantity, 0);
+      const count = cart.reduce((t, i) => t + i.quantity, 0);
+      document.getElementById('cartCount').textContent = count;
+      const desktopCount = document.getElementById('cartCountDesktop');
+      if (desktopCount) desktopCount.textContent = count;
+      const total = `R$ ${cartTotal.toFixed(2).replace('.', ',')}`;
+      document.getElementById('cartTotal').textContent = total;
+      document.getElementById('mobileCartTotal').textContent = total;
+      updateCartItems('cartItems');
+      updateCartItems('mobileCartItems');
+      const has = cart.length > 0;
+      document.getElementById('checkoutBtn').disabled = !has;
       document.getElementById('mobileCheckoutBtn').disabled = !has;
-      
-      // Update floating cart button (mobile)
+
+      // Update floating cart button (mobile) - only show on public store
       const floatingBtn = document.getElementById('floatingCartButton');
       if (floatingBtn) {
         const hasItems = cart.length > 0;
+        const isPublicStoreVisible = !document.getElementById('publicStore')?.classList.contains('hidden');
 
-        if (hasItems) {
+        if (hasItems && isPublicStoreVisible) {
           floatingBtn.classList.remove('hidden');
           floatingBtn.style.display = 'flex';
+          // Ensure FAB is positioned correctly
+          floatingBtn.style.position = 'fixed';
+          floatingBtn.style.bottom = '1rem';
+          floatingBtn.style.right = '1rem';
+          floatingBtn.style.zIndex = '9999';
           const countEl = document.getElementById('floatingCartCount');
           const totalEl = document.getElementById('floatingCartTotal');
 
@@ -5157,30 +5225,30 @@
           floatingBtn.style.display = 'none';
         }
       }
-      
+
       // Persist cart to localStorage
-      try { localStorage.setItem('fastCart', JSON.stringify(cart)); } catch(e) {}
-      
+      try { localStorage.setItem('fastCart', JSON.stringify(cart)); } catch (e) { }
+
       // Update upsell suggestions
       renderUpsellSuggestions();
     }
-    
+
     // Render upsell suggestions based on cart contents
     function renderUpsellSuggestions() {
       const section = document.getElementById('upsellSection');
       const container = document.getElementById('upsellContainer');
       if (!section || !container) return;
-      
+
       if (cart.length === 0) {
         section.classList.add('hidden');
         return;
       }
-      
+
       // Get categories in cart
       const cartProductIds = cart.map(item => item.id);
       const cartProducts = products.filter(p => cartProductIds.includes(p.id));
       const cartCategories = [...new Set(cartProducts.map(p => p.category))];
-      
+
       // Define complementary categories
       const complementMap = {
         'salgados': ['bebidas', 'adicionais'],
@@ -5190,7 +5258,7 @@
         'bebidas': ['salgados', 'adicionais'],
         'adicionais': ['bebidas']
       };
-      
+
       // Find complementary products not in cart
       let suggestCategories = [];
       cartCategories.forEach(cat => {
@@ -5199,27 +5267,27 @@
         }
       });
       suggestCategories = [...new Set(suggestCategories)].filter(cat => !cartCategories.includes(cat));
-      
+
       if (suggestCategories.length === 0) {
         section.classList.add('hidden');
         return;
       }
-      
+
       // Get up to 3 suggestions from complementary categories
       const suggestions = products
-        .filter(p => 
-          suggestCategories.includes(p.category) && 
-          !cartProductIds.includes(p.id) && 
-          isProductAvailableToday(p) && 
+        .filter(p =>
+          suggestCategories.includes(p.category) &&
+          !cartProductIds.includes(p.id) &&
+          isProductAvailableToday(p) &&
           p.visible !== false
         )
-        .slice(0, 3);
-      
+        .slice(0, 2);
+
       if (suggestions.length === 0) {
         section.classList.add('hidden');
         return;
       }
-      
+
       section.classList.remove('hidden');
       container.innerHTML = suggestions.map(product => {
         const priceDisplay = `R$ ${product.price.toFixed(2).replace('.', ',')}`;
@@ -5480,7 +5548,7 @@
 
     document.getElementById('cartBtn')?.addEventListener('click', () => document.getElementById('cartModal').classList.remove('hidden'));
     document.getElementById('cartBtnDesktop')?.addEventListener('click', () => document.getElementById('cartModal').classList.remove('hidden'));
-    document.getElementById('closeCartModal')?.addEventListener('click', () => document.getElementById('cartModal').classList.add('hidden'));
+    document.getElementById('closeCartModal')?.addEventListener('click', () => { document.getElementById('cartModal').classList.add('hidden'); const floatingBtn = document.getElementById('floatingCartButton'); if (floatingBtn && cart.length > 0) { floatingBtn.style.display = 'flex'; } });
     document.getElementById('checkoutBtn')?.addEventListener('click', showCheckout);
     document.getElementById('mobileCheckoutBtn')?.addEventListener('click', () => { document.getElementById('cartModal').classList.add('hidden'); showCheckout(); });
     function showCheckout() {
@@ -5544,7 +5612,7 @@
           if (deliverySel && deliverySel.value === 'entrega') { slot.min = '07:00'; slot.max = '18:00'; }
           else { slot.removeAttribute('min'); slot.removeAttribute('max'); }
         }
-      } catch (e) {}
+      } catch (e) { }
       updateCheckoutFeeAndTotalFast();
       showLastOrders(); // Mostrar últimos pedidos para recompra rápida
       updateLoyaltyUI(document.getElementById('customerPhone')?.value);
@@ -5678,10 +5746,10 @@
             .limit(50);
 
           if (error) throw error;
-          
+
           // Busca por order_code (sequencial) ou por formatOrderCode (timestamp)
-          const found = (data || []).find(o => 
-            o.order_code === code || 
+          const found = (data || []).find(o =>
+            o.order_code === code ||
             formatOrderCode(o.order_sequence || o.id) === code
           );
           if (found) return found;
@@ -5692,8 +5760,8 @@
 
       try {
         const history = loadOrderHistory(phone);
-        const foundLocal = (history || []).find(o => 
-          o.orderCode === code || 
+        const foundLocal = (history || []).find(o =>
+          o.orderCode === code ||
           formatOrderCode(o.orderSequence || o.id) === code
         );
         if (foundLocal) {
@@ -5707,7 +5775,7 @@
             created_at: foundLocal.createdAt || new Date().toISOString()
           };
         }
-      } catch (e2) {}
+      } catch (e2) { }
 
       return null;
     }
@@ -5828,7 +5896,7 @@
     async function loadOrderForRating(orderCode, phone) {
       const code = String(orderCode || '').trim().toUpperCase();
       const phoneDigits = normalizePhoneDigits(phone);
-      
+
       if (!code || !phoneDigits) {
         setRatingMessage('Código do pedido ou telefone inválido.', 'error');
         return null;
@@ -5844,8 +5912,8 @@
 
         if (error) throw error;
 
-        const order = (data || []).find(o => 
-          o.order_code === code || 
+        const order = (data || []).find(o =>
+          o.order_code === code ||
           formatOrderCode(o.order_sequence || o.id) === code
         );
 
@@ -5869,7 +5937,7 @@
 
       currentRatingOrderId = order.id;
       currentRatingPhone = phone;
-      
+
       const displayCode = order.order_code || formatOrderCode(order.order_sequence || order.id);
       document.getElementById('ratingOrderCode').textContent = displayCode;
 
@@ -6111,7 +6179,7 @@
             if (e.target.value === 'entrega') { slot.min = '07:00'; slot.max = '18:00'; }
             else { slot.removeAttribute('min'); slot.removeAttribute('max'); }
           }
-        } catch (e2) {}
+        } catch (e2) { }
         updateCheckoutFeeAndTotalFast();
       }
       if (e.target.name === 'payment') { const b = document.getElementById('moneyChangeBox'); if (e.target.value === 'dinheiro') b.classList.remove('hidden'); else b.classList.add('hidden'); updateCheckoutFeeAndTotalFast(); }
@@ -6215,7 +6283,7 @@
       // Gerar código sequencial do pedido
       const { sequence: orderSequence, code: orderCode } = await generateOrderCode();
       const orderId = Date.now();
-      
+
       let msg = `🥟 *Pedido Fast Savory's*\n\n`;
       msg += `🧾 *Código:* ${orderCode}\n`;
       msg += `👤 *Cliente:* ${customerName}\n`;
@@ -6439,7 +6507,7 @@
         showBirthdayModal();
       } else {
         // Client has birthdate - proceed directly
-        saveOrderToSupabase(orderData);
+        await saveOrderToSupabase(orderData);
 
         // Record birthday discount usage if applied
         if (hasBirthdayDiscount && customerPhone) {
@@ -6988,7 +7056,7 @@
 
         // Update stats
         updateOrderStats(orders || []);
-        
+
         // Update KPIs dashboard
         updateKPIsDashboard(orders || [], dateFilter);
 
@@ -7026,30 +7094,30 @@
       try {
         // Filtrar apenas pedidos pagos/entregues para faturamento
         // Status válidos: delivered (entregue) ou com payment_status pago
-        const paidOrders = orders.filter(o => 
-          o.status === 'delivered' || 
-          o.payment_status === 'paid' || 
+        const paidOrders = orders.filter(o =>
+          o.status === 'delivered' ||
+          o.payment_status === 'paid' ||
           o.payment_status === 'paid_full'
         );
-        
+
         // Pedidos válidos (não cancelados) para outras métricas
         const validOrders = orders.filter(o => o.status !== 'cancelled');
-        
+
         // Faturamento total (apenas pedidos pagos/entregues)
         const faturamento = paidOrders.reduce((sum, o) => sum + (o.total || 0), 0);
         document.getElementById('kpiFaturamento').textContent = `R$ ${faturamento.toFixed(2).replace('.', ',')}`;
-        
+
         // Total de pedidos
         document.getElementById('kpiTotalPedidos').textContent = orders.length;
-        
+
         // Ticket médio
         const ticketMedio = validOrders.length > 0 ? faturamento / validOrders.length : 0;
         document.getElementById('kpiTicketMedio').textContent = `R$ ${ticketMedio.toFixed(2).replace('.', ',')}`;
-        
+
         // Maior pedido
         const maiorPedido = validOrders.length > 0 ? Math.max(...validOrders.map(o => o.total || 0)) : 0;
         document.getElementById('kpiMaiorPedido').textContent = `R$ ${maiorPedido.toFixed(2).replace('.', ',')}`;
-        
+
         // Label do período
         const periodLabels = {
           today: 'hoje',
@@ -7093,13 +7161,13 @@
         const moreItems = items.length > 3 ? ` +${items.length - 3}` : '';
         const deliveryType = order.delivery_type === 'entrega' ? '🚚 Entrega' : '🏪 Retirada';
         const address = order.address ? `${order.address.street}, ${order.address.number} - ${order.address.neighborhood}` : '';
-        
+
         // Payment info
         const isCardPayment = order.payment_method === 'cartao1x' || order.payment_method === 'cartao2x' || order.payment_method === 'card_stripe';
-        const paymentMethod = order.payment_method === 'cartao1x' ? '💳 Cartão 1x' : 
-                              order.payment_method === 'cartao2x' ? '💳 Cartão 1x' : 
-                              order.payment_method === 'pix' ? '📱 PIX' : 
-                              order.payment_method === 'dinheiro' ? '💵 Dinheiro' : '⏳ Pendente';
+        const paymentMethod = order.payment_method === 'cartao1x' ? '💳 Cartão 1x' :
+          order.payment_method === 'cartao2x' ? '💳 Cartão 1x' :
+            order.payment_method === 'pix' ? '📱 PIX' :
+              order.payment_method === 'dinheiro' ? '💵 Dinheiro' : '⏳ Pendente';
         const paymentStatus = PAYMENT_STATUS_LABELS[order.payment_status] || PAYMENT_STATUS_LABELS.pending;
         const needsAcceptance = isCardPayment && order.status === 'pending' && !order.payment_link;
         const awaitingPayment = isCardPayment && order.payment_status === 'awaiting_payment';
@@ -7244,7 +7312,7 @@
     async function checkAutoArchive() {
       const lastArchive = localStorage.getItem('fastLastAutoArchive');
       const today = new Date().toDateString();
-      
+
       if (lastArchive !== today) {
         console.log('[Archive] Verificando pedidos para arquivamento automático...');
         const result = await archiveOldOrders(90);
@@ -7301,7 +7369,7 @@
           .select('*')
           .eq('order_id', orderId)
           .order('changed_at', { ascending: true });
-        
+
         if (error) throw error;
         return data || [];
       } catch (e) {
@@ -7347,7 +7415,7 @@
         if (newStatus === 'delivered' && order && order.client_phone) {
           const ratingLink = buildRatingLink(orderCode, order.client_phone);
           const firstName = (order.client_name || 'Cliente').split(' ')[0];
-          
+
           const sendRating = confirm(`✅ Pedido marcado como entregue!\n\nDeseja enviar link de avaliação para ${firstName}?`);
           if (sendRating) {
             const msg = `Olá, ${firstName}! 😊\n\nSeu pedido *${orderCode}* foi entregue!\n\nNos ajude a melhorar: avalie sua experiência:\n${ratingLink}\n\nObrigado por escolher a Fast Savory's! 🥟`;
@@ -7372,7 +7440,7 @@
         const isLocal = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
         const isPrivateIP = /^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/.test(hostname);
         if (isLocal || isPrivateIP) return 'http://localhost:3001';
-      } catch (e) {}
+      } catch (e) { }
       try {
         return localStorage.getItem('fastStripeServerUrl') || 'https://fastsavorys.onrender.com';
       } catch (e2) {
@@ -7382,7 +7450,7 @@
 
     const StripeService = {
       config: null,
-      
+
       async loadConfig() {
         try {
           const { data, error } = await window.supabaseClient
@@ -7390,10 +7458,10 @@
             .select('*')
             .eq('store_id', 1)
             .single();
-          
+
           if (error) throw error;
           this.config = data || null;
-          
+
           if (!this.config) {
             console.warn('[Stripe] Config não encontrada (store_id=1).');
           } else {
@@ -7403,7 +7471,7 @@
               has_public_key: !!this.config.stripe_public_key
             });
           }
-          
+
           return this.config;
         } catch (e) {
           console.warn('[Stripe] Erro ao carregar config do Supabase:', e);
@@ -7411,13 +7479,13 @@
           return null;
         }
       },
-      
+
       async saveConfig(config) {
         try {
           const { error } = await window.supabaseClient
             .from('fast_stripe_config')
             .upsert({ ...config, store_id: 1, updated_at: new Date().toISOString() }, { onConflict: 'store_id' });
-          
+
           if (error) throw error;
           this.config = config;
           return true;
@@ -7426,7 +7494,7 @@
           return false;
         }
       },
-      
+
       // Gera saudação dinâmica baseada no horário
       getGreeting() {
         const hour = new Date().getHours();
@@ -7434,13 +7502,14 @@
         if (hour >= 12 && hour < 18) return 'Boa tarde';
         return 'Boa noite';
       },
-      
+
       // Gera mensagem de pagamento para WhatsApp
       generatePaymentMessage(order, paymentLink) {
         const greeting = this.getGreeting();
         const firstName = MsgTemplateService.getFirstName(order.client_name);
-        const orderCode = formatOrderCode(order.id);
-        
+        // Use already formatted code if available, otherwise format the ID
+        const orderCode = order.order_code || formatOrderCode(order.id);
+
         return `${greeting}, ${firstName}! 🎉
 
 Seu pedido ${orderCode} foi *ACEITO* pela Fast Savory's!
@@ -7454,13 +7523,13 @@ Após a confirmação do pagamento, seu pedido será preparado com muito carinho
 
 Obrigado pela preferência! ❤️`;
       },
-      
+
       // Gera Checkout Session do Stripe usando servidor local
       async generatePaymentLink(order) {
         if (!this.config || !this.config.enabled) {
           console.warn('[Stripe] Stripe não configurado ou desabilitado (Supabase). Tentando gerar link via servidor local mesmo assim...');
         }
-        
+
         try {
           console.log('[Stripe] Gerando link para pedido:', order.id);
 
@@ -7468,7 +7537,7 @@ Obrigado pela preferência! ❤️`;
           if (!baseUrl) {
             throw new Error('Stripe server URL não configurada. Defina localStorage.fastStripeServerUrl em produção.');
           }
-          
+
           const response = await fetch(baseUrl + '/create-checkout-session', {
             method: 'POST',
             headers: {
@@ -7481,15 +7550,15 @@ Obrigado pela preferência! ❤️`;
               customerName: order.client_name
             })
           });
-          
+
           if (!response.ok) {
-            const error = await response.json().catch(function() { return {}; });
+            const error = await response.json().catch(function () { return {}; });
             throw new Error(error.error || 'Erro ao gerar link');
           }
-          
+
           const data = await response.json();
           console.log('[Stripe] Link gerado com sucesso:', data.url);
-          
+
           return data.url;
         } catch (error) {
           console.error('[Stripe] Erro ao gerar link:', error);
@@ -7503,7 +7572,7 @@ Obrigado pela preferência! ❤️`;
     async function acceptCardOrder(orderId) {
       const btn = document.getElementById(`acceptBtn_${orderId}`);
       const originalText = btn ? btn.innerHTML : '';
-      
+
       try {
         // Mostrar loading no botão
         if (btn) {
@@ -7511,27 +7580,27 @@ Obrigado pela preferência! ❤️`;
           btn.disabled = true;
           btn.classList.add('opacity-75', 'cursor-wait');
         }
-        
+
         // Busca dados completos do pedido
         const { data: order, error: fetchError } = await window.supabaseClient
           .from('fast_orders')
           .select('*')
           .eq('id', orderId)
           .single();
-        
+
         if (fetchError || !order) {
           alert('Erro ao buscar pedido');
           return;
         }
-        
+
         // Carrega config do Stripe se necessário
         if (!StripeService.config) {
           await StripeService.loadConfig();
         }
-        
+
         // Gera o link de pagamento
         const paymentLink = await StripeService.generatePaymentLink(order);
-        
+
         // Atualiza o pedido com o link de pagamento
         const { error: updateError } = await window.supabaseClient
           .from('fast_orders')
@@ -7542,22 +7611,22 @@ Obrigado pela preferência! ❤️`;
             accepted_at: new Date().toISOString()
           })
           .eq('id', orderId);
-        
+
         if (updateError) throw updateError;
-        
+
         // Gera mensagem para WhatsApp
         const message = StripeService.generatePaymentMessage(order, paymentLink);
-        
+
         // Abre WhatsApp com a mensagem
         if (order.client_phone) {
           const cleanPhone = order.client_phone.replace(/\D/g, '');
           const url = `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(message)}`;
           window.open(url, '_blank');
         }
-        
+
         // Atualiza a lista de pedidos
         loadDashboardOrders();
-        
+
       } catch (error) {
         console.error('Erro ao aceitar pedido:', error);
         alert('Erro ao aceitar pedido: ' + error.message);
@@ -7579,19 +7648,19 @@ Obrigado pela preferência! ❤️`;
           .select('total, amount_paid')
           .eq('id', orderId)
           .single();
-        
+
         const updateData = {
           payment_status: paymentType === 'full' ? 'paid_full' : 'paid_partial',
           amount_paid: paymentType === 'full' ? order.total : (order.total * 0.5)
         };
-        
+
         const { error } = await window.supabaseClient
           .from('fast_orders')
           .update(updateData)
           .eq('id', orderId);
-        
+
         if (error) throw error;
-        
+
         alert(paymentType === 'full' ? '✅ Pagamento total registrado!' : '✅ Entrada de 50% registrada!');
         loadDashboardOrders();
       } catch (error) {
@@ -7614,11 +7683,11 @@ Obrigado pela preferência! ❤️`;
     function deleteOrdersByCodes() {
       const orderCodesToDeleteInput = document.getElementById('orderCodesToDelete');
       const deleteOrdersResult = document.getElementById('deleteOrdersResult');
-      
+
       if (!orderCodesToDeleteInput || !deleteOrdersResult) return;
-      
+
       const inputValue = orderCodesToDeleteInput.value.trim();
-      
+
       if (!inputValue) {
         deleteOrdersResult.textContent = '⚠️ Digite ao menos um código de pedido.';
         deleteOrdersResult.style.color = '#856404';
@@ -7627,7 +7696,7 @@ Obrigado pela preferência! ❤️`;
 
       // Extrai os códigos (separa por vírgula, remove espaços e filtra vazios)
       const codes = inputValue.split(',').map(c => c.trim().toUpperCase()).filter(c => c);
-      
+
       if (codes.length === 0) {
         deleteOrdersResult.textContent = '⚠️ Nenhum código válido encontrado.';
         deleteOrdersResult.style.color = '#856404';
@@ -7638,7 +7707,7 @@ Obrigado pela preferência! ❤️`;
       pendingOrderCodesToDelete = codes;
       const deleteOrdersModal = document.getElementById('deleteOrdersModal');
       const deleteOrdersModalText = document.getElementById('deleteOrdersModalText');
-      
+
       deleteOrdersModalText.textContent = `Tem certeza que deseja excluir ${codes.length} pedido(s)?\n\n${codes.join(', ')}`;
       deleteOrdersModal.classList.remove('hidden');
     }
@@ -7648,9 +7717,9 @@ Obrigado pela preferência! ❤️`;
       const orderCodesToDeleteInput = document.getElementById('orderCodesToDelete');
       const deleteOrdersResult = document.getElementById('deleteOrdersResult');
       const deleteOrdersModal = document.getElementById('deleteOrdersModal');
-      
+
       deleteOrdersModal.classList.add('hidden');
-      
+
       const codes = pendingOrderCodesToDelete;
       if (codes.length === 0) return;
 
@@ -7667,7 +7736,7 @@ Obrigado pela preferência! ❤️`;
 
         // Filtra os pedidos cujo código formatado está na lista
         const ordersToDelete = (allOrders || []).filter(order => {
-          const orderCode = formatOrderCode(order.id);
+          const orderCode = order.order_code || formatOrderCode(order.order_sequence || order.id);
           return codes.includes(orderCode);
         });
 
@@ -7693,14 +7762,14 @@ Obrigado pela preferência! ❤️`;
         // Limpa o input e recarrega os pedidos
         orderCodesToDeleteInput.value = '';
         pendingOrderCodesToDelete = [];
-        
+
         // Limpa cache local
-        try { localStorage.removeItem('fastOrders'); } catch (e) {}
-        
+        try { localStorage.removeItem('fastOrders'); } catch (e) { }
+
         // Recarrega listas
-        await loadOrders().catch(function() {});
-        try { renderReportsData(); } catch (e) {}
-        try { loadDashboardOrders(); } catch (e) {}
+        await loadOrders().catch(function () { });
+        try { renderReportsData(); } catch (e) { }
+        try { loadDashboardOrders(); } catch (e) { }
 
       } catch (error) {
         console.error('Erro ao excluir pedidos:', error);
@@ -7980,10 +8049,12 @@ Obrigado pela preferência! ❤️`;
     // Welcome Screen - Enter buttons (desktop and mobile)
     document.getElementById('enterStoreBtn')?.addEventListener('click', () => {
       document.getElementById('welcomeScreen').classList.add('hidden');
+      document.body.classList.remove('overflow-hidden');
       sessionStorage.setItem('fastWelcomeSeen', 'true');
     });
     document.getElementById('enterStoreBtnMobile')?.addEventListener('click', () => {
       document.getElementById('welcomeScreen').classList.add('hidden');
+      document.body.classList.remove('overflow-hidden');
       sessionStorage.setItem('fastWelcomeSeen', 'true');
     });
 
@@ -7996,6 +8067,7 @@ Obrigado pela preferência! ❤️`;
     // Check if welcome was already seen in this session
     if (sessionStorage.getItem('fastWelcomeSeen') === 'true') {
       document.getElementById('welcomeScreen')?.classList.add('hidden');
+      document.body.classList.remove('overflow-hidden');
     }
 
     // Evento para salvar novo endereço
@@ -8197,7 +8269,7 @@ Obrigado pela preferência! ❤️`;
         'entregue': 'entregue',
         'cancelado': 'cancelado'
       },
-      
+
       // Mapeamento reverso: português -> inglês (para enviar ao banco)
       statusToDb: {
         'recebido': 'pending',
@@ -8229,7 +8301,7 @@ Obrigado pela preferência! ❤️`;
       },
 
       // Extrai primeiro nome ou nome composto (ex: "João Pedro" de "João Pedro dos Santos Costa")
-      getFirstName: function(fullName) {
+      getFirstName: function (fullName) {
         if (!fullName) return 'Cliente';
         const parts = fullName.trim().split(/\s+/);
         if (parts.length <= 2) return fullName.trim();
@@ -8244,7 +8316,7 @@ Obrigado pela preferência! ❤️`;
       },
 
       // Gera saudação dinâmica baseada no horário
-      getGreeting: function() {
+      getGreeting: function () {
         const hour = new Date().getHours();
         if (hour >= 5 && hour < 12) return 'Bom dia';
         if (hour >= 12 && hour < 18) return 'Boa tarde';
@@ -8257,25 +8329,25 @@ Obrigado pela preferência! ❤️`;
         const safeStatus = status || 'recebido';
         const templateKey = this.statusMap[safeStatus] || safeStatus;
         const tpl = this.getAll()[templateKey] || this.defaults.recebido;
-        
+
         if (!tpl) {
           console.warn('[MsgTemplate] Template não encontrado para status:', status, '-> key:', templateKey);
         }
-        
+
         const itemsSummary = (order.items || []).map(i => `${i.quantity}x ${i.name}`).join(', ');
         const address = order.address ? `${order.address.street}, ${order.address.number}` : 'Balcão';
         const deliveryText = order.delivery_type === 'entrega' ? 'Aguarde o entregador.' : 'Pode vir retirar!';
         const prepTime = `${storeConfig.prep_time_min || 20}-${storeConfig.prep_time_max || 40}`;
-        
+
         // Usa apenas primeiro nome (ou nome composto)
         const firstName = this.getFirstName(order.client_name);
-        
+
         // Saudação dinâmica
         const greeting = this.getGreeting();
 
         return tpl
           .replace(/{{nome}}/g, firstName)
-          .replace(/{{pedido}}/g, formatOrderCode(order.id))
+          .replace(/{{pedido}}/g, order.order_code || formatOrderCode(order.id))
           .replace(/{{total}}/g, (order.total || 0).toFixed(2).replace('.', ','))
           .replace(/{{itens}}/g, itemsSummary || 'Itens do pedido')
           .replace(/{{endereco}}/g, address)
@@ -8342,12 +8414,12 @@ Obrigado pela preferência! ❤️`;
     }
 
     // Event Listeners for Modal
-    document.addEventListener('DOMContentLoaded', function() {
-      document.getElementById('closeMsgUpdate')?.addEventListener('click', function() {
+    document.addEventListener('DOMContentLoaded', function () {
+      document.getElementById('closeMsgUpdate')?.addEventListener('click', function () {
         document.getElementById('msgUpdateModal').classList.add('hidden');
       });
 
-      document.getElementById('confirmMsgUpdate')?.addEventListener('click', async function() {
+      document.getElementById('confirmMsgUpdate')?.addEventListener('click', async function () {
         const orderId = document.getElementById('msgUpdateOrderId').value;
         const newStatus = document.getElementById('msgUpdateStatus').value;
         const msg = document.getElementById('msgUpdatePreview').value;
@@ -8405,7 +8477,7 @@ Obrigado pela preferência! ❤️`;
 
       notice.textContent = text;
       notice.className = `text-sm py-2 px-3 rounded-lg my-2 text-center font-medium ${colorClass}`;
-      
+
       // Update delivery status banner
       updateDeliveryStatusBanner();
     }
@@ -8414,7 +8486,7 @@ Obrigado pela preferência! ❤️`;
     async function checkHighDemand() {
       try {
         const maxConcurrent = storeConfig.max_concurrent_orders || 10;
-        
+
         // Contar pedidos em preparo (status: pending, preparing, accepted, confirmed)
         const { data, error } = await window.supabaseClient
           .from('fast_orders')
@@ -8423,7 +8495,7 @@ Obrigado pela preferência! ❤️`;
           .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
 
         if (error) throw error;
-        
+
         const inProgressCount = (data || []).length;
         return inProgressCount >= maxConcurrent;
       } catch (e) {
@@ -8436,25 +8508,25 @@ Obrigado pela preferência! ❤️`;
     async function updateDeliveryStatusBanner() {
       const banner = document.getElementById('deliveryStatusBanner');
       if (!banner) return;
-      
+
       const isOpen = isFastOpen() && !storeIsClosed;
-      
+
       // Only show delivery banner when store is open
       if (!isOpen) {
         banner.classList.add('hidden');
         return;
       }
-      
+
       banner.classList.remove('hidden');
-      
+
       // Verificar alta demanda
       const isHighDemand = await checkHighDemand();
       const extraTime = isHighDemand ? (storeConfig.high_demand_extra_time || 15) : 0;
-      
+
       if (storeConfig.delivery_enabled) {
         // Delivery available
         let deliveryText = '🛵 Entregas disponíveis';
-        
+
         // Add time estimates if configured (com ajuste de alta demanda)
         if (storeConfig.delivery_time_min && storeConfig.delivery_time_max) {
           const minTime = parseInt(storeConfig.delivery_time_min) + extraTime;
@@ -8466,12 +8538,12 @@ Obrigado pela preferência! ❤️`;
           const maxPrep = parseInt(storeConfig.prep_time_max) + extraTime;
           deliveryText += ` • Preparo: ${minPrep}-${maxPrep} min`;
         }
-        
+
         // Aviso de alta demanda
         if (isHighDemand) {
           deliveryText += ' • ⚠️ Alta demanda';
         }
-        
+
         banner.innerHTML = deliveryText;
         const demandClass = isHighDemand ? 'bg-yellow-50 text-yellow-700 border-yellow-200' : 'bg-green-50 text-green-700 border-green-200';
         banner.className = `text-sm py-2 px-3 rounded-lg mb-2 text-center font-medium ${demandClass} border`;
@@ -8568,7 +8640,27 @@ Obrigado pela preferência! ❤️`;
       </div>
       <div id="feesListFast" class="divide-y"></div>
     </div>
-  </div>
+    <!-- Script to ensure FAB and cartModal are at body level for proper fixed positioning -->
+    <script>
+      (function () {
+        // Move floating elements to body level to ensure position:fixed works correctly
+        var fab = document.getElementById('floatingCartButton');
+        var cartModal = document.getElementById('cartModal');
+        if (fab && fab.parentNode !== document.body) {
+          document.body.appendChild(fab);
+        }
+        if (cartModal && cartModal.parentNode !== document.body) {
+          document.body.appendChild(cartModal);
+        }
+        // Ensure FAB has correct fixed positioning styles (in case CSS classes don't apply)
+        if (fab) {
+          fab.style.position = 'fixed';
+          fab.style.bottom = '1rem';
+          fab.style.right = '1rem';
+          fab.style.zIndex = '9999';
+        }
+      })();
+    </script>
 </body>
 
 </html>
