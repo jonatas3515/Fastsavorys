@@ -2,9 +2,32 @@
 
 Sistema de pedidos online para a Fast Savory's.
 
-## 🌐 Produção
+## 🌐 Produção (Vercel)
 
-https://fastsavorys.netlify.app/pages/fast.html
+Projeto configurado para deploy na Vercel com:
+- Frontend estático (Tailwind CSS)
+- Backend Serverless (`/api` functions)
+
+### Configuração na Vercel
+
+1. **Build & Output Settings**:
+   - **Framework Preset**: Other
+   - **Build Command**: `npm run build`
+   - **Output Directory**: `.` (Raiz)
+
+2. **Environment Variables**:
+   Configure as seguintes variáveis no painel da Vercel (Project Settings > Environment Variables):
+
+   - `STRIPE_SECRET_KEY`: Chave secreta do Stripe (`sk_...`)
+   - `STRIPE_WEBHOOK_SECRET`: Segredo do Webhook de produção (`whsec_...`). Pode ser uma lista separada por vírgulas se houver múltiplos endpoints.
+   - `SUPABASE_URL`: URL do projeto Supabase
+   - `SUPABASE_SERVICE_ROLE_KEY`: Service Role Key (necessária para updates de pagamento)
+   - `CHECKOUT_SUCCESS_URL`: URL de sucesso, ex: `https://seu-dominio.vercel.app/pages/fast.html?checkout=success&session_id={CHECKOUT_SESSION_ID}`
+   - `CHECKOUT_CANCEL_URL`: URL de cancelamento, ex: `https://seu-dominio.vercel.app/pages/fast.html?checkout=cancel&order_id=`
+
+3. **Stripe Webhook**:
+   - Aponte o webhook no dashboard do Stripe para: `https://seu-dominio.vercel.app/api/webhook-stripe`
+   - Eventos necessários: `payment_intent.succeeded`, `checkout.session.completed`, `charge.refunded`
 
 ## 📁 Estrutura do Projeto
 
@@ -12,65 +35,38 @@ https://fastsavorys.netlify.app/pages/fast.html
 Fastsavorys/
 ├── index.html              # Landing page (redireciona para fast.html)
 ├── pages/fast.html         # Aplicação principal
-├── manifest.json           # PWA manifest
-├── service-worker.js       # Service Worker (cache + offline)
-├── assets/
-│   ├── css/styles.css      # Tailwind CSS compilado
-│   └── img/                # Ícones e logos
-└── package.json            # Scripts de build
+├── api/                    # Serverless Functions (Backend Vercel)
+│   ├── webhook-stripe.js
+│   ├── create-checkout-session.js
+│   ├── create-payment-link.js
+│   └── ...
+├── stripe-server/          # Backend legado (Node Express) - Apenas referência
+├── assets/                 # CSS compilado e Imagens
+└── vercel.json             # Configuração Vercel (Rewrites, Headers)
 ```
-
-## 🚀 Deploy (Netlify)
-
-### Arquivos essenciais para produção:
-- `index.html`
-- `pages/fast.html`
-- `manifest.json`
-- `service-worker.js`
-- `assets/` (CSS + imagens)
-
-### Após alterações no Service Worker:
-
-> ⚠️ **Sempre incrementar o CACHE_NAME** para forçar atualização nos clientes:
-> 
-> ```javascript
-> // service-worker.js
-> const CACHE_NAME = 'fastsavorys-v5'; // Incrementar: v4 → v5 → v6...
-> ```
 
 ## 🛠️ Desenvolvimento Local
 
+Para rodar com suporte a API Serverless localmente, use o [Vercel CLI](https://vercel.com/docs/cli):
+
 ```bash
-# Instalar dependências
-npm install
+# Instalar Vercel CLI
+npm i -g vercel
 
-# Servidor de desenvolvimento
-npm run serve
-# ou
-npx serve . -l 3000
-
-# Build CSS (Tailwind)
-npm run build
+# Rodar projeto localmente (Frontend + API)
+vercel dev
 ```
+
+Se rodar apenas `npm run start`, as APIs `/api/...` não estarão disponíveis.
+
+## 📦 Scripts
+
+- `npm run build`: Compila o CSS do Tailwind (Minificado)
+- `npm run dev`: Compila CSS em modo watch
+- `npm run preview`: Serve arquivos estáticos (sem API)
+
+---
 
 ## 📱 PWA & Service Worker
-
-- **Manifest**: `manifest.json` com `start_url: "/pages/fast.html"`
-- **Service Worker**: 
-  - Network-first para HTML
-  - Cache-first para assets
-  - Fallback inteligente para iOS (evita tela branca)
-- **Registro**: Em `index.html` e `pages/fast.html`
-
-## 🐛 Debug iOS
-
-Handlers de erro globais em `fast.html` para capturar problemas:
-- `window.onerror` → `[GLOBAL ERROR]`
-- `unhandledrejection` → `[PROMISE ERROR]`
-
-## 📦 Android (Capacitor)
-
-```bash
-npm run android:sync    # Sincronizar web → Android
-npm run android:open    # Abrir Android Studio
-```
+- **Manifest**: `manifest.json`
+- **Service Worker**: Cache-first para assets, Network-first para HTML

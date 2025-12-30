@@ -1,5 +1,5 @@
-const CACHE_NAME = 'fastsavorys-v10';
-const CACHE_VERSION = 'v10';
+const CACHE_NAME = 'fastsavorys-v11';
+const CACHE_VERSION = 'v11';
 
 // URLs para cache - paths relativos à raiz do site
 const urlsToCache = [
@@ -13,16 +13,16 @@ const urlsToCache = [
 ];
 
 // Instalar Service Worker e fazer cache dos arquivos
-self.addEventListener('install', function(event) {
+self.addEventListener('install', function (event) {
   console.log('[SW ' + CACHE_VERSION + '] Instalando FastSavorys ' + CACHE_VERSION + '...');
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(function(cache) {
+      .then(function (cache) {
         console.log('[SW ' + CACHE_VERSION + '] Cache aberto, adicionando arquivos...');
         // Adiciona arquivos um a um para evitar falha total se um não existir
         return Promise.all(
-          urlsToCache.map(function(url) {
-            return cache.add(url).catch(function(err) {
+          urlsToCache.map(function (url) {
+            return cache.add(url).catch(function (err) {
               console.warn('[SW ' + CACHE_VERSION + '] Falha ao cachear:', url, err.message);
               // Não falha a instalação se um arquivo não existir
               return Promise.resolve();
@@ -30,10 +30,10 @@ self.addEventListener('install', function(event) {
           })
         );
       })
-      .then(function() {
+      .then(function () {
         console.log('[SW ' + CACHE_VERSION + '] Instalação concluída');
       })
-      .catch(function(err) {
+      .catch(function (err) {
         console.error('[SW ' + CACHE_VERSION + '] Erro na instalação:', err);
       })
   );
@@ -41,12 +41,12 @@ self.addEventListener('install', function(event) {
 });
 
 // Ativar Service Worker e limpar TODOS os caches antigos
-self.addEventListener('activate', function(event) {
+self.addEventListener('activate', function (event) {
   console.log('[SW ' + CACHE_VERSION + '] Ativando e limpando caches antigos...');
   event.waitUntil(
-    caches.keys().then(function(cacheNames) {
+    caches.keys().then(function (cacheNames) {
       return Promise.all(
-        cacheNames.map(function(cacheName) {
+        cacheNames.map(function (cacheName) {
           // Remove QUALQUER cache que não seja o atual
           if (cacheName !== CACHE_NAME) {
             console.log('[SW ' + CACHE_VERSION + '] Removendo cache antigo:', cacheName);
@@ -55,7 +55,7 @@ self.addEventListener('activate', function(event) {
           return Promise.resolve();
         })
       );
-    }).then(function() {
+    }).then(function () {
       console.log('[SW ' + CACHE_VERSION + '] Ativação concluída, assumindo controle...');
       return self.clients.claim();
     })
@@ -63,7 +63,7 @@ self.addEventListener('activate', function(event) {
 });
 
 // Interceptar requisições - NETWORK FIRST para HTML, CACHE FIRST para assets
-self.addEventListener('fetch', function(event) {
+self.addEventListener('fetch', function (event) {
   // Ignorar requisições POST, PUT, DELETE (não podem ser cacheadas)
   if (event.request.method !== 'GET') {
     return;
@@ -82,27 +82,27 @@ self.addEventListener('fetch', function(event) {
   }
 
   // Determinar se é HTML
-  var isHTML = url.pathname.endsWith('.html') || 
-               url.pathname === '/' || 
-               (url.pathname.endsWith('/') && !url.pathname.includes('.'));
+  var isHTML = url.pathname.endsWith('.html') ||
+    url.pathname === '/' ||
+    (url.pathname.endsWith('/') && !url.pathname.includes('.'));
 
   if (isHTML) {
     // HTML: Network First com fallback para cache
     event.respondWith(
       fetch(event.request)
-        .then(function(response) {
+        .then(function (response) {
           // Atualiza o cache com a nova versão
           if (response && response.status === 200) {
             var responseToCache = response.clone();
-            caches.open(CACHE_NAME).then(function(cache) {
+            caches.open(CACHE_NAME).then(function (cache) {
               cache.put(event.request, responseToCache);
             });
           }
           return response;
         })
-        .catch(function() {
+        .catch(function () {
           // Offline: tenta o cache
-          return caches.match(event.request).then(function(cached) {
+          return caches.match(event.request).then(function (cached) {
             if (cached) return cached;
             // Fallback simplificado para iOS: sempre tenta index.html
             return caches.match('/index.html');
@@ -113,12 +113,12 @@ self.addEventListener('fetch', function(event) {
     // Assets: Cache First com fallback para network
     event.respondWith(
       caches.match(event.request)
-        .then(function(response) {
+        .then(function (response) {
           if (response) {
             return response;
           }
           return fetch(event.request)
-            .then(function(networkResponse) {
+            .then(function (networkResponse) {
               // Só cacheia respostas válidas
               if (!networkResponse || networkResponse.status !== 200) {
                 return networkResponse;
@@ -128,12 +128,12 @@ self.addEventListener('fetch', function(event) {
                 return networkResponse;
               }
               var responseToCache = networkResponse.clone();
-              caches.open(CACHE_NAME).then(function(cache) {
+              caches.open(CACHE_NAME).then(function (cache) {
                 cache.put(event.request, responseToCache);
-              }).catch(function() {});
+              }).catch(function () { });
               return networkResponse;
             })
-            .catch(function() {
+            .catch(function () {
               // Asset não encontrado - retorna undefined para browser tratar
               return undefined;
             });

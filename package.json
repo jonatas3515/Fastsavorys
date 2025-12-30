@@ -4,11 +4,11 @@
   "description": "FastSavory's - Sistema de Delivery e Encomendas",
   "main": "index.html",
   "scripts": {
-    "dev": "npm run build-css && python -m http.server 8000",
-    "build-css": "tailwindcss -i ./assets/css/tailwind.css -o ./assets/css/styles.css --watch",
+    "dev": "npm run build:css:watch",
+    "build:css:watch": "tailwindcss -i ./assets/css/tailwind.css -o ./assets/css/styles.css --watch",
     "build": "tailwindcss -i ./assets/css/tailwind.css -o ./assets/css/styles.css --minify",
-    "serve": "python -m http.server 8000",
-    "start": "npm run build && npm run serve",
+    "preview": "npx serve .",
+    "start": "npm run build && npm run preview",
     "android:build": "npx cap copy android && npx cap sync android && npx cap open android",
     "android:sync": "npx cap sync android",
     "android:open": "npx cap open android"

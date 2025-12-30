@@ -153,13 +153,15 @@
           style="max-width: 50vw; max-height: 80vh; width: auto; height: auto;" />
       </div>
 
-      <!-- Testimonials Column (Desktop only - right side) -->
-      <div id="testimonialsColumn" class="hidden xl:block absolute top-8 right-4 2xl:right-8 z-10 w-64 2xl:w-72">
-        <h3 class="text-base font-bold text-white mb-3 drop-shadow-lg">⭐ Avaliações dos Clientes</h3>
-        <div id="testimonialsContainer" class="space-y-2 max-h-[60vh] overflow-y-auto pr-1 scrollbar-thin">
-          <!-- Testimonials will be loaded here -->
-          <div class="text-white/60 text-sm italic text-center py-4">Carregando...</div>
-        </div>
+    </div>
+
+    <!-- Testimonials Column (Desktop only - right side, outside desktop container) -->
+    <div id="testimonialsColumn"
+      class="hidden lg:block fixed top-8 right-4 lg:right-6 2xl:right-8 z-[101] w-56 lg:w-64 2xl:w-72">
+      <h3 class="text-base font-bold text-white mb-3 drop-shadow-lg">⭐ Avaliações dos Clientes</h3>
+      <div id="testimonialsContainer" class="space-y-2 max-h-[60vh] overflow-y-auto pr-1 scrollbar-thin">
+        <!-- Testimonials will be loaded here -->
+        <div class="text-white/60 text-sm italic text-center py-4">Carregando...</div>
       </div>
     </div>
   </div>
@@ -362,10 +364,11 @@
     </header>
 
 
-    <main id="productsPanelFast" class="container mx-auto px-4 py-6 text-gray-800 hidden">
-      <div class="grid lg:grid-cols-2 gap-6">
-        <div class="space-y-4">
-          <div class="bg-white rounded-xl shadow p-4">
+    <main id="productsPanelFast"
+      class="container mx-auto px-2 sm:px-4 py-4 sm:py-6 text-gray-800 hidden overflow-x-hidden">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+        <div class="space-y-4 max-w-full overflow-hidden">
+          <div class="bg-white rounded-xl shadow p-3 sm:p-4">
             <h3 class="text-xl font-bold text-gray-800 mb-4">Adicionar Produto</h3>
             <form id="productForm" class="space-y-4">
               <div>
@@ -452,6 +455,30 @@
                 <p class="text-xs text-gray-500 mt-1">Ex.: Kits festa, bolos personalizados.</p>
               </div>
 
+              <!-- Flavor Selection (Mini-Salgados only) -->
+              <div id="flavorSelectionSection" class="border-t pt-4 mt-2 hidden">
+                <h5 class="text-sm font-medium text-gray-700 mb-3">🍽️ Seleção de Sabores (Mini-Salgados)</h5>
+                <label class="flex items-center gap-2 cursor-pointer mb-3">
+                  <input type="checkbox" id="flavorSelectionEnabled" class="w-4 h-4 text-rose-600">
+                  <span class="text-sm text-gray-700">Cliente escolhe sabores?</span>
+                </label>
+                <div id="flavorSelectionDetails" class="hidden space-y-3 pl-4 border-l-2 border-rose-200">
+                  <div>
+                    <label class="text-xs text-gray-600">Quantos sabores o cliente pode escolher?</label>
+                    <input type="number" id="flavorSelectionMax" min="1" max="20" value="3"
+                      class="w-20 px-2 py-1 border rounded text-sm">
+                  </div>
+                  <div>
+                    <label class="text-xs text-gray-600 block mb-2">Sabores disponíveis para este produto:</label>
+                    <div id="flavorSelectionFlavors" class="space-y-1 max-h-40 overflow-y-auto">
+                      <!-- Rendered dynamically -->
+                    </div>
+                  </div>
+                </div>
+                <p class="text-xs text-gray-500 mt-2">Se ativado, o cliente poderá escolher os sabores no momento da
+                  compra.</p>
+              </div>
+
               <button type="submit"
                 class="w-full bg-rose-600 hover:bg-rose-700 text-white py-2 rounded-lg font-medium">Salvar
                 Produto</button>
@@ -460,8 +487,8 @@
         </div>
 
         <!-- RIGHT COLUMN: Products List -->
-        <div>
-          <div class="bg-white rounded-xl shadow p-6">
+        <div class="max-w-full overflow-hidden">
+          <div class="bg-white rounded-xl shadow p-3 sm:p-6">
             <h3 class="text-xl font-bold text-gray-800 mb-4">Produtos Cadastrados</h3>
             <div class="flex flex-wrap gap-2 mb-3">
               <button class="admin-filter px-3 py-1 rounded bg-rose-200 text-rose-900" data-filter="all">Todas</button>
@@ -484,6 +511,42 @@
             </div>
             <div id="productsList" class="space-y-4 max-h-[70vh] overflow-y-auto"></div>
           </div>
+        </div>
+      </div>
+
+      <!-- Product Options Management Section -->
+      <div class="mt-6 bg-white rounded-xl shadow p-3 sm:p-6">
+        <h3 class="text-xl font-bold text-gray-800 mb-4">⚙️ Opções de Personalização</h3>
+        <p class="text-sm text-gray-600 mb-4">Gerencie as opções disponíveis nos modais de Kits Festa, Bolos e
+          Mini-Salgados.</p>
+
+        <!-- Options Tabs -->
+        <div class="flex flex-wrap gap-2 mb-4">
+          <button class="options-tab px-3 py-2 rounded-lg bg-rose-600 text-white text-sm font-medium"
+            data-type="cakeMass">🍰 Massas</button>
+          <button class="options-tab px-3 py-2 rounded-lg bg-gray-200 text-gray-700 text-sm font-medium"
+            data-type="filling">🎂 Recheios</button>
+          <button class="options-tab px-3 py-2 rounded-lg bg-gray-200 text-gray-700 text-sm font-medium"
+            data-type="salgados">🥟 Salgados</button>
+          <button class="options-tab px-3 py-2 rounded-lg bg-gray-200 text-gray-700 text-sm font-medium"
+            data-type="miniSalgadosFlavors">🍽️ Mini-Salgados</button>
+        </div>
+
+        <!-- Add New Option Form -->
+        <div class="flex gap-2 mb-4">
+          <input type="text" id="newOptionName" placeholder="Nome da nova opção..."
+            class="flex-1 px-3 py-2 border rounded-lg text-sm">
+          <button id="addNewOptionBtn"
+            class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium">+
+            Adicionar</button>
+        </div>
+
+        <!-- Inline Message -->
+        <div id="optionsMessage" class="hidden mb-4 p-3 rounded-lg text-sm"></div>
+
+        <!-- Options List -->
+        <div id="optionsListContainer" class="space-y-2 max-h-64 overflow-y-auto">
+          <p class="text-gray-500 text-sm">Carregando opções...</p>
         </div>
       </div>
     </main>
@@ -2198,6 +2261,44 @@
     </div>
   </div>
 
+  <!-- Mini-Salgados Flavor Selection Modal -->
+  <div id="miniSalgadosModal"
+    class="fixed inset-0 bg-black bg-opacity-50 z-[60] hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl p-6 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto shadow-2xl">
+      <h3 class="text-xl font-bold text-gray-800 mb-4">🍽️ Escolha os Sabores</h3>
+
+      <!-- Product Info -->
+      <div class="mb-4 p-3 bg-gray-50 rounded-lg">
+        <p class="font-semibold text-gray-800" id="miniProductName"></p>
+        <p class="text-rose-600 font-bold" id="miniProductPrice"></p>
+      </div>
+
+      <!-- Flavor Selection -->
+      <div class="mb-4">
+        <label class="block font-semibold text-gray-800 mb-2">Escolha os sabores:
+          <span id="miniFlavorLimit" class="text-xs text-gray-500">(até 3)</span>
+        </label>
+        <p id="miniFlavorCounter" class="text-xs text-rose-600 mb-2">Selecionados: 0/3</p>
+        <div id="miniFlavorsContainer" class="space-y-2 max-h-64 overflow-y-auto">
+          <!-- Rendered dynamically -->
+        </div>
+      </div>
+
+      <!-- Validation Message -->
+      <div id="miniSalgadosError"
+        class="hidden mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm"></div>
+
+      <!-- Buttons -->
+      <div class="flex gap-3">
+        <button type="button" onclick="closeMiniSalgadosModal()"
+          class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 py-3 rounded-lg font-medium">Cancelar</button>
+        <button type="button" onclick="confirmMiniSalgados()"
+          class="flex-1 bg-rose-600 hover:bg-rose-700 text-white py-3 rounded-lg font-medium">Adicionar ao
+          Carrinho</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Product Delete Confirmation Modal (Inline) -->
   <div id="deleteProductModal"
     class="fixed inset-0 bg-black bg-opacity-50 z-[60] hidden flex items-center justify-center p-4">
@@ -2750,6 +2851,267 @@
     };
 
     // ========================================
+    // PRODUCT OPTIONS MODULE (Dynamic Options)
+    // Manages customization options for Kits/Bolos/Mini-Salgados
+    // ========================================
+    const ProductOptionsModule = {
+      // State - cached options by type
+      options: {
+        cakeMass: [],
+        filling: [],
+        salgados: [],
+        miniSalgadosFlavors: []
+      },
+      loaded: false,
+
+      // Default options (used for migration if Supabase is empty)
+      defaults: {
+        cakeMass: [
+          { name: 'Massa Branca', visible: true, sort_order: 1 },
+          { name: 'Massa de Chocolate', visible: true, sort_order: 2 }
+        ],
+        filling: [
+          { name: 'Ninho', visible: true, sort_order: 1 },
+          { name: 'Beijinho', visible: true, sort_order: 2 },
+          { name: 'Chocolate', visible: true, sort_order: 3 },
+          { name: 'Chocolate com Côco', visible: true, sort_order: 4 },
+          { name: 'Ninho com Côco', visible: true, sort_order: 5 },
+          { name: 'Ninho com Chocolate', visible: true, sort_order: 6 }
+        ],
+        salgados: [
+          { name: 'Coxinha', visible: true, sort_order: 1 },
+          { name: 'Bolinha de Carne', visible: true, sort_order: 2 },
+          { name: 'Cazulo de Presunto e Queijo', visible: true, sort_order: 3 },
+          { name: 'Quibe', visible: true, sort_order: 4 },
+          { name: 'Bolinha de Queijo', visible: true, sort_order: 5 },
+          { name: 'Enroladinho de Salsicha', visible: true, sort_order: 6 }
+        ],
+        miniSalgadosFlavors: [
+          { name: 'Coxinha', visible: true, sort_order: 1 },
+          { name: 'Enroladinho', visible: true, sort_order: 2 },
+          { name: 'Quibe', visible: true, sort_order: 3 },
+          { name: 'Bolinha de Carne', visible: true, sort_order: 4 },
+          { name: 'Bolinha de Queijo', visible: true, sort_order: 5 },
+          { name: 'Risole de Carne', visible: true, sort_order: 6 },
+          { name: 'Risole de Queijo', visible: true, sort_order: 7 }
+        ]
+      },
+
+      // Load all options from Supabase (with localStorage fallback)
+      load: async function () {
+        try {
+          console.log('[ProductOptions] Carregando opções do Supabase...');
+          const { data, error } = await window.supabaseClient
+            .from('fast_product_options')
+            .select('*')
+            .order('sort_order', { ascending: true });
+
+          if (error) throw error;
+
+          if (data && data.length > 0) {
+            // Group by type
+            this.options = { cakeMass: [], filling: [], salgados: [], miniSalgadosFlavors: [] };
+            data.forEach(opt => {
+              if (this.options[opt.type]) {
+                this.options[opt.type].push(opt);
+              }
+            });
+            console.log('[ProductOptions] Opções carregadas:', Object.keys(this.options).map(k => `${k}: ${this.options[k].length}`).join(', '));
+          } else {
+            // Supabase table empty - seed with defaults
+            console.log('[ProductOptions] Tabela vazia, populando com padrões...');
+            await this.seedDefaults();
+          }
+
+          // Cache locally
+          localStorage.setItem('fastProductOptions', JSON.stringify(this.options));
+          this.loaded = true;
+          return this.options;
+        } catch (e) {
+          console.warn('[ProductOptions] Erro ao carregar do Supabase, usando cache local:', e);
+          // Fallback to localStorage
+          const cached = localStorage.getItem('fastProductOptions');
+          if (cached) {
+            this.options = JSON.parse(cached);
+          } else {
+            // Use hardcoded defaults
+            this.options = JSON.parse(JSON.stringify(this.defaults));
+            this.options.cakeMass.forEach((o, i) => o.id = -(i + 1));
+            this.options.filling.forEach((o, i) => o.id = -(i + 100));
+            this.options.salgados.forEach((o, i) => o.id = -(i + 200));
+            this.options.miniSalgadosFlavors.forEach((o, i) => o.id = -(i + 300));
+          }
+          this.loaded = true;
+          return this.options;
+        }
+      },
+
+      // Seed default options to Supabase
+      seedDefaults: async function () {
+        try {
+          const inserts = [];
+          Object.keys(this.defaults).forEach(type => {
+            this.defaults[type].forEach(opt => {
+              inserts.push({ type, name: opt.name, visible: opt.visible, sort_order: opt.sort_order });
+            });
+          });
+
+          const { data, error } = await window.supabaseClient
+            .from('fast_product_options')
+            .insert(inserts)
+            .select();
+
+          if (error) throw error;
+
+          // Reload after seeding
+          return await this.load();
+        } catch (e) {
+          console.error('[ProductOptions] Erro ao popular padrões:', e);
+        }
+      },
+
+      // Get visible options by type
+      getVisible: function (type) {
+        return (this.options[type] || []).filter(o => o.visible);
+      },
+
+      // Get all options by type
+      getAll: function (type) {
+        return this.options[type] || [];
+      },
+
+      // Add new option
+      add: async function (type, name) {
+        try {
+          const maxOrder = Math.max(0, ...this.options[type].map(o => o.sort_order || 0));
+          const { data, error } = await window.supabaseClient
+            .from('fast_product_options')
+            .insert({ type, name, visible: true, sort_order: maxOrder + 1 })
+            .select()
+            .single();
+
+          if (error) throw error;
+
+          this.options[type].push(data);
+          localStorage.setItem('fastProductOptions', JSON.stringify(this.options));
+          return { success: true, data };
+        } catch (e) {
+          console.error('[ProductOptions] Erro ao adicionar:', e);
+          return { success: false, error: e.message };
+        }
+      },
+
+      // Update option
+      update: async function (id, updates) {
+        try {
+          const { data, error } = await window.supabaseClient
+            .from('fast_product_options')
+            .update({ ...updates, updated_at: new Date().toISOString() })
+            .eq('id', id)
+            .select()
+            .single();
+
+          if (error) throw error;
+
+          // Update local cache
+          Object.keys(this.options).forEach(type => {
+            const idx = this.options[type].findIndex(o => o.id === id);
+            if (idx !== -1) {
+              this.options[type][idx] = { ...this.options[type][idx], ...data };
+            }
+          });
+          localStorage.setItem('fastProductOptions', JSON.stringify(this.options));
+          return { success: true, data };
+        } catch (e) {
+          console.error('[ProductOptions] Erro ao atualizar:', e);
+          return { success: false, error: e.message };
+        }
+      },
+
+      // Toggle visibility
+      toggleVisibility: async function (id) {
+        let opt = null;
+        Object.keys(this.options).forEach(type => {
+          const found = this.options[type].find(o => o.id === id);
+          if (found) opt = found;
+        });
+        if (!opt) return { success: false, error: 'Opção não encontrada' };
+
+        return await this.update(id, { visible: !opt.visible });
+      },
+
+      // Delete option
+      delete: async function (id) {
+        try {
+          const { error } = await window.supabaseClient
+            .from('fast_product_options')
+            .delete()
+            .eq('id', id);
+
+          if (error) throw error;
+
+          // Remove from local cache
+          Object.keys(this.options).forEach(type => {
+            this.options[type] = this.options[type].filter(o => o.id !== id);
+          });
+          localStorage.setItem('fastProductOptions', JSON.stringify(this.options));
+
+          // Clean up products that reference this option
+          await this.cleanupProductReferences(id);
+
+          return { success: true };
+        } catch (e) {
+          console.error('[ProductOptions] Erro ao excluir:', e);
+          return { success: false, error: e.message };
+        }
+      },
+
+      // Clean up product flavor references when an option is deleted
+      cleanupProductReferences: async function (deletedOptionId) {
+        try {
+          // Find products with flavorSelection referencing this ID
+          const { data: prods } = await window.supabaseClient
+            .from('fast_products')
+            .select('id, flavor_selection')
+            .not('flavor_selection', 'is', null);
+
+          if (!prods || prods.length === 0) return;
+
+          for (const p of prods) {
+            if (p.flavor_selection && Array.isArray(p.flavor_selection.availableFlavors)) {
+              const newFlavors = p.flavor_selection.availableFlavors.filter(fid => fid !== deletedOptionId);
+              if (newFlavors.length !== p.flavor_selection.availableFlavors.length) {
+                await window.supabaseClient
+                  .from('fast_products')
+                  .update({ flavor_selection: { ...p.flavor_selection, availableFlavors: newFlavors } })
+                  .eq('id', p.id);
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('[ProductOptions] Erro ao limpar referências:', e);
+        }
+      },
+
+      // Reorder options
+      reorder: async function (type, orderedIds) {
+        try {
+          for (let i = 0; i < orderedIds.length; i++) {
+            await window.supabaseClient
+              .from('fast_product_options')
+              .update({ sort_order: i + 1 })
+              .eq('id', orderedIds[i]);
+          }
+          await this.load(); // Reload to sync
+          return { success: true };
+        } catch (e) {
+          console.error('[ProductOptions] Erro ao reordenar:', e);
+          return { success: false, error: e.message };
+        }
+      }
+    };
+
+    // ========================================
     // RATINGS MODULE - FastSavory's (Módulo Centralizado)
     // Todas as funções de avaliação consolidadas aqui
     // ========================================
@@ -2839,7 +3201,9 @@
 
       // Load only published ratings (for landing page)
       loadPublished: async function () {
+        // Always try to fetch fresh data first
         try {
+          console.log('[Ratings] Buscando avaliações publicadas (fresh)...');
           const { data, error } = await window.supabaseClient
             .from('fast_ratings')
             .select('*')
@@ -2849,7 +3213,9 @@
 
           if (error) throw error;
           this.cache = data || [];
+          // Update cache only after successful fetch
           localStorage.setItem('fastPublishedRatings', JSON.stringify(this.cache));
+          console.log('[Ratings] Dados frescos carregados:', this.cache.length);
           return this.cache;
         } catch (e) {
           console.warn('[Ratings] Erro ao carregar publicados, usando cache:', e);
@@ -3495,7 +3861,8 @@
           Promise.resolve().then(function () { loadPromotions(); }).catch(function (e) { console.error('[INIT] loadPromotions erro:', e); }),
           loadCoupons().catch(function (e) { console.error('[INIT] loadCoupons erro:', e); }),
           loadStoreConfig().catch(function (e) { console.error('[INIT] loadStoreConfig erro:', e); }),
-          loadBusinessHours().catch(function (e) { console.error('[INIT] loadBusinessHours erro:', e); })
+          loadBusinessHours().catch(function (e) { console.error('[INIT] loadBusinessHours erro:', e); }),
+          ProductOptionsModule.load().catch(function (e) { console.error('[INIT] ProductOptionsModule erro:', e); })
         ]);
 
         console.log('[INIT] Dados carregados, mostrando painel');
@@ -3588,6 +3955,12 @@
 
         // Load public testimonials for landing page
         try { loadPublicRatings(); } catch (e) { console.warn('[Ratings] Failed to load:', e); }
+
+        // Initialize Options Admin UI (for products panel)
+        try { OptionsAdminUI.init(); } catch (e) { console.warn('[OptionsAdmin] Failed to init:', e); }
+
+        // Initialize Flavor Selection UI (for product form)
+        try { FlavorSelectionUI.init(); } catch (e) { console.warn('[FlavorSelection] Failed to init:', e); }
 
       } catch (e) {
         console.error('[INIT] Erro crítico na inicialização:', e);
@@ -5786,7 +6159,15 @@
         if (error) throw error;
 
         if (data && data.length > 0) {
-          products = data;
+          // Map snake_case from Supabase to camelCase for local use
+          products = data.map(p => ({
+            ...p,
+            startDate: p.start_date,
+            endDate: p.end_date,
+            unavailableToday: p.unavailable_today,
+            isEncomenda: p.is_encomenda,
+            flavor_selection: p.flavor_selection
+          }));
           console.log('Produtos carregados do Supabase:', products.length);
         } else {
           // Se não há produtos no Supabase, usar defaults e salvar
@@ -5848,7 +6229,13 @@
               category: product.category,
               image: product.image,
               emoji: product.emoji,
-              visible: product.visible
+              visible: product.visible,
+              start_date: product.startDate || null,
+              end_date: product.endDate || null,
+              unavailable_today: product.unavailableToday || false,
+              promo: product.promo || null,
+              is_encomenda: product.isEncomenda || false,
+              flavor_selection: product.flavor_selection || null
             }, { onConflict: 'id' });
 
           if (error) {
@@ -6008,6 +6395,22 @@
       // Encomenda
       const isEncomenda = document.getElementById('productIsEncomenda').checked;
 
+      // Flavor Selection (Mini-Salgados)
+      let flavorSelection = null;
+      if (category === 'mini' && document.getElementById('flavorSelectionEnabled')?.checked) {
+        const maxFlavors = parseInt(document.getElementById('flavorSelectionMax')?.value) || 3;
+        const availableFlavors = Array.from(document.querySelectorAll('.flavor-checkbox:checked'))
+          .map(cb => parseInt(cb.value));
+
+        if (availableFlavors.length > 0 && maxFlavors > 0) {
+          flavorSelection = {
+            enabled: true,
+            maxFlavors: Math.min(maxFlavors, availableFlavors.length),
+            availableFlavors: availableFlavors
+          };
+        }
+      }
+
       if (editingProductId) {
         const i = products.findIndex(p => p.id === editingProductId);
         if (i !== -1) {
@@ -6016,7 +6419,7 @@
             name, description, price, category,
             image: image || products[i].image,
             emoji, startDate, endDate, unavailableToday,
-            promo, isEncomenda
+            promo, isEncomenda, flavor_selection: flavorSelection
           };
         }
         editingProductId = null;
@@ -6024,7 +6427,7 @@
         products.push({
           id: Date.now(), name, description, price, category,
           image, emoji, visible: true, startDate, endDate, unavailableToday,
-          promo, isEncomenda
+          promo, isEncomenda, flavor_selection: flavorSelection
         });
       }
 
@@ -6131,10 +6534,31 @@
       document.getElementById('deleteProductModal').classList.add('hidden');
     }
 
-    function confirmDeleteProduct() {
+    async function confirmDeleteProduct() {
       if (pendingDeleteProductId) {
+        // Delete from Supabase first
+        try {
+          const { error } = await window.supabaseClient
+            .from('fast_products')
+            .delete()
+            .eq('id', pendingDeleteProductId);
+
+          if (error) {
+            console.error('Erro ao excluir produto do Supabase:', error);
+          } else {
+            console.log('Produto excluído do Supabase:', pendingDeleteProductId);
+          }
+        } catch (e) {
+          console.error('Erro ao excluir produto:', e);
+        }
+
+        // Remove from local array
         products = products.filter(p => p.id !== pendingDeleteProductId);
-        saveProducts();
+
+        // Update localStorage
+        localStorage.setItem('fastProducts', JSON.stringify(products));
+
+        // Reload UI
         loadProductsAdmin();
         loadProductsPublic();
       }
@@ -6163,13 +6587,461 @@
         document.getElementById('salgadosSection').classList.add('hidden');
       }
 
+      // Render dynamic options from ProductOptionsModule
+      renderDynamicCakeMassOptions();
+      renderDynamicFillingOptions();
+      renderDynamicSalgadosOptions();
+
       // Reset form
-      document.querySelectorAll('#customOptionsModal input[type="radio"]').forEach(r => r.checked = false);
-      document.querySelectorAll('#customOptionsModal input[type="checkbox"]').forEach(c => c.checked = false);
       document.getElementById('customOptionsError').classList.add('hidden');
       updateSalgadosCounter();
 
       document.getElementById('customOptionsModal').classList.remove('hidden');
+    }
+
+    function renderDynamicCakeMassOptions() {
+      const container = document.querySelector('#cakeMassSection .space-y-2');
+      if (!container) return;
+
+      const options = ProductOptionsModule.getVisible('cakeMass');
+      if (options.length === 0) {
+        container.innerHTML = '<p class="text-gray-500 text-sm">Nenhuma opção disponível</p>';
+        return;
+      }
+
+      container.innerHTML = options.map(opt => `
+        <label class="flex items-center p-2 border rounded-lg hover:bg-gray-50 cursor-pointer">
+          <input type="radio" name="cakeMass" value="${opt.name}" class="mr-3 text-rose-600">
+          <span>${opt.name}</span>
+        </label>
+      `).join('');
+    }
+
+    function renderDynamicFillingOptions() {
+      const container = document.querySelector('#fillingSection .space-y-2');
+      if (!container) return;
+
+      const options = ProductOptionsModule.getVisible('filling');
+      if (options.length === 0) {
+        container.innerHTML = '<p class="text-gray-500 text-sm">Nenhuma opção disponível</p>';
+        return;
+      }
+
+      container.innerHTML = options.map(opt => `
+        <label class="flex items-center p-2 border rounded-lg hover:bg-gray-50 cursor-pointer">
+          <input type="radio" name="filling" value="${opt.name}" class="mr-3 text-rose-600">
+          <span>${opt.name}</span>
+        </label>
+      `).join('');
+    }
+
+    function renderDynamicSalgadosOptions() {
+      const container = document.querySelector('#salgadosSection .space-y-2');
+      if (!container) return;
+
+      const options = ProductOptionsModule.getVisible('salgados');
+      if (options.length === 0) {
+        container.innerHTML = '<p class="text-gray-500 text-sm">Nenhuma opção disponível</p>';
+        return;
+      }
+
+      container.innerHTML = options.map(opt => `
+        <label class="flex items-center p-2 border rounded-lg hover:bg-gray-50 cursor-pointer">
+          <input type="checkbox" name="salgados" value="${opt.name}" class="mr-3 text-rose-600 salgado-checkbox">
+          <span>${opt.name}</span>
+        </label>
+      `).join('');
+    }
+
+    // ========================================
+    // OPTIONS ADMIN UI FUNCTIONS
+    // ========================================
+    const OptionsAdminUI = {
+      currentType: 'cakeMass',
+      pendingDeleteId: null,
+
+      init: function () {
+        // Tab switching
+        document.querySelectorAll('.options-tab').forEach(tab => {
+          tab.addEventListener('click', () => {
+            this.switchTab(tab.dataset.type);
+          });
+        });
+
+        // Add new option
+        document.getElementById('addNewOptionBtn')?.addEventListener('click', () => this.handleAdd());
+
+        // Initial render
+        this.render();
+      },
+
+      switchTab: function (type) {
+        this.currentType = type;
+        // Update tab styles
+        document.querySelectorAll('.options-tab').forEach(tab => {
+          if (tab.dataset.type === type) {
+            tab.classList.remove('bg-gray-200', 'text-gray-700');
+            tab.classList.add('bg-rose-600', 'text-white');
+          } else {
+            tab.classList.remove('bg-rose-600', 'text-white');
+            tab.classList.add('bg-gray-200', 'text-gray-700');
+          }
+        });
+        this.render();
+      },
+
+      render: function () {
+        const container = document.getElementById('optionsListContainer');
+        if (!container) return;
+
+        const options = ProductOptionsModule.getAll(this.currentType);
+
+        if (options.length === 0) {
+          container.innerHTML = '<p class="text-gray-500 text-sm text-center py-4">Nenhuma opção cadastrada nesta categoria.</p>';
+          return;
+        }
+
+        container.innerHTML = options.map(opt => `
+          <div class="flex items-center justify-between p-3 border rounded-lg ${opt.visible ? 'bg-white' : 'bg-gray-100 opacity-60'}" data-option-id="${opt.id}">
+            <div class="flex items-center gap-3 flex-1">
+              <span id="optName_${opt.id}" class="${opt.visible ? 'text-gray-800' : 'text-gray-500 line-through'}">${opt.name}</span>
+              ${!opt.visible ? '<span class="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded">Oculto</span>' : ''}
+            </div>
+            <div class="flex gap-2">
+              <button onclick="OptionsAdminUI.showEditForm(${opt.id}, '${opt.name.replace(/'/g, "\\'")}')" class="px-3 py-1 text-sm rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200">
+                ✏️ Editar
+              </button>
+              <button onclick="OptionsAdminUI.toggleVisibility(${opt.id})" class="px-3 py-1 text-sm rounded-lg ${opt.visible ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200' : 'bg-green-100 text-green-700 hover:bg-green-200'}">
+                ${opt.visible ? '👁️ Ocultar' : '👁️ Mostrar'}
+              </button>
+              <button onclick="OptionsAdminUI.confirmDelete(${opt.id}, '${opt.name.replace(/'/g, "\\'")}')" class="px-3 py-1 text-sm rounded-lg bg-red-100 text-red-700 hover:bg-red-200">
+                🗑️
+              </button>
+            </div>
+          </div>
+          <div id="editForm_${opt.id}" class="hidden p-3 bg-blue-50 border border-blue-200 rounded-lg mt-1">
+            <div class="flex gap-2 items-center">
+              <input type="text" id="editInput_${opt.id}" value="${opt.name}" class="flex-1 px-3 py-2 border rounded-lg text-sm">
+              <button onclick="OptionsAdminUI.saveEdit(${opt.id})" class="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700">Salvar</button>
+              <button onclick="OptionsAdminUI.cancelEdit(${opt.id})" class="px-3 py-1 text-sm bg-gray-300 text-gray-700 rounded hover:bg-gray-400">Cancelar</button>
+            </div>
+          </div>
+          <div id="deleteConfirm_${opt.id}" class="hidden p-3 bg-red-50 border border-red-200 rounded-lg mt-1">
+            <p class="text-sm text-red-700 mb-2">⚠️ Excluir "${opt.name}"? Esta opção deixará de aparecer para clientes.</p>
+            <div class="flex gap-2">
+              <button onclick="OptionsAdminUI.handleDelete(${opt.id})" class="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700">Confirmar</button>
+              <button onclick="OptionsAdminUI.cancelDelete(${opt.id})" class="px-3 py-1 text-sm bg-gray-300 text-gray-700 rounded hover:bg-gray-400">Cancelar</button>
+            </div>
+          </div>
+        `).join('');
+      },
+
+      showMessage: function (text, type) {
+        const el = document.getElementById('optionsMessage');
+        if (!el) return;
+        el.textContent = text;
+        el.className = 'mb-4 p-3 rounded-lg text-sm';
+        if (type === 'success') el.classList.add('bg-green-100', 'text-green-700');
+        else if (type === 'error') el.classList.add('bg-red-100', 'text-red-700');
+        else el.classList.add('bg-blue-100', 'text-blue-700');
+        el.classList.remove('hidden');
+        setTimeout(() => el.classList.add('hidden'), 3000);
+      },
+
+      handleAdd: async function () {
+        const input = document.getElementById('newOptionName');
+        const name = input?.value?.trim();
+        if (!name) {
+          this.showMessage('Digite o nome da opção.', 'error');
+          return;
+        }
+
+        const result = await ProductOptionsModule.add(this.currentType, name);
+        if (result.success) {
+          input.value = '';
+          this.showMessage(`"${name}" adicionado com sucesso!`, 'success');
+          this.render();
+        } else {
+          this.showMessage(`Erro ao adicionar: ${result.error}`, 'error');
+        }
+      },
+
+      toggleVisibility: async function (id) {
+        const result = await ProductOptionsModule.toggleVisibility(id);
+        if (result.success) {
+          this.showMessage('Visibilidade alterada!', 'success');
+          this.render();
+        } else {
+          this.showMessage(`Erro: ${result.error}`, 'error');
+        }
+      },
+
+      showEditForm: function (id, currentName) {
+        // Hide other edit/delete forms
+        document.querySelectorAll('[id^="editForm_"]').forEach(el => el.classList.add('hidden'));
+        document.querySelectorAll('[id^="deleteConfirm_"]').forEach(el => el.classList.add('hidden'));
+        // Show this edit form
+        const form = document.getElementById(`editForm_${id}`);
+        if (form) {
+          form.classList.remove('hidden');
+          const input = document.getElementById(`editInput_${id}`);
+          if (input) {
+            input.value = currentName;
+            input.focus();
+          }
+        }
+      },
+
+      cancelEdit: function (id) {
+        const form = document.getElementById(`editForm_${id}`);
+        if (form) form.classList.add('hidden');
+      },
+
+      saveEdit: async function (id) {
+        const input = document.getElementById(`editInput_${id}`);
+        const newName = input?.value?.trim();
+        if (!newName) {
+          this.showMessage('Nome não pode estar vazio.', 'error');
+          return;
+        }
+
+        const result = await ProductOptionsModule.update(id, { name: newName });
+        if (result.success) {
+          this.showMessage('Nome atualizado!', 'success');
+          this.render();
+        } else {
+          this.showMessage(`Erro ao atualizar: ${result.error}`, 'error');
+        }
+      },
+
+      confirmDelete: function (id, name) {
+        // Hide any other confirm dialogs
+        document.querySelectorAll('[id^="deleteConfirm_"]').forEach(el => el.classList.add('hidden'));
+        // Show this one
+        const confirmEl = document.getElementById(`deleteConfirm_${id}`);
+        if (confirmEl) confirmEl.classList.remove('hidden');
+        this.pendingDeleteId = id;
+      },
+
+      cancelDelete: function (id) {
+        const confirmEl = document.getElementById(`deleteConfirm_${id}`);
+        if (confirmEl) confirmEl.classList.add('hidden');
+        this.pendingDeleteId = null;
+      },
+
+      handleDelete: async function (id) {
+        const result = await ProductOptionsModule.delete(id);
+        if (result.success) {
+          this.showMessage('Opção excluída!', 'success');
+          this.render();
+        } else {
+          this.showMessage(`Erro ao excluir: ${result.error}`, 'error');
+        }
+        this.pendingDeleteId = null;
+      }
+    };
+
+    // ========================================
+    // FLAVOR SELECTION UI (Product Form)
+    // ========================================
+    const FlavorSelectionUI = {
+      init: function () {
+        // Listen for category changes
+        document.getElementById('productCategory')?.addEventListener('change', (e) => {
+          this.toggleSectionVisibility(e.target.value);
+        });
+
+        // Listen for enabled checkbox toggle
+        document.getElementById('flavorSelectionEnabled')?.addEventListener('change', (e) => {
+          this.toggleDetailsVisibility(e.target.checked);
+        });
+      },
+
+      toggleSectionVisibility: function (category) {
+        const section = document.getElementById('flavorSelectionSection');
+        if (!section) return;
+
+        if (category === 'mini') {
+          section.classList.remove('hidden');
+          this.renderAvailableFlavors();
+        } else {
+          section.classList.add('hidden');
+        }
+      },
+
+      toggleDetailsVisibility: function (enabled) {
+        const details = document.getElementById('flavorSelectionDetails');
+        if (details) {
+          details.classList.toggle('hidden', !enabled);
+        }
+      },
+
+      renderAvailableFlavors: function (selectedIds = []) {
+        const container = document.getElementById('flavorSelectionFlavors');
+        if (!container) return;
+
+        const flavors = ProductOptionsModule.getVisible('miniSalgadosFlavors');
+        if (flavors.length === 0) {
+          container.innerHTML = '<p class="text-xs text-gray-500">Nenhum sabor cadastrado. Adicione sabores na seção "Opções de Personalização".</p>';
+          return;
+        }
+
+        container.innerHTML = flavors.map(f => `
+          <label class="flex items-center gap-2 cursor-pointer text-sm">
+            <input type="checkbox" value="${f.id}" class="flavor-checkbox text-rose-600" ${selectedIds.includes(f.id) ? 'checked' : ''}>
+            <span>${f.name}</span>
+          </label>
+        `).join('');
+      },
+
+      loadForProduct: function (product) {
+        const section = document.getElementById('flavorSelectionSection');
+        const enabledCb = document.getElementById('flavorSelectionEnabled');
+        const maxInput = document.getElementById('flavorSelectionMax');
+
+        // Show section only for mini category
+        if (product.category === 'mini') {
+          section?.classList.remove('hidden');
+
+          if (product.flavor_selection && product.flavor_selection.enabled) {
+            enabledCb && (enabledCb.checked = true);
+            maxInput && (maxInput.value = product.flavor_selection.maxFlavors || 3);
+            this.toggleDetailsVisibility(true);
+            this.renderAvailableFlavors(product.flavor_selection.availableFlavors || []);
+          } else {
+            enabledCb && (enabledCb.checked = false);
+            maxInput && (maxInput.value = 3);
+            this.toggleDetailsVisibility(false);
+            this.renderAvailableFlavors([]);
+          }
+        } else {
+          section?.classList.add('hidden');
+        }
+      },
+
+      reset: function () {
+        document.getElementById('flavorSelectionSection')?.classList.add('hidden');
+        document.getElementById('flavorSelectionEnabled') && (document.getElementById('flavorSelectionEnabled').checked = false);
+        document.getElementById('flavorSelectionMax') && (document.getElementById('flavorSelectionMax').value = 3);
+        this.toggleDetailsVisibility(false);
+      }
+    };
+
+    // ========================================
+    // MINI-SALGADOS MODAL (Public - Flavor Selection)
+    // ========================================
+    let pendingMiniProduct = null;
+    let miniMaxFlavors = 3;
+
+    function openMiniSalgadosModal(product) {
+      pendingMiniProduct = product;
+      const fs = product.flavor_selection;
+      miniMaxFlavors = fs?.maxFlavors || 3;
+
+      // Set product info
+      document.getElementById('miniProductName').textContent = product.name;
+      document.getElementById('miniProductPrice').textContent = `R$ ${product.price.toFixed(2).replace('.', ',')}`;
+      document.getElementById('miniFlavorLimit').textContent = `(até ${miniMaxFlavors})`;
+      document.getElementById('miniFlavorCounter').textContent = `Selecionados: 0/${miniMaxFlavors}`;
+
+      // Render available flavors
+      const container = document.getElementById('miniFlavorsContainer');
+      const allFlavors = ProductOptionsModule.getVisible('miniSalgadosFlavors');
+      const availableIds = fs?.availableFlavors || allFlavors.map(f => f.id);
+
+      const flavors = allFlavors.filter(f => availableIds.includes(f.id));
+
+      if (flavors.length === 0) {
+        container.innerHTML = '<p class="text-gray-500 text-sm text-center py-4">Nenhum sabor disponível para este produto.</p>';
+      } else {
+        container.innerHTML = flavors.map(f => `
+          <label class="flex items-center p-2 border rounded-lg hover:bg-gray-50 cursor-pointer">
+            <input type="checkbox" name="miniFlavor" value="${f.name}" class="mr-3 text-rose-600 mini-flavor-checkbox">
+            <span>${f.name}</span>
+          </label>
+        `).join('');
+      }
+
+      document.getElementById('miniSalgadosError').classList.add('hidden');
+      document.getElementById('miniSalgadosModal').classList.remove('hidden');
+    }
+
+    function closeMiniSalgadosModal() {
+      pendingMiniProduct = null;
+      document.getElementById('miniSalgadosModal').classList.add('hidden');
+    }
+
+    function updateMiniFlavorCounter() {
+      const checked = document.querySelectorAll('.mini-flavor-checkbox:checked').length;
+      const counter = document.getElementById('miniFlavorCounter');
+      if (counter) {
+        counter.textContent = `Selecionados: ${checked}/${miniMaxFlavors}`;
+        counter.classList.toggle('text-red-600', checked > miniMaxFlavors);
+        counter.classList.toggle('text-rose-600', checked <= miniMaxFlavors);
+      }
+    }
+
+    // Limit mini-salgados flavor selections
+    document.addEventListener('change', function (e) {
+      if (e.target.classList.contains('mini-flavor-checkbox')) {
+        const checked = document.querySelectorAll('.mini-flavor-checkbox:checked').length;
+        if (checked > miniMaxFlavors) {
+          e.target.checked = false;
+          const errorEl = document.getElementById('miniSalgadosError');
+          if (errorEl) {
+            errorEl.textContent = `Você pode escolher no máximo ${miniMaxFlavors} sabores.`;
+            errorEl.classList.remove('hidden');
+            setTimeout(() => errorEl.classList.add('hidden'), 3000);
+          }
+        }
+        updateMiniFlavorCounter();
+      }
+    });
+
+    function confirmMiniSalgados() {
+      if (!pendingMiniProduct) return;
+
+      const selectedFlavors = Array.from(document.querySelectorAll('.mini-flavor-checkbox:checked'))
+        .map(cb => cb.value);
+
+      const errorEl = document.getElementById('miniSalgadosError');
+
+      if (selectedFlavors.length === 0) {
+        errorEl.textContent = 'Selecione pelo menos um sabor.';
+        errorEl.classList.remove('hidden');
+        return;
+      }
+
+      if (selectedFlavors.length > miniMaxFlavors) {
+        errorEl.textContent = `Selecione no máximo ${miniMaxFlavors} sabores.`;
+        errorEl.classList.remove('hidden');
+        return;
+      }
+
+      // Build note with selected flavors
+      const note = `Sabores: ${selectedFlavors.join(', ')}`;
+
+      // Add to cart
+      const existingIndex = cart.findIndex(item =>
+        item.id === pendingMiniProduct.id && item.note === note
+      );
+
+      if (existingIndex !== -1) {
+        cart[existingIndex].quantity++;
+      } else {
+        cart.push({
+          id: pendingMiniProduct.id,
+          name: pendingMiniProduct.name,
+          description: pendingMiniProduct.description || '',
+          price: pendingMiniProduct.price,
+          quantity: 1,
+          note: note,
+          customOptions: { flavors: selectedFlavors }
+        });
+      }
+
+      updateCart();
+      closeMiniSalgadosModal();
     }
 
     function closeCustomOptionsModal() {
@@ -6760,6 +7632,13 @@
         // For kits and bolos, open custom options modal
         if (category === 'kits' || category === 'bolos') {
           openCustomOptionsModal(id, name, description, price, category);
+          return;
+        }
+
+        // For mini products with flavor selection enabled, open mini-salgados modal
+        const product = products.find(p => p.id === id);
+        if (product && product.category === 'mini' && product.flavor_selection?.enabled) {
+          openMiniSalgadosModal(product);
           return;
         }
 
@@ -9335,17 +10214,8 @@
     // STRIPE PAYMENT SERVICE
     // ========================================
     function getStripeServerBaseUrl() {
-      try {
-        const hostname = location.hostname;
-        const isLocal = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
-        const isPrivateIP = /^(10\.|172\.(1[6-9]|2\d|3[01])\.|192\.168\.)/.test(hostname);
-        if (isLocal || isPrivateIP) return 'http://localhost:3001';
-      } catch (e) { }
-      try {
-        return localStorage.getItem('fastStripeServerUrl') || 'https://fastsavorys.onrender.com';
-      } catch (e2) {
-        return 'https://fastsavorys.onrender.com';
-      }
+      // Vercel Serverless Functions path
+      return '/api';
     }
 
     const StripeService = {
