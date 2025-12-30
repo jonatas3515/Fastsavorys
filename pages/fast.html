@@ -150,7 +150,16 @@
       <!-- Image centered on screen -->
       <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
         <img src="../assets/img/capa-logo.png" alt="Fast Savory's" class="object-contain drop-shadow-2xl"
-          style="max-width: 60vw; max-height: 80vh; width: auto; height: auto;" />
+          style="max-width: 50vw; max-height: 80vh; width: auto; height: auto;" />
+      </div>
+
+      <!-- Testimonials Column (Desktop only - right side) -->
+      <div id="testimonialsColumn" class="hidden xl:block absolute top-8 right-4 2xl:right-8 z-10 w-64 2xl:w-72">
+        <h3 class="text-base font-bold text-white mb-3 drop-shadow-lg">⭐ Avaliações dos Clientes</h3>
+        <div id="testimonialsContainer" class="space-y-2 max-h-[60vh] overflow-y-auto pr-1 scrollbar-thin">
+          <!-- Testimonials will be loaded here -->
+          <div class="text-white/60 text-sm italic text-center py-4">Carregando...</div>
+        </div>
       </div>
     </div>
   </div>
@@ -160,6 +169,95 @@
 
 
 
+  <!-- Rating Modal (Public - for customers) -->
+  <div id="ratingModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+    <!-- Gradient Background like welcome screen -->
+    <div class="absolute inset-0 bg-gradient-to-br from-rose-900 via-purple-900 to-rose-800"></div>
+
+    <div class="relative min-h-screen flex flex-col items-center justify-center px-4 py-8">
+      <!-- Logo -->
+      <img src="../assets/img/fast-logo.png" alt="Fast Savory's" class="h-20 mb-6 object-contain" />
+
+      <!-- Rating Card -->
+      <div class="bg-white rounded-2xl shadow-2xl p-6 max-w-md w-full border-2 border-rose-200 my-8">
+        <h2 class="text-xl font-bold text-gray-800 text-center mb-2">⭐ Avalie sua Experiência</h2>
+        <p id="ratingOrderCode" class="text-center text-rose-600 font-medium mb-4">FAST-0000</p>
+
+        <!-- Rating Message -->
+        <div id="ratingMessage" class="hidden mb-4 p-3 rounded-lg text-sm text-center"></div>
+
+        <!-- Rating Form -->
+        <div id="ratingForm">
+          <!-- Client Name -->
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Seu Nome *</label>
+            <input id="ratingClientName" type="text" required
+              class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-rose-500 focus:ring-2 focus:ring-rose-200"
+              placeholder="Digite seu nome" />
+          </div>
+
+          <!-- Star Rating -->
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Sua Nota *</label>
+            <input type="hidden" id="ratingValue" value="0" />
+            <div id="starRating" class="flex justify-center gap-2">
+              <button type="button" class="star-btn text-4xl text-gray-300 hover:text-yellow-400 transition"
+                data-star="1">☆</button>
+              <button type="button" class="star-btn text-4xl text-gray-300 hover:text-yellow-400 transition"
+                data-star="2">☆</button>
+              <button type="button" class="star-btn text-4xl text-gray-300 hover:text-yellow-400 transition"
+                data-star="3">☆</button>
+              <button type="button" class="star-btn text-4xl text-gray-300 hover:text-yellow-400 transition"
+                data-star="4">☆</button>
+              <button type="button" class="star-btn text-4xl text-gray-300 hover:text-yellow-400 transition"
+                data-star="5">☆</button>
+            </div>
+          </div>
+
+          <!-- Comment -->
+          <div class="mb-6">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Seu Comentário *</label>
+            <textarea id="ratingComment" rows="4" required maxlength="500"
+              class="w-full px-4 py-3 border-2 border-gray-200 rounded-xl focus:border-rose-500 focus:ring-2 focus:ring-rose-200 resize-none"
+              placeholder="Conte como foi sua experiência..."></textarea>
+            <p class="text-xs text-gray-400 mt-1 text-right"><span id="ratingCharCount">0</span>/500</p>
+          </div>
+
+          <!-- Submit Button -->
+          <button id="submitRatingBtn" type="button" disabled
+            class="w-full py-4 rounded-xl font-bold text-lg text-white bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 disabled:opacity-50 disabled:cursor-not-allowed transition shadow-lg mb-4">
+            Enviar Avaliação
+          </button>
+        </div>
+
+        <!-- Already Rated State -->
+        <div id="ratingAlreadyDone" class="hidden text-center py-6">
+          <p class="text-2xl mb-2">✅</p>
+          <p class="text-lg font-semibold text-gray-800 mb-2">Você já avaliou este pedido!</p>
+          <p id="existingRatingStars" class="text-3xl text-yellow-400 mb-2">★★★★★</p>
+          <p id="existingRatingComment" class="text-gray-600 text-sm italic">"Comentário anterior"</p>
+        </div>
+
+        <!-- Thank You State -->
+        <div id="ratingThankYou" class="hidden text-center py-6">
+          <p class="text-4xl mb-3">🎉</p>
+          <p class="text-xl font-bold text-green-600 mb-2">Obrigado!</p>
+          <p class="text-gray-600">Sua avaliação será analisada pela nossa equipe e poderá aparecer em nosso site em
+            breve.</p>
+          <button onclick="closeRatingModal()"
+            class="mt-4 px-6 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg">
+            Fechar
+          </button>
+        </div>
+      </div>
+
+      <!-- Close Button -->
+      <button id="closeRatingModalBtn" onclick="closeRatingModal()"
+        class="mt-4 text-white hover:text-yellow-300 transition text-sm">
+        ✕ Fechar
+      </button>
+    </div>
+  </div>
 
   <!-- Login Modal -->
   <div id="loginModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center">
@@ -212,6 +310,8 @@
               class="bg-gray-600 hover:bg-gray-700 text-white px-3 py-2 rounded-lg text-xs">Promoções</button>
             <button id="showReportsPanelFast"
               class="bg-gray-600 hover:bg-gray-700 text-white px-3 py-2 rounded-lg text-xs">Relatórios</button>
+            <button id="showRatingsPanelFast"
+              class="bg-yellow-600 hover:bg-yellow-700 text-white px-3 py-2 rounded-lg text-xs">⭐ Avaliações</button>
             <button id="showOrdersPanelFast"
               class="bg-orange-600 hover:bg-orange-700 text-white px-3 py-2 rounded-lg text-xs">📋 Pedidos</button>
             <button id="showConfigPanelFast"
@@ -241,6 +341,9 @@
               class="bg-gray-600 hover:bg-gray-700 text-white px-2 py-2 rounded-lg text-xs text-center">Promoções</button>
             <button id="showReportsPanelFastMobile"
               class="bg-gray-600 hover:bg-gray-700 text-white px-2 py-2 rounded-lg text-xs text-center">Relatórios</button>
+            <button id="showRatingsPanelFastMobile"
+              class="bg-yellow-600 hover:bg-yellow-700 text-white px-2 py-2 rounded-lg text-xs text-center">⭐
+              Avaliações</button>
             <button id="showOrdersPanelFastMobile"
               class="bg-orange-600 hover:bg-orange-700 text-white px-2 py-2 rounded-lg text-xs text-center">📋
               Pedidos</button>
@@ -257,9 +360,9 @@
     </header>
 
 
-    <main id="productsPanelFast" class="container mx-auto px-2 py-4">
-      <div class="grid xl:grid-cols-3 lg:grid-cols-2 gap-4">
-        <div class="xl:col-span-1 lg:col-span-2 space-y-4">
+    <main id="productsPanelFast" class="container mx-auto px-4 py-6 text-gray-800 hidden">
+      <div class="grid lg:grid-cols-2 gap-6">
+        <div class="space-y-4">
           <div class="bg-white rounded-xl shadow p-4">
             <h3 class="text-xl font-bold text-gray-800 mb-4">Adicionar Produto</h3>
             <form id="productForm" class="space-y-4">
@@ -352,10 +455,10 @@
                 Produto</button>
             </form>
           </div>
-
         </div>
 
-        <div class="lg:col-span-2">
+        <!-- RIGHT COLUMN: Products List -->
+        <div>
           <div class="bg-white rounded-xl shadow p-6">
             <h3 class="text-xl font-bold text-gray-800 mb-4">Produtos Cadastrados</h3>
             <div class="flex flex-wrap gap-2 mb-3">
@@ -377,7 +480,7 @@
               <button class="admin-filter px-3 py-1 rounded bg-red-100 text-red-800" data-filter="unavailable">❌
                 Indisponíveis</button>
             </div>
-            <div id="productsList" class="space-y-4"></div>
+            <div id="productsList" class="space-y-4 max-h-[70vh] overflow-y-auto"></div>
           </div>
         </div>
       </div>
@@ -808,6 +911,95 @@
           <h4 class="font-semibold text-gray-800 mb-3">Promoções Ativas</h4>
           <div id="promotionsList" class="space-y-2"></div>
         </div>
+        <div class="mt-6">
+          <h4 class="font-semibold text-gray-800 mb-3">🎯 Descontos por Cliente</h4>
+          <div id="clientDiscountsList" class="space-y-2 max-h-60 overflow-y-auto">
+            <p class="text-sm text-gray-500">Nenhum desconto ativo</p>
+          </div>
+        </div>
+      </div>
+    </div>
+    </div>
+
+    <!-- Discounts Configuration Grid -->
+    <div class="mt-6 grid lg:grid-cols-2 gap-6">
+      <!-- Special Discount Configuration (Left) -->
+      <div class="bg-white rounded-xl shadow p-6">
+        <h3 class="text-xl font-bold text-gray-800 mb-4">⭐ Desconto Fidelidade</h3>
+
+        <!-- Status Card -->
+        <div id="specialDiscountStatus" class="mb-4 p-3 rounded-lg bg-gray-100 border-l-4 border-gray-400">
+          <p class="text-sm text-gray-600 font-medium">Carregando configuração...</p>
+        </div>
+
+        <div class="space-y-4">
+          <p class="text-sm text-gray-600">Desconto automático baseado na fidelidade do cliente.</p>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Mínimo de Pedidos (Pagos)</label>
+              <input type="number" id="specialDiscountMinOrders" class="w-full px-3 py-2 border rounded-lg"
+                placeholder="Ex: 10">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Mínimo Valor Pedido (R$)</label>
+              <input type="number" step="0.01" id="specialDiscountMinVal" class="w-full px-3 py-2 border rounded-lg"
+                placeholder="Ex: 50.00">
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Tipo de Desconto</label>
+              <select id="specialDiscountType" class="w-full px-3 py-2 border rounded-lg">
+                <option value="percentage">% Porcentagem</option>
+                <option value="fixed">R$ Fixo</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Valor do Desconto</label>
+              <input type="number" step="0.01" id="specialDiscountValue" class="w-full px-3 py-2 border rounded-lg"
+                placeholder="Ex: 10">
+            </div>
+          </div>
+          <div class="flex gap-2">
+            <button id="saveSpecialDiscountConfig"
+              class="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-lg font-medium">Salvar
+              Configuração</button>
+            <div id="specialDiscountMsg" class="text-sm text-gray-600 flex items-center"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Birthday Discount Configuration (Right) -->
+      <div class="bg-white rounded-xl shadow p-6">
+        <h3 class="text-xl font-bold text-gray-800 mb-4">🎂 Desconto de Aniversário</h3>
+
+        <!-- Status Card -->
+        <div id="birthdayDiscountStatus" class="mb-4 p-3 rounded-lg bg-gray-100 border-l-4 border-gray-400">
+          <p class="text-sm text-gray-600 font-medium">Carregando configuração...</p>
+        </div>
+
+        <div class="space-y-4">
+          <p class="text-sm text-gray-600">Desconto especial no dia do aniversário do cliente. Uso único por ano.</p>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Tipo de Desconto</label>
+              <select id="birthdayDiscountType" class="w-full px-3 py-2 border rounded-lg">
+                <option value="percentage">% Porcentagem</option>
+                <option value="fixed">R$ Fixo</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Valor do Desconto</label>
+              <input type="number" step="0.01" id="birthdayDiscountValue" class="w-full px-3 py-2 border rounded-lg"
+                placeholder="Ex: 10">
+            </div>
+          </div>
+          <div class="flex gap-2">
+            <button id="saveBirthdayDiscountConfig"
+              class="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-lg font-medium">Salvar
+              Configuração</button>
+            <div id="birthdayDiscountMsg" class="text-sm text-gray-600 flex items-center"></div>
+          </div>
+          <p class="text-xs text-gray-500 mt-2">💡 Este desconto acumula com qualquer outro desconto.</p>
+        </div>
       </div>
     </div>
 
@@ -885,6 +1077,49 @@
     </div>
   </main>
 
+  <!-- Ratings (Avaliações) Panel -->
+  <main id="ratingsPanelFast" class="hidden container mx-auto px-4 py-6">
+    <div class="bg-white rounded-xl shadow-lg p-6">
+      <h2 class="text-2xl font-bold text-gray-800 mb-4">⭐ Avaliações dos Clientes</h2>
+
+      <!-- Status Filter Tabs -->
+      <div class="flex flex-wrap gap-2 mb-3">
+        <button onclick="RatingsModule.setStatusFilter('all')" data-filter="all"
+          class="rating-filter-btn px-4 py-2 bg-rose-600 text-white rounded-lg text-sm font-medium transition">Todas</button>
+        <button onclick="RatingsModule.setStatusFilter('pending')" data-filter="pending"
+          class="rating-filter-btn px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition hover:bg-gray-300">⏳ Pendentes</button>
+        <button onclick="RatingsModule.setStatusFilter('published')" data-filter="published"
+          class="rating-filter-btn px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition hover:bg-gray-300">✓ Publicadas</button>
+        <button onclick="RatingsModule.setStatusFilter('archived')" data-filter="archived"
+          class="rating-filter-btn px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition hover:bg-gray-300">Arquivadas</button>
+      </div>
+
+      <!-- Star Filter (quick filter for high ratings to publish) -->
+      <div class="flex flex-wrap items-center gap-2 mb-4">
+        <span class="text-xs text-gray-500">Filtrar por nota:</span>
+        <button onclick="RatingsModule.setStarFilter(0)" data-stars="0"
+          class="star-filter-btn px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs hover:bg-gray-200 ring-2 ring-rose-500">Todas</button>
+        <button onclick="RatingsModule.setStarFilter(5)" data-stars="5"
+          class="star-filter-btn px-2 py-1 bg-yellow-50 text-yellow-700 rounded text-xs hover:bg-yellow-100">⭐5</button>
+        <button onclick="RatingsModule.setStarFilter(4)" data-stars="4"
+          class="star-filter-btn px-2 py-1 bg-yellow-50 text-yellow-700 rounded text-xs hover:bg-yellow-100">⭐4+</button>
+        <button onclick="RatingsModule.setStarFilter(3)" data-stars="3"
+          class="star-filter-btn px-2 py-1 bg-yellow-50 text-yellow-700 rounded text-xs hover:bg-yellow-100">⭐3+</button>
+      </div>
+
+      <!-- Inline Message Area -->
+      <div id="ratingsMessage" class="hidden mb-4 p-3 rounded-lg text-sm text-center"></div>
+
+      <!-- Ratings List -->
+      <div id="ratingsList" class="space-y-4 max-h-[70vh] overflow-y-auto">
+        <div class="text-center py-12 text-gray-500">
+          <p class="text-4xl mb-2">⭐</p>
+          <p>Carregando avaliações...</p>
+        </div>
+      </div>
+    </div>
+  </main>
+
   <!-- Reports Panel -->
   <main id="reportsPanelFast" class="hidden container mx-auto px-4 py-6">
     <div class="bg-white rounded-xl shadow-lg p-6">
@@ -934,24 +1169,52 @@
         </div>
       </div>
 
-      <!-- Top Products -->
-      <div class="mt-6 bg-gray-50 rounded-lg p-4">
-        <h3 class="text-lg font-semibold text-gray-800 mb-4">🔥 Produtos Mais Pedidos</h3>
-        <div id="topProductsList" class="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div class="text-center py-6 text-gray-500 col-span-full">
-            <p class="text-4xl mb-2">🍽️</p>
-            <p>Aguardando dados de pedidos...</p>
+      <!-- Charts Section (2 Columns) -->
+      <div class="mt-6 grid lg:grid-cols-2 gap-6">
+        <!-- Top Products -->
+        <div class="bg-gray-50 rounded-lg p-4">
+          <h3 class="text-lg font-semibold text-gray-800 mb-4">🔥 Produtos Mais Pedidos</h3>
+          <div id="topProductsList" class="grid grid-cols-2 gap-3">
+            <div class="text-center py-6 text-gray-500 col-span-full">
+              <p class="text-4xl mb-2">🍽️</p>
+              <p>Aguardando dados de pedidos...</p>
+            </div>
           </div>
         </div>
-      </div>
 
-      <!-- Neighborhood Orders Chart -->
-      <div class="mt-6 bg-gray-50 rounded-lg p-4">
-        <h3 class="text-lg font-semibold text-gray-800 mb-4">🗺️ Pedidos por Bairro</h3>
-        <div id="neighborhoodChartContainer" class="space-y-2">
-          <div class="text-center py-6 text-gray-500">
-            <p class="text-4xl mb-2">📍</p>
-            <p>Aguardando dados de pedidos...</p>
+        <!-- Neighborhood Orders Chart -->
+        <div class="bg-gray-50 rounded-lg p-4">
+          <div class="flex flex-wrap items-center justify-between mb-4 gap-2">
+            <h3 class="text-lg font-semibold text-gray-800">🗺️ Pedidos por Bairro</h3>
+            <div class="flex gap-2">
+              <select id="neighborhoodFilterYear" class="text-xs border rounded p-1">
+                <option value="2024">2024</option>
+                <option value="2025" selected>2025</option>
+              </select>
+              <select id="neighborhoodFilterPeriod" class="text-xs border rounded p-1">
+                <option value="all">Todo o ano</option>
+                <option value="1">1º Semestre</option>
+                <option value="2">2º Semestre</option>
+                <option value="jan">Janeiro</option>
+                <option value="feb">Fevereiro</option>
+                <option value="mar">Março</option>
+                <option value="apr">Abril</option>
+                <option value="may">Maio</option>
+                <option value="jun">Junho</option>
+                <option value="jul">Julho</option>
+                <option value="aug">Agosto</option>
+                <option value="sep">Setembro</option>
+                <option value="oct">Outubro</option>
+                <option value="nov">Novembro</option>
+                <option value="dec">Dezembro</option>
+              </select>
+            </div>
+          </div>
+          <div id="neighborhoodChartContainer" class="space-y-2">
+            <div class="text-center py-6 text-gray-500">
+              <p class="text-4xl mb-2">📍</p>
+              <p>Aguardando dados de pedidos...</p>
+            </div>
           </div>
         </div>
       </div>
@@ -1009,55 +1272,57 @@
         </div>
       </div>
 
-      <!-- Filters -->
-      <div class="grid md:grid-cols-3 gap-4 mb-6">
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">Data</label>
-          <select id="ordersFilterDate" class="w-full px-3 py-2 border rounded-lg">
-            <option value="today">Hoje</option>
-            <option value="yesterday">Ontem</option>
-            <option value="week">Última semana</option>
-            <option value="month">Este mês</option>
-            <option value="all">Todos</option>
-          </select>
+      <div class="grid xl:grid-cols-2 gap-6 mb-6">
+        <!-- Filters -->
+        <div class="grid md:grid-cols-3 gap-4 h-fit">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Data</label>
+            <select id="ordersFilterDate" class="w-full px-3 py-2 border rounded-lg">
+              <option value="today">Hoje</option>
+              <option value="yesterday">Ontem</option>
+              <option value="week">Última semana</option>
+              <option value="month">Este mês</option>
+              <option value="all">Todos</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Status</label>
+            <select id="ordersFilterStatus" class="w-full px-3 py-2 border rounded-lg">
+              <option value="all">Todos</option>
+              <option value="pending">🆕 Recebido</option>
+              <option value="accepted">✅ Aceito (Aguard. Pgto)</option>
+              <option value="preparing">🍳 Em Preparo</option>
+              <option value="confirmed">✅ Pronto</option>
+              <option value="out_for_delivery">🚚 Saiu p/ Entrega</option>
+              <option value="delivered">✔️ Entregue</option>
+              <option value="cancelled">❌ Cancelado</option>
+            </select>
+          </div>
+          <div class="flex items-end">
+            <button id="refreshOrders"
+              class="w-full bg-rose-600 hover:bg-rose-700 text-white py-2 rounded-lg font-medium">
+              🔄 Atualizar
+            </button>
+          </div>
         </div>
-        <div>
-          <label class="block text-sm font-medium text-gray-700 mb-2">Status</label>
-          <select id="ordersFilterStatus" class="w-full px-3 py-2 border rounded-lg">
-            <option value="all">Todos</option>
-            <option value="pending">🆕 Recebido</option>
-            <option value="accepted">✅ Aceito (Aguard. Pgto)</option>
-            <option value="preparing">🍳 Em Preparo</option>
-            <option value="confirmed">✅ Pronto</option>
-            <option value="out_for_delivery">🚚 Saiu p/ Entrega</option>
-            <option value="delivered">✔️ Entregue</option>
-            <option value="cancelled">❌ Cancelado</option>
-          </select>
-        </div>
-        <div class="flex items-end">
-          <button id="refreshOrders"
-            class="w-full bg-rose-600 hover:bg-rose-700 text-white py-2 rounded-lg font-medium">
-            🔄 Atualizar
-          </button>
-        </div>
-      </div>
 
-      <!-- Excluir Pedidos por Código -->
-      <div class="bg-amber-50 border border-amber-300 rounded-lg p-4 mb-6">
-        <h4 class="font-semibold text-amber-800 mb-2">🗑️ Excluir Pedidos de Teste</h4>
-        <p class="text-sm text-amber-700 mb-3">
-          Digite o código do pedido que deseja excluir (ex: FAST-0001).
-          Para excluir vários, separe por vírgula.
-        </p>
-        <div class="flex gap-2 items-center flex-wrap">
-          <input type="text" id="orderCodesToDelete" placeholder="FAST-0001, FAST-0002, ..."
-            class="flex-1 min-w-[200px] px-3 py-2 border border-amber-300 rounded-lg text-sm" />
-          <button id="confirmDeleteOrdersBtn"
-            class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap">
-            🗑️ Excluir
-          </button>
+        <!-- Excluir Pedidos por Código -->
+        <div class="bg-amber-50 border border-amber-300 rounded-lg p-4 h-fit">
+          <h4 class="font-semibold text-amber-800 mb-2">🗑️ Excluir Pedidos</h4>
+          <p class="text-sm text-amber-700 mb-3">
+            Digite o código do pedido que deseja excluir (ex: FAST-0001).
+            Para excluir vários, separe por vírgula.
+          </p>
+          <div class="flex gap-2 items-center flex-wrap">
+            <input type="text" id="orderCodesToDelete" placeholder="FAST-0001, FAST-0002, ..."
+              class="flex-1 min-w-[200px] px-3 py-2 border border-amber-300 rounded-lg text-sm" />
+            <button id="confirmDeleteOrdersBtn"
+              class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg font-medium text-sm whitespace-nowrap">
+              🗑️ Excluir
+            </button>
+          </div>
+          <div id="deleteOrdersResult" class="mt-2 text-sm font-medium"></div>
         </div>
-        <div id="deleteOrdersResult" class="mt-2 text-sm font-medium"></div>
       </div>
 
       <!-- Stats Summary -->
@@ -1349,7 +1614,7 @@
     <!-- Footer -->
     <footer class="bg-gray-900 text-white py-6 mt-12">
       <div class="container mx-auto px-4 text-center">
-        <p class="text-sm mb-2">2025 FastSavory's. Todos os direitos reservados.</p>
+        <p class="text-sm mb-2">© 2026 FastSavory's. Todos os direitos reservados.</p>
         <p class="text-xs text-gray-400">
           Desenvolvido por
           <a href="https://i.im.ge/2025/12/20/BSwhSJ.JNC.png" target="_blank"
@@ -1432,9 +1697,8 @@
 
   <!-- Checkout Modal -->
   <div id="checkoutModal"
-    class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-start sm:items-center justify-center overflow-y-auto py-2 sm:py-4">
-    <div
-      class="bg-white rounded-xl p-4 sm:p-6 max-w-md w-[calc(100%-1rem)] sm:w-full sm:mx-4 max-h-[calc(100vh-1rem)] overflow-y-auto text-gray-800 my-2 sm:my-auto">
+    class="fixed inset-0 bg-black bg-opacity-50 z-[60] hidden flex items-start justify-center overflow-y-auto pt-4 pb-20 sm:py-10">
+    <div class="bg-white rounded-xl p-4 sm:p-6 max-w-md w-full mx-auto shadow-2xl relative my-auto">
       <h3 class="text-xl font-bold text-gray-800 mb-4">Finalizar Pedido</h3>
 
       <!-- Dados do Cliente - Primeiro -->
@@ -1497,7 +1761,19 @@
             </label>
           </div>
 
-          <div class="bg-blue-50 p-3 rounded-lg">
+          <!-- Termos de Uso -->
+          <div class="mt-3">
+            <label class="flex items-start gap-2 cursor-pointer">
+              <input type="checkbox" id="acceptTermsCheckbox" class="w-4 h-4 text-rose-600 mt-1">
+              <span class="text-sm text-gray-700">
+                Aceito os <a href="#" onclick="openTermsModal(); return false;"
+                  class="text-rose-600 hover:underline font-medium">Termos de Uso</a>
+                do aplicativo.
+              </span>
+            </label>
+          </div>
+
+          <div class="bg-blue-50 p-3 rounded-lg mt-3">
             <p class="text-xs text-blue-800">
               <strong>LGPD:</strong> Seus dados serão usados apenas para contato sobre este pedido e para participar de
               promoções.
@@ -1648,69 +1924,125 @@
     </div>
   </div>
 
-  <!-- Rating Modal -->
-  <div id="ratingModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center">
-    <div class="bg-white rounded-xl p-6 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto text-gray-800">
-      <div class="flex items-center justify-between mb-4">
-        <h3 class="text-xl font-bold text-gray-800">⭐ Avaliar Pedido</h3>
-        <button id="closeRatingModalBtn" class="text-gray-500 hover:text-gray-700"><span
-            class="text-2xl">×</span></button>
+  <!-- Terms of Use Modal -->
+  <div id="termsModal" class="fixed inset-0 bg-black bg-opacity-50 z-[70] hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl max-w-2xl w-full max-h-[85vh] overflow-y-auto shadow-2xl">
+      <div class="sticky top-0 bg-white p-4 border-b z-10">
+        <h3 class="text-xl font-bold text-gray-800 text-center">📜 Termos de Uso</h3>
+        <p class="text-xs text-gray-500 text-center mt-1">FastSavory's - Delivery de Alimentos</p>
       </div>
+      <div class="p-6 text-gray-700 space-y-5 text-sm leading-relaxed">
 
-      <!-- Rating Form -->
-      <div id="ratingForm">
-        <div class="bg-gray-50 border rounded-lg p-4 mb-4">
-          <p class="text-sm text-gray-700"><strong>Pedido:</strong> <span id="ratingOrderCode">-</span></p>
-        </div>
+        <section>
+          <h4 class="font-bold text-gray-900 mb-2">1. Definições</h4>
+          <ul class="list-disc pl-5 space-y-1 text-xs">
+            <li><strong>Aplicativo:</strong> plataforma digital da FastSavory's para pedidos de alimentos (entrega e
+              retirada).</li>
+            <li><strong>Usuário/Cliente:</strong> pessoa física cadastrada que utiliza o Aplicativo.</li>
+            <li><strong>Pedido:</strong> solicitação de compra realizada pelo Usuário.</li>
+            <li><strong>Entrega:</strong> serviço de deslocamento até o endereço informado.</li>
+            <li><strong>Retirada:</strong> opção em que o Usuário busca o Pedido na loja.</li>
+          </ul>
+        </section>
 
-        <p class="text-sm text-gray-600 mb-3 text-center">Como foi sua experiência?</p>
+        <section>
+          <h4 class="font-bold text-gray-900 mb-2">2. Objeto e Aceite</h4>
+          <p>Ao se cadastrar ou utilizar o Aplicativo, o Usuário declara ter lido, compreendido e aceitado integralmente
+            estes Termos.</p>
+        </section>
 
-        <!-- Star Rating -->
-        <div id="starRating" class="flex justify-center gap-2 mb-4">
-          <button type="button" data-star="1"
-            class="star-btn text-4xl text-gray-300 hover:text-yellow-400 transition-colors">★</button>
-          <button type="button" data-star="2"
-            class="star-btn text-4xl text-gray-300 hover:text-yellow-400 transition-colors">★</button>
-          <button type="button" data-star="3"
-            class="star-btn text-4xl text-gray-300 hover:text-yellow-400 transition-colors">★</button>
-          <button type="button" data-star="4"
-            class="star-btn text-4xl text-gray-300 hover:text-yellow-400 transition-colors">★</button>
-          <button type="button" data-star="5"
-            class="star-btn text-4xl text-gray-300 hover:text-yellow-400 transition-colors">★</button>
-        </div>
-        <input type="hidden" id="ratingValue" value="0">
+        <section>
+          <h4 class="font-bold text-gray-900 mb-2">3. Cadastro e Conta</h4>
+          <p>O Usuário deve fornecer dados verdadeiros e ser maior de 18 anos. A FastSavory's pode recusar cadastro ou
+            encerrar contas em casos de fraude ou violação.</p>
+        </section>
 
-        <textarea id="ratingComment" rows="3" placeholder="Deixe um comentário (opcional)"
-          class="w-full px-3 py-2 border rounded-lg resize-none mb-4"></textarea>
+        <section>
+          <h4 class="font-bold text-gray-900 mb-2">4. Funcionamento (Delivery e Retirada)</h4>
+          <ul class="list-disc pl-5 space-y-1 text-xs">
+            <li><strong>Entrega:</strong> enviado ao endereço informado, mediante taxa quando aplicável.</li>
+            <li><strong>Retirada:</strong> buscar diretamente na loja no prazo informado.</li>
+          </ul>
+          <p class="mt-2 text-xs">Horários, área de entrega, valores e disponibilidade são definidos pela loja.</p>
+        </section>
 
-        <button id="submitRatingBtn" type="button"
-          class="w-full bg-rose-600 hover:bg-rose-700 text-white py-3 rounded-lg font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed"
-          disabled>
-          Enviar Avaliação
+        <section>
+          <h4 class="font-bold text-gray-900 mb-2">5. Pedidos e Entrega</h4>
+          <p>O tempo de entrega é estimado e pode variar. Na entrega, o Usuário deve informar endereço correto e estar
+            disponível para receber. Na retirada, comparecer dentro do prazo.</p>
+        </section>
+
+        <section>
+          <h4 class="font-bold text-gray-900 mb-2">6. Pagamentos</h4>
+          <p>Pagamentos por cartão, PIX ou dinheiro. O valor final inclui taxas quando aplicável. Dados de cartão são
+            tratados conforme normas de segurança.</p>
+        </section>
+
+        <section>
+          <h4 class="font-bold text-gray-900 mb-2">7. Promoções e Cupons</h4>
+          <p>Cupons e promoções têm regras específicas (validade, limite de uso, valor mínimo). A FastSavory's pode
+            alterar ou encerrar promoções a qualquer momento.</p>
+        </section>
+
+        <section>
+          <h4 class="font-bold text-gray-900 mb-2">8. Cancelamentos e Reembolsos</h4>
+          <p>Cancelamentos são aceitos conforme estágio do pedido. Pedidos em preparo ou entrega podem não ser
+            canceláveis. Problemas devem ser reportados pelos canais oficiais.</p>
+        </section>
+
+        <section>
+          <h4 class="font-bold text-gray-900 mb-2">9. Responsabilidades</h4>
+          <p>O Usuário deve conferir o pedido, guardar alimentos corretamente e não praticar condutas abusivas. A
+            FastSavory's mantém o Aplicativo funcionando de forma estável.</p>
+        </section>
+
+        <section>
+          <h4 class="font-bold text-gray-900 mb-2">10. Uso Adequado</h4>
+          <p>É vedado uso ilícito, contornar sistemas de segurança ou criar múltiplas contas para obter benefícios
+            indevidos.</p>
+        </section>
+
+        <section>
+          <h4 class="font-bold text-gray-900 mb-2">11. Proteção de Dados (LGPD)</h4>
+          <p>Dados pessoais são tratados conforme a Lei 13.709/2018. Usados para processamento de pedidos, comunicação
+            e, com consentimento, marketing. O titular pode solicitar acesso, correção ou exclusão.</p>
+        </section>
+
+        <section>
+          <h4 class="font-bold text-gray-900 mb-2">12. Geolocalização</h4>
+          <p>Quando autorizado, dados de localização são usados para estimar prazos e otimizar a experiência. Pode ser
+            gerenciado nas configurações do dispositivo.</p>
+        </section>
+
+        <section>
+          <h4 class="font-bold text-gray-900 mb-2">13. Propriedade Intelectual</h4>
+          <p>Todos os direitos do Aplicativo pertencem à FastSavory's. Reprodução ou uso não autorizado é proibido.</p>
+        </section>
+
+        <section>
+          <h4 class="font-bold text-gray-900 mb-2">14. Atendimento</h4>
+          <p><strong>Telefones:</strong> (73) 99936-6554 / (73) 99934-8552<br>
+            <strong>E-mail:</strong> contato@nevesecosta.com.br
+          </p>
+        </section>
+
+        <section>
+          <h4 class="font-bold text-gray-900 mb-2">15. Alterações</h4>
+          <p>A FastSavory's pode alterar estes Termos. O uso continuado após alterações implica concordância.</p>
+        </section>
+
+        <section>
+          <h4 class="font-bold text-gray-900 mb-2">16. Legislação e Foro</h4>
+          <p>Regido pelas leis do Brasil, CDC e LGPD. Foro: Comarca de Itamaraju/BA, sem prejuízo do direito do
+            consumidor.</p>
+        </section>
+
+      </div>
+      <div class="sticky bottom-0 bg-white p-4 border-t">
+        <button onclick="closeTermsModal()"
+          class="w-full bg-rose-600 hover:bg-rose-700 text-white py-3 rounded-lg font-semibold text-lg">
+          Entendi
         </button>
-        <div id="ratingMessage" class="hidden mt-3 text-sm text-center"></div>
-      </div>
-
-      <!-- Already Rated View -->
-      <div id="ratingAlreadyDone" class="hidden">
-        <div class="text-center py-4">
-          <p class="text-5xl mb-3">✅</p>
-          <p class="font-semibold text-gray-800 mb-2">Você já avaliou este pedido!</p>
-          <div class="bg-gray-50 border rounded-lg p-4 mt-4">
-            <p class="text-sm text-gray-600 mb-2">Sua avaliação:</p>
-            <div id="existingRatingStars" class="text-2xl text-yellow-400 mb-2"></div>
-            <p id="existingRatingComment" class="text-sm text-gray-700 italic"></p>
-          </div>
-        </div>
-      </div>
-
-      <!-- Thank You View -->
-      <div id="ratingThankYou" class="hidden">
-        <div class="text-center py-8">
-          <p class="text-5xl mb-3">🙏</p>
-          <p class="text-xl font-bold text-gray-800 mb-2">Obrigado pela avaliação!</p>
-          <p class="text-sm text-gray-600">Sua opinião é muito importante para nós.</p>
-        </div>
       </div>
     </div>
   </div>
@@ -1773,6 +2105,7 @@
     let couriers = []; // Entregadores
     let promotions = [];
     let clientDiscounts = {};
+    let currentSpecialDiscount = null;
     let currentSelectedClient = null;
     let coupons = [];
 
@@ -1942,8 +2275,8 @@
           const key = this.getKey(phone);
           const orders = this.getOrders(phone);
           orders.unshift(order); // Adiciona no início
-          // Mantém apenas últimos 10 pedidos
-          localStorage.setItem(key, JSON.stringify(orders.slice(0, 10)));
+          // Mantém apenas últimos 2 pedidos
+          localStorage.setItem(key, JSON.stringify(orders.slice(0, 2)));
         } catch (e) {
           console.error('[OrderHistory] Erro ao salvar:', e);
         }
@@ -1954,7 +2287,7 @@
           const anonOrders = this.getOrders(null);
           if (anonOrders.length > 0) {
             const phoneOrders = this.getOrders(phone);
-            const merged = [...anonOrders, ...phoneOrders].slice(0, 10);
+            const merged = [...anonOrders, ...phoneOrders].slice(0, 2);
             localStorage.setItem(this.getKey(phone), JSON.stringify(merged));
             localStorage.removeItem('fastOrders_anon');
           }
@@ -2011,6 +2344,728 @@
         } catch (e) { }
       }
     };
+
+    // ========================================
+    // SPECIAL DISCOUNT SERVICE (Fidelidade Avançada)
+    // ========================================
+    const SpecialDiscountService = {
+      config: null,
+
+      getConfig: async function () {
+        if (this.config) return this.config;
+        try {
+          const { data, error } = await window.supabaseClient
+            .from('fast_special_discounts')
+            .select('*')
+            .eq('store_id', 1)
+            .maybeSingle();
+
+          if (data) {
+            this.config = data;
+          } else {
+            // Default config if none in DB
+            this.config = {
+              min_orders: 10,
+              discount_type: 'percentage',
+              discount_value: 10,
+              min_order_value: 0,
+              active: true
+            };
+          }
+          return this.config;
+        } catch (e) {
+          console.error('[SpecialDiscount] Erro ao carregar config:', e);
+          // Return default on error
+          return {
+            min_orders: 10,
+            discount_type: 'percentage',
+            discount_value: 10,
+            min_order_value: 0,
+            active: false // disable if error
+          };
+        }
+      },
+
+      saveConfig: async function (config) {
+        try {
+          const { data, error } = await window.supabaseClient
+            .from('fast_special_discounts')
+            .upsert({
+              store_id: 1,
+              ...config,
+              updated_at: new Date().toISOString()
+            }, { onConflict: 'store_id' })
+            .select();
+
+          if (error) throw error;
+          this.config = data[0];
+          return true;
+        } catch (e) {
+          console.error('[SpecialDiscount] Erro ao salvar config:', e);
+          return false;
+        }
+      },
+
+      getValidOrderCount: async function (phone) {
+        if (!phone) return 0;
+        const phoneDigits = phone.replace(/\D/g, '');
+        try {
+          const { count, error } = await window.supabaseClient
+            .from('fast_orders')
+            .select('*', { count: 'exact', head: true })
+            .eq('client_phone', phoneDigits)
+            .eq('status', 'delivered');
+
+          if (error) throw error;
+          return count || 0;
+        } catch (e) {
+          console.error('[SpecialDiscount] Erro ao contar pedidos:', e);
+          return 0;
+        }
+      }
+    };
+
+    // ========================================
+    // BIRTHDAY DISCOUNT SERVICE
+    // ========================================
+    const BirthdayDiscountService = {
+      config: null,
+
+      getConfig: async function () {
+        if (this.config) return this.config;
+        try {
+          const { data, error } = await window.supabaseClient
+            .from('fast_birthday_discount')
+            .select('*')
+            .maybeSingle();
+
+          if (data) {
+            this.config = data;
+          } else {
+            this.config = { discount_type: 'percentage', discount_value: 10, active: true };
+          }
+          return this.config;
+        } catch (e) {
+          console.error('[BirthdayDiscount] Erro ao carregar config:', e);
+          return { discount_type: 'percentage', discount_value: 10, active: false };
+        }
+      },
+
+      saveConfig: async function (config) {
+        try {
+          // Delete existing and insert new
+          await window.supabaseClient.from('fast_birthday_discount').delete().neq('id', 0);
+          const { data, error } = await window.supabaseClient
+            .from('fast_birthday_discount')
+            .insert(config)
+            .select()
+            .single();
+
+          if (error) throw error;
+          this.config = data;
+          return true;
+        } catch (e) {
+          console.error('[BirthdayDiscount] Erro ao salvar config:', e);
+          return false;
+        }
+      },
+
+      hasUsedThisYear: async function (phone) {
+        if (!phone) return false;
+        const phoneDigits = phone.replace(/\D/g, '');
+        const currentYear = new Date().getFullYear();
+        try {
+          const { data, error } = await window.supabaseClient
+            .from('fast_birthday_usage')
+            .select('id')
+            .eq('phone', phoneDigits)
+            .eq('year', currentYear)
+            .maybeSingle();
+
+          return !!data;
+        } catch (e) {
+          console.error('[BirthdayDiscount] Erro ao verificar uso:', e);
+          return false;
+        }
+      },
+
+      markUsed: async function (phone, orderId) {
+        if (!phone) return false;
+        const phoneDigits = phone.replace(/\D/g, '');
+        const currentYear = new Date().getFullYear();
+        try {
+          const { error } = await window.supabaseClient
+            .from('fast_birthday_usage')
+            .insert({ phone: phoneDigits, year: currentYear, order_id: orderId });
+
+          if (error) throw error;
+          return true;
+        } catch (e) {
+          console.error('[BirthdayDiscount] Erro ao marcar uso:', e);
+          return false;
+        }
+      }
+    };
+
+    // ========================================
+    // CLIENT DISCOUNTS SERVICE (Supabase sync)
+    // ========================================
+    const ClientDiscountsService = {
+      cache: null,
+
+      load: async function () {
+        if (this.cache) return this.cache;
+        try {
+          const { data, error } = await window.supabaseClient
+            .from('fast_client_discounts')
+            .select('*');
+
+          if (error) throw error;
+
+          this.cache = {};
+          (data || []).forEach(d => {
+            this.cache[d.phone] = d.discount_percentage;
+          });
+          console.log('Descontos por cliente carregados:', Object.keys(this.cache).length);
+          return this.cache;
+        } catch (e) {
+          console.error('[ClientDiscounts] Erro ao carregar:', e);
+          // Fallback to localStorage
+          const saved = localStorage.getItem('fastClientDiscounts');
+          this.cache = saved ? JSON.parse(saved) : {};
+          return this.cache;
+        }
+      },
+
+      save: async function (phone, discountPercentage) {
+        if (!phone) return false;
+        const phoneDigits = phone.replace(/\D/g, '');
+        try {
+          if (discountPercentage > 0) {
+            const { error } = await window.supabaseClient
+              .from('fast_client_discounts')
+              .upsert({
+                phone: phoneDigits,
+                discount_percentage: discountPercentage,
+                updated_at: new Date().toISOString()
+              }, { onConflict: 'phone' });
+
+            if (error) throw error;
+            if (this.cache) this.cache[phoneDigits] = discountPercentage;
+          } else {
+            // Delete if 0
+            await window.supabaseClient
+              .from('fast_client_discounts')
+              .delete()
+              .eq('phone', phoneDigits);
+
+            if (this.cache) delete this.cache[phoneDigits];
+          }
+          // Also update localStorage for fallback
+          localStorage.setItem('fastClientDiscounts', JSON.stringify(this.cache || {}));
+          return true;
+        } catch (e) {
+          console.error('[ClientDiscounts] Erro ao salvar:', e);
+          return false;
+        }
+      },
+
+      get: function (phone) {
+        if (!phone) return 0;
+        const phoneDigits = phone.replace(/\D/g, '');
+        return this.cache?.[phoneDigits] || 0;
+      }
+    };
+
+    // ========================================
+    // COUPON USAGE SERVICE (single use per phone)
+    // ========================================
+    const CouponUsageService = {
+      hasUsed: async function (phone, couponCode) {
+        if (!phone || !couponCode) return false;
+        const phoneDigits = phone.replace(/\D/g, '');
+        try {
+          const { data, error } = await window.supabaseClient
+            .from('fast_coupon_usage')
+            .select('id')
+            .eq('phone', phoneDigits)
+            .eq('coupon_code', couponCode.toUpperCase())
+            .maybeSingle();
+
+          return !!data;
+        } catch (e) {
+          console.error('[CouponUsage] Erro ao verificar:', e);
+          return false;
+        }
+      },
+
+      markUsed: async function (phone, couponCode, orderId) {
+        if (!phone || !couponCode) return false;
+        const phoneDigits = phone.replace(/\D/g, '');
+        try {
+          const { error } = await window.supabaseClient
+            .from('fast_coupon_usage')
+            .insert({
+              phone: phoneDigits,
+              coupon_code: couponCode.toUpperCase(),
+              order_id: orderId
+            });
+
+          if (error && error.code !== '23505') throw error; // Ignore duplicate error
+          return true;
+        } catch (e) {
+          console.error('[CouponUsage] Erro ao marcar:', e);
+          return false;
+        }
+      }
+    };
+
+    // ========================================
+    // RATINGS MODULE - FastSavory's (Módulo Centralizado)
+    // Todas as funções de avaliação consolidadas aqui
+    // ========================================
+    const RatingsModule = {
+      // State
+      cache: null,
+      adminData: [],
+      adminFilter: 'all',
+      adminStarFilter: 0, // 0 = all, 1-5 = specific star
+
+      // ========================================
+      // DATABASE OPERATIONS
+      // ========================================
+      
+      // Check if rating already exists for order_code + phone
+      checkExists: async function(orderCode, phone) {
+        try {
+          const phoneDigits = (phone || '').replace(/\D/g, '');
+          const { data, error } = await window.supabaseClient
+            .from('fast_ratings')
+            .select('id, rating, comment')
+            .eq('order_code', orderCode)
+            .eq('phone', phoneDigits)
+            .limit(1);
+          
+          if (error) throw error;
+          return data && data.length > 0 ? data[0] : null;
+        } catch (e) {
+          console.warn('[Ratings] Erro ao verificar existência:', e);
+          return null;
+        }
+      },
+
+      // Submit a new rating (from customer)
+      submit: async function(data) {
+        try {
+          const phoneDigits = (data.phone || '').replace(/\D/g, '');
+          
+          // Check for duplicate
+          const existing = await this.checkExists(data.orderCode, phoneDigits);
+          if (existing) {
+            console.log('[Ratings] Avaliação já existe para este pedido');
+            return { success: false, duplicate: true, existing };
+          }
+
+          // Get user agent for tracking
+          const userAgent = navigator.userAgent || 'unknown';
+
+          const { error } = await window.supabaseClient
+            .from('fast_ratings')
+            .insert({
+              order_code: data.orderCode,
+              phone: phoneDigits,
+              client_name: data.clientName,
+              rating: data.rating,
+              comment: data.comment,
+              status: 'pending',
+              user_agent: userAgent
+            });
+
+          if (error) throw error;
+          console.log('[Ratings] Avaliação salva com sucesso');
+          return { success: true };
+        } catch (e) {
+          console.error('[Ratings] Erro ao salvar:', e);
+          return { success: false, error: e };
+        }
+      },
+
+      // Load all ratings for admin
+      loadAll: async function() {
+        try {
+          const { data, error } = await window.supabaseClient
+            .from('fast_ratings')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+          if (error) throw error;
+          this.adminData = data || [];
+          return this.adminData;
+        } catch (e) {
+          console.error('[Ratings] Erro ao carregar:', e);
+          this.adminData = [];
+          return [];
+        }
+      },
+
+      // Load only published ratings (for landing page)
+      loadPublished: async function() {
+        try {
+          const { data, error } = await window.supabaseClient
+            .from('fast_ratings')
+            .select('*')
+            .eq('status', 'published')
+            .order('published_at', { ascending: false })
+            .limit(4);
+
+          if (error) throw error;
+          this.cache = data || [];
+          localStorage.setItem('fastPublishedRatings', JSON.stringify(this.cache));
+          return this.cache;
+        } catch (e) {
+          console.warn('[Ratings] Erro ao carregar publicados, usando cache:', e);
+          const cached = localStorage.getItem('fastPublishedRatings');
+          return cached ? JSON.parse(cached) : [];
+        }
+      },
+
+      // ========================================
+      // ADMIN ACTIONS
+      // ========================================
+      
+      publish: async function(id) {
+        try {
+          const { error } = await window.supabaseClient
+            .from('fast_ratings')
+            .update({ status: 'published', published_at: new Date().toISOString() })
+            .eq('id', id);
+
+          if (error) throw error;
+          // Update local data
+          const item = this.adminData.find(r => r.id === id);
+          if (item) {
+            item.status = 'published';
+            item.published_at = new Date().toISOString();
+          }
+          return true;
+        } catch (e) {
+          console.error('[Ratings] Erro ao publicar:', e);
+          return false;
+        }
+      },
+
+      archive: async function(id) {
+        try {
+          const { error } = await window.supabaseClient
+            .from('fast_ratings')
+            .update({ status: 'archived' })
+            .eq('id', id);
+
+          if (error) throw error;
+          // Update local data
+          const item = this.adminData.find(r => r.id === id);
+          if (item) item.status = 'archived';
+          return true;
+        } catch (e) {
+          console.error('[Ratings] Erro ao arquivar:', e);
+          return false;
+        }
+      },
+
+      reply: async function(id, replyText) {
+        try {
+          const { error } = await window.supabaseClient
+            .from('fast_ratings')
+            .update({ admin_reply: replyText })
+            .eq('id', id);
+
+          if (error) throw error;
+          // Update local data
+          const item = this.adminData.find(r => r.id === id);
+          if (item) item.admin_reply = replyText;
+          return true;
+        } catch (e) {
+          console.error('[Ratings] Erro ao responder:', e);
+          return false;
+        }
+      },
+
+      // ========================================
+      // UI HELPERS
+      // ========================================
+      
+      formatDate: function(dateStr) {
+        if (!dateStr) return '';
+        const d = new Date(dateStr);
+        return d.toLocaleDateString('pt-BR') + ' às ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      },
+
+      formatStars: function(rating) {
+        return '★'.repeat(rating) + '☆'.repeat(5 - rating);
+      },
+
+      // ========================================
+      // PUBLIC LANDING RENDERING
+      // ========================================
+      
+      renderPublicRatings: function(ratings, container) {
+        if (!container) return;
+
+        if (!ratings || ratings.length === 0) {
+          container.innerHTML = `
+            <div class="text-white/60 text-sm italic text-center py-4">
+              <p>Seja o primeiro a avaliar!</p>
+            </div>
+          `;
+          return;
+        }
+
+        container.innerHTML = ratings.map(r => {
+          const stars = this.formatStars(r.rating);
+          const truncatedComment = r.comment && r.comment.length > 80
+            ? r.comment.substring(0, 80) + '...'
+            : (r.comment || '');
+
+          return `
+            <div class="bg-white/95 backdrop-blur-sm rounded-lg p-3 shadow-lg border border-white/20">
+              <div class="flex items-center justify-between mb-1">
+                <p class="font-semibold text-gray-800 text-xs truncate max-w-[100px]">${r.client_name || 'Cliente'}</p>
+                <p class="text-yellow-500 text-xs">${stars}</p>
+              </div>
+              <p class="text-gray-600 text-xs leading-relaxed line-clamp-2">"${truncatedComment}"</p>
+              ${r.admin_reply ? `
+                <div class="mt-1 pt-1 border-t border-gray-200">
+                  <p class="text-xs text-rose-600 italic truncate">💬 ${r.admin_reply}</p>
+                </div>
+              ` : ''}
+            </div>
+          `;
+        }).join('');
+      },
+
+      // ========================================
+      // ADMIN PANEL RENDERING
+      // ========================================
+      
+      renderAdminRatings: function() {
+        const list = document.getElementById('ratingsList');
+        if (!list) {
+          console.warn('[Ratings] ratingsList container não encontrado');
+          return;
+        }
+
+        let filtered = this.adminData;
+        
+        // Status filter
+        if (this.adminFilter !== 'all') {
+          filtered = filtered.filter(r => r.status === this.adminFilter);
+        }
+        
+        // Star filter
+        if (this.adminStarFilter > 0) {
+          filtered = filtered.filter(r => r.rating >= this.adminStarFilter);
+        }
+
+        if (filtered.length === 0) {
+          list.innerHTML = `
+            <div class="text-center py-12 text-gray-500">
+              <p class="text-4xl mb-2">⭐</p>
+              <p>Nenhuma avaliação ${this.adminFilter === 'all' ? '' : 'com este filtro '}encontrada.</p>
+            </div>
+          `;
+          return;
+        }
+
+        list.innerHTML = filtered.map(r => {
+          const stars = this.formatStars(r.rating);
+          const statusBadge = r.status === 'published'
+            ? '<span class="px-2 py-0.5 bg-green-100 text-green-800 text-xs rounded-full">✓ Publicado</span>'
+            : r.status === 'archived'
+              ? '<span class="px-2 py-0.5 bg-gray-200 text-gray-600 text-xs rounded-full">Arquivado</span>'
+              : '<span class="px-2 py-0.5 bg-yellow-100 text-yellow-800 text-xs rounded-full">⏳ Pendente</span>';
+
+          const dateFormatted = this.formatDate(r.created_at);
+          const ratingBadge = `<span class="px-2 py-0.5 bg-yellow-50 text-yellow-700 text-xs rounded-full font-medium">${r.rating}⭐</span>`;
+
+          return `
+            <div class="p-4 border rounded-lg bg-gray-50 hover:bg-gray-100 transition" data-rating-id="${r.id}">
+              <div class="flex justify-between items-start mb-2 flex-wrap gap-2">
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <p class="font-semibold text-gray-800">${r.client_name || 'Anônimo'}</p>
+                    ${ratingBadge}
+                  </div>
+                  <p class="text-yellow-500 text-lg">${stars}</p>
+                  ${r.order_code ? `<p class="text-xs text-gray-500">📦 Pedido: ${r.order_code}</p>` : ''}
+                </div>
+                <div class="text-right flex flex-col items-end gap-1">
+                  ${statusBadge}
+                  <p class="text-xs text-gray-400">${dateFormatted}</p>
+                </div>
+              </div>
+              <p class="text-gray-700 text-sm mb-3 whitespace-pre-wrap">${r.comment || 'Sem comentário'}</p>
+              ${r.admin_reply ? `
+                <div class="text-xs text-blue-600 bg-blue-50 p-2 rounded mb-3">
+                  💬 <strong>Sua resposta:</strong> ${r.admin_reply}
+                </div>
+              ` : ''}
+              <div class="flex flex-wrap gap-2">
+                ${r.status === 'pending' ? `
+                  <button onclick="RatingsModule.handlePublish(${r.id})" class="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs rounded-lg transition">✓ Publicar</button>
+                  <button onclick="RatingsModule.handleArchive(${r.id})" class="px-3 py-1.5 bg-gray-500 hover:bg-gray-600 text-white text-xs rounded-lg transition">Arquivar</button>
+                ` : ''}
+                ${r.status === 'published' ? `
+                  <button onclick="RatingsModule.handleArchive(${r.id})" class="px-3 py-1.5 bg-gray-500 hover:bg-gray-600 text-white text-xs rounded-lg transition">Arquivar</button>
+                ` : ''}
+                ${!r.admin_reply ? `
+                  <button onclick="RatingsModule.handleReply(${r.id})" class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded-lg transition">💬 Responder</button>
+                ` : ''}
+              </div>
+            </div>
+          `;
+        }).join('');
+      },
+
+      // ========================================
+      // ADMIN EVENT HANDLERS
+      // ========================================
+      
+      handlePublish: async function(id) {
+        const success = await this.publish(id);
+        if (success) {
+          this.showMessage('✅ Avaliação publicada!', 'success');
+          this.renderAdminRatings(); // Re-render only, data already updated
+        } else {
+          this.showMessage('❌ Erro ao publicar.', 'error');
+        }
+      },
+
+      handleArchive: async function(id) {
+        const success = await this.archive(id);
+        if (success) {
+          this.showMessage('✅ Avaliação arquivada.', 'success');
+          this.renderAdminRatings();
+        } else {
+          this.showMessage('❌ Erro ao arquivar.', 'error');
+        }
+      },
+
+      handleReply: function(id) {
+        const reply = prompt('Digite sua resposta para o cliente:');
+        if (reply !== null && reply.trim()) {
+          this.submitReply(id, reply.trim());
+        }
+      },
+
+      submitReply: async function(id, replyText) {
+        const success = await this.reply(id, replyText);
+        if (success) {
+          this.showMessage('✅ Resposta enviada!', 'success');
+          this.renderAdminRatings();
+        } else {
+          this.showMessage('❌ Erro ao responder.', 'error');
+        }
+      },
+
+      setStatusFilter: function(filter) {
+        this.adminFilter = filter;
+        // Update button styles
+        document.querySelectorAll('.rating-filter-btn').forEach(btn => {
+          btn.classList.toggle('bg-rose-600', btn.dataset.filter === filter);
+          btn.classList.toggle('text-white', btn.dataset.filter === filter);
+          btn.classList.toggle('bg-gray-200', btn.dataset.filter !== filter);
+          btn.classList.toggle('text-gray-700', btn.dataset.filter !== filter);
+        });
+        this.renderAdminRatings();
+      },
+
+      setStarFilter: function(stars) {
+        this.adminStarFilter = stars;
+        // Update star filter buttons
+        document.querySelectorAll('.star-filter-btn').forEach(btn => {
+          const btnStars = parseInt(btn.dataset.stars, 10);
+          btn.classList.toggle('ring-2', btnStars === stars);
+          btn.classList.toggle('ring-rose-500', btnStars === stars);
+        });
+        this.renderAdminRatings();
+      },
+
+      showMessage: function(text, type) {
+        const msg = document.getElementById('ratingsMessage');
+        if (!msg) return;
+        msg.textContent = text;
+        msg.className = 'mb-4 p-3 rounded-lg text-sm text-center';
+        if (type === 'success') msg.classList.add('bg-green-100', 'text-green-700');
+        else if (type === 'error') msg.classList.add('bg-red-100', 'text-red-700');
+        else msg.classList.add('bg-blue-100', 'text-blue-700');
+        msg.classList.remove('hidden');
+        setTimeout(() => msg.classList.add('hidden'), 3000);
+      },
+
+      // ========================================
+      // INITIALIZATION (Safe - with try/catch)
+      // ========================================
+      
+      initPublicRatings: async function() {
+        const container = document.getElementById('testimonialsContainer');
+        if (!container) {
+          console.log('[Ratings] Container de testimonials não encontrado - OK se não estiver na landing');
+          return;
+        }
+
+        try {
+          console.log('[Ratings] Carregando avaliações publicadas...');
+          const ratings = await this.loadPublished();
+          console.log('[Ratings] Avaliações publicadas:', ratings.length);
+          this.renderPublicRatings(ratings, container);
+        } catch (e) {
+          console.error('[Ratings] Erro ao inicializar públicas:', e);
+          container.innerHTML = `
+            <div class="text-white/40 text-sm italic text-center py-4">
+              <p>Avaliações em breve...</p>
+            </div>
+          `;
+        }
+      },
+
+      initAdminPanel: async function() {
+        const panel = document.getElementById('ratingsPanelFast');
+        const list = document.getElementById('ratingsList');
+        
+        if (!panel || !list) {
+          console.warn('[Ratings] Painel admin não encontrado');
+          return;
+        }
+
+        try {
+          console.log('[Ratings] Carregando avaliações para admin...');
+          await this.loadAll();
+          console.log('[Ratings] Total de avaliações:', this.adminData.length);
+          this.renderAdminRatings();
+        } catch (e) {
+          console.error('[Ratings] Erro ao carregar admin:', e);
+          list.innerHTML = `
+            <div class="text-center py-12 text-red-500">
+              <p class="text-4xl mb-2">⚠️</p>
+              <p>Erro ao carregar avaliações.</p>
+              <p class="text-xs mt-2">${e.message || 'Tente novamente'}</p>
+            </div>
+          `;
+        }
+      }
+    };
+
+    // Alias for backward compatibility
+    const RatingsService = RatingsModule;
+
+    // Global function aliases for onclick handlers
+    function loadPublicRatings() { return RatingsModule.initPublicRatings(); }
+    function loadRatings() { return RatingsModule.initAdminPanel(); }
+    function renderRatings() { return RatingsModule.renderAdminRatings(); }
+    function publishRating(id) { return RatingsModule.handlePublish(id); }
+    function archiveRating(id) { return RatingsModule.handleArchive(id); }
+    function promptReplyRating(id) { return RatingsModule.handleReply(id); }
+    function showRatingsMessage(text, type) { return RatingsModule.showMessage(text, type); }
 
     // ========================================
     // ADDRESS SERVICE (múltiplos endereços por cliente)
@@ -2175,7 +3230,7 @@
       container.classList.remove('hidden');
 
       // Build order cards
-      const orderCards = history.slice(0, 3).map((order, idx) => {
+      const orderCards = history.slice(0, 2).map((order, idx) => {
         const resumo = order.items.slice(0, 2).map(i => `${i.quantity}x ${i.name}`).join(', ');
         const more = order.items.length > 2 ? ` +${order.items.length - 2}` : '';
         const data = safeDate(order.createdAt).toLocaleDateString('pt-BR');
@@ -2343,15 +3398,27 @@
           }
         } catch (e) { console.warn('[Tracking] Deep-link error:', e); }
 
-        // Deep-link: auto-open rating modal if ?rate=FAST-xxxx&phone=...
+        // Deep-link: auto-open rating modal if ?rate=FAST-xxxx&phone=... or #rating hash
         try {
           const params = new URLSearchParams(window.location.search);
           const rateCode = params.get('rate');
           const ratePhone = params.get('phone');
-          if (rateCode && ratePhone) {
-            setTimeout(() => initRatingModal(rateCode, ratePhone), 500);
+          
+          // Check for hash #rating to force modal open
+          if (window.location.hash === '#rating' || rateCode && ratePhone) {
+            setTimeout(() => {
+              if (rateCode && ratePhone) {
+                initRatingModal(rateCode, ratePhone);
+              } else {
+                // If only hash is present, show a message or open empty modal
+                console.log('[Rating] Hash #rating detectado, mas sem parâmetros');
+              }
+            }, 500);
           }
         } catch (e) { console.warn('[Rating] Deep-link error:', e); }
+
+        // Load public testimonials for landing page
+        try { loadPublicRatings(); } catch (e) { console.warn('[Ratings] Failed to load:', e); }
 
       } catch (e) {
         console.error('[INIT] Erro crítico na inicialização:', e);
@@ -3597,17 +4664,99 @@
       }
     }
 
-    // Promotion Management Functions
-    function loadPromotions() {
-      const saved = localStorage.getItem('fastPromotions');
-      if (saved) { promotions = JSON.parse(saved); }
-      else { promotions = []; savePromotions(); }
+    // Promotion Management Functions (Supabase-synced)
+    async function loadPromotions() {
+      try {
+        const { data, error } = await window.supabaseClient
+          .from('fast_promotions')
+          .select('*')
+          .eq('active', true);
 
-      const discountsSaved = localStorage.getItem('fastClientDiscounts');
-      if (discountsSaved) { clientDiscounts = JSON.parse(discountsSaved); }
-      else { clientDiscounts = {}; saveClientDiscounts(); }
+        if (error) throw error;
+
+        // Map database fields to app format
+        promotions = (data || []).map(p => ({
+          id: p.id,
+          productId: p.product_id,
+          productName: p.product_name,
+          type: p.type,
+          value: parseFloat(p.value),
+          description: p.description
+        }));
+        console.log('Promoções carregadas do Supabase:', promotions.length);
+      } catch (e) {
+        console.warn('Erro ao carregar promoções do Supabase, usando localStorage:', e);
+        const saved = localStorage.getItem('fastPromotions');
+        if (saved) { promotions = JSON.parse(saved); }
+        else { promotions = []; }
+      }
+
+      // Load client discounts from Supabase (sync across devices)
+      try {
+        const loadedDiscounts = await ClientDiscountsService.load();
+        if (loadedDiscounts && Object.keys(loadedDiscounts).length > 0) {
+          clientDiscounts = loadedDiscounts;
+          saveClientDiscounts(); // Update localStorage as fallback
+        } else {
+          // Fallback to localStorage
+          const discountsSaved = localStorage.getItem('fastClientDiscounts');
+          if (discountsSaved) { clientDiscounts = JSON.parse(discountsSaved); }
+          else { clientDiscounts = {}; }
+        }
+      } catch (e) {
+        console.warn('[ClientDiscounts] Erro ao carregar do Supabase:', e);
+        const discountsSaved = localStorage.getItem('fastClientDiscounts');
+        if (discountsSaved) { clientDiscounts = JSON.parse(discountsSaved); }
+        else { clientDiscounts = {}; saveClientDiscounts(); }
+      }
     }
-    function savePromotions() { localStorage.setItem('fastPromotions', JSON.stringify(promotions)); }
+
+    async function savePromotions() {
+      // Keep localStorage as fallback
+      localStorage.setItem('fastPromotions', JSON.stringify(promotions));
+
+      // Sync to Supabase (will be implemented when called)
+      console.log('Promoções salvas localmente. Serão sincronizadas ao adicionar/remover.');
+    }
+
+    async function addPromotionToSupabase(promo) {
+      try {
+        const { data, error } = await window.supabaseClient
+          .from('fast_promotions')
+          .insert({
+            product_id: promo.productId,
+            product_name: promo.productName,
+            type: promo.type,
+            value: promo.value,
+            description: promo.description,
+            active: true
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+        return data;
+      } catch (e) {
+        console.error('Erro ao salvar promoção no Supabase:', e);
+        return null;
+      }
+    }
+
+    async function deletePromotionFromSupabase(productId) {
+      try {
+        const { error } = await window.supabaseClient
+          .from('fast_promotions')
+          .delete()
+          .eq('product_id', productId);
+
+        if (error) throw error;
+        return true;
+      } catch (e) {
+        console.error('Erro ao remover promoção do Supabase:', e);
+        return false;
+      }
+    }
+
     function saveClientDiscounts() { localStorage.setItem('fastClientDiscounts', JSON.stringify(clientDiscounts)); }
     function renderPromotions() {
       const box = document.getElementById('promotionsList'); if (!box) return;
@@ -3624,13 +4773,77 @@
             <button class='px-2 py-1 rounded bg-red-500 hover:bg-red-600 text-white text-sm' onclick='deletePromotion(${i})'>Remover</button>
           </div>
         </div>`).join('') : '<p class="text-gray-500 text-sm">Nenhuma promoção ativa.</p>';
+
+      // Also render client discounts
+      renderClientDiscounts();
     }
-    function deletePromotion(i) {
+
+    function renderClientDiscounts() {
+      const box = document.getElementById('clientDiscountsList');
+      if (!box) return;
+
+      const discountEntries = Object.entries(clientDiscounts).filter(([phone, discount]) => discount > 0);
+
+      if (discountEntries.length === 0) {
+        box.innerHTML = '<p class="text-sm text-gray-500">Nenhum desconto ativo</p>';
+        return;
+      }
+
+      box.innerHTML = discountEntries.map(([phone, discount]) => {
+        // Find client name
+        const client = clients.find(c => c.phone === phone || c.phone?.replace(/\D/g, '') === phone.replace(/\D/g, ''));
+        const clientName = client ? client.name : phone;
+
+        return `
+          <div class='p-3 border rounded-lg bg-blue-50'>
+            <div class='flex justify-between items-center'>
+              <div>
+                <p class='font-medium text-gray-800'>${clientName}</p>
+                <p class='text-xs text-gray-500'>${phone}</p>
+                <p class='text-sm font-semibold text-blue-600'>${discount}% de desconto</p>
+              </div>
+              <div class='flex gap-1'>
+                <button class='px-2 py-1 rounded bg-yellow-500 hover:bg-yellow-600 text-white text-xs' onclick='editClientDiscount("${phone}", ${discount})'>Editar</button>
+                <button class='px-2 py-1 rounded bg-red-500 hover:bg-red-600 text-white text-xs' onclick='removeClientDiscount("${phone}")'>Remover</button>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function editClientDiscount(phone, currentDiscount) {
+      // Populate the form with current values for editing
+      const select = document.getElementById('clientDiscountSelect');
+      const input = document.getElementById('clientDiscountValue');
+      if (select) select.value = phone;
+      if (input) input.value = currentDiscount;
+      // Scroll to form
+      document.getElementById('clientDiscountSelect')?.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    async function removeClientDiscount(phone) {
+      if (confirm('Remover desconto deste cliente?')) {
+        delete clientDiscounts[phone];
+        saveClientDiscounts();
+        await ClientDiscountsService.save(phone, 0);
+        renderClientDiscounts();
+        showInlineMessage('promotionsPanelFast', '✅ Desconto removido!', 'success');
+      }
+    }
+    async function deletePromotion(i) {
       if (confirm('Remover esta promoção?')) {
+        const promo = promotions[i];
         promotions.splice(i, 1);
         savePromotions();
         renderPromotions();
         updatePromotionProductSelect();
+        loadProductsPublic(); // Refresh public store
+
+        // Sync to Supabase
+        if (promo && promo.productId) {
+          await deletePromotionFromSupabase(promo.productId);
+        }
       }
     }
     function updatePromotionProductSelect() {
@@ -3643,51 +4856,62 @@
       select.innerHTML = '<option value="">Escolha um cliente...</option>' +
         clients.map(c => `<option value="${c.phone}">${c.name} - ${c.phone}</option>`).join('');
     }
-    document.getElementById('savePromotion')?.addEventListener('click', () => {
+    document.getElementById('savePromotion')?.addEventListener('click', async () => {
       const productId = parseInt(document.getElementById('promotionProduct').value);
       const type = document.getElementById('promotionType').value;
       const value = parseFloat(document.getElementById('promotionValue').value);
       const description = document.getElementById('promotionDescription').value.trim();
 
       if (!productId || !value || !description) {
-        alert('Preencha todos os campos da promoção.');
+        showInlineMessage('promotionsPanelFast', '⚠️ Preencha todos os campos da promoção.', 'error');
         return;
       }
 
       const product = products.find(p => p.id === productId);
       if (!product) return;
 
-      // Remove existing promotion for this product
+      // Remove existing promotion for this product (local and Supabase)
       promotions = promotions.filter(p => p.productId !== productId);
+      await deletePromotionFromSupabase(productId);
 
-      promotions.push({
+      const newPromo = {
         productId,
         productName: product.name,
         type,
         value,
         description
-      });
+      };
 
+      promotions.push(newPromo);
       savePromotions();
+
+      // Sync to Supabase
+      const saved = await addPromotionToSupabase(newPromo);
+      if (saved) {
+        showInlineMessage('promotionsPanelFast', '✅ Promoção salva e sincronizada!', 'success');
+      } else {
+        showInlineMessage('promotionsPanelFast', '⚠️ Promoção salva localmente. Erro ao sincronizar.', 'error');
+      }
+
       renderPromotions();
-      alert('Promoção salva com sucesso!');
+      loadProductsPublic(); // Refresh public store with new promotion
 
       // Reset form
       document.getElementById('promotionProduct').value = '';
       document.getElementById('promotionValue').value = '';
       document.getElementById('promotionDescription').value = '';
     });
-    document.getElementById('saveClientDiscount')?.addEventListener('click', () => {
+    document.getElementById('saveClientDiscount')?.addEventListener('click', async () => {
       const phone = document.getElementById('clientDiscountSelect').value;
       const discount = parseFloat(document.getElementById('clientDiscountValue').value) || 0;
 
       if (!phone) {
-        alert('Selecione um cliente.');
+        showInlineMessage('promotionsPanelFast', '⚠️ Selecione um cliente.', 'error');
         return;
       }
 
       if (discount < 0 || discount > 100) {
-        alert('Desconto deve estar entre 0% e 100%.');
+        showInlineMessage('promotionsPanelFast', '⚠️ Desconto deve estar entre 0% e 100%.', 'error');
         return;
       }
 
@@ -3698,8 +4922,10 @@
       }
 
       saveClientDiscounts();
+      // Also sync to Supabase for cross-device access
+      await ClientDiscountsService.save(phone, discount);
       renderClients();
-      alert('Desconto salvo com sucesso!');
+      showInlineMessage('promotionsPanelFast', '✅ Desconto salvo com sucesso!', 'success');
 
       document.getElementById('clientDiscountValue').value = '';
     });
@@ -4035,7 +5261,7 @@
     function hideAllAdminPanels() {
       // Esconde todos os painéis do admin
       ['adminPanel', 'productsPanelFast', 'configPanelFast', 'clientsPanelFast',
-        'promotionsPanelFast', 'reportsPanelFast', 'ordersPanelFast'].forEach(id => {
+        'promotionsPanelFast', 'reportsPanelFast', 'ordersPanelFast', 'ratingsPanelFast'].forEach(id => {
           const el = document.getElementById(id);
           if (el) el.classList.add('hidden');
         });
@@ -4758,10 +5984,33 @@
       Object.values(map).forEach(el => { if (el) el.innerHTML = ''; });
       products.filter(p => isProductAvailableToday(p)).forEach(product => {
         const isAdditional = product.category === 'adicionais';
-        const priceDisplay = `R$ ${product.price.toFixed(2).replace('.', ',')}`;
         const isFav = FavoritesService.isFavorite(currentClientPhone, product.id);
         const heartIcon = isFav ? '❤️' : '🤍';
-        const html = `<div class='bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow p-4 border'>
+
+        // Check for promotion from promotions table
+        const promotion = promotions.find(p => p.productId === product.id);
+        let displayPrice = product.price;
+        let priceHtml = '';
+        let promoBadge = '';
+        let borderClass = '';
+
+        if (promotion) {
+          // Apply promotion discount
+          if (promotion.type === 'percentage') {
+            displayPrice = product.price * (1 - promotion.value / 100);
+            promoBadge = `<span class='absolute -top-2 -right-2 bg-yellow-400 text-yellow-900 text-xs font-bold px-2 py-1 rounded-full shadow'>-${promotion.value}%</span>`;
+          } else {
+            displayPrice = product.price - promotion.value;
+            promoBadge = `<span class='absolute -top-2 -right-2 bg-yellow-400 text-yellow-900 text-xs font-bold px-2 py-1 rounded-full shadow'>-R$${promotion.value}</span>`;
+          }
+          priceHtml = `<span class='line-through text-gray-400 text-sm mr-1'>R$ ${product.price.toFixed(2).replace('.', ',')}</span><span class='text-rose-600 font-bold'>R$ ${displayPrice.toFixed(2).replace('.', ',')}</span>`;
+          borderClass = 'border-yellow-400 border-2';
+        } else {
+          priceHtml = `<span class='text-rose-600 ${isAdditional ? "text-sm" : "text-lg"} font-bold'>R$ ${product.price.toFixed(2).replace('.', ',')}</span>`;
+        }
+
+        const html = `<div class='bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow p-4 border ${borderClass} relative'>
+          ${promoBadge}
           <div class='flex items-center mb-3'>
             ${product.image ? `<img src='${product.image}' class='w-14 h-14 object-cover rounded mr-3'>` : `<span class='${isAdditional ? "text-2xl" : "text-3xl"} mr-3'>${product.emoji}</span>`}
             <div class='flex-1'>
@@ -4771,8 +6020,8 @@
             <button class='favorite-btn text-xl p-1 hover:scale-110 transition-transform' data-id='${product.id}' title='Favorito'>${heartIcon}</button>
           </div>
           <div class='flex items-center justify-between'>
-            <span class='text-rose-600 ${isAdditional ? "text-sm" : "text-lg"} font-bold'>${priceDisplay}</span>
-            <button class='add-to-cart bg-rose-600 hover:bg-rose-700 text-white px-3 py-2 rounded-lg text-xs font-medium' data-id='${product.id}' data-name='${product.name}' data-description='${product.description}' data-price='${product.price}'>Adicionar</button>
+            ${priceHtml}
+            <button class='add-to-cart bg-rose-600 hover:bg-rose-700 text-white px-3 py-2 rounded-lg text-xs font-medium' data-id='${product.id}' data-name='${product.name}' data-description='${product.description}' data-price='${displayPrice}'>Adicionar</button>
           </div>
         </div>`;
         map[product.category].innerHTML += html;
@@ -4824,9 +6073,10 @@
       const container = document.getElementById('promosContainer');
       if (!section || !container) return;
 
-      // Filter products with active promotions
+      // Filter products with active promotions from the promotions table
+      const promoProductIds = promotions.map(p => p.productId);
       const promoProducts = products.filter(p =>
-        p.promo && p.promo.active &&
+        promoProductIds.includes(p.id) &&
         isProductAvailableToday(p) &&
         p.visible !== false
       );
@@ -4839,16 +6089,19 @@
       section.classList.remove('hidden');
 
       container.innerHTML = promoProducts.map(product => {
+        const promotion = promotions.find(p => p.productId === product.id);
         const originalPrice = product.price;
         let discountedPrice = originalPrice;
         let discountBadge = '';
 
-        if (product.promo.type === 'percent') {
-          discountedPrice = originalPrice * (1 - product.promo.value / 100);
-          discountBadge = `-${product.promo.value}%`;
-        } else if (product.promo.type === 'value') {
-          discountedPrice = originalPrice - product.promo.value;
-          discountBadge = `-R$${product.promo.value.toFixed(0)}`;
+        if (promotion) {
+          if (promotion.type === 'percentage') {
+            discountedPrice = originalPrice * (1 - promotion.value / 100);
+            discountBadge = `-${promotion.value}%`;
+          } else {
+            discountedPrice = originalPrice - promotion.value;
+            discountBadge = `-R$${promotion.value.toFixed(0)}`;
+          }
         }
 
         const originalDisplay = `R$ ${originalPrice.toFixed(2).replace('.', ',')}`;
@@ -4913,7 +6166,7 @@
         // Ordenar por quantidade e pegar top 5
         const topProductIds = Object.entries(productCounts)
           .sort((a, b) => b[1] - a[1])
-          .slice(0, 5)
+          .slice(0, 4)
           .map(([id]) => parseInt(id, 10) || id);
 
         // Buscar dados dos produtos
@@ -4929,7 +6182,7 @@
         section.classList.remove('hidden');
 
         container.innerHTML = topProducts.map((product, index) => {
-          const medals = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣'];
+          const medals = ['🥇', '🥈', '🥉', '4️⃣'];
           const medal = medals[index] || '';
           const priceDisplay = `R$ ${product.price.toFixed(2).replace('.', ',')}`;
           const isFav = FavoritesService.isFavorite(currentClientPhone, product.id);
@@ -5384,7 +6637,7 @@
       }
 
       section.classList.remove('hidden');
-      list.innerHTML = orders.slice(0, 3).map((order, idx) => {
+      list.innerHTML = orders.slice(0, 2).map((order, idx) => {
         const date = safeDate(order.createdAt).toLocaleDateString('pt-BR');
         const summary = order.items.slice(0, 2).map(i => `${i.quantity}x ${i.name}`).join(', ');
         const more = order.items.length > 2 ? ` +${order.items.length - 2}` : '';
@@ -5853,22 +7106,124 @@
     let currentRatingOrderId = null;
     let currentRatingPhone = null;
 
+    // ========================================
+    // TERMS OF USE MODAL
+    // ========================================
+    function openTermsModal() {
+      document.getElementById('termsModal')?.classList.remove('hidden');
+    }
+
+    function closeTermsModal() {
+      document.getElementById('termsModal')?.classList.add('hidden');
+    }
+
+    // ========================================
+    // TERMS ACCEPTANCE SERVICE (Per Phone)
+    // ========================================
+    const TermsAcceptanceService = {
+      storageKey: 'fastTermsAccepted',
+      cache: null,
+
+      loadFromSupabase: async function () {
+        try {
+          const { data, error } = await window.supabaseClient
+            .from('fast_clients')
+            .select('phone, terms_accepted')
+            .eq('terms_accepted', true);
+
+          if (!error && data) {
+            this.cache = data.map(d => d.phone?.replace(/\D/g, '')).filter(Boolean);
+            // Also update localStorage as fallback
+            localStorage.setItem(this.storageKey, JSON.stringify(this.cache));
+          }
+        } catch (e) {
+          console.warn('[Terms] Erro ao carregar do Supabase:', e);
+        }
+      },
+
+      getAcceptedPhones: function () {
+        if (this.cache) return this.cache;
+        try {
+          const data = localStorage.getItem(this.storageKey);
+          this.cache = data ? JSON.parse(data) : [];
+          return this.cache;
+        } catch (e) {
+          return [];
+        }
+      },
+
+      hasAccepted: function (phone) {
+        if (!phone) return false;
+        const phoneDigits = phone.replace(/\D/g, '');
+        return this.getAcceptedPhones().includes(phoneDigits);
+      },
+
+      markAccepted: async function (phone) {
+        if (!phone) return;
+        const phoneDigits = phone.replace(/\D/g, '');
+        const phones = this.getAcceptedPhones();
+        if (!phones.includes(phoneDigits)) {
+          phones.push(phoneDigits);
+          this.cache = phones;
+          try {
+            localStorage.setItem(this.storageKey, JSON.stringify(phones));
+            // Also update in Supabase client record
+            await window.supabaseClient
+              .from('fast_clients')
+              .update({ terms_accepted: true, terms_accepted_at: new Date().toISOString() })
+              .eq('phone', phoneDigits);
+          } catch (e) {
+            console.warn('[Terms] Erro ao salvar no Supabase:', e);
+          }
+        }
+      }
+    };
+
+    // Check terms acceptance when phone is entered
+    function checkTermsAcceptance(phone) {
+      const checkbox = document.getElementById('acceptTermsCheckbox');
+      if (!checkbox) return;
+
+      if (TermsAcceptanceService.hasAccepted(phone)) {
+        checkbox.checked = true;
+        checkbox.disabled = true; // Already accepted, can't uncheck
+      } else {
+        checkbox.checked = false;
+        checkbox.disabled = false;
+      }
+    }
+
+    // Rating Modal Functions
     function openRatingModal() {
       document.getElementById('ratingModal')?.classList.remove('hidden');
+      document.body.style.overflow = 'hidden'; // Prevent scroll
+      resetRatingModal();
     }
 
     function closeRatingModal() {
       document.getElementById('ratingModal')?.classList.add('hidden');
-      resetRatingModal();
+      document.body.style.overflow = ''; // Restore scroll
+      // Clear URL params
+      const url = new URL(window.location);
+      url.searchParams.delete('rate');
+      url.searchParams.delete('phone');
+      window.history.replaceState({}, '', url);
     }
 
     function resetRatingModal() {
       document.getElementById('ratingForm')?.classList.remove('hidden');
       document.getElementById('ratingAlreadyDone')?.classList.add('hidden');
       document.getElementById('ratingThankYou')?.classList.add('hidden');
-      document.getElementById('ratingValue').value = '0';
-      document.getElementById('ratingComment').value = '';
-      document.getElementById('submitRatingBtn').disabled = true;
+      const ratingValue = document.getElementById('ratingValue');
+      if (ratingValue) ratingValue.value = '0';
+      const ratingComment = document.getElementById('ratingComment');
+      if (ratingComment) ratingComment.value = '';
+      const ratingClientName = document.getElementById('ratingClientName');
+      if (ratingClientName) ratingClientName.value = '';
+      const ratingCharCount = document.getElementById('ratingCharCount');
+      if (ratingCharCount) ratingCharCount.textContent = '0';
+      const submitBtn = document.getElementById('submitRatingBtn');
+      if (submitBtn) submitBtn.disabled = true;
       document.getElementById('ratingMessage')?.classList.add('hidden');
       updateStarDisplay(0);
       currentRatingOrderId = null;
@@ -5887,10 +7242,10 @@
       if (!box) return;
       box.classList.remove('hidden');
       box.textContent = text;
-      box.className = 'mt-3 text-sm text-center';
-      if (type === 'success') box.classList.add('text-green-700');
-      else if (type === 'error') box.classList.add('text-red-700');
-      else box.classList.add('text-gray-600');
+      box.className = 'mb-4 p-3 rounded-lg text-sm text-center';
+      if (type === 'success') box.classList.add('bg-green-100', 'text-green-700');
+      else if (type === 'error') box.classList.add('bg-red-100', 'text-red-700');
+      else box.classList.add('bg-blue-100', 'text-blue-700');
     }
 
     async function loadOrderForRating(orderCode, phone) {
@@ -5960,6 +7315,8 @@
     async function submitRating() {
       const rating = parseInt(document.getElementById('ratingValue').value, 10);
       const comment = document.getElementById('ratingComment').value.trim();
+      const clientName = document.getElementById('ratingClientName')?.value?.trim() || 'Cliente';
+      const orderCode = document.getElementById('ratingOrderCode')?.textContent || '';
 
       if (!rating || rating < 1 || rating > 5) {
         setRatingMessage('Selecione uma nota de 1 a 5 estrelas.', 'error');
@@ -5971,19 +7328,64 @@
         return;
       }
 
+      // Disable button to prevent double submit
+      const submitBtn = document.getElementById('submitRatingBtn');
+      if (submitBtn) {
+        submitBtn.disabled = true;
+        submitBtn.textContent = 'Enviando...';
+      }
+
       try {
-        const { error } = await window.supabaseClient
+        // Check for duplicate in fast_ratings first
+        const existing = await RatingsModule.checkExists(orderCode, currentRatingPhone);
+        if (existing) {
+          console.log('[Rating] Avaliação já existe:', existing);
+          showExistingRating(existing.rating, existing.comment);
+          return;
+        }
+
+        // Save to fast_orders for quick reference
+        const { error: orderError } = await window.supabaseClient
           .from('fast_orders')
           .update({ rating, rating_comment: comment })
           .eq('id', currentRatingOrderId);
 
-        if (error) throw error;
+        if (orderError) {
+          console.error('[Rating] Erro ao salvar em fast_orders:', orderError);
+          // Continue anyway - fast_ratings is the main storage
+        }
 
+        // Save to fast_ratings for testimonials system
+        console.log('[Rating] Salvando avaliação:', { orderCode, phone: currentRatingPhone, clientName, rating, comment });
+        
+        const ratingResult = await RatingsModule.submit({
+          orderCode: orderCode,
+          phone: currentRatingPhone,
+          clientName: clientName,
+          rating: rating,
+          comment: comment
+        });
+
+        if (!ratingResult.success) {
+          if (ratingResult.duplicate) {
+            showExistingRating(ratingResult.existing.rating, ratingResult.existing.comment);
+            return;
+          }
+          console.error('[Rating] Erro ao salvar em fast_ratings:', ratingResult.error);
+          throw ratingResult.error;
+        }
+
+        console.log('[Rating] Avaliação salva com sucesso!');
         document.getElementById('ratingForm')?.classList.add('hidden');
         document.getElementById('ratingThankYou')?.classList.remove('hidden');
       } catch (e) {
         console.error('[Rating] Erro ao salvar:', e);
         setRatingMessage('Erro ao salvar avaliação. Tente novamente.', 'error');
+        // Re-enable button on error
+        if (submitBtn) {
+          submitBtn.disabled = false;
+          submitBtn.textContent = 'Enviar Avaliação';
+        }
       }
     }
 
@@ -5993,7 +7395,7 @@
         const star = parseInt(btn.dataset.star, 10);
         document.getElementById('ratingValue').value = star;
         updateStarDisplay(star);
-        document.getElementById('submitRatingBtn').disabled = false;
+        validateRatingForm();
       });
     });
 
@@ -6007,11 +7409,32 @@
       submitRating();
     });
 
+    // Character counter for rating comment
+    document.getElementById('ratingComment')?.addEventListener('input', (e) => {
+      const count = e.target.value.length;
+      const counter = document.getElementById('ratingCharCount');
+      if (counter) counter.textContent = count;
+      validateRatingForm();
+    });
+
+    // Validate rating form and enable/disable submit button
+    document.getElementById('ratingClientName')?.addEventListener('input', validateRatingForm);
+
+    function validateRatingForm() {
+      const name = document.getElementById('ratingClientName')?.value?.trim() || '';
+      const rating = parseInt(document.getElementById('ratingValue')?.value || 0, 10);
+      const comment = document.getElementById('ratingComment')?.value?.trim() || '';
+      const btn = document.getElementById('submitRatingBtn');
+      if (btn) {
+        btn.disabled = !(name.length >= 2 && rating >= 1 && comment.length >= 10);
+      }
+    }
+
     // Build rating link
     function buildRatingLink(orderCode, phone) {
       const phoneDigits = normalizePhoneDigits(phone);
-      const baseUrl = `${window.location.origin}${window.location.pathname}`;
-      return `${baseUrl}?rate=${encodeURIComponent(orderCode)}&phone=${encodeURIComponent(phoneDigits)}`;
+      const baseUrl = 'https://fastsavorys.netlify.app/pages/fast.html';
+      return `${baseUrl}?rate=${encodeURIComponent(orderCode)}&phone=${encodeURIComponent(phoneDigits)}#rating`;
     }
 
     // ========================================
@@ -6074,7 +7497,7 @@
       if (row) row.remove();
     }
 
-    function applyCouponFromInput() {
+    async function applyCouponFromInput() {
       hideCouponMessage();
       const input = document.getElementById('couponInput');
       const code = input?.value?.trim()?.toUpperCase();
@@ -6093,6 +7516,25 @@
       if (coupon.minOrder && cartTotal < coupon.minOrder) {
         setCouponMessage(`Este cupom exige pedido mínimo de R$ ${Number(coupon.minOrder).toFixed(2).replace('.', ',')}.`, 'error');
         return;
+      }
+
+      // Check if coupon was already used by this phone
+      const customerPhone = document.getElementById('customerPhone')?.value?.trim() || '';
+      const phoneDigits = customerPhone.replace(/\D/g, '');
+      console.log('[Coupon] Verificando uso para telefone:', phoneDigits, 'cupom:', code);
+
+      if (phoneDigits && phoneDigits.length === 11) {
+        try {
+          const alreadyUsed = await CouponUsageService.hasUsed(phoneDigits, code);
+          console.log('[Coupon] Resultado hasUsed:', alreadyUsed);
+          if (alreadyUsed) {
+            setCouponMessage('Cupom já utilizado pelo cliente.', 'error');
+            return;
+          }
+        } catch (e) {
+          console.warn('[Coupon] Erro ao verificar uso:', e);
+          // Continue anyway if check fails
+        }
       }
 
       appliedCoupon = coupon;
@@ -6122,7 +7564,7 @@
     // ========================================
     // LOYALTY UI (CHECKOUT)
     // ========================================
-    function updateLoyaltyUI(phone) {
+    async function updateLoyaltyUI(phone) {
       const box = document.getElementById('loyaltyInfoBox');
       const textEl = document.getElementById('loyaltyInfoText');
       if (!box || !textEl) return;
@@ -6133,15 +7575,39 @@
         return;
       }
 
-      const history = loadOrderHistory(digits);
-      const count = Array.isArray(history) ? history.length : 0;
-
-      let text = `Você já fez ${count} pedido${count !== 1 ? 's' : ''} conosco.`;
-      if (count < 10) {
-        text += ` Faltam ${10 - count} pedidos para desbloquear um desconto especial!`;
-      } else {
-        text += ' 🌟 Você faz parte do nosso grupo de clientes VIP!';
+      // Check Special Discount Config
+      const config = await SpecialDiscountService.getConfig();
+      if (!config || !config.active) {
+        box.classList.add('hidden');
+        return;
       }
+
+      const count = await SpecialDiscountService.getValidOrderCount(digits);
+      const minOrders = config.min_orders || 10;
+
+      let text = `Você tem ${count} pedido${count !== 1 ? 's' : ''} entregues/pagos.`;
+
+      const remainder = count % minOrders;
+      const needed = minOrders - remainder;
+
+      if (remainder === 0 && count > 0) {
+        // Just reached the milestone (on this next order? No, if 10 orders done, next is 11th. 
+        // Logic: After 10 orders, the 11th gets discount? Or the 10th?
+        // Usually "Complete 10 orders, get discount on next".
+        // So if count = 10, discount available!
+        // If count = 11, discount used? We need to track usage.
+        // Ah, simpler logic: Every X orders.
+        // If count > 0 and count % minOrders == 0, then user has X completed orders. They are ELIGIBLE for discount on CURRENT order (which will be X+1).
+        // Wait. "A cada 10 pedidos".
+        // Use modulus.
+        text += ` 🌟 PARABÉNS! Você completou ${minOrders} pedidos e tem um desconto especial agora!`;
+        currentSpecialDiscount = config;
+      } else {
+        text += ` Faltam ${needed} pedidos para seu próximo desconto especial!`;
+        currentSpecialDiscount = null;
+      }
+      // Re-calculate totals to show discount immediately if phone entered
+      updateCheckoutFeeAndTotalFast();
 
       textEl.textContent = text;
       box.classList.remove('hidden');
@@ -6215,6 +7681,11 @@
           currentSelectedClient = null;
           document.getElementById('customerSearchArea').classList.add('hidden');
         }
+
+        // Check terms acceptance when phone changes
+        if (e.target.id === 'customerPhone') {
+          checkTermsAcceptance(phone);
+        }
       }
     });
     document.getElementById('cancelCheckout')?.addEventListener('click', () => document.getElementById('checkoutModal').classList.add('hidden'));
@@ -6235,6 +7706,13 @@
       if (normalizedPhone.length !== 11) {
         showWarning('Informe um telefone válido com DDD e 9 dígitos. Ex: 73999348552.');
         document.getElementById('customerPhone')?.focus();
+        return;
+      }
+
+      // Validate Terms of Use acceptance (required for new customers)
+      const termsCheckbox = document.getElementById('acceptTermsCheckbox');
+      if (termsCheckbox && !termsCheckbox.checked) {
+        showWarning('Você precisa aceitar os Termos de Uso para continuar.');
         return;
       }
 
@@ -6312,12 +7790,16 @@
       });
 
       // Calculate discounts
+      // NOTE: productDiscount is already applied in cart item prices when added
+      // So we just calculate for display in WhatsApp message, not for subtraction
       let productDiscount = 0;
       cart.forEach(item => {
         const promotion = promotions.find(p => p.productId === item.id);
         if (promotion) {
+          // Calculate original price vs discounted to show savings
+          const originalPrice = products.find(p => p.id === item.id)?.price || item.price;
           if (promotion.type === 'percentage') {
-            productDiscount += (item.price * item.quantity) * (promotion.value / 100);
+            productDiscount += (originalPrice * item.quantity) * (promotion.value / 100);
           } else {
             productDiscount += promotion.value * item.quantity;
           }
@@ -6325,7 +7807,46 @@
       });
 
       let clientDiscount = 0;
-      if (customerPhone && clientDiscounts[customerPhone]) {
+      // SPECIAL DISCOUNT LOGIC (Replacing old clientDiscount logic)
+      const specialConfig = await SpecialDiscountService.getConfig();
+      if (specialConfig && specialConfig.active) {
+        const validOrderCount = await SpecialDiscountService.getValidOrderCount(normalizedPhone);
+        const minOrders = specialConfig.min_orders || 10;
+        const minVal = specialConfig.min_order_value || 0;
+
+        // Check if eligible (Every X orders)
+        // e.g. at 10, 20, 30...
+        // If validOrderCount is 10, and user is making 11th order... NO.
+        // Discount is usually given ON the 10th order? Or after 10?
+        // "Faltam 2 pedidos".
+        // If I have 9 orders. I make 10th. Do I get discount?
+        // Usually loyalty programs give reward AFTER accumulated points.
+        // So if I have 10 valid orders, I have a "reward" pending. 
+        // Unless it's automatically applied on the 10th order?
+        // Let's assume: When validOrderCount > 0 and validOrderCount % minOrders == 0.
+        // This means I have exactly 10, 20, 30 past orders.
+        // So this CURRENT order is the 11th, 21st... 
+        // WAIT. 
+        // If I have 9 orders. I place 10th. Count is still 9 (until this one is delivered).
+        // If I need to complete 10 to get discount.
+        // Then when count is 10, I get discount on the 11th.
+
+        if (validOrderCount > 0 && (validOrderCount % minOrders === 0)) {
+          if (cartTotal >= minVal) {
+            const type = specialConfig.discount_type;
+            const val = specialConfig.discount_value;
+
+            if (type === 'percentage') {
+              clientDiscount = (cartTotal - productDiscount) * (val / 100);
+            } else {
+              clientDiscount = val;
+            }
+            // Cap discount?
+            clientDiscount = Math.min(clientDiscount, (cartTotal - productDiscount));
+          }
+        }
+      } else if (customerPhone && clientDiscounts[customerPhone]) {
+        // Fallback to manual per-client discount if configured and special discount inactive
         clientDiscount = (cartTotal - productDiscount) * (clientDiscounts[customerPhone] / 100);
       }
 
@@ -6514,6 +8035,11 @@
           recordBirthdayDiscountUsage(customerPhone, birthdayDiscount, orderData.id);
         }
 
+        // Mark coupon as used for this phone (single-use per client)
+        if (appliedCoupon && appliedCoupon.code && customerPhone) {
+          await CouponUsageService.markUsed(customerPhone, appliedCoupon.code, orderData.id);
+        }
+
         // Salvar no histórico local para recompra rápida
         const orderForHistory = {
           id: Date.now().toString(),
@@ -6544,6 +8070,9 @@
         // Limpar dados do checkout após envio
         clearCheckoutData();
         clearAppliedCoupon();
+
+        // Mark terms as accepted for this phone for future orders
+        TermsAcceptanceService.markAccepted(customerPhone);
 
         cart = []; updateCart(); document.getElementById('checkoutModal').classList.add('hidden');
         showInlineMessage('publicStore', '✅ Pedido enviado para o WhatsApp!', 'success');
@@ -6869,36 +8398,52 @@
         cardRow.classList.add('hidden');
       }
 
-      // Calculate product promotions
+      // NOTE: Product promotions are ALREADY applied to cart item prices when added
+      // So cartTotal already reflects discounted prices - we just show info, don't subtract again
       let productDiscount = 0;
       cart.forEach(item => {
         const promotion = promotions.find(p => p.productId === item.id);
         if (promotion) {
-          if (promotion.type === 'percentage') {
-            productDiscount += (item.price * item.quantity) * (promotion.value / 100);
-          } else {
-            productDiscount += promotion.value * item.quantity;
+          // Calculate savings for display only (original price - discounted price)
+          const originalProduct = products.find(p => p.id === item.id);
+          if (originalProduct) {
+            const originalPrice = originalProduct.price;
+            const discountPerItem = originalPrice - item.price;
+            productDiscount += discountPerItem * item.quantity;
           }
         }
       });
 
-      // Calculate client discount
+      // Calculate client discount (Special Discount OR Manual)
+      // Client discount applies to cartTotal (which already has promo discounts)
       let clientDiscount = 0;
-      if (customerPhone && clientDiscounts[customerPhone]) {
-        clientDiscount = (cartTotal - productDiscount) * (clientDiscounts[customerPhone] / 100);
+      if (currentSpecialDiscount && currentSpecialDiscount.active) {
+        const minVal = currentSpecialDiscount.min_order_value || 0;
+        if (cartTotal >= minVal) {
+          if (currentSpecialDiscount.discount_type === 'percentage') {
+            clientDiscount = cartTotal * (currentSpecialDiscount.discount_value / 100);
+          } else {
+            clientDiscount = currentSpecialDiscount.discount_value;
+          }
+          // Cap discount
+          clientDiscount = Math.min(clientDiscount, cartTotal);
+        }
+      } else if (customerPhone && clientDiscounts[customerPhone]) {
+        clientDiscount = cartTotal * (clientDiscounts[customerPhone] / 100);
       }
 
       // Update discount rows
       const productDiscountRow = document.getElementById('productDiscountRow');
       const clientDiscountRow = document.getElementById('clientDiscountRow');
 
+      // Show product discount info (savings from promos - already in cart prices)
       if (productDiscount > 0) {
         if (!productDiscountRow) {
           const checkoutTotal = document.getElementById('checkoutTotal').parentElement;
           const newRow = document.createElement('div');
           newRow.id = 'productDiscountRow';
           newRow.className = 'flex justify-between text-sm mb-1 text-green-600';
-          newRow.innerHTML = '<span>Desconto produtos:</span><span id="productDiscountValue">R$ 0,00</span>';
+          newRow.innerHTML = '<span>Economia promoções:</span><span id="productDiscountValue">R$ 0,00</span>';
           checkoutTotal.insertBefore(newRow, checkoutTotal.querySelector('.border-t'));
         }
         document.getElementById('productDiscountValue').textContent = `R$ ${productDiscount.toFixed(2).replace('.', ',')}`;
@@ -6924,6 +8469,9 @@
       let couponDiscount = 0;
       const couponDiscountRow = document.getElementById('couponDiscountRow');
       if (appliedCoupon) {
+        // Check if any cart item has a promotion - if so, coupon doesn't apply to those
+        const hasPromoItems = cart.some(item => promotions.find(p => p.productId === item.id));
+
         const validCoupon = findValidCouponByCode(appliedCoupon.code);
         if (!validCoupon) {
           clearAppliedCoupon();
@@ -6931,9 +8479,13 @@
         } else if (validCoupon.minOrder && cartTotal < validCoupon.minOrder) {
           clearAppliedCoupon();
           setCouponMessage('Cupom removido: pedido abaixo do mínimo.', 'error');
+        } else if (hasPromoItems && validCoupon.code !== 'ANIVERSARIO') {
+          // Products with promotions can't use coupons (except birthday)
+          clearAppliedCoupon();
+          setCouponMessage('Cupom não acumula com produtos em promoção.', 'error');
         } else {
           appliedCoupon = validCoupon;
-          const baseForCoupon = cartTotal - productDiscount - clientDiscount;
+          const baseForCoupon = cartTotal - clientDiscount;
           couponDiscount = computeCouponDiscount(baseForCoupon, appliedCoupon);
 
           if (couponDiscount > 0) {
@@ -6954,7 +8506,8 @@
         couponDiscountRow.remove();
       }
 
-      const total = cartTotal + (isNaN(deliveryFee) ? 0 : deliveryFee) + cardFee - productDiscount - clientDiscount - couponDiscount;
+      // Total: cartTotal already has product discounts, so only subtract client and coupon discounts
+      const total = cartTotal + (isNaN(deliveryFee) ? 0 : deliveryFee) + cardFee - clientDiscount - couponDiscount;
       document.getElementById('checkoutTotal').textContent = `R$ ${total.toFixed(2).replace('.', ',')}`;
     }
 
@@ -6971,7 +8524,7 @@
 
     // Panel Navigation (Fast Admin)
     function showPanel(panelName) {
-      const panels = ['productsPanelFast', 'clientsPanelFast', 'promotionsPanelFast', 'configPanelFast', 'reportsPanelFast', 'ordersPanelFast'];
+      const panels = ['productsPanelFast', 'clientsPanelFast', 'promotionsPanelFast', 'configPanelFast', 'reportsPanelFast', 'ordersPanelFast', 'ratingsPanelFast'];
       panels.forEach(p => {
         const el = document.getElementById(p);
         if (el) el.classList.toggle('hidden', p !== panelName);
@@ -7199,6 +8752,15 @@
               </p>
               ${partiallyPaid ? `<p class="text-orange-600 font-medium">⚠️ Falta pagar restante na entrega/retirada</p>` : ''}
               ${order.payment_link ? `<p class="text-xs text-purple-600 truncate"><strong>Link:</strong> <a href="${order.payment_link}" target="_blank" class="underline">${order.payment_link}</a></p>` : ''}
+              
+              <!-- Detalhamento do Valor -->
+              <div class="mt-2 pt-2 border-t border-gray-200 text-xs">
+                <p class="text-gray-600"><strong>Subtotal:</strong> R$ ${(order.subtotal || order.total || 0).toFixed(2).replace('.', ',')}</p>
+                ${order.delivery_fee && order.delivery_fee > 0 ? `<p class="text-gray-600"><strong>Taxa Entrega:</strong> R$ ${Number(order.delivery_fee).toFixed(2).replace('.', ',')}</p>` : ''}
+                ${order.card_fee && order.card_fee > 0 ? `<p class="text-gray-600"><strong>Taxa Cartão:</strong> R$ ${Number(order.card_fee).toFixed(2).replace('.', ',')}</p>` : ''}
+                ${order.discount && order.discount > 0 ? `<p class="text-green-600"><strong>Desconto:</strong> -R$ ${Number(order.discount).toFixed(2).replace('.', ',')}</p>` : ''}
+                ${order.coupon_code ? `<p class="text-blue-600"><strong>Cupom:</strong> ${order.coupon_code} ${order.coupon_discount ? `(-R$ ${Number(order.coupon_discount).toFixed(2).replace('.', ',')})` : ''}</p>` : ''}
+              </div>
             </div>
             
             <div class="flex flex-wrap gap-2">
@@ -7227,6 +8789,9 @@
                 <button onclick="updateOrderStatus(${order.id}, 'cancelled')" class="bg-red-100 hover:bg-red-200 text-red-700 px-3 py-2 rounded text-sm">❌ Cancelar</button>
               ` : ''}
               <button onclick="openWhatsAppForOrder('${order.client_phone}')" class="bg-green-100 hover:bg-green-200 text-green-700 px-3 py-2 rounded text-sm">📱 WhatsApp</button>
+              ${isCardPayment && order.payment_link ? `
+                <button onclick="resendPaymentLink(${order.id}, '${order.client_phone}', '${order.client_name || 'Cliente'}', '${order.order_code || ''}', '${order.payment_link}')" class="bg-purple-100 hover:bg-purple-200 text-purple-700 px-3 py-2 rounded text-sm">🔗 Reenviar Link</button>
+              ` : ''}
               <button onclick="prepareOrderUpdate('${order.id}')" class="bg-blue-100 hover:bg-blue-200 text-blue-700 px-3 py-2 rounded text-sm">💬 Enviar Atualização</button>
             </div>
           </div>
@@ -7411,17 +8976,15 @@
         const orderCode = order?.order_code || formatOrderCode(order?.order_sequence || order?.id);
         await logOrderChange(orderId, orderCode, oldStatus, newStatus);
 
-        // Se marcou como entregue, oferecer enviar link de avaliação
+        // Se marcou como entregue, enviar mensagem com link de avaliação automaticamente
         if (newStatus === 'delivered' && order && order.client_phone) {
           const ratingLink = buildRatingLink(orderCode, order.client_phone);
           const firstName = (order.client_name || 'Cliente').split(' ')[0];
 
-          const sendRating = confirm(`✅ Pedido marcado como entregue!\n\nDeseja enviar link de avaliação para ${firstName}?`);
-          if (sendRating) {
-            const msg = `Olá, ${firstName}! 😊\n\nSeu pedido *${orderCode}* foi entregue!\n\nNos ajude a melhorar: avalie sua experiência:\n${ratingLink}\n\nObrigado por escolher a Fast Savory's! 🥟`;
-            const whatsappUrl = `https://wa.me/55${normalizePhoneDigits(order.client_phone)}?text=${encodeURIComponent(msg)}`;
-            window.open(whatsappUrl, '_blank');
-          }
+          // Enviar automaticamente via WhatsApp (sem confirm popup)
+          const msg = `Olá, ${firstName}! 😊\n\nSeu pedido *${orderCode}* foi entregue!\n\nNos ajude a melhorar: avalie sua experiência:\n${ratingLink}\n\nObrigado por escolher a Fast Savory's! 🥟`;
+          const whatsappUrl = `https://wa.me/55${normalizePhoneDigits(order.client_phone)}?text=${encodeURIComponent(msg)}`;
+          window.open(whatsappUrl, '_blank');
         }
 
         loadDashboardOrders(); // Refresh list
@@ -7640,6 +9203,40 @@ Obrigado pela preferência! ❤️`;
       }
     }
 
+    // Reenviar link de pagamento via WhatsApp
+    async function resendPaymentLink(orderId, phone, clientName, orderCode, paymentLink) {
+      try {
+        // Busca dados completos do pedido se não tivermos
+        let order = { client_name: clientName, order_code: orderCode, payment_link: paymentLink };
+        if (!paymentLink) {
+          const { data } = await window.supabaseClient
+            .from('fast_orders')
+            .select('*')
+            .eq('id', orderId)
+            .single();
+          if (data) order = data;
+        }
+
+        // Carrega config do Stripe se necessário
+        if (!StripeService.config) {
+          await StripeService.loadConfig();
+        }
+
+        // Gera mensagem para WhatsApp
+        const message = StripeService.generatePaymentMessage(order, order.payment_link);
+
+        // Abre WhatsApp com a mensagem
+        const cleanPhone = (phone || '').replace(/\D/g, '');
+        if (cleanPhone) {
+          const url = `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(message)}`;
+          window.open(url, '_blank');
+        }
+      } catch (error) {
+        console.error('Erro ao reenviar link:', error);
+        alert('Erro ao reenviar link: ' + error.message);
+      }
+    }
+
     // Marcar pagamento como recebido (parcial ou total)
     async function markPaymentReceived(orderId, paymentType) {
       try {
@@ -7749,6 +9346,14 @@ Obrigado pela preferência! ❤️`;
 
         // Exclui os pedidos encontrados
         const idsToDelete = ordersToDelete.map(o => o.id);
+
+        // First delete related logs (to avoid FK constraint violation)
+        await window.supabaseClient
+          .from('fast_order_logs')
+          .delete()
+          .in('order_id', idsToDelete);
+
+        // Then delete orders
         const { error: deleteError } = await window.supabaseClient
           .from('fast_orders')
           .delete()
@@ -7809,24 +9414,177 @@ Obrigado pela preferência! ❤️`;
     // Desktop buttons
     document.getElementById('showProductsPanelFast')?.addEventListener('click', () => {
       showPanel('productsPanelFast');
+      loadProductsAdmin();
     });
     document.getElementById('showClientsPanelFast')?.addEventListener('click', () => {
       showPanel('clientsPanelFast');
       renderClients();
       updateClientDiscountSelect();
     });
-    document.getElementById('showPromotionsPanelFast')?.addEventListener('click', () => {
+    document.getElementById('showPromotionsPanelFast')?.addEventListener('click', async () => {
       showPanel('promotionsPanelFast');
       renderPromotions();
       updatePromotionProductSelect();
       updateClientDiscountSelect();
       renderCoupons();
+
+      // Load Special Discount Config
+      try {
+        const config = await SpecialDiscountService.getConfig();
+        if (config) {
+          document.getElementById('specialDiscountMinOrders').value = config.min_orders || '';
+          document.getElementById('specialDiscountMinVal').value = config.min_order_value || '';
+          document.getElementById('specialDiscountType').value = config.discount_type || 'percentage';
+          document.getElementById('specialDiscountValue').value = config.discount_value || '';
+
+          // Update status card
+          const statusCard = document.getElementById('specialDiscountStatus');
+          if (statusCard && config.active && config.discount_value > 0) {
+            const typeText = config.discount_type === 'percentage' ? `${config.discount_value}%` : `R$ ${config.discount_value?.toFixed(2).replace('.', ',')}`;
+            statusCard.className = 'mb-4 p-3 rounded-lg bg-green-50 border-l-4 border-green-500';
+            statusCard.innerHTML = `
+              <p class="text-sm font-bold text-green-800">✅ Desconto Ativo</p>
+              <p class="text-xs text-green-700 mt-1">A cada <strong>${config.min_orders}</strong> pedidos pagos, cliente ganha <strong>${typeText}</strong> de desconto</p>
+              ${config.min_order_value > 0 ? `<p class="text-xs text-green-600 mt-1">Pedido mínimo: R$ ${config.min_order_value?.toFixed(2).replace('.', ',')}</p>` : ''}
+            `;
+          } else if (statusCard) {
+            statusCard.className = 'mb-4 p-3 rounded-lg bg-gray-100 border-l-4 border-gray-400';
+            statusCard.innerHTML = '<p class="text-sm text-gray-600 font-medium">⚪ Nenhum desconto configurado</p>';
+          }
+        }
+      } catch (e) {
+        console.error('[SpecialDiscount] Erro ao carregar:', e);
+        const statusCard = document.getElementById('specialDiscountStatus');
+        if (statusCard) {
+          statusCard.className = 'mb-4 p-3 rounded-lg bg-gray-100 border-l-4 border-gray-400';
+          statusCard.innerHTML = '<p class="text-sm text-gray-600 font-medium">⚪ Configure acima</p>';
+        }
+      }
+
+      // Load Birthday Discount Config
+      try {
+        const config = await BirthdayDiscountService.getConfig();
+        if (config) {
+          document.getElementById('birthdayDiscountType').value = config.discount_type || 'percentage';
+          document.getElementById('birthdayDiscountValue').value = config.discount_value || '';
+
+          // Update status card
+          const statusCard = document.getElementById('birthdayDiscountStatus');
+          if (statusCard && config.active && config.discount_value > 0) {
+            const typeText = config.discount_type === 'percentage' ? `${config.discount_value}%` : `R$ ${config.discount_value?.toFixed(2).replace('.', ',')}`;
+            statusCard.className = 'mb-4 p-3 rounded-lg bg-pink-50 border-l-4 border-pink-500';
+            statusCard.innerHTML = `
+              <p class="text-sm font-bold text-pink-800">🎂 Desconto Ativo</p>
+              <p class="text-xs text-pink-700 mt-1">Cliente aniversariante ganha <strong>${typeText}</strong> de desconto (uso único por ano)</p>
+            `;
+          } else if (statusCard) {
+            statusCard.className = 'mb-4 p-3 rounded-lg bg-gray-100 border-l-4 border-gray-400';
+            statusCard.innerHTML = '<p class="text-sm text-gray-600 font-medium">⚪ Nenhum desconto configurado</p>';
+          }
+        }
+      } catch (e) {
+        console.error('[BirthdayDiscount] Erro ao carregar:', e);
+        const statusCard = document.getElementById('birthdayDiscountStatus');
+        if (statusCard) {
+          statusCard.className = 'mb-4 p-3 rounded-lg bg-gray-100 border-l-4 border-gray-400';
+          statusCard.innerHTML = '<p class="text-sm text-gray-600 font-medium">⚪ Configure acima</p>';
+        }
+      }
     });
+
+    // Special Discount Save Listener
+    document.getElementById('saveSpecialDiscountConfig')?.addEventListener('click', async () => {
+      const minOrders = parseInt(document.getElementById('specialDiscountMinOrders').value);
+      const minVal = parseFloat(document.getElementById('specialDiscountMinVal').value);
+      const type = document.getElementById('specialDiscountType').value;
+      const val = parseFloat(document.getElementById('specialDiscountValue').value);
+      const msg = document.getElementById('specialDiscountMsg');
+
+      if (isNaN(minOrders) || isNaN(val)) {
+        msg.textContent = 'Preencha os campos corretamente.';
+        msg.className = 'text-red-600 text-sm ml-2';
+        return;
+      }
+
+      const config = {
+        min_orders: minOrders,
+        discount_type: type,
+        discount_value: val,
+        min_order_value: isNaN(minVal) ? 0 : minVal,
+        active: true
+      };
+
+      msg.textContent = 'Salvando...';
+      const success = await SpecialDiscountService.saveConfig(config);
+      if (success) {
+        msg.textContent = 'Configuração salva!';
+        msg.className = 'text-green-600 text-sm ml-2';
+        // Update global
+        currentSpecialDiscount = config;
+        // Update status card
+        const statusCard = document.getElementById('specialDiscountStatus');
+        const typeText = config.discount_type === 'percentage' ? `${config.discount_value}%` : `R$ ${config.discount_value?.toFixed(2).replace('.', ',')}`;
+        statusCard.className = 'mb-4 p-3 rounded-lg bg-green-50 border-l-4 border-green-500';
+        statusCard.innerHTML = `
+          <p class="text-sm font-bold text-green-800">✅ Desconto Ativo</p>
+          <p class="text-xs text-green-700 mt-1">A cada <strong>${config.min_orders}</strong> pedidos pagos, cliente ganha <strong>${typeText}</strong> de desconto</p>
+          ${config.min_order_value > 0 ? `<p class="text-xs text-green-600 mt-1">Pedido mínimo: R$ ${config.min_order_value?.toFixed(2).replace('.', ',')}</p>` : ''}
+        `;
+      } else {
+        msg.textContent = 'Erro ao salvar.';
+        msg.className = 'text-red-600 text-sm ml-2';
+      }
+    });
+
+    // Birthday Discount Save Listener
+    document.getElementById('saveBirthdayDiscountConfig')?.addEventListener('click', async () => {
+      const type = document.getElementById('birthdayDiscountType').value;
+      const val = parseFloat(document.getElementById('birthdayDiscountValue').value);
+      const msg = document.getElementById('birthdayDiscountMsg');
+
+      if (isNaN(val) || val <= 0) {
+        msg.textContent = 'Preencha o valor do desconto.';
+        msg.className = 'text-red-600 text-sm ml-2';
+        return;
+      }
+
+      const config = {
+        discount_type: type,
+        discount_value: val,
+        active: true
+      };
+
+      msg.textContent = 'Salvando...';
+      const success = await BirthdayDiscountService.saveConfig(config);
+      if (success) {
+        msg.textContent = 'Configuração salva!';
+        msg.className = 'text-green-600 text-sm ml-2';
+        // Update status card
+        const statusCard = document.getElementById('birthdayDiscountStatus');
+        const typeText = config.discount_type === 'percentage' ? `${config.discount_value}%` : `R$ ${config.discount_value?.toFixed(2).replace('.', ',')}`;
+        statusCard.className = 'mb-4 p-3 rounded-lg bg-pink-50 border-l-4 border-pink-500';
+        statusCard.innerHTML = `
+          <p class="text-sm font-bold text-pink-800">🎂 Desconto Ativo</p>
+          <p class="text-xs text-pink-700 mt-1">Cliente aniversariante ganha <strong>${typeText}</strong> de desconto (uso único por ano)</p>
+        `;
+      } else {
+        msg.textContent = 'Erro ao salvar.';
+        msg.className = 'text-red-600 text-sm ml-2';
+      }
+    });
+
     document.getElementById('showReportsPanelFast')?.addEventListener('click', async () => {
       showPanel('reportsPanelFast');
       await loadOrders();
       renderReportsData();
     });
+
+    // Ratings Panel - Uses RatingsModule (defined earlier)
+    document.getElementById('showRatingsPanelFast')?.addEventListener('click', async () => {
+      showPanel('ratingsPanelFast');
+      await RatingsModule.initAdminPanel();
+    });
+
     document.getElementById('showConfigPanelFast')?.addEventListener('click', () => {
       showPanel('configPanelFast');
       renderUsers();
@@ -7840,23 +9598,37 @@ Obrigado pela preferência! ❤️`;
     // Mobile buttons - same actions
     document.getElementById('showProductsPanelFastMobile')?.addEventListener('click', () => {
       showPanel('productsPanelFast');
+      loadProductsAdmin();
     });
     document.getElementById('showClientsPanelFastMobile')?.addEventListener('click', () => {
       showPanel('clientsPanelFast');
       renderClients();
       updateClientDiscountSelect();
     });
-    document.getElementById('showPromotionsPanelFastMobile')?.addEventListener('click', () => {
+    document.getElementById('showPromotionsPanelFastMobile')?.addEventListener('click', async () => {
       showPanel('promotionsPanelFast');
       renderPromotions();
       updatePromotionProductSelect();
       updateClientDiscountSelect();
       renderCoupons();
+      try {
+        const config = await SpecialDiscountService.getConfig();
+        if (config) {
+          document.getElementById('specialDiscountMinOrders').value = config.min_orders;
+          document.getElementById('specialDiscountMinVal').value = config.min_order_value;
+          document.getElementById('specialDiscountType').value = config.discount_type;
+          document.getElementById('specialDiscountValue').value = config.discount_value;
+        }
+      } catch (e) { }
     });
     document.getElementById('showReportsPanelFastMobile')?.addEventListener('click', async () => {
       showPanel('reportsPanelFast');
       await loadOrders();
       renderReportsData();
+    });
+    document.getElementById('showRatingsPanelFastMobile')?.addEventListener('click', async () => {
+      showPanel('ratingsPanelFast');
+      await loadRatings();
     });
     document.getElementById('showConfigPanelFastMobile')?.addEventListener('click', () => {
       showPanel('configPanelFast');
@@ -8287,7 +10059,7 @@ Obrigado pela preferência! ❤️`;
         em_preparo: 'Olá {{nome}}! Seu pedido #{{pedido}} já está sendo preparado com muito carinho! 🍳🔥\nTempo estimado: {{preparo}} min.',
         pronto: 'Opa {{nome}}! Seu pedido #{{pedido}} está PRONTO! ✅\n{{tipo_entrega}}',
         saiu_entrega: 'Olá {{nome}}! Seu pedido #{{pedido}} saiu para entrega! 🚚\nAguarde nosso entregador.',
-        entregue: 'Pedido entregue! 🥟❤️\nObrigado pela preferência, {{nome}}! Se puder, nos avalie.',
+        entregue: 'Olá, {{nome}}! 😊\n\nSeu pedido *{{pedido}}* foi entregue!\n\nNos ajude a melhorar: avalie sua experiência:\n{{rating_link}}\n\nObrigado por escolher a Fast Savory\'s! 🥟❤️',
         cancelado: 'Olá {{nome}}. Infelizmente seu pedido #{{pedido}} foi cancelado.\nMotivo: {{motivo}} 😔'
       },
 
@@ -8345,9 +10117,13 @@ Obrigado pela preferência! ❤️`;
         // Saudação dinâmica
         const greeting = this.getGreeting();
 
+        // Gerar link de avaliação
+        const orderCode = order.order_code || formatOrderCode(order.id);
+        const ratingLink = buildRatingLink(orderCode, order.client_phone);
+
         return tpl
           .replace(/{{nome}}/g, firstName)
-          .replace(/{{pedido}}/g, order.order_code || formatOrderCode(order.id))
+          .replace(/{{pedido}}/g, orderCode)
           .replace(/{{total}}/g, (order.total || 0).toFixed(2).replace('.', ','))
           .replace(/{{itens}}/g, itemsSummary || 'Itens do pedido')
           .replace(/{{endereco}}/g, address)
@@ -8355,7 +10131,8 @@ Obrigado pela preferência! ❤️`;
           .replace(/{{tipo_entrega}}/g, deliveryText)
           .replace(/{{preparo}}/g, prepTime)
           .replace(/{{saudacao}}/g, greeting)
-          .replace(/{{payment_link}}/g, order.payment_link || '[Link será enviado]');
+          .replace(/{{payment_link}}/g, order.payment_link || '[Link será enviado]')
+          .replace(/{{rating_link}}/g, ratingLink);
       }
     };
 
