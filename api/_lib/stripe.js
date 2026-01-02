@@ -8,10 +8,15 @@
  * - SUPABASE_SERVICE_ROLE_KEY: Supabase service role key
  * - CHECKOUT_SUCCESS_URL: Success redirect URL
  * - CHECKOUT_CANCEL_URL: Cancel redirect URL
+ * - WHATSAPP_NUMBER: WhatsApp number for payment link redirect (e.g., 5573999366554)
  */
 
 const Stripe = require('stripe');
 const { createClient } = require('@supabase/supabase-js');
+
+// Constants
+const EPSILON = 0.009; // Tolerance for partial payment comparison
+const WHATSAPP_NUMBER = process.env.WHATSAPP_NUMBER || '5573999366554';
 
 // Initialize Stripe
 const stripe = process.env.STRIPE_SECRET_KEY
@@ -43,9 +48,26 @@ function handleCors(req, res) {
     return false;
 }
 
+// Helper to check if payment is partial or full
+function isPartialPayment(amountPaid, total) {
+    return total > 0 && (amountPaid + EPSILON) < total;
+}
+
+// Helper to return safe error message (no internal details)
+function safeErrorMessage(error, defaultMsg = 'An error occurred') {
+    if (process.env.NODE_ENV === 'development') {
+        return error?.message || defaultMsg;
+    }
+    return defaultMsg;
+}
+
 module.exports = {
     stripe,
     supabaseAdmin,
     setCorsHeaders,
-    handleCors
+    handleCors,
+    EPSILON,
+    WHATSAPP_NUMBER,
+    isPartialPayment,
+    safeErrorMessage
 };

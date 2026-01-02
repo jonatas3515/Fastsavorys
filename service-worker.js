@@ -1,3 +1,12 @@
+/**
+ * FastSavory's Service Worker
+ * 
+ * CACHE VERSIONING CONVENTION:
+ * - Increment CACHE_NAME version (e.g., v11 → v12) on every frontend release
+ *   that includes changes to cached assets (HTML, CSS, JS, images)
+ * - This forces clients to download fresh assets and clear old cache
+ * - Format: 'fastsavorys-vNN' where NN is the version number
+ */
 const CACHE_NAME = 'fastsavorys-v11';
 const CACHE_VERSION = 'v11';
 

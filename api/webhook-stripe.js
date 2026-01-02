@@ -11,6 +11,7 @@
 
 const Stripe = require('stripe');
 const { createClient } = require('@supabase/supabase-js');
+const { EPSILON, isPartialPayment } = require('./_lib/stripe');
 
 // Disable body parsing - Stripe needs raw body
 export const config = {
@@ -111,7 +112,7 @@ module.exports = async function handler(req, res) {
                 if (orderErr) throw orderErr;
 
                 const total = Number(orderRow?.total || 0);
-                const paymentStatus = (total > 0 && amountPaid + 0.009 < total) ? 'paid_partial' : 'paid_full';
+                const paymentStatus = isPartialPayment(amountPaid, total) ? 'paid_partial' : 'paid_full';
 
                 const { error: upErr } = await supabaseAdmin
                     .from('fast_orders')
@@ -141,7 +142,7 @@ module.exports = async function handler(req, res) {
                 if (orderErr) throw orderErr;
 
                 const total = Number(orderRow?.total || 0);
-                const paymentStatus = (total > 0 && amountPaid + 0.009 < total) ? 'paid_partial' : 'paid_full';
+                const paymentStatus = isPartialPayment(amountPaid, total) ? 'paid_partial' : 'paid_full';
 
                 const { error: upErr } = await supabaseAdmin
                     .from('fast_orders')

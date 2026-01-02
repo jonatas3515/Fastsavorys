@@ -320,6 +320,8 @@
               class="bg-orange-600 hover:bg-orange-700 text-white px-3 py-2 rounded-lg text-xs">📋 Pedidos</button>
             <button id="showConfigPanelFast"
               class="bg-gray-600 hover:bg-gray-700 text-white px-3 py-2 rounded-lg text-xs">Config</button>
+            <button id="showBannerPanelFast"
+              class="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg text-xs">📢 Banner</button>
             <button id="closeStoreToday"
               class="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-lg text-xs">Fechar</button>
             <button id="goToStore" class="bg-rose-200 hover:bg-rose-300 text-black px-3 py-2 rounded-lg text-xs">Ver
@@ -353,6 +355,9 @@
               Pedidos</button>
             <button id="showConfigPanelFastMobile"
               class="bg-gray-600 hover:bg-gray-700 text-white px-2 py-2 rounded-lg text-xs text-center">Config</button>
+            <button id="showBannerPanelFastMobile"
+              class="bg-purple-600 hover:bg-purple-700 text-white px-2 py-2 rounded-lg text-xs text-center">📢
+              Banner</button>
             <button id="closeStoreTodayMobile"
               class="bg-red-600 hover:bg-red-700 text-white px-2 py-2 rounded-lg text-xs text-center">Fechar</button>
             <button id="goToStoreMobile"
@@ -1142,6 +1147,78 @@
     </div>
   </main>
 
+  <!-- Banner de Propaganda Admin Panel -->
+  <main id="bannerPanelFast" class="hidden container mx-auto px-4 py-6">
+    <div class="bg-white rounded-xl shadow-lg p-6 max-w-2xl mx-auto">
+      <h2 class="text-2xl font-bold text-gray-800 mb-6">📢 Banner de Propaganda</h2>
+
+      <div id="bannerAdminMessage" class="hidden mb-4 p-3 rounded-lg text-sm"></div>
+
+      <div class="space-y-6">
+        <!-- Enable Toggle -->
+        <div class="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+          <div>
+            <label class="font-medium text-gray-800">Exibir Banner</label>
+            <p class="text-sm text-gray-500">Se desativado, nenhum banner aparece (nem fallback)</p>
+          </div>
+          <label class="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" id="bannerEnabled" class="sr-only peer" checked>
+            <div
+              class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600">
+            </div>
+          </label>
+        </div>
+
+        <!-- Image Upload -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Imagem do Banner</label>
+          <p class="text-xs text-gray-500 mb-2">📐 Dimensões recomendadas: 728×90 (desktop) ou 320×50 (mobile)</p>
+          <div class="flex gap-3">
+            <input type="text" id="bannerImageUrl" class="flex-1 px-3 py-2 border rounded-lg text-sm"
+              placeholder="URL da imagem ou faça upload">
+            <label
+              class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg cursor-pointer text-sm font-medium">
+              Upload
+              <input type="file" id="bannerImageUpload" accept="image/*" class="hidden">
+            </label>
+          </div>
+          <div id="bannerImagePreview" class="mt-3 hidden">
+            <img id="bannerPreviewImg" src="" alt="Preview" class="max-h-24 rounded-lg border">
+          </div>
+        </div>
+
+        <!-- Link URL -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Link de Destino (opcional)</label>
+          <input type="url" id="bannerLinkUrl" class="w-full px-3 py-2 border rounded-lg text-sm"
+            placeholder="https://exemplo.com ou deixe vazio">
+        </div>
+
+        <!-- Alt Text -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">Texto Alternativo</label>
+          <input type="text" id="bannerAltText" class="w-full px-3 py-2 border rounded-lg text-sm"
+            placeholder="Anuncie aqui" value="Anuncie aqui">
+        </div>
+
+        <!-- Save Button -->
+        <button id="saveBannerConfig"
+          class="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-lg font-medium text-lg">
+          💾 Salvar Configuração
+        </button>
+      </div>
+
+      <!-- Preview Section -->
+      <div class="mt-6 pt-6 border-t">
+        <h3 class="font-bold text-gray-800 mb-3">Preview do Banner</h3>
+        <div id="bannerLivePreview" class="bg-gradient-to-r from-purple-100 to-pink-100 rounded-lg p-4 text-center">
+          <p class="text-purple-600 font-medium">Anuncie aqui</p>
+          <p class="text-xs text-gray-500 mt-1">Configure uma imagem para substituir este placeholder</p>
+        </div>
+      </div>
+    </div>
+  </main>
+
   <!-- Ratings (Avaliações) Panel -->
   <main id="ratingsPanelFast" class="hidden container mx-auto px-4 py-6">
     <div class="bg-white rounded-xl shadow-lg p-6">
@@ -1577,7 +1654,7 @@
             <span
               class="text-xs bg-yellow-400 text-yellow-900 px-2 py-1 rounded-full font-semibold animate-pulse">OFERTAS</span>
           </div>
-          <div id="promosContainer" class="flex gap-3 overflow-x-auto pb-2 snap-x snap-mandatory scrollbar-hide"
+          <div id="promosContainer" class="flex gap-3 overflow-x-auto pt-2 pb-2 snap-x snap-mandatory scrollbar-hide"
             style="scroll-behavior: smooth;"></div>
         </div>
       </div>
@@ -1758,6 +1835,33 @@
           class="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg font-medium">Cancelar</button>
         <button id="confirmDeleteClientModalBtn"
           class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium">Excluir Cliente</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Public Ad Banner (Fixed Bottom) -->
+  <div id="adBannerPublic" class="fixed bottom-0 left-0 right-0 z-[55] hidden">
+    <div class="bg-gradient-to-r from-purple-600 to-pink-600 shadow-lg">
+      <div class="container mx-auto px-3 py-2 relative">
+        <!-- Close Button -->
+        <button id="closeBannerBtn"
+          class="absolute top-1 right-1 sm:top-2 sm:right-2 z-10 bg-white/90 hover:bg-white text-gray-800 rounded-full w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center shadow-lg font-bold text-lg"
+          aria-label="Fechar banner">
+          ✕
+        </button>
+
+        <!-- Banner Content (Image or Fallback) -->
+        <a id="adBannerLink" href="#" target="_blank" rel="noopener noreferrer" class="block">
+          <!-- Image Banner -->
+          <img id="adBannerImage" src="" alt=""
+            class="hidden mx-auto max-h-[60px] sm:max-h-[80px] md:max-h-[90px] object-contain rounded">
+
+          <!-- Fallback Banner -->
+          <div id="adBannerFallback" class="text-center py-2">
+            <p class="text-white font-bold text-sm sm:text-base">📢 Anuncie aqui</p>
+            <p class="text-white/80 text-xs">Entre em contato para divulgar sua marca</p>
+          </div>
+        </a>
       </div>
     </div>
   </div>
@@ -5221,7 +5325,7 @@
           id: p.id,
           productId: p.product_id,
           productName: p.product_name,
-          type: p.type,
+          type: p.discount_type,
           value: parseFloat(p.value),
           description: p.description
         }));
@@ -5263,12 +5367,19 @@
 
     async function addPromotionToSupabase(promo) {
       try {
+        // First, delete any existing promotion for this product
+        await window.supabaseClient
+          .from('fast_promotions')
+          .delete()
+          .eq('product_id', promo.productId);
+
+        // Then insert the new promotion
         const { data, error } = await window.supabaseClient
           .from('fast_promotions')
           .insert({
             product_id: promo.productId,
             product_name: promo.productName,
-            type: promo.type,
+            discount_type: promo.type,
             value: promo.value,
             description: promo.description,
             active: true
@@ -5803,7 +5914,7 @@
     function hideAllAdminPanels() {
       // Esconde todos os painéis do admin
       ['adminPanel', 'productsPanelFast', 'configPanelFast', 'clientsPanelFast',
-        'promotionsPanelFast', 'reportsPanelFast', 'ordersPanelFast', 'ratingsPanelFast'].forEach(id => {
+        'promotionsPanelFast', 'reportsPanelFast', 'ordersPanelFast', 'ratingsPanelFast', 'bannerPanelFast'].forEach(id => {
           const el = document.getElementById(id);
           if (el) el.classList.add('hidden');
         });
@@ -5873,6 +5984,10 @@
 
       // Forçar atualização e exibição do FAB ao mostrar a loja
       updateCart();
+
+      // Initialize ad banner
+      BannerModule.init();
+
       // Se tem itens no carrinho, mostrar FAB explicitamente
       const floatingBtn = document.getElementById('floatingCartButton');
       if (floatingBtn && cart.length > 0) {
@@ -6938,9 +7053,21 @@
       const fs = product.flavor_selection;
       miniMaxFlavors = fs?.maxFlavors || 3;
 
+      // Check for promotion and calculate discounted price
+      const promotion = promotions.find(p => p.productId === product.id);
+      let displayPrice = product.price;
+      if (promotion) {
+        if (promotion.type === 'percentage') {
+          displayPrice = product.price * (1 - promotion.value / 100);
+        } else {
+          displayPrice = product.price - promotion.value;
+        }
+      }
+      pendingMiniProduct.displayPrice = displayPrice;
+
       // Set product info
       document.getElementById('miniProductName').textContent = product.name;
-      document.getElementById('miniProductPrice').textContent = `R$ ${product.price.toFixed(2).replace('.', ',')}`;
+      document.getElementById('miniProductPrice').textContent = `R$ ${displayPrice.toFixed(2).replace('.', ',')}`;
       document.getElementById('miniFlavorLimit').textContent = `(até ${miniMaxFlavors})`;
       document.getElementById('miniFlavorCounter').textContent = `Selecionados: 0/${miniMaxFlavors}`;
 
@@ -7033,7 +7160,7 @@
           id: pendingMiniProduct.id,
           name: pendingMiniProduct.name,
           description: pendingMiniProduct.description || '',
-          price: pendingMiniProduct.price,
+          price: pendingMiniProduct.displayPrice || pendingMiniProduct.price,
           quantity: 1,
           note: note,
           customOptions: { flavors: selectedFlavors }
@@ -7307,8 +7434,8 @@
         const heartIcon = isFav ? '❤️' : '🤍';
 
         return `
-          <div class="flex-shrink-0 w-[200px] bg-white rounded-xl shadow-sm border border-yellow-200 p-3 snap-start relative">
-            <div class="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full shadow">${discountBadge}</div>
+          <div class="flex-shrink-0 w-[200px] bg-white rounded-xl shadow-sm border border-yellow-200 p-3 snap-start relative overflow-visible mt-3">
+            <div class="absolute -top-3 -right-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full shadow">${discountBadge}</div>
             <div class="flex items-center mb-2">
               ${product.image ? `<img src="${product.image}" class="w-12 h-12 object-cover rounded mr-2">` : `<span class="text-2xl mr-2">${product.emoji}</span>`}
               <div class="flex-1 min-w-0">
@@ -9740,7 +9867,7 @@
 
     // Panel Navigation (Fast Admin)
     function showPanel(panelName) {
-      const panels = ['productsPanelFast', 'clientsPanelFast', 'promotionsPanelFast', 'configPanelFast', 'reportsPanelFast', 'ordersPanelFast', 'ratingsPanelFast'];
+      const panels = ['productsPanelFast', 'clientsPanelFast', 'promotionsPanelFast', 'configPanelFast', 'reportsPanelFast', 'ordersPanelFast', 'ratingsPanelFast', 'bannerPanelFast'];
       panels.forEach(p => {
         const el = document.getElementById(p);
         if (el) el.classList.toggle('hidden', p !== panelName);
@@ -10209,6 +10336,250 @@
         alert('Erro ao atualizar status do pedido.');
       }
     }
+
+    // ========================================
+    // BANNER MODULE (Ad Banner Management)
+    // ========================================
+    const BannerModule = {
+      config: null,
+      SESSION_KEY: 'fastAdBannerClosed',
+
+      // Load banner config from Supabase
+      async loadConfig() {
+        try {
+          const { data, error } = await window.supabaseClient
+            .from('fast_banner_config')
+            .select('*')
+            .eq('store_id', 1)
+            .single();
+
+          if (error && error.code !== 'PGRST116') throw error;
+          this.config = data || { enabled: true, image_url: null, link_url: null, alt_text: 'Anuncie aqui' };
+          return this.config;
+        } catch (e) {
+          console.warn('[Banner] Error loading config:', e);
+          this.config = { enabled: true, image_url: null, link_url: null, alt_text: 'Anuncie aqui' };
+          return this.config;
+        }
+      },
+
+      // Save banner config to Supabase
+      async saveConfig(config) {
+        try {
+          const { error } = await window.supabaseClient
+            .from('fast_banner_config')
+            .upsert({
+              store_id: 1,
+              image_url: config.image_url || null,
+              link_url: config.link_url || null,
+              alt_text: config.alt_text || 'Anuncie aqui',
+              enabled: config.enabled !== false,
+              updated_at: new Date().toISOString()
+            }, { onConflict: 'store_id' });
+
+          if (error) throw error;
+          this.config = config;
+          return true;
+        } catch (e) {
+          console.error('[Banner] Error saving config:', e);
+          return false;
+        }
+      },
+
+      // Check if banner should be shown (sessionStorage)
+      shouldShow() {
+        try {
+          return !sessionStorage.getItem(this.SESSION_KEY);
+        } catch (e) {
+          return true; // Show by default if sessionStorage fails
+        }
+      },
+
+      // Mark banner as closed for this session
+      markClosed() {
+        try {
+          sessionStorage.setItem(this.SESSION_KEY, 'true');
+        } catch (e) {
+          console.warn('[Banner] Could not save close state');
+        }
+      },
+
+      // Show public banner
+      showPublicBanner() {
+        if (!this.config || !this.config.enabled || !this.shouldShow()) {
+          return;
+        }
+
+        const container = document.getElementById('adBannerPublic');
+        const image = document.getElementById('adBannerImage');
+        const fallback = document.getElementById('adBannerFallback');
+        const link = document.getElementById('adBannerLink');
+
+        if (!container) return;
+
+        // Set link URL
+        if (this.config.link_url) {
+          link.href = this.config.link_url;
+          link.style.cursor = 'pointer';
+        } else {
+          link.removeAttribute('href');
+          link.style.cursor = 'default';
+        }
+
+        // Show image or fallback
+        if (this.config.image_url) {
+          image.src = this.config.image_url;
+          image.alt = this.config.alt_text || 'Banner publicitário';
+          image.classList.remove('hidden');
+          fallback.classList.add('hidden');
+        } else {
+          image.classList.add('hidden');
+          fallback.classList.remove('hidden');
+        }
+
+        container.classList.remove('hidden');
+      },
+
+      // Hide public banner
+      hideBanner() {
+        const container = document.getElementById('adBannerPublic');
+        if (container) {
+          container.classList.add('hidden');
+        }
+        this.markClosed();
+      },
+
+      // Admin: Load config into form
+      loadAdminForm() {
+        if (!this.config) return;
+
+        const enabledEl = document.getElementById('bannerEnabled');
+        const imageUrlEl = document.getElementById('bannerImageUrl');
+        const linkUrlEl = document.getElementById('bannerLinkUrl');
+        const altTextEl = document.getElementById('bannerAltText');
+        const previewEl = document.getElementById('bannerImagePreview');
+        const previewImgEl = document.getElementById('bannerPreviewImg');
+        const livePreviewEl = document.getElementById('bannerLivePreview');
+
+        if (enabledEl) enabledEl.checked = this.config.enabled !== false;
+        if (imageUrlEl) imageUrlEl.value = this.config.image_url || '';
+        if (linkUrlEl) linkUrlEl.value = this.config.link_url || '';
+        if (altTextEl) altTextEl.value = this.config.alt_text || 'Anuncie aqui';
+
+        // Show image preview
+        if (this.config.image_url && previewEl && previewImgEl) {
+          previewImgEl.src = this.config.image_url;
+          previewEl.classList.remove('hidden');
+        }
+
+        // Update live preview
+        this.updateLivePreview();
+      },
+
+      // Admin: Update live preview
+      updateLivePreview() {
+        const imageUrl = document.getElementById('bannerImageUrl')?.value;
+        const altText = document.getElementById('bannerAltText')?.value || 'Anuncie aqui';
+        const livePreviewEl = document.getElementById('bannerLivePreview');
+
+        if (!livePreviewEl) return;
+
+        if (imageUrl) {
+          livePreviewEl.innerHTML = `<img src="${imageUrl}" alt="${altText}" class="mx-auto max-h-20 rounded">`;
+        } else {
+          livePreviewEl.innerHTML = `
+            <p class="text-purple-600 font-medium">${altText}</p>
+            <p class="text-xs text-gray-500 mt-1">Configure uma imagem para substituir este placeholder</p>
+          `;
+        }
+      },
+
+      // Admin: Save from form
+      async saveFromForm() {
+        const config = {
+          enabled: document.getElementById('bannerEnabled')?.checked !== false,
+          image_url: document.getElementById('bannerImageUrl')?.value || null,
+          link_url: document.getElementById('bannerLinkUrl')?.value || null,
+          alt_text: document.getElementById('bannerAltText')?.value || 'Anuncie aqui'
+        };
+
+        const success = await this.saveConfig(config);
+
+        const msgEl = document.getElementById('bannerAdminMessage');
+        if (msgEl) {
+          msgEl.textContent = success ? '✅ Configuração salva com sucesso!' : '❌ Erro ao salvar configuração';
+          msgEl.className = success
+            ? 'mb-4 p-3 rounded-lg text-sm bg-green-100 text-green-700'
+            : 'mb-4 p-3 rounded-lg text-sm bg-red-100 text-red-700';
+          msgEl.classList.remove('hidden');
+          setTimeout(() => msgEl.classList.add('hidden'), 3000);
+        }
+
+        return success;
+      },
+
+      // Initialize banner module
+      async init() {
+        await this.loadConfig();
+
+        // Public: Show banner on store page
+        this.showPublicBanner();
+
+        // Public: Close button handler
+        document.getElementById('closeBannerBtn')?.addEventListener('click', () => {
+          this.hideBanner();
+        });
+
+        // Admin: Save button handler
+        document.getElementById('saveBannerConfig')?.addEventListener('click', async () => {
+          await this.saveFromForm();
+        });
+
+        // Admin: Image URL change handler
+        document.getElementById('bannerImageUrl')?.addEventListener('input', () => {
+          const url = document.getElementById('bannerImageUrl').value;
+          const previewEl = document.getElementById('bannerImagePreview');
+          const previewImgEl = document.getElementById('bannerPreviewImg');
+
+          if (url && previewEl && previewImgEl) {
+            previewImgEl.src = url;
+            previewEl.classList.remove('hidden');
+          } else if (previewEl) {
+            previewEl.classList.add('hidden');
+          }
+
+          this.updateLivePreview();
+        });
+
+        // Admin: Alt text change handler
+        document.getElementById('bannerAltText')?.addEventListener('input', () => {
+          this.updateLivePreview();
+        });
+
+        // Admin: Image upload handler
+        document.getElementById('bannerImageUpload')?.addEventListener('change', async (e) => {
+          const file = e.target.files[0];
+          if (!file) return;
+
+          // Convert to base64 for simplicity (or upload to Supabase Storage)
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            const base64 = event.target.result;
+            document.getElementById('bannerImageUrl').value = base64;
+            const previewEl = document.getElementById('bannerImagePreview');
+            const previewImgEl = document.getElementById('bannerPreviewImg');
+            if (previewEl && previewImgEl) {
+              previewImgEl.src = base64;
+              previewEl.classList.remove('hidden');
+            }
+            this.updateLivePreview();
+          };
+          reader.readAsDataURL(file);
+        });
+
+        console.log('[Banner] Module initialized');
+      }
+    };
 
     // ========================================
     // STRIPE PAYMENT SERVICE
@@ -10810,6 +11181,11 @@ Obrigado pela preferência! ❤️`;
       renderFastFeesListPanel();
       loadCouriers();
     });
+    document.getElementById('showBannerPanelFast')?.addEventListener('click', async () => {
+      showPanel('bannerPanelFast');
+      await BannerModule.loadConfig();
+      BannerModule.loadAdminForm();
+    });
     document.getElementById('showOrdersPanelFast')?.addEventListener('click', () => {
       showPanel('ordersPanelFast');
     });
@@ -10854,6 +11230,11 @@ Obrigado pela preferência! ❤️`;
       renderUsers();
       renderFastFeesListPanel();
       loadCouriers();
+    });
+    document.getElementById('showBannerPanelFastMobile')?.addEventListener('click', async () => {
+      showPanel('bannerPanelFast');
+      await BannerModule.loadConfig();
+      BannerModule.loadAdminForm();
     });
     document.getElementById('showOrdersPanelFastMobile')?.addEventListener('click', () => {
       showPanel('ordersPanelFast');

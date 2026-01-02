@@ -10,7 +10,7 @@
  * Body: { orderId, amount, customerEmail?, customerName? }
  */
 
-const { stripe, handleCors } = require('./_lib/stripe');
+const { stripe, handleCors, safeErrorMessage } = require('./_lib/stripe');
 
 module.exports = async function handler(req, res) {
     if (handleCors(req, res)) return;
@@ -90,6 +90,6 @@ module.exports = async function handler(req, res) {
         });
     } catch (error) {
         console.error('Stripe Checkout error:', error);
-        res.status(400).json({ error: error.message });
+        res.status(400).json({ error: safeErrorMessage(error, 'Erro ao criar sessão de checkout') });
     }
 };

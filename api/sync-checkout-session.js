@@ -12,7 +12,7 @@
  * Body: { sessionId }
  */
 
-const { stripe, supabaseAdmin, handleCors } = require('./_lib/stripe');
+const { stripe, supabaseAdmin, handleCors, isPartialPayment, safeErrorMessage } = require('./_lib/stripe');
 
 module.exports = async function handler(req, res) {
     if (handleCors(req, res)) return;
@@ -59,7 +59,7 @@ module.exports = async function handler(req, res) {
 
         const total = Number(orderRow?.total || 0);
         const paymentStatus = isPaid
-            ? ((total > 0 && amountPaid + 0.009 < total) ? 'paid_partial' : 'paid_full')
+            ? (isPartialPayment(amountPaid, total) ? 'paid_partial' : 'paid_full')
             : (orderRow?.payment_status || 'awaiting_payment');
 
         const { error: upErr } = await supabaseAdmin
@@ -83,6 +83,6 @@ module.exports = async function handler(req, res) {
         });
     } catch (err) {
         console.error('❌ Sync Checkout error:', err);
-        return res.status(400).json({ error: err.message || 'Falha ao sincronizar checkout' });
+        return res.status(400).json({ error: safeErrorMessage(err, 'Falha ao sincronizar checkout') });
     }
 };

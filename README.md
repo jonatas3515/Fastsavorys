@@ -24,6 +24,7 @@ Projeto configurado para deploy na Vercel com:
    - `SUPABASE_SERVICE_ROLE_KEY`: Service Role Key (necessária para updates de pagamento)
    - `CHECKOUT_SUCCESS_URL`: URL de sucesso, ex: `https://seu-dominio.vercel.app/pages/fast.html?checkout=success&session_id={CHECKOUT_SESSION_ID}`
    - `CHECKOUT_CANCEL_URL`: URL de cancelamento, ex: `https://seu-dominio.vercel.app/pages/fast.html?checkout=cancel&order_id=`
+   - `WHATSAPP_NUMBER` (opcional): Número do WhatsApp para redirecionamento após pagamento. Padrão: `5573999366554`
 
 3. **Stripe Webhook**:
    - Aponte o webhook no dashboard do Stripe para: `https://seu-dominio.vercel.app/api/webhook-stripe`

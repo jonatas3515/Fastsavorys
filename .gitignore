@@ -29,3 +29,5 @@ stripe-server/.env
 .env
 *.env
 
+
+.vercel
