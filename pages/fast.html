@@ -1874,30 +1874,28 @@
 
   <!-- Public Ad Banner (Fixed Bottom) -->
   <div id="adBannerPublic" class="fixed bottom-0 left-0 right-0 z-[55] hidden">
-    <div class="bg-gradient-to-r from-purple-600 to-pink-600 shadow-lg">
-      <div class="container mx-auto px-3 py-2 relative">
-        <!-- Close Button -->
-        <button id="closeBannerBtn"
-          class="absolute top-1 right-1 sm:top-2 sm:right-2 z-10 bg-white/90 hover:bg-white text-gray-800 rounded-full w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center shadow-lg font-bold text-lg"
-          aria-label="Fechar banner">
-          ✕
-        </button>
+    <div class="relative">
+      <!-- Close Button -->
+      <button id="closeBannerBtn"
+        class="absolute top-1 right-1 sm:top-2 sm:right-2 z-10 bg-black/60 hover:bg-black/80 text-white rounded-full w-6 h-6 sm:w-7 sm:h-7 flex items-center justify-center shadow-lg text-sm font-bold"
+        aria-label="Fechar banner">
+        ✕
+      </button>
 
-        <!-- Banner Content (Image or Fallback) -->
-        <a id="adBannerLink" href="#" target="_blank" rel="noopener noreferrer" class="block">
-          <!-- Image Banner -->
-          <img id="adBannerImage" src="" alt=""
-            class="hidden mx-auto max-h-[60px] sm:max-h-[80px] md:max-h-[90px] object-contain rounded">
+      <!-- Banner Content (Image or Fallback) -->
+      <a id="adBannerLink" href="#" target="_blank" rel="noopener noreferrer" class="block w-full">
+        <!-- Image Banner - Full width, no padding -->
+        <img id="adBannerImage" src="" alt="" class="hidden w-full h-auto max-h-[80px] sm:max-h-[100px] object-cover">
 
-          <!-- Fallback Banner -->
-          <div id="adBannerFallback" class="text-center py-2">
-            <p class="text-white font-bold text-sm sm:text-base">📢 Anuncie aqui</p>
-            <p class="text-white/80 text-xs">Entre em contato para divulgar sua marca</p>
-          </div>
-        </a>
-      </div>
+        <!-- Fallback Banner (only shown when no image) -->
+        <div id="adBannerFallback" class="bg-gradient-to-r from-rose-600 to-orange-500 text-center py-3 px-4">
+          <p class="text-white font-bold text-sm sm:text-base">📢 Anuncie aqui</p>
+          <p class="text-white/80 text-xs">Entre em contato para divulgar sua marca</p>
+        </div>
+      </a>
     </div>
   </div>
+
 
   <!-- Checkout Modal -->
   <div id="checkoutModal"
@@ -11874,13 +11872,18 @@ Obrigado pela preferência! ❤️`;
 
       defaults: {
         recebido: 'Olá {{nome}}! Recebemos seu pedido #{{pedido}} com sucesso. 🎉\nResumo: {{itens}}\nTotal: R$ {{total}}\nJá vamos começar a preparar!',
-        recebido_pix: 'Olá {{nome}}! Recebemos seu pedido #{{pedido}} com sucesso. 🎉\nResumo: {{itens}}\nTotal: R$ {{total}}\nPagamento: 📱 PIX\n\nPara confirmar seu pedido, efetue o pagamento de no mínimo 50% do valor do pedido.\nSegue chave Pix (copia e cola):\n\n{{pix_payload}}\n\nApós o pagamento, envie o comprovante.',
+        recebido_pix: 'Olá {{nome}}! Recebemos seu pedido #{{pedido}} com sucesso. 🎉\nResumo: {{itens}}\nTotal: R$ {{total}}\nPagamento: 📱 PIX\n\nPara confirmar seu pedido, efetue o pagamento de no mínimo 50% do valor do pedido.\nSegue chave Pix (e-mail):\n\n{{pix_key}}\n\nApós o pagamento, envie o comprovante.',
         aceito: '{{saudacao}}, {{nome}}! 🎉\n\nSeu pedido #{{pedido}} foi *ACEITO* pela Fast Savory\'s!\n\nPara confirmar sua encomenda, realize o pagamento pelo link:\n{{payment_link}}\n\n💳 *Opções:*\n• Mínimo 50% agora (entrada)\n• Ou valor total\n\n*Valor:* R$ {{total}}\n\nObrigado! ❤️',
         em_preparo: 'Olá {{nome}}! Seu pedido #{{pedido}} já está sendo preparado com muito carinho! 🍳🔥\nTempo estimado: {{preparo}} min.',
         pronto: 'Opa {{nome}}! Seu pedido #{{pedido}} está PRONTO! ✅\n{{tipo_entrega}}',
         saiu_entrega: 'Olá {{nome}}! Seu pedido #{{pedido}} saiu para entrega! 🚚\nAguarde nosso entregador.',
         entregue: 'Olá, {{nome}}! 😊\n\nSeu pedido *{{pedido}}* foi entregue!\n\nNos ajude a melhorar: avalie sua experiência:\n{{rating_link}}\n\nObrigado por escolher a Fast Savory\'s! 🥟❤️',
-        cancelado: 'Olá {{nome}}. Infelizmente seu pedido #{{pedido}} foi cancelado.\nMotivo: {{motivo}} 😔'
+        cancelado: 'Olá {{nome}}. Infelizmente seu pedido #{{pedido}} foi cancelado.\nMotivo: {{motivo}} 😔',
+
+        // Templates para ENCOMENDAS (pedidos agendados)
+        recebido_encomenda_entrega: 'Olá {{nome}}! Recebemos sua encomenda #{{pedido}} com sucesso. 🎉\nResumo: {{itens}}\nTotal: R$ {{total}}\n\n📅 *Entrega agendada para {{data_encomenda}} às {{hora_encomenda}}.*\\nSeu pedido será preparado com muito carinho e entregue no horário combinado.\\n\\nAguarde nossa confirmação! 💛',
+        recebido_encomenda_retirada: 'Olá {{nome}}! Sua encomenda #{{pedido}} está confirmada. 🙌\nResumo: {{itens}}\nTotal: R$ {{total}}\n\n📅 *Estará pronta para retirada em {{data_encomenda}} às {{hora_encomenda}}.*\\nCapricharemos em cada detalhe para você receber tudo fresquinho! 🥟',
+        recebido_encomenda_pix: 'Olá {{nome}}! Recebemos sua encomenda #{{pedido}}. 🙏\nResumo: {{itens}}\nTotal: R$ {{total}}\nPagamento: 📱 PIX\n\n📅 *Agendado para {{data_encomenda}} às {{hora_encomenda}}.*\\n\\nPara confirmar, efetue o pagamento de no mínimo 50% do valor.\\nSegue chave Pix (e-mail):\\n\n{{pix_key}}\n\nApós o pagamento, envie o comprovante.'
       },
 
       getAll: function () {
@@ -11921,14 +11924,28 @@ Obrigado pela preferência! ❤️`;
         const safeStatus = status || 'recebido';
         let templateKey = this.statusMap[safeStatus] || safeStatus;
 
-        // Check if PIX payment and status is recebido - use PIX template if configured
+        // Detectar se é ENCOMENDA (pedido agendado para o futuro)
+        const encomendaDate = order.scheduled_date || order.encomenda_date || order.encomendaDate;
+        const encomendaSlot = order.scheduled_time || order.encomenda_slot || order.encomendaSlot;
+        const isEncomenda = !!(encomendaDate && encomendaDate.trim());
+
+        // Check if PIX payment
         const isPixPayment = order.payment_method === 'pix';
         const isRecebidoStatus = (templateKey === 'recebido');
-        let pixPayload = null;
 
-        if (isPixPayment && isRecebidoStatus && PixPayloadService.isConfigured()) {
-          pixPayload = PixPayloadService.generateForOrder(order);
-          if (pixPayload) {
+        // Escolher template correto para status "recebido"
+        if (isRecebidoStatus) {
+          if (isEncomenda) {
+            // É uma encomenda - escolher template baseado no tipo de entrega e pagamento
+            if (isPixPayment && storeConfig?.pix_key) {
+              templateKey = 'recebido_encomenda_pix';
+            } else if (order.delivery_type === 'entrega') {
+              templateKey = 'recebido_encomenda_entrega';
+            } else {
+              templateKey = 'recebido_encomenda_retirada';
+            }
+          } else if (isPixPayment && storeConfig?.pix_key) {
+            // Pedido imediato com PIX
             templateKey = 'recebido_pix';
           }
         }
@@ -11954,6 +11971,18 @@ Obrigado pela preferência! ❤️`;
         const orderCode = order.order_code || formatOrderCode(order.id);
         const ratingLink = buildRatingLink(orderCode, order.client_phone);
 
+        // Formatar data e hora da encomenda
+        let dataEncomenda = encomendaDate || '';
+        let horaEncomenda = encomendaSlot || '';
+
+        // Formatar data se estiver no formato YYYY-MM-DD
+        if (dataEncomenda && dataEncomenda.includes('-')) {
+          const parts = dataEncomenda.split('-');
+          if (parts.length === 3) {
+            dataEncomenda = `${parts[2]}/${parts[1]}/${parts[0]}`; // DD/MM/YYYY
+          }
+        }
+
         return tpl
           .replace(/{{nome}}/g, firstName)
           .replace(/{{pedido}}/g, orderCode)
@@ -11966,7 +11995,9 @@ Obrigado pela preferência! ❤️`;
           .replace(/{{saudacao}}/g, greeting)
           .replace(/{{payment_link}}/g, order.payment_link || '[Link será enviado]')
           .replace(/{{rating_link}}/g, ratingLink)
-          .replace(/{{pix_payload}}/g, pixPayload || '[PIX não configurado]');
+          .replace(/{{pix_key}}/g, storeConfig?.pix_key || '[Chave PIX não configurada]')
+          .replace(/{{data_encomenda}}/g, dataEncomenda || '[Data não informada]')
+          .replace(/{{hora_encomenda}}/g, horaEncomenda || '[Horário não informado]');
       }
     };
 
