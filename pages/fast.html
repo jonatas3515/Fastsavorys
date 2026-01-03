@@ -671,6 +671,39 @@
         <p class="text-xs text-gray-500 mt-2 text-center">As taxas serão aplicadas automaticamente no checkout.</p>
       </div>
 
+      <!-- Seção de Configuração PIX -->
+      <div class="bg-white rounded-xl shadow-lg p-6">
+        <h2 class="text-2xl font-bold text-gray-800 mb-6">📱 Configuração PIX</h2>
+        <p class="text-sm text-gray-600 mb-4">Configure sua chave PIX para gerar códigos de pagamento automáticos nas
+          mensagens de pedido.</p>
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">Chave PIX *</label>
+            <input type="text" id="pixKey" class="w-full px-3 py-2 border rounded-lg"
+              placeholder="E-mail, telefone, CPF/CNPJ ou chave aleatória" />
+            <p class="text-xs text-gray-500 mt-1">Obrigatório para gerar códigos PIX.</p>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Nome do Beneficiário *</label>
+              <input type="text" id="pixMerchantName" class="w-full px-3 py-2 border rounded-lg"
+                placeholder="FAST SAVORYS" maxlength="25" />
+              <p class="text-xs text-gray-500 mt-1">Máx. 25 caracteres, sem acentos.</p>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-2">Cidade</label>
+              <input type="text" id="pixMerchantCity" class="w-full px-3 py-2 border rounded-lg" placeholder="ITAMARAJU"
+                maxlength="15" />
+              <p class="text-xs text-gray-500 mt-1">Máx. 15 caracteres.</p>
+            </div>
+          </div>
+        </div>
+        <button type="button" id="savePixConfig"
+          class="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg font-medium mt-4">
+          💾 Salvar Configuração PIX
+        </button>
+        <div id="pixConfigStatus" class="mt-3 text-center"></div>
+      </div>
 
 
       <!-- Seção de Entregadores -->
@@ -4681,6 +4714,16 @@
         const phone = document.getElementById('clientPhone').value.trim();
         const email = document.getElementById('clientEmail').value.trim();
         const address = document.getElementById('clientAddress').value.trim();
+
+        // VALIDATION: Require Name + Surname for NEW phones
+        const isNewPhone = !clients.some(c => c.phone === phone);
+        if (isNewPhone) {
+          const nameParts = name.split(/\s+/).filter(w => w.length > 0);
+          if (nameParts.length < 2) {
+            alert('Por favor, informe nome e sobrenome do cliente.');
+            return;
+          }
+        }
 
         // Check for duplicate
         const duplicate = clients.find(c =>
@@ -11620,9 +11663,185 @@ Obrigado pela preferência! ❤️`;
     });
 
     // ========================================
+    // PIX PAYLOAD SERVICE (BR Code Generator)
+    // ========================================
+    const PixPayloadService = {
+      // CRC16 CCITT-FALSE calculation for PIX
+      crc16: function (str) {
+        let crc = 0xFFFF;
+        for (let i = 0; i < str.length; i++) {
+          crc ^= str.charCodeAt(i) << 8;
+          for (let j = 0; j < 8; j++) {
+            if (crc & 0x8000) {
+              crc = (crc << 1) ^ 0x1021;
+            } else {
+              crc = crc << 1;
+            }
+          }
+        }
+        return (crc & 0xFFFF).toString(16).toUpperCase().padStart(4, '0');
+      },
+
+      // Format EMV field: 2-digit ID + 2-digit length + value
+      formatField: function (id, value) {
+        const len = value.length.toString().padStart(2, '0');
+        return id + len + value;
+      },
+
+      // Remove accents and special chars for PIX compatibility
+      removeAccents: function (str) {
+        return str
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/[^A-Za-z0-9 ]/g, '')
+          .toUpperCase()
+          .trim();
+      },
+
+      // Check if PIX is properly configured
+      isConfigured: function () {
+        const key = storeConfig?.pix_key;
+        const name = storeConfig?.pix_merchant_name;
+        return !!(key && key.trim() && name && name.trim());
+      },
+
+      // Generate EMV/BR Code payload
+      generate: function (params) {
+        try {
+          if (!params.pixKey || !params.merchantName) {
+            console.warn('[PIX] Missing required params (pixKey, merchantName)');
+            return null;
+          }
+
+          const merchantName = this.removeAccents(params.merchantName).substring(0, 25);
+          const merchantCity = this.removeAccents(params.merchantCity || 'CIDADE').substring(0, 15);
+
+          // Format amount as XX.XX (exactly 2 decimal places)
+          const amount = params.amount ? params.amount.toFixed(2) : null;
+          const txid = params.txid ? params.txid.replace(/[^A-Za-z0-9]/g, '').toUpperCase().substring(0, 25) : '';
+
+          // Build Merchant Account Information (ID 26)
+          let merchantAcct = '';
+          merchantAcct += this.formatField('00', 'BR.GOV.BCB.PIX'); // GUI
+          merchantAcct += this.formatField('01', params.pixKey); // Chave PIX
+
+          // Build Additional Data Field (ID 62)
+          let additionalData = '';
+          if (txid) {
+            additionalData += this.formatField('05', txid); // Reference Label (TXID)
+          }
+
+          // Build main payload
+          let payload = '';
+          payload += this.formatField('00', '01'); // Payload Format Indicator
+          payload += this.formatField('01', '12'); // Point of Initiation (12 = dynamic/single use)
+          payload += this.formatField('26', merchantAcct); // Merchant Account Info
+          payload += this.formatField('52', '0000'); // Merchant Category Code
+          payload += this.formatField('53', '986'); // Transaction Currency (BRL)
+
+          if (amount) {
+            payload += this.formatField('54', amount); // Transaction Amount
+          }
+
+          payload += this.formatField('58', 'BR'); // Country Code
+          payload += this.formatField('59', merchantName); // Merchant Name
+          payload += this.formatField('60', merchantCity); // Merchant City
+
+          if (additionalData) {
+            payload += this.formatField('62', additionalData); // Additional Data
+          }
+
+          // Add CRC16 placeholder
+          payload += '6304';
+
+          // Calculate and append CRC16
+          const crc = this.crc16(payload);
+          payload = payload.slice(0, -4) + this.formatField('63', crc);
+
+          return payload;
+        } catch (e) {
+          console.error('[PIX] Error generating payload:', e);
+          return null;
+        }
+      },
+
+      // Generate PIX payload for order (50% of total)
+      generateForOrder: function (order) {
+        if (!this.isConfigured()) {
+          console.log('[PIX] Not configured, skipping payload generation');
+          return null;
+        }
+
+        const halfAmount = Math.round((order.total || 0) * 50) / 100; // 50%, rounded to 2 decimals
+        const orderCode = (order.order_code || 'FAST' + order.id).replace(/[^A-Za-z0-9]/g, '');
+
+        return this.generate({
+          pixKey: storeConfig.pix_key,
+          merchantName: storeConfig.pix_merchant_name,
+          merchantCity: storeConfig.pix_merchant_city || 'CIDADE',
+          amount: halfAmount,
+          txid: orderCode
+        });
+      }
+    };
+
+    // PIX Config Save Handler
+    document.getElementById('savePixConfig')?.addEventListener('click', async () => {
+      const pixKey = document.getElementById('pixKey')?.value?.trim() || '';
+      const pixMerchantName = document.getElementById('pixMerchantName')?.value?.trim() || '';
+      const pixMerchantCity = document.getElementById('pixMerchantCity')?.value?.trim() || '';
+      const statusEl = document.getElementById('pixConfigStatus');
+
+      if (!pixKey || !pixMerchantName) {
+        statusEl.innerHTML = '<span class="text-red-600 text-sm">❌ Preencha a chave PIX e o nome do beneficiário.</span>';
+        return;
+      }
+
+      storeConfig.pix_key = pixKey;
+      storeConfig.pix_merchant_name = PixPayloadService.removeAccents(pixMerchantName).substring(0, 25);
+      storeConfig.pix_merchant_city = PixPayloadService.removeAccents(pixMerchantCity || 'CIDADE').substring(0, 15);
+
+      const success = await saveStoreConfig();
+      if (success) {
+        statusEl.innerHTML = '<span class="text-green-600 text-sm">✅ Configuração PIX salva com sucesso!</span>';
+      } else {
+        statusEl.innerHTML = '<span class="text-red-600 text-sm">❌ Erro ao salvar configuração.</span>';
+      }
+    });
+
+    // Load PIX config into form when opening config panel
+    function loadPixConfigToForm() {
+      if (storeConfig.pix_key) {
+        const keyEl = document.getElementById('pixKey');
+        if (keyEl) keyEl.value = storeConfig.pix_key;
+      }
+      if (storeConfig.pix_merchant_name) {
+        const nameEl = document.getElementById('pixMerchantName');
+        if (nameEl) nameEl.value = storeConfig.pix_merchant_name;
+      }
+      if (storeConfig.pix_merchant_city) {
+        const cityEl = document.getElementById('pixMerchantCity');
+        if (cityEl) cityEl.value = storeConfig.pix_merchant_city;
+      }
+    }
+
+    // ========================================
+    // CANCELLATION TEMPLATES
+    // ========================================
+    const CANCELLATION_TEMPLATES = {
+      kitchen: 'Olá {{nome}}. Infelizmente seu pedido #{{pedido}} foi cancelado.\nMotivo: Imprevisto na cozinha 😔',
+      no_driver: 'Olá {{nome}}. Infelizmente seu pedido #{{pedido}} foi cancelado.\nMotivo: Estamos sem motoboy disponível para sua região no momento. Pedimos desculpas pelo transtorno. 😔',
+      weather: 'Olá {{nome}}. Infelizmente seu pedido #{{pedido}} foi cancelado.\nMotivo: Devido à chuva forte na região, não conseguimos realizar a entrega com segurança agora. 😔',
+      ingredient: 'Olá {{nome}}. Infelizmente seu pedido #{{pedido}} foi cancelado.\nMotivo: Tivemos falta de um dos ingredientes principais do seu pedido e não conseguimos produzir com a qualidade que você merece. 😔',
+      operational: 'Olá {{nome}}. Infelizmente seu pedido #{{pedido}} foi cancelado.\nMotivo: Tivemos um problema operacional interno e não conseguiremos concluir o preparo neste momento. 😔',
+      queue: 'Olá {{nome}}. Infelizmente seu pedido #{{pedido}} foi cancelado.\nMotivo: Nossa fila de produção está acima da capacidade hoje e não conseguiríamos entregar dentro de um prazo aceitável. 😔'
+    };
+
+    // ========================================
     // MESSAGE TEMPLATES SERVICE
     // ========================================
     const MsgTemplateService = {
+
       // Mapeamento entre status do banco (inglês) e chaves dos templates (português)
       statusMap: {
         'pending': 'recebido',
@@ -11655,6 +11874,7 @@ Obrigado pela preferência! ❤️`;
 
       defaults: {
         recebido: 'Olá {{nome}}! Recebemos seu pedido #{{pedido}} com sucesso. 🎉\nResumo: {{itens}}\nTotal: R$ {{total}}\nJá vamos começar a preparar!',
+        recebido_pix: 'Olá {{nome}}! Recebemos seu pedido #{{pedido}} com sucesso. 🎉\nResumo: {{itens}}\nTotal: R$ {{total}}\nPagamento: 📱 PIX\n\nPara confirmar seu pedido, efetue o pagamento de no mínimo 50% do valor do pedido.\nSegue chave Pix (copia e cola):\n\n{{pix_payload}}\n\nApós o pagamento, envie o comprovante.',
         aceito: '{{saudacao}}, {{nome}}! 🎉\n\nSeu pedido #{{pedido}} foi *ACEITO* pela Fast Savory\'s!\n\nPara confirmar sua encomenda, realize o pagamento pelo link:\n{{payment_link}}\n\n💳 *Opções:*\n• Mínimo 50% agora (entrada)\n• Ou valor total\n\n*Valor:* R$ {{total}}\n\nObrigado! ❤️',
         em_preparo: 'Olá {{nome}}! Seu pedido #{{pedido}} já está sendo preparado com muito carinho! 🍳🔥\nTempo estimado: {{preparo}} min.',
         pronto: 'Opa {{nome}}! Seu pedido #{{pedido}} está PRONTO! ✅\n{{tipo_entrega}}',
@@ -11699,7 +11919,20 @@ Obrigado pela preferência! ❤️`;
         // Mapeia o status para a chave correta do template
         // Se status vazio, usa 'recebido' como padrão
         const safeStatus = status || 'recebido';
-        const templateKey = this.statusMap[safeStatus] || safeStatus;
+        let templateKey = this.statusMap[safeStatus] || safeStatus;
+
+        // Check if PIX payment and status is recebido - use PIX template if configured
+        const isPixPayment = order.payment_method === 'pix';
+        const isRecebidoStatus = (templateKey === 'recebido');
+        let pixPayload = null;
+
+        if (isPixPayment && isRecebidoStatus && PixPayloadService.isConfigured()) {
+          pixPayload = PixPayloadService.generateForOrder(order);
+          if (pixPayload) {
+            templateKey = 'recebido_pix';
+          }
+        }
+
         const tpl = this.getAll()[templateKey] || this.defaults.recebido;
 
         if (!tpl) {
@@ -11732,7 +11965,8 @@ Obrigado pela preferência! ❤️`;
           .replace(/{{preparo}}/g, prepTime)
           .replace(/{{saudacao}}/g, greeting)
           .replace(/{{payment_link}}/g, order.payment_link || '[Link será enviado]')
-          .replace(/{{rating_link}}/g, ratingLink);
+          .replace(/{{rating_link}}/g, ratingLink)
+          .replace(/{{pix_payload}}/g, pixPayload || '[PIX não configurado]');
       }
     };
 
@@ -11778,13 +12012,50 @@ Obrigado pela preferência! ❤️`;
       document.getElementById('msgUpdateOrderId').value = orderId;
       document.getElementById('msgUpdateStatus').value = order.status;
 
+      // Reset cancellation reason
+      const reasonSelect = document.getElementById('cancellationReason');
+      if (reasonSelect) reasonSelect.value = '';
+
       // Update preview on status change
       const updatePreview = () => {
         const newStatus = document.getElementById('msgUpdateStatus').value;
+        const reasonSection = document.getElementById('cancellationReasonSection');
+
+        // Toggle cancellation reason dropdown
+        if (newStatus === 'cancelado') {
+          reasonSection.classList.remove('hidden');
+        } else {
+          reasonSection.classList.add('hidden');
+        }
+
+        // If cancelled, check if reason selected
+        if (newStatus === 'cancelado') {
+          const reasonKey = document.getElementById('cancellationReason').value;
+
+          if (reasonKey && CANCELLATION_TEMPLATES[reasonKey]) {
+            // Use specific cancellation template
+            let tpl = CANCELLATION_TEMPLATES[reasonKey];
+
+            // Format cancellation template
+            const firstName = MsgTemplateService.getFirstName(order.client_name);
+            const orderCode = order.order_code || formatOrderCode(order.id);
+
+            tpl = tpl
+              .replace(/{{nome}}/g, firstName)
+              .replace(/{{pedido}}/g, orderCode);
+
+            document.getElementById('msgUpdatePreview').value = tpl;
+            return;
+          }
+        }
+
+        // Default behavior for other statuses or if no specific cancellation reason
         document.getElementById('msgUpdatePreview').value = MsgTemplateService.getFormatted(newStatus, order);
       };
 
       document.getElementById('msgUpdateStatus').onchange = updatePreview;
+      document.getElementById('cancellationReason').onchange = updatePreview;
+
       updatePreview(); // Initial load
 
       modal.classList.remove('hidden');
@@ -11978,11 +12249,26 @@ Obrigado pela preferência! ❤️`;
             <option value="cancelado">❌ Cancelado</option>
           </select>
         </div>
+        <!-- Cancellation reason selector (only visible when status = cancelado) -->
+        <div id="cancellationReasonSection" class="hidden">
+          <label class="block text-sm font-medium text-gray-700 mb-2">Motivo do Cancelamento</label>
+          <select id="cancellationReason" class="w-full px-3 py-2 border rounded-lg">
+            <option value="">📝 Selecione um motivo (ou escreva manualmente)...</option>
+            <option value="kitchen">🍳 Imprevisto na cozinha</option>
+            <option value="no_driver">🏍️ Sem motoboy disponível</option>
+            <option value="weather">🌧️ Chuva forte / condições climáticas</option>
+            <option value="ingredient">🥗 Falta de ingrediente</option>
+            <option value="operational">⚙️ Problema operacional interno</option>
+            <option value="queue">⏰ Fila acima da capacidade</option>
+          </select>
+          <p class="text-xs text-gray-500 mt-1">Você pode editar a mensagem abaixo livremente.</p>
+        </div>
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-2">Mensagem (Preview)</label>
           <textarea id="msgUpdatePreview" rows="4"
             class="w-full px-3 py-2 border rounded-lg text-sm bg-gray-50"></textarea>
         </div>
+
         <div class="flex gap-2 justify-end mt-4">
           <button type="button" id="closeMsgUpdate"
             class="px-4 py-2 text-gray-600 hover:text-gray-800">Cancelar</button>
