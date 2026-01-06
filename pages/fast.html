@@ -68,6 +68,72 @@
     })();
   </script>
   <link rel="stylesheet" href="../assets/css/styles.css" />
+  <!-- Catalog page-flip animation styles (3D effect) -->
+  <style>
+    /* 3D perspective container */
+    .catalog-book-3d {
+      perspective: 2000px;
+    }
+
+    .catalog-page {
+      transition: transform 0.45s ease, opacity 0.45s ease;
+      transform-style: preserve-3d;
+      backface-visibility: hidden;
+    }
+
+    /* 3D page flip effect */
+    .catalog-page--flip-next {
+      transform: rotateY(-20deg) translateX(-30px);
+      opacity: 0;
+    }
+
+    .catalog-page--flip-prev {
+      transform: rotateY(20deg) translateX(30px);
+      opacity: 0;
+    }
+
+    /* Text truncation for consistent card heights */
+    .line-clamp-2 {
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    /* Fixed-dimension image card - NEVER changes size based on image */
+    .catalog-image-card {
+      width: 100%;
+      max-width: 320px;
+      height: 260px;
+      min-height: 260px;
+      max-height: 260px;
+      border-radius: 1rem;
+      background: #fff;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      flex-shrink: 0;
+    }
+
+    .catalog-image {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+
+    /* Fixed-height text block for aligned prices */
+    .catalog-text-block {
+      width: 100%;
+      max-width: 320px;
+      min-height: 150px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+  </style>
   <style>
     .fs-accent {
       background: linear-gradient(135deg, #f59e0b, #ef4444, #f472b6);
@@ -124,10 +190,16 @@
         <img src="../assets/img/capa-logo.png" alt="Fast Savory's"
           class="max-w-full max-h-[55vh] object-contain drop-shadow-2xl" />
       </div>
-      <div class="text-center pb-6">
+      <div class="text-center pb-6 space-y-3">
         <button id="enterStoreBtnMobile"
           class="px-6 py-3 bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-black font-bold text-base rounded-full shadow-2xl animate-pulse">
           🛒 Fazer Pedido
+        </button>
+        <!-- CATALOG BUTTON (Mobile Welcome) - Abre página pública + catálogo -->
+        <button id="openCatalogBtnMobile" type="button"
+          onclick="showPublicStore(); document.getElementById('welcomeScreen').classList.add('hidden'); setTimeout(() => CatalogModule.open(), 100);"
+          class="block mx-auto px-5 py-2 bg-gradient-to-r from-rose-500 to-purple-600 hover:from-rose-600 hover:to-purple-700 text-white font-bold text-sm rounded-full shadow-xl">
+          📚 Ver Catálogo
         </button>
       </div>
     </div>
@@ -145,6 +217,12 @@
         <button id="enterStoreBtn"
           class="px-6 py-3 bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-black font-bold text-lg rounded-full shadow-2xl transform hover:scale-105 transition-all duration-300">
           🛒 Fazer Pedido
+        </button>
+        <!-- CATALOG BUTTON (Desktop Welcome) - Abre página pública + catálogo -->
+        <button id="openCatalogBtnDesktop" type="button"
+          onclick="showPublicStore(); document.getElementById('welcomeScreen').classList.add('hidden'); setTimeout(() => CatalogModule.open(), 100);"
+          class="ml-3 px-6 py-3 bg-gradient-to-r from-rose-500 to-purple-600 hover:from-rose-600 hover:to-purple-700 text-white font-bold text-lg rounded-full shadow-2xl transform hover:scale-105 transition-all duration-300">
+          📚 Catálogo
         </button>
       </div>
       <!-- Image centered on screen -->
@@ -482,6 +560,47 @@
                 </div>
                 <p class="text-xs text-gray-500 mt-2">Se ativado, o cliente poderá escolher os sabores no momento da
                   compra.</p>
+              </div>
+
+              <!-- CATALOG SECTION - Added for catalog feature -->
+              <div class="border-t pt-4 mt-2">
+                <h5 class="text-sm font-medium text-gray-700 mb-3">📚 Catálogo</h5>
+                <label class="flex items-center gap-2 cursor-pointer mb-3">
+                  <input type="checkbox" id="productCatalogEnabled" class="w-4 h-4 text-rose-600" checked>
+                  <span class="text-sm text-gray-700">Mostrar no catálogo</span>
+                </label>
+                <div class="grid grid-cols-2 gap-3 mb-3">
+                  <div>
+                    <label class="text-xs text-gray-600 block mb-1">Opções de tamanho</label>
+                    <div class="space-y-1">
+                      <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" id="catalogSizeSmall" class="w-3 h-3 text-rose-600">
+                        <span class="text-xs text-gray-700">Pequeno</span>
+                      </label>
+                      <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" id="catalogSizeLarge" class="w-3 h-3 text-rose-600">
+                        <span class="text-xs text-gray-700">Grande</span>
+                      </label>
+                    </div>
+                  </div>
+                  <div>
+                    <label class="flex items-center gap-2 cursor-pointer mt-4">
+                      <input type="checkbox" id="catalogVegan" class="w-4 h-4 text-green-600">
+                      <span class="text-sm text-gray-700">🌱 Vegano</span>
+                    </label>
+                  </div>
+                </div>
+                <div class="mb-3">
+                  <label class="text-xs text-gray-600 block mb-1">Frase para o catálogo</label>
+                  <textarea id="catalogPhrase" rows="2" placeholder="Ex: Perfeito para festas de aniversário!"
+                    class="w-full px-2 py-1 border rounded text-sm"></textarea>
+                </div>
+                <div>
+                  <label class="text-xs text-gray-600 block mb-1">Posição no catálogo (ordem)</label>
+                  <input type="number" id="catalogOrder" min="0" placeholder="0"
+                    class="w-20 px-2 py-1 border rounded text-sm">
+                </div>
+                <p class="text-xs text-gray-500 mt-2">Menor número = aparece primeiro no catálogo.</p>
               </div>
 
               <button type="submit"
@@ -1598,10 +1717,16 @@
         <div id="openNotice" class="text-sm py-2 px-3 rounded-lg my-2 text-center"></div>
         <div id="deliveryStatusBanner" class="hidden text-sm py-2 px-3 rounded-lg mb-2 text-center"></div>
 
-        <div class="flex justify-center mb-2">
+        <!-- Tracking + Catalog buttons row -->
+        <div class="flex flex-col sm:flex-row justify-center gap-2 mb-2">
           <button id="openTrackingModalBtn" type="button"
             class="text-xs sm:text-sm bg-gray-100 hover:bg-gray-200 text-gray-800 px-3 py-2 rounded-lg font-medium w-full sm:w-auto">
             🔎 Acompanhar pedido
+          </button>
+          <!-- CATALOG BUTTON (Public Store) - Added for catalog feature -->
+          <button id="openCatalogBtnPublic" type="button" onclick="CatalogModule.open()"
+            class="text-xs sm:text-sm bg-gradient-to-r from-rose-500 to-purple-600 hover:from-rose-600 hover:to-purple-700 text-white px-3 py-2 rounded-lg font-medium w-full sm:w-auto">
+            📚 Ver Catálogo
           </button>
         </div>
 
@@ -2448,6 +2573,68 @@
       </div>
     </div>
   </div>
+
+  <!-- ========================================
+       CATALOG OVERLAY (REVISTA/FOLHETO)
+       ======================================== -->
+  <div id="catalogOverlay"
+    class="fixed inset-0 z-[70] bg-black/80 hidden flex items-center justify-center px-2 sm:px-6">
+    <!-- Close on backdrop click -->
+    <div class="absolute inset-0" onclick="CatalogModule.close()"></div>
+
+    <!-- Catalog Book Container -->
+    <div id="catalogBook"
+      class="relative bg-gradient-to-br from-white to-rose-50 rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
+      <!-- Header -->
+      <div class="flex items-center p-3 sm:p-4 border-b bg-gradient-to-r from-rose-600 to-purple-600 text-white">
+        <!-- Logo on left (no background, larger) -->
+        <img src="../assets/img/FastSavorys.png" alt="FastSavory's"
+          class="h-10 w-10 sm:h-12 sm:w-12 object-contain flex-shrink-0" />
+        <!-- Centered title -->
+        <h2 class="flex-1 text-center text-lg sm:text-xl font-bold">Catálogo FastSavory's</h2>
+        <!-- Close button on right (red background, no X) -->
+        <button onclick="CatalogModule.close()"
+          class="bg-red-600 hover:bg-red-700 px-4 py-1.5 rounded-lg text-sm font-medium flex-shrink-0">
+          Fechar
+        </button>
+      </div>
+
+      <!-- Pages Container with 3D perspective -->
+      <div class="catalog-book-3d flex-1 flex overflow-hidden relative min-h-[300px]">
+        <!-- Navigation Left -->
+        <button id="catalogPrevBtn" onclick="CatalogModule.navigate(-1)"
+          class="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-white/80 hover:bg-white shadow-lg rounded-full w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center text-gray-700 text-xl font-bold disabled:opacity-30"
+          disabled>
+          ‹
+        </button>
+
+        <!-- Left Page (Desktop only) -->
+        <div id="catalogPageLeft"
+          class="catalog-page hidden lg:flex flex-1 p-6 flex-col items-center justify-center border-r bg-gradient-to-b from-white to-rose-50 overflow-y-auto">
+          <!-- Content rendered by JS -->
+        </div>
+
+        <!-- Right Page (or single page on mobile) -->
+        <div id="catalogPageRight"
+          class="catalog-page flex flex-1 p-6 flex-col items-center justify-center bg-gradient-to-b from-white to-rose-50 overflow-y-auto">
+          <!-- Content rendered by JS -->
+        </div>
+
+        <!-- Navigation Right -->
+        <button id="catalogNextBtn" onclick="CatalogModule.navigate(1)"
+          class="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-white/80 hover:bg-white shadow-lg rounded-full w-10 h-10 sm:w-12 sm:h-12 flex items-center justify-center text-gray-700 text-xl font-bold disabled:opacity-30">
+          ›
+        </button>
+      </div>
+
+      <!-- Footer with page counter -->
+      <div class="p-3 border-t bg-white/80 flex items-center justify-between text-sm text-gray-600">
+        <span id="catalogPageInfo">Página 1 de 1</span>
+        <span class="text-xs text-gray-400">Toque nas setas para navegar</span>
+      </div>
+    </div>
+  </div>
+
   <script>
     // Configuração do Supabase
     const supabaseUrl = 'https://vqjyjdllapqbqpylshkw.supabase.co';
@@ -2486,6 +2673,428 @@
       high_demand_extra_time: 15
     };
     let businessHours = [];
+
+    // ========================================
+    // CATALOG MODULE - Catálogo em formato revista
+    // Displays products in a magazine-style overlay
+    // ========================================
+    const CatalogModule = {
+      products: [],
+      currentPage: 0,
+      isMobile: false,
+      previousOverflow: '',
+      // Touch/swipe support properties
+      touchStartX: 0,
+      touchEndX: 0,
+
+      init: function () {
+        // Detectar mobile (lg breakpoint = 1024px)
+        this.isMobile = window.innerWidth < 1024;
+        window.addEventListener('resize', () => {
+          const wasMobile = this.isMobile;
+          this.isMobile = window.innerWidth < 1024;
+          // Re-render if breakpoint crossed while catalog is open
+          if (wasMobile !== this.isMobile && !document.getElementById('catalogOverlay').classList.contains('hidden')) {
+            this.render();
+          }
+        });
+
+        // ESC to close catalog
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape' && !document.getElementById('catalogOverlay').classList.contains('hidden')) {
+            this.close();
+          }
+        });
+
+        // Initialize swipe support
+        this.bindSwipeEvents();
+      },
+
+      // Swipe (touch) event handlers for iOS/Android
+      bindSwipeEvents: function () {
+        const book = document.getElementById('catalogBook');
+        if (!book) return;
+
+        book.addEventListener('touchstart', (e) => {
+          if (!e.touches || !e.touches.length) return;
+          this.touchStartX = e.touches[0].clientX;
+          this.touchEndX = this.touchStartX;
+        }, { passive: true });
+
+        book.addEventListener('touchmove', (e) => {
+          if (!e.touches || !e.touches.length) return;
+          this.touchEndX = e.touches[0].clientX;
+        }, { passive: true });
+
+        book.addEventListener('touchend', () => {
+          const deltaX = this.touchEndX - this.touchStartX;
+          const threshold = 40; // minimum px to trigger swipe
+
+          if (Math.abs(deltaX) > threshold) {
+            if (deltaX < 0) {
+              this.navigate(1);  // swipe left -> next page
+            } else {
+              this.navigate(-1); // swipe right -> previous page
+            }
+          }
+
+          this.touchStartX = 0;
+          this.touchEndX = 0;
+        });
+      },
+
+      open: async function () {
+        // If products haven't been loaded yet (e.g., opening from landing page), load them first
+        if (!products || products.length === 0) {
+          try {
+            // Try to load from Supabase directly
+            const { data, error } = await window.supabaseClient
+              .from('fast_products')
+              .select('*')
+              .order('catalog_order', { ascending: true });
+
+            if (data && data.length > 0) {
+              // Map to global products array
+              products = data.map(p => ({
+                ...p,
+                startDate: p.start_date,
+                endDate: p.end_date,
+                unavailableToday: p.unavailable_today,
+                isEncomenda: p.is_encomenda,
+                flavor_selection: p.flavor_selection,
+                catalog_enabled: p.catalog_enabled !== undefined ? p.catalog_enabled : true,
+                catalog_size_options: p.catalog_size_options || null,
+                catalog_vegan: p.catalog_vegan || false,
+                catalog_phrase: p.catalog_phrase || null,
+                catalog_order: p.catalog_order || 0
+              }));
+            }
+          } catch (e) {
+            console.warn('[Catalog] Failed to load products:', e);
+          }
+        }
+
+        this.loadProducts();
+        this.currentPage = 0;
+        this.render();
+        // Save previous overflow and prevent body scroll
+        this.previousOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        document.getElementById('catalogOverlay').classList.remove('hidden');
+      },
+
+      close: function () {
+        document.getElementById('catalogOverlay').classList.add('hidden');
+        // Restore previous overflow
+        document.body.style.overflow = this.previousOverflow || '';
+      },
+
+      loadProducts: function () {
+        // Use global products array, filter for catalog_enabled (default true if field missing)
+        // Sort by catalog_order (lower first)
+        this.products = products.filter(p =>
+          p.visible !== false &&
+          (p.catalog_enabled === undefined || p.catalog_enabled === true)
+        ).sort((a, b) => (a.catalog_order || 0) - (b.catalog_order || 0));
+      },
+
+      render: function () {
+        const leftPage = document.getElementById('catalogPageLeft');
+        const rightPage = document.getElementById('catalogPageRight');
+        const pageInfo = document.getElementById('catalogPageInfo');
+        const prevBtn = document.getElementById('catalogPrevBtn');
+        const nextBtn = document.getElementById('catalogNextBtn');
+
+        if (!rightPage) return;
+
+        // Calculate products per page and total pages
+        const productsPerPage = this.isMobile ? 1 : 2;
+        const totalPages = Math.ceil(this.products.length / productsPerPage);
+
+        // Handle empty catalog
+        if (this.products.length === 0) {
+          rightPage.innerHTML = this.renderEmptyMessage();
+          if (leftPage) leftPage.innerHTML = '';
+          pageInfo.textContent = 'Catálogo vazio';
+          prevBtn.disabled = true;
+          nextBtn.disabled = true;
+          return;
+        }
+
+        // Calculate product indices for current page
+        const startIdx = this.currentPage * productsPerPage;
+        const product1 = this.products[startIdx];
+        const product2 = this.isMobile ? null : this.products[startIdx + 1];
+
+        // Render pages
+        if (this.isMobile) {
+          rightPage.innerHTML = product1 ? this.renderProductPage(product1) : this.renderEmptyPage();
+          if (leftPage) leftPage.innerHTML = '';
+        } else {
+          leftPage.innerHTML = product1 ? this.renderProductPage(product1) : this.renderEmptyPage();
+          rightPage.innerHTML = product2 ? this.renderProductPage(product2) : this.renderEmptyPage();
+        }
+
+        // Update page counter
+        pageInfo.textContent = `Página ${this.currentPage + 1} de ${Math.max(1, totalPages)}`;
+
+        // Update navigation buttons
+        prevBtn.disabled = this.currentPage === 0;
+        nextBtn.disabled = this.currentPage >= totalPages - 1;
+      },
+
+      renderProductPage: function (product) {
+        const price = (product.price || 0).toFixed(2).replace('.', ',');
+        const categoryLabels = {
+          salgados: '🥟 Salgados',
+          mini: '🧁 Mini-Salgados',
+          kits: '🎁 Kits Festa',
+          bolos: '🎂 Bolos',
+          bebidas: '🥤 Bebidas',
+          adicionais: '➕ Adicionais'
+        };
+        const categoryLabel = categoryLabels[product.category] || product.category || '';
+
+        // Size options
+        let sizeHtml = '';
+        if (product.catalog_size_options) {
+          try {
+            const sizes = JSON.parse(product.catalog_size_options);
+            if (Array.isArray(sizes) && sizes.length > 0) {
+              sizeHtml = `<p class="text-xs sm:text-sm text-gray-600">📏 Tamanhos: ${sizes.join(' / ')}</p>`;
+            }
+          } catch (e) {
+            if (typeof product.catalog_size_options === 'string' && product.catalog_size_options.trim()) {
+              sizeHtml = `<p class="text-xs sm:text-sm text-gray-600">📏 ${product.catalog_size_options}</p>`;
+            }
+          }
+        }
+
+        // Vegan badge
+        const veganBadge = product.catalog_vegan
+          ? '<span class="inline-block bg-green-100 text-green-800 text-[11px] px-2 py-0.5 rounded-full font-medium ml-1">🌱 Vegano</span>'
+          : '';
+
+        // Catalog phrase
+        const phraseHtml = product.catalog_phrase
+          ? `<p class="text-xs sm:text-sm text-purple-700 italic mt-2">"${product.catalog_phrase}"</p>`
+          : '';
+
+        // Promo badge if applicable
+        let promoHtml = '';
+        if (product.promo && product.promo.active) {
+          const promoText = product.promo.type === 'percentage'
+            ? `-${product.promo.value}%`
+            : `-R$ ${product.promo.value.toFixed(2).replace('.', ',')}`;
+          promoHtml = `<span class="inline-block bg-yellow-100 text-yellow-800 text-[11px] px-2 py-0.5 rounded-full font-medium ml-1">🏷️ ${promoText}</span>`;
+        }
+
+        // Fixed-dimension image card - uses CSS class for guaranteed fixed size
+        const imageCard = product.image
+          ? `<div class="catalog-image-card">
+               <img src="${product.image}" alt="${product.name}" class="catalog-image" />
+             </div>`
+          : `<div class="catalog-image-card" style="background: linear-gradient(to bottom right, #ffe4e6, #fed7aa);">
+               <span class="text-6xl text-gray-400">${product.emoji || '🥟'}</span>
+             </div>`;
+
+        // Fixed-height text block for aligned prices between left/right pages
+        const textBlock = `
+          <div class="catalog-text-block mt-4">
+            <div class="space-y-1 text-center">
+              <div class="flex flex-wrap items-center justify-center gap-1">
+                ${categoryLabel ? `<span class="text-[11px] bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full">${categoryLabel}</span>` : ''}
+                ${veganBadge}
+                ${promoHtml}
+              </div>
+              ${product.name ? `<h3 class="text-lg sm:text-xl font-bold text-gray-900 truncate">${product.name}</h3>` : ''}
+              ${product.description ? `<p class="text-xs sm:text-sm text-gray-600 line-clamp-2">${product.description}</p>` : ''}
+              ${sizeHtml}
+            </div>
+            <div class="mt-2 text-center">
+              ${price ? `<p class="text-xl sm:text-2xl font-bold text-rose-600">R$ ${price}</p>` : ''}
+              ${phraseHtml}
+            </div>
+            <!-- Botão Adicionar ao Carrinho -->
+            <div class="mt-3 flex justify-center">
+              <button 
+                onclick="event.stopPropagation(); CatalogModule.addToCartFromCatalog(${product.id})"
+                class="flex items-center justify-center gap-2 bg-rose-500 hover:bg-rose-600 text-white font-bold py-2 px-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
+                title="Adicionar ao carrinho"
+              >
+                <span class="text-xl">+</span>
+                <span class="text-sm">Adicionar</span>
+              </button>
+            </div>
+          </div>
+        `;
+
+        return `
+          <div class="w-full h-full flex flex-col items-center justify-center">
+            ${imageCard}
+            ${textBlock}
+          </div>
+        `;
+
+      },
+
+      renderEmptyPage: function () {
+        return `
+          <div class="w-full h-full flex items-center justify-center text-gray-400">
+            <p class="text-sm">Fim do catálogo</p>
+          </div>
+        `;
+      },
+
+      renderEmptyMessage: function () {
+        return `
+          <div class="w-full h-full flex flex-col items-center justify-center text-gray-500 p-4">
+            <p class="text-4xl mb-4">📚</p>
+            <p class="text-lg font-medium">Nenhum produto no catálogo</p>
+            <p class="text-sm text-gray-400 mt-2">Os produtos serão exibidos aqui quando cadastrados.</p>
+          </div>
+        `;
+      },
+
+      navigate: function (direction) {
+        const productsPerPage = this.isMobile ? 1 : 2;
+        const totalPages = Math.ceil(this.products.length / productsPerPage);
+        if (totalPages === 0) return;
+
+        const leftPage = document.getElementById('catalogPageLeft');
+        const rightPage = document.getElementById('catalogPageRight');
+        const goingNext = direction > 0;
+
+        // 3D page-flip exit animation
+        const flipClass = goingNext ? 'catalog-page--flip-next' : 'catalog-page--flip-prev';
+        if (leftPage) leftPage.classList.add(flipClass);
+        if (rightPage) rightPage.classList.add(flipClass);
+
+        // After animation, update page and render
+        setTimeout(() => {
+          this.currentPage += direction;
+          if (this.currentPage < 0) this.currentPage = 0;
+          if (this.currentPage >= totalPages) this.currentPage = Math.max(0, totalPages - 1);
+
+          this.render();
+
+          // Remove animation classes for clean entry
+          if (leftPage) {
+            leftPage.classList.remove('catalog-page--flip-next', 'catalog-page--flip-prev');
+          }
+          if (rightPage) {
+            rightPage.classList.remove('catalog-page--flip-next', 'catalog-page--flip-prev');
+          }
+        }, 220);
+      },
+
+      // Adiciona produto ao carrinho diretamente do catálogo
+      // Inclui verificação de modais de sabores e cálculo de promoção
+      addToCartFromCatalog: function (productId) {
+        const product = products.find(p => p.id === productId);
+        if (!product) {
+          console.error('[Catalog] Produto não encontrado:', productId);
+          return;
+        }
+
+        // Fecha o catálogo primeiro
+        this.close();
+
+        // Para kits e bolos, abre modal de opções customizadas
+        if (product.category === 'kits' || product.category === 'bolos') {
+          console.log('[Catalog] Produto requer modal de opções:', product.name, product.category);
+          // Chama o modal existente de opções customizadas
+          if (typeof openCustomOptionsModal === 'function') {
+            openCustomOptionsModal(product.id, product.name, product.description, product.price, product.category);
+          } else {
+            console.warn('[Catalog] openCustomOptionsModal não disponível');
+            this.addProductDirectly(product);
+          }
+          return;
+        }
+
+        // Para mini salgados com seleção de sabores habilitada
+        if (product.category === 'mini' && product.flavor_selection?.enabled) {
+          console.log('[Catalog] Produto mini com seleção de sabores:', product.name);
+          if (typeof openMiniSalgadosModal === 'function') {
+            openMiniSalgadosModal(product);
+          } else {
+            console.warn('[Catalog] openMiniSalgadosModal não disponível');
+            this.addProductDirectly(product);
+          }
+          return;
+        }
+
+        // Para outros produtos, adiciona diretamente com cálculo de promoção
+        this.addProductDirectly(product);
+      },
+
+      // Adiciona produto diretamente ao carrinho (sem modal)
+      // Calcula preço promocional se aplicável
+      addProductDirectly: function (product) {
+        // Calcula preço final considerando promoção
+        let finalPrice = product.price;
+        let hasPromo = false;
+
+        if (product.promo?.active && product.promo?.value > 0) {
+          hasPromo = true;
+          if (product.promo.type === 'percent' || product.promo.type === 'percentage') {
+            finalPrice = product.price * (1 - product.promo.value / 100);
+          } else {
+            // Tipo fixo
+            finalPrice = product.price - product.promo.value;
+          }
+          // Garante preço mínimo de 0
+          finalPrice = Math.max(0, finalPrice);
+          console.log('[Catalog] Promoção aplicada:', product.name, 'de R$', product.price, 'por R$', finalPrice);
+        }
+
+        // Verifica se produto já está no carrinho
+        const existingItem = cart.find(item => item.id === product.id);
+
+        if (existingItem) {
+          // Incrementa quantidade (mantém o preço original do item)
+          existingItem.quantity += 1;
+          console.log('[Catalog] Quantidade incrementada:', product.name, existingItem.quantity);
+        } else {
+          // Adiciona novo item com preço promocional
+          cart.push({
+            id: product.id,
+            name: product.name,
+            description: product.description || '',
+            price: finalPrice,
+            originalPrice: hasPromo ? product.price : null,
+            quantity: 1,
+            image: product.image,
+            emoji: product.emoji,
+            note: ''
+          });
+          console.log('[Catalog] Produto adicionado:', product.name, 'preço:', finalPrice);
+        }
+
+        // Atualiza o carrinho
+        updateCart();
+
+        // Mostra a loja pública com o carrinho visível
+        showPublicStore();
+
+        // Scroll para o carrinho
+        const cartSection = document.getElementById('cart');
+        if (cartSection) {
+          setTimeout(() => {
+            cartSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }, 300);
+        }
+
+        // Feedback visual
+        const promoText = hasPromo ? ' (com desconto!)' : '';
+        showInlineMessage('publicStore', `✅ ${product.name} adicionado ao carrinho${promoText}`, 'success');
+      }
+    };
+
+    // Initialize CatalogModule when DOM is ready (handled in DOMContentLoaded)
+
+
 
     // ========================================
     // OFFLINE SYNC QUEUE SERVICE
@@ -2619,6 +3228,225 @@
     }, 30000);
 
     // ========================================
+    // SMART DATA CACHE SERVICE
+    // ========================================
+    // Sistema de cache inteligente para reduzir Cached Egress do Supabase.
+    // Dados são cacheados em localStorage e atualizados apenas quando a versão muda.
+    // Admin sempre escreve direto no Supabase; público lê do cache.
+    // 
+    // SQL para criar tabela de versões (execute no Supabase SQL Editor):
+    // migrations/create_data_versions_table.sql
+    // ========================================
+    const DataCache = {
+      PREFIX: 'fast_cache_',
+
+      // Lê dados do cache
+      get: function (key) {
+        try {
+          const raw = localStorage.getItem(this.PREFIX + key);
+          return raw ? JSON.parse(raw) : null;
+        } catch (e) {
+          console.warn('[DataCache] Erro ao ler:', key, e);
+          return null;
+        }
+      },
+
+      // Salva dados no cache com versão
+      set: function (key, data, version) {
+        try {
+          const payload = {
+            items: data,
+            version: version || 0,
+            savedAt: Date.now()
+          };
+          localStorage.setItem(this.PREFIX + key, JSON.stringify(payload));
+          console.log('[DataCache] Salvo:', key, 'versão:', version);
+          return true;
+        } catch (e) {
+          console.warn('[DataCache] Erro ao salvar:', key, e);
+          return false;
+        }
+      },
+
+      // Obtém versão local
+      getLocalVersion: function (key) {
+        const cached = this.get(key);
+        return cached ? cached.version : null;
+      },
+
+      // Limpa cache específico
+      clear: function (key) {
+        try {
+          localStorage.removeItem(this.PREFIX + key);
+          console.log('[DataCache] Limpo:', key);
+        } catch (e) {
+          console.warn('[DataCache] Erro ao limpar:', key, e);
+        }
+      },
+
+      // Limpa todo o cache
+      clearAll: function () {
+        try {
+          const keys = Object.keys(localStorage).filter(k => k.startsWith(this.PREFIX));
+          keys.forEach(k => localStorage.removeItem(k));
+          console.log('[DataCache] Cache completo limpo');
+        } catch (e) {
+          console.warn('[DataCache] Erro ao limpar tudo:', e);
+        }
+      }
+    };
+
+    // ========================================
+    // VERSION CHECKING SERVICE
+    // ========================================
+    const VersionService = {
+      // Debounce control
+      _lastCheck: {},
+      _minInterval: 180000, // 3 minutos entre checks do mesmo key
+
+      // Busca versão do servidor (query leve)
+      getServerVersion: async function (key) {
+        try {
+          const { data, error } = await window.supabaseClient
+            .from('fast_data_versions')
+            .select('version')
+            .eq('key', key)
+            .single();
+
+          if (error) {
+            // Tabela pode não existir ainda - não é erro crítico
+            if (error.code === 'PGRST116') {
+              console.log('[VersionService] Tabela fast_data_versions não encontrada (execute a migração)');
+              return null;
+            }
+            console.warn('[VersionService] Erro ao buscar versão:', key, error);
+            return null;
+          }
+
+          return data ? data.version : null;
+        } catch (e) {
+          console.warn('[VersionService] Exceção ao buscar versão:', key, e);
+          return null;
+        }
+      },
+
+      // Incrementa versão (chamado pelo admin após salvar)
+      incrementVersion: async function (key) {
+        try {
+          const { data, error } = await window.supabaseClient
+            .rpc('increment_data_version', { p_key: key });
+
+          if (error) {
+            console.warn('[VersionService] Erro ao incrementar versão:', key, error);
+            return null;
+          }
+
+          console.log('[VersionService] Versão incrementada:', key, '→', data);
+          return data;
+        } catch (e) {
+          console.warn('[VersionService] Exceção ao incrementar:', key, e);
+          return null;
+        }
+      },
+
+      // Verifica se precisa atualizar (com debounce)
+      shouldCheck: function (key) {
+        const now = Date.now();
+        const lastCheck = this._lastCheck[key] || 0;
+
+        if (now - lastCheck < this._minInterval) {
+          console.log('[VersionService] Debounce ativo para:', key);
+          return false;
+        }
+
+        this._lastCheck[key] = now;
+        return true;
+      },
+
+      // Verifica e atualiza se necessário
+      checkAndRefresh: async function (key, localVersion, refreshFn) {
+        if (!this.shouldCheck(key)) return false;
+
+        const serverVersion = await this.getServerVersion(key);
+
+        if (serverVersion === null) {
+          // Não conseguiu verificar - não força refresh
+          console.log('[VersionService] Não foi possível verificar versão de:', key);
+          return false;
+        }
+
+        if (serverVersion !== localVersion) {
+          console.log('[VersionService] Versão mudou:', key, 'local:', localVersion, 'server:', serverVersion);
+          if (typeof refreshFn === 'function') {
+            await refreshFn();
+          }
+          return true;
+        }
+
+        console.log('[VersionService] Versão atual:', key, '=', serverVersion);
+        return false;
+      }
+    };
+
+    // ========================================
+    // BACKGROUND SYNC (apenas loja pública)
+    // ========================================
+    let _backgroundSyncInterval = null;
+
+    function startBackgroundVersionSync() {
+      // Só roda na loja pública, não no admin
+      if (sessionStorage.getItem('fastAdmin') === '1') {
+        console.log('[BackgroundSync] Admin detectado, sync desativado');
+        return;
+      }
+
+      // Evita múltiplos intervalos
+      if (_backgroundSyncInterval) return;
+
+      // Check a cada 5 minutos
+      _backgroundSyncInterval = setInterval(async () => {
+        if (!OfflineSyncService.isOnline()) return;
+
+        console.log('[BackgroundSync] Verificando versões...');
+
+        // Verifica produtos
+        const cachedProducts = DataCache.get('products');
+        if (cachedProducts) {
+          await VersionService.checkAndRefresh(
+            'products',
+            cachedProducts.version,
+            fetchProductsFromSupabase
+          );
+        }
+      }, 300000); // 5 minutos
+
+      console.log('[BackgroundSync] Iniciado (intervalo: 5 min)');
+    }
+
+    // Visibility change handler com debounce
+    let _lastVisibilityCheck = 0;
+    document.addEventListener('visibilitychange', async () => {
+      if (document.visibilityState !== 'visible') return;
+      if (sessionStorage.getItem('fastAdmin') === '1') return;
+
+      const now = Date.now();
+      if (now - _lastVisibilityCheck < 180000) return; // 3 min debounce
+      _lastVisibilityCheck = now;
+
+      console.log('[BackgroundSync] Tab ficou visível, verificando versões...');
+
+      const cachedProducts = DataCache.get('products');
+      if (cachedProducts) {
+        await VersionService.checkAndRefresh(
+          'products',
+          cachedProducts.version,
+          fetchProductsFromSupabase
+        );
+      }
+    });
+
+    // ========================================
+
     // ORDER HISTORY SERVICE (localStorage + Supabase)
     // ========================================
     const OrderHistoryService = {
@@ -4096,6 +4924,9 @@
 
         // Initialize Flavor Selection UI (for product form)
         try { FlavorSelectionUI.init(); } catch (e) { console.warn('[FlavorSelection] Failed to init:', e); }
+
+        // Initialize Catalog Module (for magazine-style catalog)
+        try { CatalogModule.init(); } catch (e) { console.warn('[Catalog] Failed to init:', e); }
 
       } catch (e) {
         console.error('[INIT] Erro crítico na inicialização:', e);
@@ -6304,9 +7135,27 @@
 
     // ========== PRODUCTS - SUPABASE INTEGRATION ==========
 
-    async function loadProducts() {
+    // Helper para mapear snake_case do Supabase para camelCase local
+    function mapProductData(p) {
+      return {
+        ...p,
+        startDate: p.start_date,
+        endDate: p.end_date,
+        unavailableToday: p.unavailable_today,
+        isEncomenda: p.is_encomenda,
+        flavor_selection: p.flavor_selection,
+        catalog_enabled: p.catalog_enabled !== undefined ? p.catalog_enabled : true,
+        catalog_size_options: p.catalog_size_options || null,
+        catalog_vegan: p.catalog_vegan || false,
+        catalog_phrase: p.catalog_phrase || null,
+        catalog_order: p.catalog_order || 0
+      };
+    }
+
+    // Busca produtos do Supabase e atualiza cache (sem cache-first)
+    // Esta função é chamada pelo VersionService quando detecta mudança
+    async function fetchProductsFromSupabase() {
       try {
-        // Tentar carregar do Supabase primeiro
         const { data, error } = await window.supabaseClient
           .from('fast_products')
           .select('*')
@@ -6315,34 +7164,76 @@
         if (error) throw error;
 
         if (data && data.length > 0) {
-          // Map snake_case from Supabase to camelCase for local use
-          products = data.map(p => ({
-            ...p,
-            startDate: p.start_date,
-            endDate: p.end_date,
-            unavailableToday: p.unavailable_today,
-            isEncomenda: p.is_encomenda,
-            flavor_selection: p.flavor_selection
-          }));
-          console.log('Produtos carregados do Supabase:', products.length);
+          products = data.map(mapProductData);
+          console.log('[Products] Carregados do Supabase:', products.length);
+
+          // Salva no cache com versão atual
+          const serverVersion = await VersionService.getServerVersion('products');
+          DataCache.set('products', products, serverVersion || 1);
+
+          // Backup local legado
+          localStorage.setItem('fastProducts', JSON.stringify(products));
         } else {
-          // Se não há produtos no Supabase, usar defaults e salvar
           await seedDefaultProducts();
         }
       } catch (error) {
-        console.error('Erro ao carregar produtos do Supabase:', error);
-        // Fallback para localStorage
+        console.error('[Products] Erro ao carregar do Supabase:', error);
+        // Fallback para localStorage legado
         const saved = localStorage.getItem('fastProducts');
         if (saved) {
           products = JSON.parse(saved);
-          console.log('Produtos carregados do localStorage (fallback)');
+          console.log('[Products] Carregados do localStorage (fallback)');
         } else {
           await seedDefaultProducts();
         }
       }
-      // Sempre manter backup local
-      localStorage.setItem('fastProducts', JSON.stringify(products));
     }
+
+    // Carregamento principal com estratégia cache-first
+    async function loadProducts() {
+      const isAdmin = sessionStorage.getItem('fastAdmin') === '1';
+
+      // ADMIN: sempre busca do Supabase (sem cache)
+      if (isAdmin) {
+        console.log('[Products] Admin detectado, carregando do Supabase...');
+        await fetchProductsFromSupabase();
+        return;
+      }
+
+      // PÚBLICO: tenta cache primeiro
+      try {
+        const cached = DataCache.get('products');
+
+        if (cached && Array.isArray(cached.items) && cached.items.length > 0) {
+          // Cache encontrado → usa imediatamente
+          products = cached.items;
+          console.log('[Products] Carregados do cache:', products.length, 'versão:', cached.version);
+
+          // Manter backup local legado sincronizado
+          localStorage.setItem('fastProducts', JSON.stringify(products));
+
+          // Em segundo plano: verifica se há versão nova
+          VersionService.checkAndRefresh('products', cached.version, fetchProductsFromSupabase);
+
+          // Inicia background sync para futuras atualizações
+          startBackgroundVersionSync();
+          return;
+        }
+
+        // Sem cache válido → fallback para busca completa
+        console.log('[Products] Cache não encontrado, buscando do Supabase...');
+        await fetchProductsFromSupabase();
+
+        // Inicia background sync
+        startBackgroundVersionSync();
+
+      } catch (error) {
+        // Qualquer erro → comportamento original (busca do Supabase)
+        console.error('[Products] Erro no cache, fallback para Supabase:', error);
+        await fetchProductsFromSupabase();
+      }
+    }
+
 
     async function seedDefaultProducts() {
       products = [
@@ -6391,18 +7282,29 @@
               unavailable_today: product.unavailableToday || false,
               promo: product.promo || null,
               is_encomenda: product.isEncomenda || false,
-              flavor_selection: product.flavor_selection || null
+              flavor_selection: product.flavor_selection || null,
+              // Catalog fields
+              catalog_enabled: product.catalog_enabled !== undefined ? product.catalog_enabled : true,
+              catalog_size_options: product.catalog_size_options || null,
+              catalog_vegan: product.catalog_vegan || false,
+              catalog_phrase: product.catalog_phrase || null,
+              catalog_order: product.catalog_order || 0
             }, { onConflict: 'id' });
 
           if (error) {
             console.error('Erro ao salvar produto:', product.name, error);
           }
         }
-        console.log('Produtos sincronizados com Supabase');
+        console.log('[Products] Sincronizados com Supabase');
+
+        // SMART CACHE: Incrementa versão para invalidar cache dos clientes
+        await VersionService.incrementVersion('products');
+
       } catch (error) {
-        console.error('Erro ao sincronizar produtos com Supabase:', error);
+        console.error('[Products] Erro ao sincronizar com Supabase:', error);
       }
     }
+
 
     // ========================================
     // IMAGE COMPRESSION SERVICE
@@ -6567,6 +7469,18 @@
         }
       }
 
+      // Catalog fields - Added for catalog feature
+      const catalog_enabled = document.getElementById('productCatalogEnabled')?.checked !== false;
+      const catalog_vegan = document.getElementById('catalogVegan')?.checked || false;
+      const catalog_phrase = document.getElementById('catalogPhrase')?.value?.trim() || null;
+      const catalog_order = parseInt(document.getElementById('catalogOrder')?.value) || 0;
+
+      // Build size options array from checkboxes
+      const sizeOptionsArr = [];
+      if (document.getElementById('catalogSizeSmall')?.checked) sizeOptionsArr.push('Pequeno');
+      if (document.getElementById('catalogSizeLarge')?.checked) sizeOptionsArr.push('Grande');
+      const catalog_size_options = sizeOptionsArr.length > 0 ? JSON.stringify(sizeOptionsArr) : null;
+
       if (editingProductId) {
         const i = products.findIndex(p => p.id === editingProductId);
         if (i !== -1) {
@@ -6575,7 +7489,9 @@
             name, description, price, category,
             image: image || products[i].image,
             emoji, startDate, endDate, unavailableToday,
-            promo, isEncomenda, flavor_selection: flavorSelection
+            promo, isEncomenda, flavor_selection: flavorSelection,
+            // Catalog fields
+            catalog_enabled, catalog_size_options, catalog_vegan, catalog_phrase, catalog_order
           };
         }
         editingProductId = null;
@@ -6583,7 +7499,9 @@
         products.push({
           id: Date.now(), name, description, price, category,
           image, emoji, visible: true, startDate, endDate, unavailableToday,
-          promo, isEncomenda, flavor_selection: flavorSelection
+          promo, isEncomenda, flavor_selection: flavorSelection,
+          // Catalog fields
+          catalog_enabled, catalog_size_options, catalog_vegan, catalog_phrase, catalog_order
         });
       }
 
@@ -6667,6 +7585,17 @@
         document.getElementById('promoDetailsFields').classList.toggle('hidden', !promoActive);
         // Encomenda
         document.getElementById('productIsEncomenda').checked = !!p.isEncomenda;
+
+        // Catalog fields - Added for catalog feature
+        document.getElementById('productCatalogEnabled').checked = p.catalog_enabled !== false;
+        document.getElementById('catalogVegan').checked = !!p.catalog_vegan;
+        document.getElementById('catalogPhrase').value = p.catalog_phrase || '';
+        document.getElementById('catalogOrder').value = p.catalog_order || 0;
+        // Parse size options
+        const sizeOpts = p.catalog_size_options ? (typeof p.catalog_size_options === 'string' ? JSON.parse(p.catalog_size_options) : p.catalog_size_options) : [];
+        document.getElementById('catalogSizeSmall').checked = Array.isArray(sizeOpts) && sizeOpts.includes('Pequeno');
+        document.getElementById('catalogSizeLarge').checked = Array.isArray(sizeOpts) && sizeOpts.includes('Grande');
+
         editingProductId = id;
         // Scroll to form
         document.getElementById('productForm').scrollIntoView({ behavior: 'smooth' });
