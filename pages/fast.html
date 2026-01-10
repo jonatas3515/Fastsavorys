@@ -7124,6 +7124,38 @@
       return { sequence, code };
     }
 
+    /**
+     * Notifies ManyChat of a new order (fire-and-forget)
+     * This function is called after saveOrderToSupabase() to notify Jéssica via ManyChat.
+     * 
+     * IMPORTANT:
+     * - This is 100% additive - does not affect existing order/WhatsApp flows
+     * - All errors are caught and logged - never throws
+     * - If ManyChat is not configured, silently succeeds (logs warning)
+     * 
+     * @param {Object} order - Order data from saveOrderToSupabase
+     */
+    async function notifyManychatNewOrder(order) {
+      try {
+        const response = await fetch('/api/notify-manychat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ order })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+          console.log('[ManyChat] ✅ Order notification sent:', order.order_code || order.id);
+        } else {
+          console.warn('[ManyChat] ⚠️ Notification skipped/failed:', data.error);
+        }
+      } catch (err) {
+        // Fire-and-forget: log but never throw
+        console.warn('[ManyChat] ❌ Request failed:', err.message);
+      }
+    }
+
     // Using character range instead of \p{Diacritic} for iOS/Safari compatibility
     function norm(s) { return (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim(); }
     function isFastDeliveryAllowed(nei) {
@@ -10343,6 +10375,11 @@
         // Client has birthdate - proceed directly
         await saveOrderToSupabase(orderData);
 
+        // Notify ManyChat of new order (fire-and-forget, won't block checkout)
+        notifyManychatNewOrder(orderData).catch(err =>
+          console.warn('[ManyChat] Notification error (non-blocking):', err.message)
+        );
+
         // Record birthday discount usage if applied
         if (hasBirthdayDiscount && customerPhone) {
           recordBirthdayDiscountUsage(customerPhone, birthdayDiscount, orderData.id);
@@ -10534,6 +10571,11 @@
 
       // Save order to Supabase
       saveOrderToSupabase(pendingOrderData);
+
+      // Notify ManyChat of new order (fire-and-forget, won't block checkout)
+      notifyManychatNewOrder(pendingOrderData).catch(err =>
+        console.warn('[ManyChat] Notification error (non-blocking):', err.message)
+      );
 
       // Record birthday discount usage if applied
       if (pendingOrderData.birthday_discount && pendingOrderData.birthday_discount > 0 && pendingOrderData.client_phone) {
