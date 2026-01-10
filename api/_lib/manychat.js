@@ -40,6 +40,9 @@ const MANYCHAT_CONFIG = {
         orderDescription: process.env.MANYCHAT_FIELD_ID_ORDER_DESCRIPTION,
         orderDate: process.env.MANYCHAT_FIELD_ID_ORDER_DATE,
         orderDeliveryMethod: process.env.MANYCHAT_FIELD_ID_ORDER_DELIVERY_METHOD,
+        clientFirstName: process.env.MANYCHAT_FIELD_ID_CLIENT_FIRST_NAME,
+        paymentMethod: process.env.MANYCHAT_FIELD_ID_PAYMENT_METHOD,
+        clientPhone: process.env.MANYCHAT_FIELD_ID_CLIENT_PHONE,
     }
 };
 
@@ -170,9 +173,10 @@ async function sendFlowToUser(userId, flowId) {
 }
 
 /**
- * Formats order items for ManyChat description field
+ * Formats order items for ManyChat description field with WhatsApp-style formatting
+ * Includes item notes/observations in italic format
  * @param {Array} items - Order items array
- * @returns {string} Formatted description
+ * @returns {string} Formatted description (single line, WhatsApp compatible)
  */
 function formatOrderDescription(items) {
     if (!items || !Array.isArray(items)) return 'Sem itens';
@@ -181,29 +185,96 @@ function formatOrderDescription(items) {
         const qty = item.quantity || 1;
         const name = item.name || 'Item';
         const price = item.price ? `R$ ${Number(item.price).toFixed(2).replace('.', ',')}` : '';
-        return `${qty}x ${name}${price ? ` (${price})` : ''}`;
-    }).join(' | ');
+        const note = item.note ? ` _${item.note}_` : '';
+
+        // Format: "2x Coxinha (R$ 10,00) _observação_"
+        let itemStr = `${qty}x ${name}`;
+        if (price) itemStr += ` (${price})`;
+        if (note) itemStr += note;
+
+        return itemStr;
+    }).join(' • ');
 }
 
 /**
- * Formats a date for display
- * @param {string|Date} date - Date to format
- * @returns {string} Formatted date string
+ * Formats delivery date/time for ManyChat
+ * Uses scheduled_date for encomendas, otherwise shows "Hoje" or "Agora"
+ * @param {object} order - Order data
+ * @returns {string} Formatted delivery date string
  */
-function formatOrderDate(date) {
+function formatDeliveryDate(order) {
     try {
-        const d = date ? new Date(date) : new Date();
-        return d.toLocaleString('pt-BR', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            timeZone: 'America/Sao_Paulo'
-        });
+        // If it's an encomenda (scheduled order), use scheduled_date
+        if (order.scheduled_date) {
+            // Parse YYYY-MM-DD format
+            const parts = order.scheduled_date.split('-');
+            if (parts.length === 3) {
+                const dateStr = `${parts[2]}/${parts[1]}/${parts[0]}`;
+                // Include scheduled time if available
+                if (order.scheduled_time) {
+                    return `${dateStr} às ${order.scheduled_time}`;
+                }
+                return `${dateStr} (Encomenda)`;
+            }
+            return order.scheduled_date;
+        }
+
+        // For immediate orders, show "Hoje" with current time estimate
+        return 'Hoje - o mais breve possível';
     } catch {
-        return new Date().toLocaleString('pt-BR');
+        return 'A confirmar';
     }
+}
+
+/**
+ * Formats payment method with details for ManyChat
+ * Includes payment type and when/where payment happens
+ * @param {object} order - Order data
+ * @returns {string} Formatted payment info
+ */
+function formatPaymentInfo(order) {
+    const paymentMap = {
+        'dinheiro': '💵 Dinheiro',
+        'cartao1x': '💳 Cartão',
+        'pix': '📱 PIX'
+    };
+
+    const method = paymentMap[order.payment_method] || order.payment_method || 'Não informado';
+    const isDelivery = order.delivery_type === 'entrega';
+    const location = isDelivery ? 'na entrega' : 'na retirada';
+
+    return `${method} (${location})`;
+}
+
+/**
+ * Extracts first name from full name
+ * @param {string} fullName - Full client name
+ * @returns {string} First name only
+ */
+function getFirstName(fullName) {
+    if (!fullName) return 'Cliente';
+    const firstName = fullName.trim().split(/\s+/)[0];
+    return firstName || 'Cliente';
+}
+
+/**
+ * Formats phone number for display
+ * @param {string} phone - Phone number
+ * @returns {string} Formatted phone
+ */
+function formatPhone(phone) {
+    if (!phone) return 'Não informado';
+    // Clean phone - keep only digits
+    const digits = phone.replace(/\D/g, '');
+    // Format as (XX) XXXXX-XXXX if 11 digits
+    if (digits.length === 11) {
+        return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+    }
+    // Format as (XX) XXXX-XXXX if 10 digits
+    if (digits.length === 10) {
+        return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+    }
+    return phone;
 }
 
 /**
@@ -268,20 +339,41 @@ async function notifyNewOrder(order) {
         }
 
         if (fieldIds.orderDate) {
-            const dateStr = order.scheduled_date
-                ? `${formatOrderDate()} (Encomenda: ${order.scheduled_date})`
-                : formatOrderDate();
             fields.push({
                 field_id: parseInt(fieldIds.orderDate, 10),
-                field_value: dateStr
+                field_value: formatDeliveryDate(order)
             });
         }
 
         if (fieldIds.orderDeliveryMethod) {
-            const method = order.delivery_type === 'entrega' ? 'Entrega' : 'Retirada';
+            const method = order.delivery_type === 'entrega' ? '🚚 Entrega' : '🏪 Retirada';
             fields.push({
                 field_id: parseInt(fieldIds.orderDeliveryMethod, 10),
                 field_value: method
+            });
+        }
+
+        // NEW: Client first name
+        if (fieldIds.clientFirstName) {
+            fields.push({
+                field_id: parseInt(fieldIds.clientFirstName, 10),
+                field_value: getFirstName(order.client_name)
+            });
+        }
+
+        // NEW: Payment method with details
+        if (fieldIds.paymentMethod) {
+            fields.push({
+                field_id: parseInt(fieldIds.paymentMethod, 10),
+                field_value: formatPaymentInfo(order)
+            });
+        }
+
+        // NEW: Client phone
+        if (fieldIds.clientPhone) {
+            fields.push({
+                field_id: parseInt(fieldIds.clientPhone, 10),
+                field_value: formatPhone(order.client_phone)
             });
         }
 
