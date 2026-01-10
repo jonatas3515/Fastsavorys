@@ -20,14 +20,8 @@
  * }
  */
 
-const { createClient } = require('@supabase/supabase-js');
-
-// Initialize Supabase
-const supabaseAdmin = (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY)
-    ? createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
-        auth: { persistSession: false }
-    })
-    : null;
+// Use shared Supabase client from _lib
+const { supabaseAdmin } = require('./_lib/stripe');
 
 /**
  * Extracts order code (FAST-XXXX) from message text using regex
