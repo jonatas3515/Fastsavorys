@@ -146,22 +146,36 @@ module.exports = async function handler(req, res) {
             // Check if already registered
             const { data: existingClients } = await supabaseAdmin
                 .from('fast_clients')
-                .select('phone, name')
+                .select('id, phone, name, email, birthdate')
                 .eq('manychat_id', manychatIdStr)
                 .limit(1);
 
             if (existingClients?.[0]) {
+                const client = existingClients[0];
                 const { data: orders } = await supabaseAdmin
                     .from('fast_orders')
                     .select('*')
-                    .eq('client_phone', existingClients[0].phone)
+                    .eq('client_phone', client.phone)
                     .order('created_at', { ascending: false })
                     .limit(1);
+
+                // Count total orders for this client
+                const { count: totalOrders } = await supabaseAdmin
+                    .from('fast_orders')
+                    .select('id', { count: 'exact', head: true })
+                    .eq('client_phone', client.phone);
 
                 return res.status(200).json({
                     success: true,
                     already_registered: true,
-                    client_name: existingClients[0].name,
+                    client: {
+                        id: client.id,
+                        name: client.name,
+                        phone: client.phone,
+                        email: client.email || null,
+                        birthdate: client.birthdate || null,
+                        total_orders: totalOrders || 0
+                    },
                     order: orders?.[0] ? formatOrderForManyChat(orders[0]) : null
                 });
             }
@@ -212,11 +226,33 @@ module.exports = async function handler(req, res) {
                 .update({ manychat_id: manychatIdStr })
                 .eq('id', order.id);
 
+            // Get client details
+            const { data: clientData } = await supabaseAdmin
+                .from('fast_clients')
+                .select('id, name, email, birthdate')
+                .eq('phone', order.client_phone)
+                .limit(1);
+
+            const client = clientData?.[0];
+
+            // Count total orders
+            const { count: totalOrders } = await supabaseAdmin
+                .from('fast_orders')
+                .select('id', { count: 'exact', head: true })
+                .eq('client_phone', order.client_phone);
+
             return res.status(200).json({
                 success: true,
                 newly_registered: true,
                 order_code: orderCode,
-                client_phone: order.client_phone,
+                client: {
+                    id: client?.id || null,
+                    name: order.client_name,
+                    phone: order.client_phone,
+                    email: client?.email || null,
+                    birthdate: client?.birthdate || null,
+                    total_orders: totalOrders || 1
+                },
                 order: formatOrderForManyChat(order)
             });
         }
