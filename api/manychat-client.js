@@ -1,22 +1,16 @@
 /**
  * ManyChat Client Registration & Order Data API
  * POST /api/manychat-client
+ * GET /api/manychat-client?id_manychat=...
  * 
- * This endpoint handles two scenarios:
+ * This endpoint handles:
  * 1. New client registration: Extracts order code from message, finds client, saves ManyChat ID
  * 2. Returns last order data for the client to populate ManyChat custom fields
  * 
- * Request Body:
+ * Request Body (POST):
  * {
- *   "id_manychat": "123456789",           // ManyChat subscriber ID
- *   "mensagem_do_pedido": "... FAST-0001 ..." // Optional: message containing order code
- * }
- * 
- * Response:
- * {
- *   "success": true,
- *   "client_registered": true,
- *   "order": { ... last order data ... }
+ *   "id_manychat": "123456789",
+ *   "mensagem_do_pedido": "... FAST-0001 ..."
  * }
  */
 
@@ -25,8 +19,6 @@ const { supabaseAdmin } = require('./_lib/stripe');
 
 /**
  * Extracts order code (FAST-XXXX) from message text using regex
- * @param {string} message - Message containing order code
- * @returns {string|null} Order code or null if not found
  */
 function extractOrderCode(message) {
     if (!message) return null;
@@ -37,7 +29,7 @@ function extractOrderCode(message) {
         return `FAST-${match[1]}`;
     }
 
-    // Also try to match just the order code format
+    // Also try with Código: prefix
     const altMatch = message.match(/Código:\s*FAST-(\d{4})/i);
     if (altMatch) {
         return `FAST-${altMatch[1]}`;
@@ -48,8 +40,6 @@ function extractOrderCode(message) {
 
 /**
  * Formats order data for ManyChat custom fields
- * @param {object} order - Order from Supabase
- * @returns {object} Formatted order data
  */
 function formatOrderForManyChat(order) {
     if (!order) return null;
@@ -71,12 +61,12 @@ function formatOrderForManyChat(order) {
         const price = item.price ? `R$ ${Number(item.price).toFixed(2).replace('.', ',')}` : '';
         const note = item.note ? ` _${item.note}_` : '';
         return `${qty}x ${name}${price ? ` (${price})` : ''}${note}`;
-    }).join(' • ');
+    }).join(' • ') || 'Sem itens';
 
     // Format delivery date
     let deliveryDate = 'Hoje - o mais breve possível';
     if (order.scheduled_date) {
-        const parts = order.scheduled_date.split('-');
+        const parts = String(order.scheduled_date).split('-');
         if (parts.length === 3) {
             deliveryDate = `${parts[2]}/${parts[1]}/${parts[0]}`;
             if (order.scheduled_time) {
@@ -102,12 +92,12 @@ function formatOrderForManyChat(order) {
     }
 
     // Get first name
-    const firstName = order.client_name ? order.client_name.trim().split(/\s+/)[0] : 'Cliente';
+    const firstName = order.client_name ? String(order.client_name).trim().split(/\s+/)[0] : 'Cliente';
 
     return {
-        order_code: order.order_code || `FAST-${String(order.order_sequence || '').padStart(4, '0')}`,
+        order_code: order.order_code || `FAST-${String(order.order_sequence || '0').padStart(4, '0')}`,
         order_total: order.total ? `R$ ${Number(order.total).toFixed(2).replace('.', ',')}` : 'R$ 0,00',
-        order_description: itemsDescription || 'Sem itens',
+        order_description: itemsDescription,
         order_date: deliveryDate,
         delivery_method: order.delivery_type === 'entrega' ? '🚚 Entrega' : '🏪 Retirada',
         client_first_name: firstName,
@@ -154,14 +144,24 @@ module.exports = async function handler(req, res) {
 
             console.log(`[manychat-client] GET request for manychat_id: ${manychatId}`);
 
-            // Find client by manychat_id
-            const { data: client, error: clientError } = await supabaseAdmin
+            // Find client by manychat_id - use maybeSingle to avoid throwing
+            const { data: clients, error: clientError } = await supabaseAdmin
                 .from('fast_clients')
                 .select('phone, name')
                 .eq('manychat_id', manychatId)
-                .single();
+                .limit(1);
 
-            if (clientError || !client) {
+            if (clientError) {
+                console.error('[manychat-client] Error fetching client:', clientError);
+                return res.status(200).json({
+                    success: false,
+                    error: 'Database error: ' + clientError.message
+                });
+            }
+
+            const client = clients && clients.length > 0 ? clients[0] : null;
+
+            if (!client) {
                 console.log(`[manychat-client] Client not found for manychat_id: ${manychatId}`);
                 return res.status(200).json({
                     success: false,
@@ -171,29 +171,20 @@ module.exports = async function handler(req, res) {
             }
 
             // Get last order for this client
-            const { data: lastOrder, error: orderError } = await supabaseAdmin
+            const { data: orders } = await supabaseAdmin
                 .from('fast_orders')
                 .select('*')
                 .eq('client_phone', client.phone)
                 .order('created_at', { ascending: false })
-                .limit(1)
-                .single();
+                .limit(1);
 
-            if (orderError || !lastOrder) {
-                return res.status(200).json({
-                    success: true,
-                    registered: true,
-                    client_name: client.name,
-                    order: null,
-                    message: 'No orders found for this client'
-                });
-            }
+            const lastOrder = orders && orders.length > 0 ? orders[0] : null;
 
             return res.status(200).json({
                 success: true,
                 registered: true,
                 client_name: client.name,
-                order: formatOrderForManyChat(lastOrder)
+                order: lastOrder ? formatOrderForManyChat(lastOrder) : null
             });
         }
 
@@ -211,30 +202,37 @@ module.exports = async function handler(req, res) {
             console.log(`[manychat-client] POST request - manychat_id: ${id_manychat}`);
 
             // Check if client already registered with this manychat_id
-            const { data: existingClient } = await supabaseAdmin
+            const { data: existingClients, error: existingError } = await supabaseAdmin
                 .from('fast_clients')
                 .select('phone, name')
                 .eq('manychat_id', id_manychat)
-                .single();
+                .limit(1);
+
+            if (existingError) {
+                console.error('[manychat-client] Error checking existing client:', existingError);
+            }
+
+            const existingClient = existingClients && existingClients.length > 0 ? existingClients[0] : null;
 
             if (existingClient) {
                 // Client already registered, just return last order
                 console.log(`[manychat-client] Client already registered: ${existingClient.phone}`);
 
-                const { data: lastOrder } = await supabaseAdmin
+                const { data: orders } = await supabaseAdmin
                     .from('fast_orders')
                     .select('*')
                     .eq('client_phone', existingClient.phone)
                     .order('created_at', { ascending: false })
-                    .limit(1)
-                    .single();
+                    .limit(1);
+
+                const lastOrder = orders && orders.length > 0 ? orders[0] : null;
 
                 return res.status(200).json({
                     success: true,
                     client_registered: true,
                     already_registered: true,
                     client_name: existingClient.name,
-                    order: formatOrderForManyChat(lastOrder)
+                    order: lastOrder ? formatOrderForManyChat(lastOrder) : null
                 });
             }
 
@@ -250,7 +248,7 @@ module.exports = async function handler(req, res) {
             const orderCode = extractOrderCode(mensagem_do_pedido);
 
             if (!orderCode) {
-                console.warn(`[manychat-client] Could not extract order code from message`);
+                console.warn(`[manychat-client] Could not extract order code from message: ${mensagem_do_pedido.substring(0, 100)}`);
                 return res.status(200).json({
                     success: false,
                     error: 'Could not extract order code (FAST-XXXX) from message'
@@ -260,13 +258,23 @@ module.exports = async function handler(req, res) {
             console.log(`[manychat-client] Extracted order code: ${orderCode}`);
 
             // Find order by order_code
-            const { data: order, error: orderError } = await supabaseAdmin
+            const { data: orders, error: orderError } = await supabaseAdmin
                 .from('fast_orders')
                 .select('*')
                 .eq('order_code', orderCode)
-                .single();
+                .limit(1);
 
-            if (orderError || !order) {
+            if (orderError) {
+                console.error('[manychat-client] Error fetching order:', orderError);
+                return res.status(200).json({
+                    success: false,
+                    error: 'Database error: ' + orderError.message
+                });
+            }
+
+            const order = orders && orders.length > 0 ? orders[0] : null;
+
+            if (!order) {
                 console.warn(`[manychat-client] Order not found: ${orderCode}`);
                 return res.status(200).json({
                     success: false,
@@ -285,7 +293,7 @@ module.exports = async function handler(req, res) {
 
             if (updateError) {
                 console.error(`[manychat-client] Error updating client:`, updateError);
-                // Continue anyway - might be a new phone not in clients table
+                // Continue anyway
             } else {
                 console.log(`[manychat-client] ✅ Updated client ${order.client_phone} with manychat_id: ${id_manychat}`);
             }
@@ -313,7 +321,7 @@ module.exports = async function handler(req, res) {
         });
 
     } catch (err) {
-        console.error('[manychat-client] ❌ Error:', err.message);
+        console.error('[manychat-client] ❌ Error:', err.message, err.stack);
         return res.status(200).json({
             success: false,
             error: 'Internal error: ' + err.message
