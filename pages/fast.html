@@ -4903,16 +4903,24 @@
           const rateCode = params.get('rate');
           const ratePhone = params.get('phone');
 
-          // Check for hash #rating to force modal open
-          if (window.location.hash === '#rating' || rateCode && ratePhone) {
+          // Check for hash #rating or rate params to force modal open immediately
+          if (window.location.hash === '#rating' || (rateCode && ratePhone)) {
+            // Hide landing page content immediately to show only rating modal
+            const landingContent = document.getElementById('landing');
+            if (landingContent) {
+              landingContent.style.display = 'none';
+            }
+
+            // Open rating modal with minimal delay
             setTimeout(() => {
               if (rateCode && ratePhone) {
                 initRatingModal(rateCode, ratePhone);
               } else {
                 // If only hash is present, show a message or open empty modal
                 console.log('[Rating] Hash #rating detectado, mas sem parâmetros');
+                openRatingModal();
               }
-            }, 500);
+            }, 100);
           }
         } catch (e) { console.warn('[Rating] Deep-link error:', e); }
 
@@ -9778,7 +9786,7 @@
     // Build rating link
     function buildRatingLink(orderCode, phone) {
       const phoneDigits = normalizePhoneDigits(phone);
-      const baseUrl = 'https://fastsavorys.netlify.app/pages/fast.html';
+      const baseUrl = 'https://fastsavorys.vercel.app/pages/fast.html';
       return `${baseUrl}?rate=${encodeURIComponent(orderCode)}&phone=${encodeURIComponent(phoneDigits)}#rating`;
     }
 
