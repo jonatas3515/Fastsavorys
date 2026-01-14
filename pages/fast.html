@@ -2032,8 +2032,9 @@
       <div class="mb-6">
         <h4 class="font-semibold text-gray-800 mb-3">Seus Dados</h4>
         <div class="space-y-3">
-          <input id="customerName" placeholder="Seu nome completo" class="w-full px-3 py-2 border rounded-lg">
-          <input id="customerPhone" placeholder="Seu telefone (WhatsApp)" class="w-full px-3 py-2 border rounded-lg">
+          <input id="customerName" placeholder="Seu nome e sobrenome" class="w-full px-3 py-2 border rounded-lg">
+          <input id="customerPhone" placeholder="(73)99999-9999" class="w-full px-3 py-2 border rounded-lg"
+            inputmode="numeric">
 
           <!-- Área de busca e endereços do cliente -->
           <div id="customerSearchArea" class="hidden">
@@ -2158,9 +2159,10 @@
       </div>
 
       <div id="orderDateBox" class="mb-6 hidden">
-        <div class="p-3 rounded-md bg-blue-100 border border-blue-300 text-blue-900 text-sm font-semibold mb-2">Fora do
-          horário, aceitamos encomendas. Até 07:00, pode agendar para hoje. A partir de 07:01, apenas para o próximo
-          dia.</div>
+        <div class="p-3 rounded-md bg-blue-100 border border-blue-300 text-blue-900 text-sm font-semibold mb-2">
+          <strong>📦 Salgados/Refrigerantes:</strong> Retirada no mesmo dia (mín. R$15, 11h–18h)<br>
+          <strong>🎂 Bolos:</strong> 1 dia de antecedência (50% entrada)
+        </div>
         <label class="block text-sm font-semibold text-gray-800 mb-2">Data da encomenda</label>
         <input type="date" id="orderDate" class="w-full px-3 py-2 border rounded-lg" />
 
@@ -6925,7 +6927,7 @@
         el.innerHTML = `<strong class="block text-lg">Aberto</strong><span class="block text-sm">${hoursStr}</span>`;
         el.className = 'text-base py-3 px-4 rounded-lg my-2 bg-green-600/20 text-green-900 font-semibold text-center';
       } else {
-        el.innerHTML = '<strong class="text-2xl">⚠️ ESTAMOS FECHADOS</strong><br>Aceitamos encomendas com 1 dia de antecedência (50% de entrada).';
+        el.innerHTML = '<strong class="text-2xl">⚠️ ESTAMOS FECHADOS</strong><br>Salgados e refrigerantes: retirada no mesmo dia (mín. R$15, 11h–18h).<br>Bolos: 1 dia de antecedência (50% entrada).';
         el.className = 'text-base py-3 px-4 rounded-lg my-2 text-red-900 font-semibold text-center';
       }
     }
@@ -6978,11 +6980,77 @@
       return `${y}-${m}-${day}`;
     }
 
-    function getMinEncomendaDateYYYYMMDD() {
+    /**
+     * Verifica se o carrinho contém bolos (que exigem 1 dia de antecedência)
+     * @param {Array} cartItems - Array com itens do carrinho
+     * @returns {boolean} true se contém bolo
+     */
+    function cartContainsBolo(cartItems = cart) {
+      return (cartItems || []).some(item => {
+        const product = products.find(p => p.id === item.id);
+        if (!product) return false;
+        const name = (product.name || '').toLowerCase();
+        const category = (product.category || '').toLowerCase();
+        return category === 'bolos' || name.includes('bolo p') || name.includes('bolo g') || name.match(/bolo\s*[pg]/i);
+      });
+    }
+
+    /**
+     * Verifica se pedido sem bolo pode ser feito para hoje (mesmo dia)
+     * Regras:
+     * - Pedido não contém bolos
+     * - Mínimo R$ 15,00
+     * - Somente retirada
+     * - Horário de retirada: 11h às 18h
+     * @param {boolean} isRetirada - true se é retirada
+     * @param {number} cartTotal - Total do carrinho
+     * @param {string} timeSlot - Horário selecionado (HH:MM)
+     * @returns {Object} { allowed: boolean, reason: string }
+     */
+    function canOrderTodayWithoutBolo(isRetirada, cartTotal, timeSlot) {
+      // Se contém bolo, não pode pedir para hoje
+      if (cartContainsBolo()) {
+        return { allowed: false, reason: 'Pedidos com bolos exigem 1 dia de antecedência.' };
+      }
+
+      // Deve ser retirada
+      if (!isRetirada) {
+        return { allowed: false, reason: 'Pedidos para o mesmo dia são apenas para retirada na loja.' };
+      }
+
+      // Mínimo R$ 15,00
+      if (cartTotal < 15) {
+        return { allowed: false, reason: 'Pedido mínimo de R$ 15,00 para retirada no mesmo dia.' };
+      }
+
+      // Horário deve ser entre 11h e 18h
+      if (timeSlot) {
+        const normalizedTime = (timeSlot || '').replace(/:/g, '');
+        const timeAsNumber = parseInt(normalizedTime, 10) || 0;
+        if (timeAsNumber < 1100 || timeAsNumber > 1800) {
+          return { allowed: false, reason: 'Para retirada no mesmo dia, o horário deve ser entre 11h e 18h.' };
+        }
+      }
+
+      return { allowed: true, reason: '' };
+    }
+
+    function getMinEncomendaDateYYYYMMDD(forceBoloRules = false) {
       const brasilia = getBrasiliaDate();
       const mins = brasilia.getHours() * 60 + brasilia.getMinutes();
-      const cutoff = 7 * 60;
+      const cutoff = 7 * 60; // 07:00
       const d = new Date(brasilia.getTime());
+
+      // Se NÃO tem bolo no carrinho e não está forçando regras de bolo,
+      // permite pedido para HOJE se for retirada
+      if (!forceBoloRules && !cartContainsBolo()) {
+        // Pedidos sem bolo podem ser para hoje (mesmo dia)
+        // A validação de horário mínimo (11h) é feita em canOrderTodayWithoutBolo
+        d.setHours(0, 0, 0, 0);
+        return formatYYYYMMDD(d);
+      }
+
+      // Regra original: pedidos com bolo exigem 1 dia de antecedência
       if (mins > cutoff) d.setDate(d.getDate() + 1);
       d.setHours(0, 0, 0, 0);
       return formatYYYYMMDD(d);
@@ -8593,9 +8661,9 @@
         // Promo price calculation
         let priceDisplay = `R$ ${product.price.toFixed(2).replace('.', ',')}`;
         let promoBadge = '';
+        let finalPrice = product.price; // Preço final para adicionar ao carrinho
 
         if (product.promo?.active && product.promo?.value > 0) {
-          let finalPrice = product.price;
           if (product.promo.type === 'percent') {
             finalPrice = product.price * (1 - product.promo.value / 100);
             promoBadge = `<span class='bg-yellow-400 text-yellow-900 text-xs px-1 rounded'>-${product.promo.value}%</span>`;
@@ -8603,6 +8671,7 @@
             finalPrice = product.price - product.promo.value;
             promoBadge = `<span class='bg-yellow-400 text-yellow-900 text-xs px-1 rounded'>-R$${product.promo.value}</span>`;
           }
+          finalPrice = Math.max(0, finalPrice); // Garantir preço mínimo de 0
           priceDisplay = `<span class='line-through text-gray-400 text-sm'>R$ ${product.price.toFixed(2).replace('.', ',')}</span> <span class='text-rose-600 font-bold'>R$ ${finalPrice.toFixed(2).replace('.', ',')}</span>`;
         }
 
@@ -8617,20 +8686,21 @@
           </div>
           <div class='flex items-center justify-between'>
             <span class='${isAdditional ? "text-sm" : "text-lg"}'>${priceDisplay}</span>
-            <button class='add-to-cart bg-rose-600 hover:bg-rose-700 text-white px-3 py-2 rounded-lg text-xs font-medium' data-id='${product.id}' data-name='${product.name}' data-description='${product.description}' data-price='${product.price}'>Adicionar</button>
+            <button class='add-to-cart bg-rose-600 hover:bg-rose-700 text-white px-3 py-2 rounded-lg text-xs font-medium' data-id='${product.id}' data-name='${product.name}' data-description='${product.description}' data-price='${finalPrice}'>Adicionar</button>
           </div>
         </div>`;
         container.innerHTML += html;
       });
     }
 
+
     function createProductCard(product, isAdditional = false) {
       let priceDisplay = `R$ ${product.price.toFixed(2).replace('.', ',')}`;
       let promoBadge = '';
       let cardBorder = '';
+      let finalPrice = product.price; // Preço final para adicionar ao carrinho
 
       if (product.promo?.active && product.promo?.value > 0) {
-        let finalPrice = product.price;
         if (product.promo.type === 'percent') {
           finalPrice = product.price * (1 - product.promo.value / 100);
           promoBadge = `<span class='bg-yellow-400 text-yellow-900 text-xs px-1 rounded ml-2'>-${product.promo.value}%</span>`;
@@ -8638,6 +8708,7 @@
           finalPrice = product.price - product.promo.value;
           promoBadge = `<span class='bg-yellow-400 text-yellow-900 text-xs px-1 rounded ml-2'>-R$${product.promo.value}</span>`;
         }
+        finalPrice = Math.max(0, finalPrice); // Garantir preço mínimo de 0
         priceDisplay = `<span class='line-through text-gray-400 text-sm'>R$ ${product.price.toFixed(2).replace('.', ',')}</span> <span class='text-rose-600 font-bold'>R$ ${finalPrice.toFixed(2).replace('.', ',')}</span>`;
         cardBorder = 'border-yellow-400';
       }
@@ -8661,12 +8732,13 @@
               data-id='${product.id}' 
               data-name='${product.name}' 
               data-description='${product.description}' 
-              data-price='${product.price}'>
+              data-price='${finalPrice}'>
               Adicionar
             </button>
           </div>
         </div>`;
     }
+
 
     // Admin: Toggle promo fields
     document.getElementById('productPromoActive')?.addEventListener('change', (e) => {
@@ -10041,6 +10113,56 @@
         }
       }
     });
+
+    /**
+     * Formata telefone no padrão brasileiro: (XX)XXXXX-XXXX
+     * @param {string} value - Valor do campo de telefone
+     * @returns {string} Telefone formatado
+     */
+    function formatPhoneMask(value) {
+      // Remove tudo que não é número
+      let digits = (value || '').replace(/\D/g, '');
+
+      // Limita a 11 dígitos
+      if (digits.length > 11) digits = digits.slice(0, 11);
+
+      // Formata progressivamente
+      if (digits.length === 0) return '';
+      if (digits.length <= 2) return `(${digits}`;
+      if (digits.length <= 7) return `(${digits.slice(0, 2)})${digits.slice(2)}`;
+      return `(${digits.slice(0, 2)})${digits.slice(2, 7)}-${digits.slice(7)}`;
+    }
+
+    // Event listener para máscara de telefone no checkout
+    document.getElementById('customerPhone')?.addEventListener('input', function (e) {
+      const cursorPos = e.target.selectionStart;
+      const oldValue = e.target.value;
+      const newValue = formatPhoneMask(oldValue);
+
+      if (newValue !== oldValue) {
+        e.target.value = newValue;
+
+        // Tenta manter a posição do cursor de forma inteligente
+        const diff = newValue.length - oldValue.length;
+        const newCursorPos = Math.max(0, cursorPos + diff);
+        e.target.setSelectionRange(newCursorPos, newCursorPos);
+      }
+    });
+
+    // Também aplicar máscara no campo de telefone do painel admin (cadastro de clientes)
+    document.getElementById('clientPhone')?.addEventListener('input', function (e) {
+      const cursorPos = e.target.selectionStart;
+      const oldValue = e.target.value;
+      const newValue = formatPhoneMask(oldValue);
+
+      if (newValue !== oldValue) {
+        e.target.value = newValue;
+        const diff = newValue.length - oldValue.length;
+        const newCursorPos = Math.max(0, cursorPos + diff);
+        e.target.setSelectionRange(newCursorPos, newCursorPos);
+      }
+    });
+
     document.getElementById('cancelCheckout')?.addEventListener('click', () => document.getElementById('checkoutModal').classList.add('hidden'));
     document.getElementById('confirmOrder')?.addEventListener('click', async () => {
       const warnings = document.getElementById('validationWarnings'); warnings.innerHTML = ''; warnings.classList.add('hidden');
@@ -10052,6 +10174,22 @@
 
       if (!customerName || !customerPhone) {
         showWarning('Preencha seu nome e telefone.'); return;
+      }
+
+      // Validar nome + sobrenome (mínimo 2 palavras) para novos clientes
+      const normalizedPhoneForCheck = customerPhone.replace(/\D/g, '');
+      const isExistingClient = clients.some(c => {
+        const clientPhone = (c.phone || '').replace(/\D/g, '');
+        return clientPhone === normalizedPhoneForCheck;
+      });
+
+      if (!isExistingClient) {
+        const nameParts = customerName.split(/\s+/).filter(w => w.length > 0);
+        if (nameParts.length < 2) {
+          showWarning('Por favor, informe nome e sobrenome completo.');
+          document.getElementById('customerName')?.focus();
+          return;
+        }
       }
 
       // Normaliza telefone para 11 dígitos
@@ -10085,28 +10223,53 @@
       if (!isFastOpen()) {
         const od = document.getElementById('orderDate').value;
         if (!od) { showWarning('Informe a data da encomenda.'); return; }
-        const minDate = getMinEncomendaDateYYYYMMDD();
-        if (od < minDate) { showWarning('Data da encomenda inválida.'); return; }
+
+        // Verificar se o pedido é para HOJE e se é permitido
+        const todayDate = formatYYYYMMDD(getBrasiliaDate());
+        const isOrderForToday = od === todayDate;
+        const isRetirada = delivery && delivery.value === 'retirada';
 
         // Validate time slot selection
         const orderTimeSlot = document.getElementById('orderTimeSlot').value;
         if (!orderTimeSlot) { showWarning('Selecione um horário desejado.'); return; }
 
-        // Validação de horário PARA ENTREGA E RETIRADA (faixa geral 07:00–18:00)
+        // Se o pedido é para HOJE (mesmo dia) - aplicar regras especiais
+        if (isOrderForToday) {
+          const todayValidation = canOrderTodayWithoutBolo(isRetirada, cartTotal, orderTimeSlot);
+          if (!todayValidation.allowed) {
+            showWarning(todayValidation.reason);
+            return;
+          }
+        } else {
+          // Pedido para outro dia - validar data mínima (regra original para bolos)
+          const minDate = getMinEncomendaDateYYYYMMDD();
+          if (od < minDate) { showWarning('Data da encomenda inválida.'); return; }
+        }
+
+        // Validação de horário PARA ENTREGA E RETIRADA (faixa geral)
         const normalizedTimeSlot = orderTimeSlot.replace(/:/g, '');
         const timeAsNumber = parseInt(normalizedTimeSlot, 10);
 
-        if (timeAsNumber < 700 || timeAsNumber > 1800) {
-          const tipoMsg = delivery && delivery.value === 'entrega' ? 'entrega' : 'retirada';
-          showWarning(`Para ${tipoMsg}, o horário permitido é das 07:00 às 18:00.`);
-          return;
-        }
+        // Pedidos para HOJE (sem bolo): horário mínimo 11h, máximo 18h
+        if (isOrderForToday && !cartContainsBolo()) {
+          if (timeAsNumber < 1100 || timeAsNumber > 1800) {
+            showWarning('Para retirada no mesmo dia, o horário deve ser entre 11h e 18h.');
+            return;
+          }
+        } else {
+          // Pedidos com bolo ou para outro dia: horário 07:00-18:00
+          if (timeAsNumber < 700 || timeAsNumber > 1800) {
+            const tipoMsg = delivery && delivery.value === 'entrega' ? 'entrega' : 'retirada';
+            showWarning(`Para ${tipoMsg}, o horário permitido é das 07:00 às 18:00.`);
+            return;
+          }
 
-        // Validação de regras especiais para horário entre 7h–14h (delivery e retirada)
-        const timeValidation = isOrderAllowedAtTime(orderTimeSlot, cartTotal, cart);
-        if (!timeValidation.allowed) {
-          showWarning(timeValidation.reason);
-          return;
+          // Validação de regras especiais para horário entre 7h–14h (para pedidos com bolo)
+          const timeValidation = isOrderAllowedAtTime(orderTimeSlot, cartTotal, cart);
+          if (!timeValidation.allowed) {
+            showWarning(timeValidation.reason);
+            return;
+          }
         }
       }
       function showWarning(txt) { const w = document.getElementById('validationWarnings'); w.innerHTML = `<div class='p-3 bg-red-100 border border-red-400 text-red-900 rounded-lg text-sm'>${txt}</div>`; w.classList.remove('hidden'); }
@@ -11309,6 +11472,178 @@
       }
     }
 
+    // Armazena confirmações pendentes de atualização de status
+    let pendingStatusUpdate = null;
+
+    /**
+     * Verifica se a data de entrega da encomenda é futura (não é hoje)
+     * @param {string} scheduledDate - Data no formato YYYY-MM-DD
+     * @returns {object} { isFuture: boolean, formattedDate: string }
+     */
+    function checkFutureDeliveryDate(scheduledDate) {
+      if (!scheduledDate) return { isFuture: false, formattedDate: null };
+
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const scheduled = new Date(scheduledDate + 'T00:00:00');
+      scheduled.setHours(0, 0, 0, 0);
+
+      const isFuture = scheduled > today;
+
+      // Formatar data para exibição (DD/MM/YYYY)
+      const parts = scheduledDate.split('-');
+      const formattedDate = parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : scheduledDate;
+
+      return { isFuture, formattedDate };
+    }
+
+    /**
+     * Mostra aviso inline no card do pedido sobre data futura
+     */
+    function showFutureDateWarning(orderId, scheduledDate, newStatus) {
+      // Remove avisos anteriores
+      hideFutureDateWarning();
+
+      const { formattedDate } = checkFutureDeliveryDate(scheduledDate);
+
+      // Encontrar o container do pedido
+      const orderContainer = document.getElementById('ordersListContainer');
+      if (!orderContainer) return;
+
+      // Criar elemento de aviso inline
+      const warningId = `futureDateWarning_${orderId}`;
+      const warningHtml = `
+        <div id="${warningId}" class="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4" onclick="if(event.target===this) hideFutureDateWarning();">
+          <div class="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full mx-4 border-l-4 border-orange-500" onclick="event.stopPropagation();">
+            <div class="flex items-start gap-3 mb-4">
+              <span class="text-3xl">⚠️</span>
+              <div>
+                <h4 class="font-bold text-gray-800 text-lg">Pedido com Data Futura</h4>
+                <p class="text-gray-600 mt-2">
+                  Este pedido <strong>não é para ser entregue hoje</strong>. 
+                  A data de entrega dele é para o dia <strong class="text-orange-600">${formattedDate}</strong>.
+                </p>
+                <p class="text-gray-600 mt-2">Deseja realmente mudar o status?</p>
+              </div>
+            </div>
+            <div class="flex gap-3 justify-end">
+              <button onclick="hideFutureDateWarning()" 
+                class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg font-medium transition-colors">
+                Cancelar
+              </button>
+              <button onclick="confirmStatusUpdate(${orderId}, '${newStatus}')" 
+                class="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium transition-colors">
+                Mudar Mesmo Assim
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      // Inserir no body
+      document.body.insertAdjacentHTML('beforeend', warningHtml);
+
+      // Salvar dados da atualização pendente
+      pendingStatusUpdate = { orderId, newStatus };
+    }
+
+    /**
+     * Esconde o aviso de data futura
+     */
+    function hideFutureDateWarning() {
+      // Remover todos os avisos de data futura
+      document.querySelectorAll('[id^="futureDateWarning_"]').forEach(el => el.remove());
+      pendingStatusUpdate = null;
+      pendingMsgUpdateData = null;
+    }
+
+    // Armazena dados de mensagem pendente (quando vem do modal de atualização)
+    let pendingMsgUpdateData = null;
+
+    /**
+     * Mostra aviso de data futura com suporte a envio de mensagem WhatsApp
+     */
+    function showFutureDateWarningWithMessage(orderId, scheduledDate, newStatus, msg, phone) {
+      // Remove avisos anteriores
+      hideFutureDateWarning();
+
+      const { formattedDate } = checkFutureDeliveryDate(scheduledDate);
+
+      // Guardar dados para uso posterior
+      pendingMsgUpdateData = { orderId, dbStatus: newStatus, msg, phone };
+
+      // Criar elemento de aviso inline
+      const warningId = `futureDateWarning_${orderId}`;
+      const warningHtml = `
+        <div id="${warningId}" class="fixed inset-0 bg-black/60 z-[100] flex items-center justify-center p-4" onclick="if(event.target===this) hideFutureDateWarning();">
+          <div class="bg-white rounded-xl shadow-2xl p-6 max-w-md w-full mx-4 border-l-4 border-orange-500" onclick="event.stopPropagation();">
+            <div class="flex items-start gap-3 mb-4">
+              <span class="text-3xl">⚠️</span>
+              <div>
+                <h4 class="font-bold text-gray-800 text-lg">Pedido com Data Futura</h4>
+                <p class="text-gray-600 mt-2">
+                  Este pedido <strong>não é para ser entregue hoje</strong>. 
+                  A data de entrega dele é para o dia <strong class="text-orange-600">${formattedDate}</strong>.
+                </p>
+                <p class="text-gray-600 mt-2">Deseja realmente mudar o status e enviar a mensagem?</p>
+              </div>
+            </div>
+            <div class="flex gap-3 justify-end">
+              <button onclick="hideFutureDateWarning()" 
+                class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded-lg font-medium transition-colors">
+                Cancelar
+              </button>
+              <button onclick="confirmStatusUpdateWithMessage()" 
+                class="px-4 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-medium transition-colors">
+                Mudar Mesmo Assim
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+
+      // Inserir no body
+      document.body.insertAdjacentHTML('beforeend', warningHtml);
+    }
+
+    /**
+     * Confirma a atualização de status com envio de mensagem WhatsApp
+     */
+    async function confirmStatusUpdateWithMessage() {
+      if (!pendingMsgUpdateData) {
+        hideFutureDateWarning();
+        return;
+      }
+
+      const { orderId, dbStatus, msg, phone } = pendingMsgUpdateData;
+
+      // Fechar aviso
+      hideFutureDateWarning();
+
+      // Enviar WhatsApp
+      if (phone) {
+        const cleanPhone = phone.replace(/\D/g, '');
+        const url = `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(msg)}`;
+        window.open(url, '_blank');
+      }
+
+      // Atualizar status
+      await executeStatusUpdate(orderId, dbStatus);
+    }
+
+    /**
+     * Confirma a atualização de status após aviso (sem mensagem)
+     */
+    async function confirmStatusUpdate(orderId, newStatus) {
+      hideFutureDateWarning();
+      // Chama a função interna que efetivamente atualiza o status
+      await executeStatusUpdate(orderId, newStatus);
+    }
+
+    /**
+     * Função principal de atualização de status - verifica data futura
+     */
     async function updateOrderStatus(orderId, newStatus) {
       try {
         // Buscar dados do pedido
@@ -11317,6 +11652,46 @@
           .select('*')
           .eq('id', orderId)
           .single();
+
+        if (!order) {
+          alert('Pedido não encontrado.');
+          return;
+        }
+
+        // Verificar se é encomenda com data futura
+        // Só bloqueia mudanças para status de preparo/entrega (não bloqueia cancelamento)
+        const statusesQueNaoDevemSerAlterados = ['preparing', 'confirmed', 'out_for_delivery', 'delivered'];
+        if (order.scheduled_date && statusesQueNaoDevemSerAlterados.includes(newStatus)) {
+          const { isFuture } = checkFutureDeliveryDate(order.scheduled_date);
+          if (isFuture) {
+            showFutureDateWarning(orderId, order.scheduled_date, newStatus);
+            return;
+          }
+        }
+
+        // Se não tem data futura ou é outro tipo de status, prossegue normalmente
+        await executeStatusUpdate(orderId, newStatus, order);
+      } catch (error) {
+        console.error('Erro ao verificar pedido:', error);
+        alert('Erro ao verificar pedido.');
+      }
+    }
+
+    /**
+     * Executa a atualização de status efetivamente
+     */
+    async function executeStatusUpdate(orderId, newStatus, orderData = null) {
+      try {
+        // Buscar dados do pedido se não foram passados
+        let order = orderData;
+        if (!order) {
+          const { data } = await window.supabaseClient
+            .from('fast_orders')
+            .select('*')
+            .eq('id', orderId)
+            .single();
+          order = data;
+        }
 
         const oldStatus = order?.status || 'unknown';
 
@@ -13084,17 +13459,48 @@ Obrigado pela preferência! ❤️`;
         const newStatus = document.getElementById('msgUpdateStatus').value;
         const msg = document.getElementById('msgUpdatePreview').value;
 
+        // Buscar dados do pedido incluindo scheduled_date
+        const { data: order } = await window.supabaseClient
+          .from('fast_orders')
+          .select('*')
+          .eq('id', orderId)
+          .single();
+
+        if (!order) {
+          alert('Pedido não encontrado.');
+          return;
+        }
+
+        // Converter status português para inglês
+        const dbStatus = MsgTemplateService.statusToDb[newStatus] || newStatus;
+
+        // Verificar se é encomenda com data futura
+        const statusesQueNaoDevemSerAlterados = ['preparing', 'confirmed', 'out_for_delivery', 'delivered'];
+        if (order.scheduled_date && statusesQueNaoDevemSerAlterados.includes(dbStatus)) {
+          const { isFuture } = checkFutureDeliveryDate(order.scheduled_date);
+          if (isFuture) {
+            // Guardar dados da mensagem para enviar após confirmação
+            pendingMsgUpdateData = { orderId, dbStatus, msg, phone: order.client_phone };
+
+            // Fechar modal de atualização
+            document.getElementById('msgUpdateModal').classList.add('hidden');
+
+            // Mostrar aviso de data futura (com callback especial para enviar mensagem)
+            showFutureDateWarningWithMessage(orderId, order.scheduled_date, dbStatus, msg, order.client_phone);
+            return;
+          }
+        }
+
+        // Se não tem data futura, prossegue normalmente
         // Send WhatsApp
-        const { data: order } = await window.supabaseClient.from('fast_orders').select('client_phone').eq('id', orderId).single();
-        if (order && order.client_phone) {
+        if (order.client_phone) {
           const cleanPhone = order.client_phone.replace(/\D/g, '');
           const url = `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(msg)}`;
           window.open(url, '_blank');
         }
 
-        // Update Status in Supabase (converte português -> inglês para o banco)
-        const dbStatus = MsgTemplateService.statusToDb[newStatus] || newStatus;
-        updateOrderStatus(orderId, dbStatus);
+        // Update Status in Supabase
+        await executeStatusUpdate(orderId, dbStatus, order);
 
         document.getElementById('msgUpdateModal').classList.add('hidden');
       });

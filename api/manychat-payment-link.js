@@ -115,9 +115,9 @@ async function generateStripePaymentLink(order) {
     const customerName = order.client_name || 'Cliente';
     const orderCode = order.order_code || `FAST-${String(order.order_sequence || orderId).padStart(4, '0')}`;
 
-    // Calculate minimum payment (50% for encomendas, or full amount)
-    const minPaymentPercent = order.scheduled_date ? 50 : 100;
-    const paymentAmount = (amount * minPaymentPercent) / 100;
+    // Card payments (Stripe) always require full payment (100%)
+    // The 50% option is only available for PIX payments
+    const paymentAmount = amount;
 
     console.log(`[manychat-payment-link] Generating Stripe link for order ${orderCode}, amount: R$ ${paymentAmount.toFixed(2)}`);
 
