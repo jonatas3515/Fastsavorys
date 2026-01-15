@@ -2649,15 +2649,18 @@
 
     // Utility: Promise com timeout para evitar travamento
     function promiseWithTimeout(promise, timeoutMs = 10000, fallbackValue = null) {
-      return Promise.race([
-        promise,
-        new Promise((resolve) => {
-          setTimeout(() => {
-            console.warn('[Timeout] Promise excedeu ' + timeoutMs + 'ms, usando fallback');
-            resolve(fallbackValue);
-          }, timeoutMs);
-        })
-      ]);
+      let timeoutId;
+      const timeoutPromise = new Promise((resolve) => {
+        timeoutId = setTimeout(() => {
+          console.warn('[Timeout] Promise excedeu ' + timeoutMs + 'ms, usando fallback');
+          resolve(fallbackValue);
+        }, timeoutMs);
+      });
+
+      return Promise.race([promise, timeoutPromise]).finally(() => {
+        // Limpar timeout quando qualquer promise resolver
+        if (timeoutId) clearTimeout(timeoutId);
+      });
     }
 
     let products = [];
