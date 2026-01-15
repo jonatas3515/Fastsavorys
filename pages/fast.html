@@ -7818,6 +7818,17 @@
       renderDynamicFillingOptions();
       renderDynamicSalgadosOptions();
 
+      // Esconder seção de massa para bolos vulcão (não tem opção de massa)
+      const isVulcao = name.toLowerCase().includes('vulcão') || name.toLowerCase().includes('vulcao');
+      const cakeMassSection = document.getElementById('cakeMassSection');
+      if (cakeMassSection) {
+        if (isVulcao) {
+          cakeMassSection.classList.add('hidden');
+        } else {
+          cakeMassSection.classList.remove('hidden');
+        }
+      }
+
       // Reset form
       document.getElementById('customOptionsError').classList.add('hidden');
       updateSalgadosCounter();
@@ -8320,11 +8331,15 @@
       const { id, name, description, price, category } = pendingCustomProduct;
       const errorEl = document.getElementById('customOptionsError');
 
+      // Verificar se é bolo vulcão (não precisa de massa)
+      const isVulcao = name.toLowerCase().includes('vulcão') || name.toLowerCase().includes('vulcao');
+
       // Validate selections
       const cakeMass = document.querySelector('input[name="cakeMass"]:checked')?.value;
       const filling = document.querySelector('input[name="filling"]:checked')?.value;
 
-      if (!cakeMass) {
+      // Validar massa apenas se NÃO for vulcão
+      if (!isVulcao && !cakeMass) {
         errorEl.textContent = 'Selecione a massa do bolo.';
         errorEl.classList.remove('hidden');
         return;
@@ -8348,7 +8363,9 @@
       }
 
       // Build customization note
-      let customNote = `Massa: ${cakeMass} | Recheio: ${filling}`;
+      let customNote = isVulcao
+        ? `Recheio: ${filling}`
+        : `Massa: ${cakeMass} | Recheio: ${filling}`;
       if (salgados.length > 0) {
         customNote += ` | Salgados: ${salgados.join(', ')}`;
       }
@@ -8362,7 +8379,7 @@
         quantity: 1,
         note: customNote,
         customOptions: {
-          cakeMass,
+          cakeMass: isVulcao ? null : cakeMass,
           filling,
           salgados
         }
