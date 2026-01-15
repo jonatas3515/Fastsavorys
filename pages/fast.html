@@ -538,6 +538,22 @@
                 <p class="text-xs text-gray-500 mt-1">Ex.: Kits festa, bolos personalizados.</p>
               </div>
 
+              <!-- Bloqueio de Opções (Bolos) -->
+              <div id="blockOptionsSection" class="border-t pt-4 mt-2 hidden">
+                <h5 class="text-sm font-medium text-gray-700 mb-3">🚫 Bloquear Opções de Personalização</h5>
+                <div class="space-y-2">
+                  <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" id="productBlockMassa" class="w-4 h-4 text-rose-600">
+                    <span class="text-sm text-gray-700">Bloquear escolha de massa</span>
+                  </label>
+                  <label class="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" id="productBlockRecheio" class="w-4 h-4 text-rose-600">
+                    <span class="text-sm text-gray-700">Bloquear escolha de recheio</span>
+                  </label>
+                </div>
+                <p class="text-xs text-gray-500 mt-2">Útil para bolos com receita fixa (ex.: Vulcão Mini).</p>
+              </div>
+
               <!-- Flavor Selection (Mini-Salgados only) -->
               <div id="flavorSelectionSection" class="border-t pt-4 mt-2 hidden">
                 <h5 class="text-sm font-medium text-gray-700 mb-3">🍽️ Seleção de Sabores (Mini-Salgados)</h5>
@@ -7282,7 +7298,9 @@
         catalog_size_options: p.catalog_size_options || null,
         catalog_vegan: p.catalog_vegan || false,
         catalog_phrase: p.catalog_phrase || null,
-        catalog_order: p.catalog_order || 0
+        catalog_order: p.catalog_order || 0,
+        blockMassa: p.block_massa || false,
+        blockRecheio: p.block_recheio || false
       };
     }
 
@@ -7424,6 +7442,8 @@
               promo: product.promo || null,
               is_encomenda: product.isEncomenda || false,
               flavor_selection: product.flavor_selection || null,
+              block_massa: product.blockMassa || false,
+              block_recheio: product.blockRecheio || false,
               // Catalog fields
               catalog_enabled: product.catalog_enabled !== undefined ? product.catalog_enabled : true,
               catalog_size_options: product.catalog_size_options || null,
@@ -7594,6 +7614,10 @@
       // Encomenda
       const isEncomenda = document.getElementById('productIsEncomenda').checked;
 
+      // Bloqueio de opções (Bolos/Kits)
+      const blockMassa = document.getElementById('productBlockMassa')?.checked || false;
+      const blockRecheio = document.getElementById('productBlockRecheio')?.checked || false;
+
       // Flavor Selection (Mini-Salgados)
       let flavorSelection = null;
       if (category === 'mini' && document.getElementById('flavorSelectionEnabled')?.checked) {
@@ -7631,6 +7655,7 @@
             image: image || products[i].image,
             emoji, startDate, endDate, unavailableToday,
             promo, isEncomenda, flavor_selection: flavorSelection,
+            blockMassa, blockRecheio,
             // Catalog fields
             catalog_enabled, catalog_size_options, catalog_vegan, catalog_phrase, catalog_order
           };
@@ -7641,6 +7666,7 @@
           id: Date.now(), name, description, price, category,
           image, emoji, visible: true, startDate, endDate, unavailableToday,
           promo, isEncomenda, flavor_selection: flavorSelection,
+          blockMassa, blockRecheio,
           // Catalog fields
           catalog_enabled, catalog_size_options, catalog_vegan, catalog_phrase, catalog_order
         });
@@ -7727,6 +7753,18 @@
         // Encomenda
         document.getElementById('productIsEncomenda').checked = !!p.isEncomenda;
 
+        // Bloqueio de opções (Bolos/Kits)
+        const blockSection = document.getElementById('blockOptionsSection');
+        if (p.category === 'bolos' || p.category === 'kits') {
+          blockSection?.classList.remove('hidden');
+          document.getElementById('productBlockMassa').checked = !!p.blockMassa;
+          document.getElementById('productBlockRecheio').checked = !!p.blockRecheio;
+        } else {
+          blockSection?.classList.add('hidden');
+          document.getElementById('productBlockMassa').checked = false;
+          document.getElementById('productBlockRecheio').checked = false;
+        }
+
         // Catalog fields - Added for catalog feature
         document.getElementById('productCatalogEnabled').checked = p.catalog_enabled !== false;
         document.getElementById('catalogVegan').checked = !!p.catalog_vegan;
@@ -7798,7 +7836,12 @@
     let pendingCustomProduct = null;
 
     function openCustomOptionsModal(id, name, description, price, category) {
-      pendingCustomProduct = { id, name, description, price, category };
+      // Buscar produto para obter configurações de bloqueio
+      const product = products.find(p => p.id === id);
+      const blockMassa = product?.blockMassa || false;
+      const blockRecheio = product?.blockRecheio || false;
+
+      pendingCustomProduct = { id, name, description, price, category, blockMassa, blockRecheio };
 
       // Set product info
       document.getElementById('customOptionsProductName').textContent = name;
@@ -7818,14 +7861,23 @@
       renderDynamicFillingOptions();
       renderDynamicSalgadosOptions();
 
-      // Esconder seção de massa para bolos vulcão (não tem opção de massa)
-      const isVulcao = name.toLowerCase().includes('vulcão') || name.toLowerCase().includes('vulcao');
+      // Mostrar/esconder seções baseado nas configurações de bloqueio do produto
       const cakeMassSection = document.getElementById('cakeMassSection');
+      const fillingSection = document.getElementById('fillingSection');
+
       if (cakeMassSection) {
-        if (isVulcao) {
+        if (blockMassa) {
           cakeMassSection.classList.add('hidden');
         } else {
           cakeMassSection.classList.remove('hidden');
+        }
+      }
+
+      if (fillingSection) {
+        if (blockRecheio) {
+          fillingSection.classList.add('hidden');
+        } else {
+          fillingSection.classList.remove('hidden');
         }
       }
 
@@ -8086,6 +8138,7 @@
         // Listen for category changes
         document.getElementById('productCategory')?.addEventListener('change', (e) => {
           this.toggleSectionVisibility(e.target.value);
+          this.toggleBlockOptionsVisibility(e.target.value);
         });
 
         // Listen for enabled checkbox toggle
@@ -8103,6 +8156,21 @@
           this.renderAvailableFlavors();
         } else {
           section.classList.add('hidden');
+        }
+      },
+
+      // Mostrar opções de bloqueio para bolos e kits
+      toggleBlockOptionsVisibility: function (category) {
+        const section = document.getElementById('blockOptionsSection');
+        if (!section) return;
+
+        if (category === 'bolos' || category === 'kits') {
+          section.classList.remove('hidden');
+        } else {
+          section.classList.add('hidden');
+          // Resetar checkboxes quando esconde
+          document.getElementById('productBlockMassa').checked = false;
+          document.getElementById('productBlockRecheio').checked = false;
         }
       },
 
@@ -8328,24 +8396,22 @@
     function confirmCustomOptions() {
       if (!pendingCustomProduct) return;
 
-      const { id, name, description, price, category } = pendingCustomProduct;
+      const { id, name, description, price, category, blockMassa, blockRecheio } = pendingCustomProduct;
       const errorEl = document.getElementById('customOptionsError');
-
-      // Verificar se é bolo vulcão (não precisa de massa)
-      const isVulcao = name.toLowerCase().includes('vulcão') || name.toLowerCase().includes('vulcao');
 
       // Validate selections
       const cakeMass = document.querySelector('input[name="cakeMass"]:checked')?.value;
       const filling = document.querySelector('input[name="filling"]:checked')?.value;
 
-      // Validar massa apenas se NÃO for vulcão
-      if (!isVulcao && !cakeMass) {
+      // Validar massa apenas se NÃO estiver bloqueada
+      if (!blockMassa && !cakeMass) {
         errorEl.textContent = 'Selecione a massa do bolo.';
         errorEl.classList.remove('hidden');
         return;
       }
 
-      if (!filling) {
+      // Validar recheio apenas se NÃO estiver bloqueado
+      if (!blockRecheio && !filling) {
         errorEl.textContent = 'Selecione o sabor do recheio.';
         errorEl.classList.remove('hidden');
         return;
@@ -8363,12 +8429,12 @@
       }
 
       // Build customization note
-      let customNote = isVulcao
-        ? `Recheio: ${filling}`
-        : `Massa: ${cakeMass} | Recheio: ${filling}`;
-      if (salgados.length > 0) {
-        customNote += ` | Salgados: ${salgados.join(', ')}`;
-      }
+      let customNoteParts = [];
+      if (!blockMassa && cakeMass) customNoteParts.push(`Massa: ${cakeMass}`);
+      if (!blockRecheio && filling) customNoteParts.push(`Recheio: ${filling}`);
+      if (salgados.length > 0) customNoteParts.push(`Salgados: ${salgados.join(', ')}`);
+
+      let customNote = customNoteParts.join(' | ');
 
       // Add to cart with customization
       const cartItem = {
@@ -8377,10 +8443,10 @@
         description,
         price,
         quantity: 1,
-        note: customNote,
+        note: customNote || null,
         customOptions: {
-          cakeMass: isVulcao ? null : cakeMass,
-          filling,
+          cakeMass: blockMassa ? null : cakeMass,
+          filling: blockRecheio ? null : filling,
           salgados
         }
       };
