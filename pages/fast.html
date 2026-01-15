@@ -2647,6 +2647,19 @@
       window.supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
     }
 
+    // Utility: Promise com timeout para evitar travamento
+    function promiseWithTimeout(promise, timeoutMs = 10000, fallbackValue = null) {
+      return Promise.race([
+        promise,
+        new Promise((resolve) => {
+          setTimeout(() => {
+            console.warn('[Timeout] Promise excedeu ' + timeoutMs + 'ms, usando fallback');
+            resolve(fallbackValue);
+          }, timeoutMs);
+        })
+      ]);
+    }
+
     let products = [];
     let cart = [];
     let cartTotal = 0;
@@ -2685,6 +2698,7 @@
       currentPage: 0,
       isMobile: false,
       previousOverflow: '',
+      _initialized: false, // Flag para prevenir inicialização múltipla
       // Touch/swipe support properties
       touchStartX: 0,
       touchEndX: 0,
@@ -2692,6 +2706,11 @@
       init: function () {
         // Detectar mobile (lg breakpoint = 1024px)
         this.isMobile = window.innerWidth < 1024;
+
+        // Registrar event listeners apenas UMA vez
+        if (this._initialized) return;
+        this._initialized = true;
+
         window.addEventListener('resize', () => {
           const wasMobile = this.isMobile;
           this.isMobile = window.innerWidth < 1024;
@@ -4818,17 +4837,21 @@
         }
 
         // Load all data in parallel for faster page load
-        // Funções síncronas são wrappadas em Promise.resolve()
-        await Promise.all([
-          seedDefaultUsers().catch(function (e) { console.error('[INIT] seedDefaultUsers erro:', e); }),
-          loadProducts().catch(function (e) { console.error('[INIT] loadProducts erro:', e); }),
-          loadClients().catch(function (e) { console.error('[INIT] loadClients erro:', e); }),
-          Promise.resolve().then(function () { loadPromotions(); }).catch(function (e) { console.error('[INIT] loadPromotions erro:', e); }),
-          loadCoupons().catch(function (e) { console.error('[INIT] loadCoupons erro:', e); }),
-          loadStoreConfig().catch(function (e) { console.error('[INIT] loadStoreConfig erro:', e); }),
-          loadBusinessHours().catch(function (e) { console.error('[INIT] loadBusinessHours erro:', e); }),
-          ProductOptionsModule.load().catch(function (e) { console.error('[INIT] ProductOptionsModule erro:', e); })
-        ]);
+        // Timeout global de 12s para evitar travamento se Supabase estiver lento
+        await promiseWithTimeout(
+          Promise.all([
+            seedDefaultUsers().catch(function (e) { console.error('[INIT] seedDefaultUsers erro:', e); }),
+            loadProducts().catch(function (e) { console.error('[INIT] loadProducts erro:', e); }),
+            loadClients().catch(function (e) { console.error('[INIT] loadClients erro:', e); }),
+            Promise.resolve().then(function () { loadPromotions(); }).catch(function (e) { console.error('[INIT] loadPromotions erro:', e); }),
+            loadCoupons().catch(function (e) { console.error('[INIT] loadCoupons erro:', e); }),
+            loadStoreConfig().catch(function (e) { console.error('[INIT] loadStoreConfig erro:', e); }),
+            loadBusinessHours().catch(function (e) { console.error('[INIT] loadBusinessHours erro:', e); }),
+            ProductOptionsModule.load().catch(function (e) { console.error('[INIT] ProductOptionsModule erro:', e); })
+          ]),
+          12000, // 12 segundos máximo
+          null
+        );
 
         console.log('[INIT] Dados carregados, mostrando painel');
 
@@ -7264,10 +7287,17 @@
     // Esta função é chamada pelo VersionService quando detecta mudança
     async function fetchProductsFromSupabase() {
       try {
-        const { data, error } = await window.supabaseClient
-          .from('fast_products')
-          .select('*')
-          .order('id', { ascending: true });
+        // Timeout de 8 segundos para evitar travamento
+        const result = await promiseWithTimeout(
+          window.supabaseClient
+            .from('fast_products')
+            .select('*')
+            .order('id', { ascending: true }),
+          8000,
+          { data: null, error: { message: 'Timeout' } }
+        );
+
+        const { data, error } = result || { data: null, error: null };
 
         if (error) throw error;
 
@@ -8373,7 +8403,19 @@
       return true;
     }
 
+    let _loadProductsPublicTimeout = null;
+    let _loadProductsPublicLastRun = 0;
     function loadProductsPublic() {
+      // Debounce: evitar chamadas muito frequentes (min 100ms)
+      const now = Date.now();
+      if (now - _loadProductsPublicLastRun < 100) {
+        // Agendar para rodar depois
+        if (_loadProductsPublicTimeout) clearTimeout(_loadProductsPublicTimeout);
+        _loadProductsPublicTimeout = setTimeout(loadProductsPublic, 100);
+        return;
+      }
+      _loadProductsPublicLastRun = now;
+
       const map = {
         salgados: document.getElementById('salgadosContainer'),
         mini: document.getElementById('miniContainer'),
@@ -8536,10 +8578,15 @@
     }
 
     // Calcular e renderizar produtos mais pedidos
+    let _topProductsLoading = false; // Lock para evitar chamadas simultâneas
     async function renderTopProductsSection() {
       const section = document.getElementById('topProductsSection');
       const container = document.getElementById('topProductsContainer');
       if (!section || !container) return;
+
+      // Prevenir chamadas simultâneas
+      if (_topProductsLoading) return;
+      _topProductsLoading = true;
 
       try {
         // Buscar pedidos dos últimos 30 dias para calcular ranking
@@ -8612,6 +8659,8 @@
       } catch (e) {
         console.warn('[TopProducts] Erro ao carregar:', e);
         section.classList.add('hidden');
+      } finally {
+        _topProductsLoading = false; // Liberar lock
       }
     }
 
@@ -11740,6 +11789,7 @@
     const BannerModule = {
       config: null,
       SESSION_KEY: 'fastAdBannerClosed',
+      _initialized: false, // Flag para prevenir inicialização múltipla
 
       // Load banner config from Supabase
       async loadConfig() {
@@ -11917,10 +11967,15 @@
 
       // Initialize banner module
       async init() {
+        // Carregar config sempre (pode ter mudado)
         await this.loadConfig();
 
-        // Public: Show banner on store page
+        // Mostrar banner público
         this.showPublicBanner();
+
+        // Registrar event listeners apenas UMA vez
+        if (this._initialized) return;
+        this._initialized = true;
 
         // Public: Close button handler
         document.getElementById('closeBannerBtn')?.addEventListener('click', () => {
