@@ -172,6 +172,13 @@
 </head>
 
 <body class="bg-white overflow-hidden">
+  <!-- Cache Notice (aparece quando dados vêm do cache local) -->
+  <div id="cacheNotice"
+    class="hidden fixed top-0 left-0 right-0 z-[200] bg-yellow-100 border-b border-yellow-300 px-4 py-2 text-center text-sm text-yellow-800 flex items-center justify-center gap-2">
+    <span>⚠️ Conexão lenta. Preços podem estar desatualizados.</span>
+    <button onclick="this.parentElement.classList.add('hidden'); loadProducts();"
+      class="text-yellow-700 hover:text-yellow-900 underline font-medium">Tentar novamente</button>
+  </div>
   <!-- Welcome Screen with Gradient Background -->
   <div id="welcomeScreen" class="fixed inset-0 z-[100] overflow-hidden"
     style="background: linear-gradient(135deg, #9e0b5a 0%, #7a0945 25%, #5a0733 50%, #1f2937 75%, #000000 100%);">
@@ -1501,7 +1508,8 @@
             <div class="flex gap-2">
               <select id="neighborhoodFilterYear" class="text-xs border rounded p-1">
                 <option value="2024">2024</option>
-                <option value="2025" selected>2025</option>
+                <option value="2025">2025</option>
+                <option value="2026" selected>2026</option>
               </select>
               <select id="neighborhoodFilterPeriod" class="text-xs border rounded p-1">
                 <option value="all">Todo o ano</option>
@@ -3333,6 +3341,41 @@
         } catch (e) {
           console.warn('[DataCache] Erro ao limpar tudo:', e);
         }
+      },
+
+      // Limpa todos os caches relacionados a produtos (legado + novo)
+      clearProductCaches: function () {
+        try {
+          localStorage.removeItem(this.PREFIX + 'products');
+          localStorage.removeItem('fastProducts');
+          console.log('[DataCache] Caches de produtos limpos (smart + legado)');
+        } catch (e) {
+          console.warn('[DataCache] Erro ao limpar caches de produtos:', e);
+        }
+      },
+
+      // CACHE HÍBRIDO: Mescla dados críticos do servidor com cache de imagens
+      // Preços e promoções SEMPRE vêm do servidor, imagens usam cache como fallback
+      mergeWithCriticalData: function (serverProducts, cachedProducts) {
+        if (!serverProducts || !Array.isArray(serverProducts)) return serverProducts;
+        if (!cachedProducts || !Array.isArray(cachedProducts)) return serverProducts;
+
+        const cachedMap = new Map();
+        cachedProducts.forEach(p => cachedMap.set(p.id, p));
+
+        return serverProducts.map(serverProduct => {
+          const cached = cachedMap.get(serverProduct.id);
+
+          // Se não tem imagem do servidor mas tem no cache, usa do cache
+          // Isso ajuda quando a imagem ainda está carregando ou houve erro temporário
+          if (!serverProduct.image && cached && cached.image) {
+            console.log('[DataCache] Usando imagem do cache para:', serverProduct.name);
+            return { ...serverProduct, image: cached.image };
+          }
+
+          // Sempre usa dados do servidor (preço, promo, visibilidade, etc.)
+          return serverProduct;
+        });
       }
     };
 
@@ -3342,7 +3385,7 @@
     const VersionService = {
       // Debounce control
       _lastCheck: {},
-      _minInterval: 180000, // 3 minutos entre checks do mesmo key
+      _minInterval: 30000, // 30 segundos entre checks (reduzido para dados críticos)
 
       // Busca versão do servidor (query leve)
       getServerVersion: async function (key) {
@@ -3443,45 +3486,56 @@
       // Evita múltiplos intervalos
       if (_backgroundSyncInterval) return;
 
-      // Check a cada 5 minutos
+      // Check a cada 2 minutos (reduzido para dados críticos como preços)
       _backgroundSyncInterval = setInterval(async () => {
         if (!OfflineSyncService.isOnline()) return;
 
-        console.log('[BackgroundSync] Verificando versões...');
+        console.log('[BackgroundSync] 🔄 Verificando atualizações de preços...');
 
-        // Verifica produtos
+        // Verifica produtos - se versão mudou, recarrega com preços atuais
         const cachedProducts = DataCache.get('products');
         if (cachedProducts) {
-          await VersionService.checkAndRefresh(
-            'products',
-            cachedProducts.version,
-            fetchProductsFromSupabase
-          );
+          const serverVersion = await VersionService.getServerVersion('products');
+          if (serverVersion !== null && serverVersion !== cachedProducts.version) {
+            console.log('[BackgroundSync] 💰 Versão mudou! Atualizando preços...');
+            // Limpa caches antigos
+            DataCache.clearProductCaches();
+            // Recarrega produtos do zero
+            await fetchProductsFromSupabase();
+            // Re-renderiza a loja se estiver visível
+            if (typeof renderProducts === 'function') {
+              renderProducts();
+            }
+          }
         }
-      }, 300000); // 5 minutos
+      }, 120000); // 2 minutos
 
-      console.log('[BackgroundSync] Iniciado (intervalo: 5 min)');
+      console.log('[BackgroundSync] ✅ Iniciado (intervalo: 2 min para preços críticos)');
     }
 
-    // Visibility change handler com debounce
+    // Visibility change handler - quando usuário volta à aba, sempre verifica preços
     let _lastVisibilityCheck = 0;
     document.addEventListener('visibilitychange', async () => {
       if (document.visibilityState !== 'visible') return;
       if (sessionStorage.getItem('fastAdmin') === '1') return;
 
       const now = Date.now();
-      if (now - _lastVisibilityCheck < 180000) return; // 3 min debounce
+      if (now - _lastVisibilityCheck < 30000) return; // 30 segundos debounce (reduzido)
       _lastVisibilityCheck = now;
 
-      console.log('[BackgroundSync] Tab ficou visível, verificando versões...');
+      console.log('[BackgroundSync] 👁️ Tab ficou visível, verificando preços...');
 
       const cachedProducts = DataCache.get('products');
       if (cachedProducts) {
-        await VersionService.checkAndRefresh(
-          'products',
-          cachedProducts.version,
-          fetchProductsFromSupabase
-        );
+        const serverVersion = await VersionService.getServerVersion('products');
+        if (serverVersion !== null && serverVersion !== cachedProducts.version) {
+          console.log('[BackgroundSync] 💰 Preços desatualizados! Atualizando...');
+          DataCache.clearProductCaches();
+          await fetchProductsFromSupabase();
+          if (typeof renderProducts === 'function') {
+            renderProducts();
+          }
+        }
       }
     });
 
@@ -5986,6 +6040,76 @@
       renderReportsData();
     });
 
+    // ===========================================
+    // NEIGHBORHOOD FILTER EVENT LISTENERS
+    // ===========================================
+    document.getElementById('neighborhoodFilterYear')?.addEventListener('change', () => {
+      renderNeighborhoodChart();
+    });
+    document.getElementById('neighborhoodFilterPeriod')?.addEventListener('change', () => {
+      renderNeighborhoodChart();
+    });
+
+    // Função para renderizar gráfico de bairros com filtros
+    function renderNeighborhoodChart() {
+      const yearSelect = document.getElementById('neighborhoodFilterYear');
+      const periodSelect = document.getElementById('neighborhoodFilterPeriod');
+      const container = document.getElementById('neighborhoodChartContainer');
+
+      if (!container) return;
+
+      const selectedYear = parseInt(yearSelect?.value || new Date().getFullYear());
+      const selectedPeriod = periodSelect?.value || 'all';
+
+      // Filtrar pedidos pelo ano e período selecionados
+      const filteredOrders = orders.filter(order => {
+        const orderDate = new Date(order.created_at);
+        const orderYear = orderDate.getFullYear();
+        const orderMonth = orderDate.getMonth() + 1; // 1-12
+
+        // Filtro de ano
+        if (orderYear !== selectedYear) return false;
+
+        // Filtro de período
+        if (selectedPeriod === 'all') return true;
+        if (selectedPeriod === '1') return orderMonth >= 1 && orderMonth <= 6; // 1º semestre
+        if (selectedPeriod === '2') return orderMonth >= 7 && orderMonth <= 12; // 2º semestre
+
+        // Meses individuais
+        const monthMap = {
+          'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'may': 5, 'jun': 6,
+          'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12
+        };
+        if (monthMap[selectedPeriod]) return orderMonth === monthMap[selectedPeriod];
+
+        return true;
+      });
+
+      // Calcular estatísticas de bairro
+      const neighborhoodStats = calculateNeighborhoodStats(filteredOrders);
+
+      if (neighborhoodStats.length > 0) {
+        const maxCount = Math.max(...neighborhoodStats.map(n => n.count));
+        container.innerHTML = neighborhoodStats.map((n, i) => {
+          const percentage = (n.count / maxCount) * 100;
+          const colors = ['bg-rose-500', 'bg-rose-400', 'bg-rose-300', 'bg-pink-400', 'bg-pink-300'];
+          const bgColor = colors[Math.min(i, colors.length - 1)];
+          return `
+            <div class="flex items-center gap-3">
+              <div class="w-24 text-right text-sm font-medium text-gray-700 truncate capitalize">${n.name}</div>
+              <div class="flex-1 bg-gray-200 rounded-full h-6 relative overflow-hidden">
+                <div class="${bgColor} h-full rounded-full transition-all duration-500" style="width: ${percentage}%"></div>
+                <span class="absolute inset-0 flex items-center justify-center text-xs font-bold ${percentage > 50 ? 'text-white' : 'text-gray-700'}">${n.count} pedidos</span>
+              </div>
+              <div class="w-20 text-right text-xs text-green-600 font-bold">R$ ${n.total.toFixed(2).replace('.', ',')}</div>
+            </div>
+          `;
+        }).join('');
+      } else {
+        container.innerHTML = `<div class="text-center py-6 text-gray-500"><p class="text-4xl mb-2">📍</p><p>Nenhum pedido com entrega no período selecionado.</p></div>`;
+      }
+    }
+
     function updatePeriodButtons() {
       const buttons = {
         'reportPeriodMonth': 'month',
@@ -6641,10 +6765,30 @@
       return c.expiry < today;
     }
 
-    function renderCoupons() {
+    async function renderCoupons() {
       const activeBox = document.getElementById('couponsList');
       const inactiveBox = document.getElementById('inactiveCouponsList');
       if (!activeBox) return;
+
+      // Buscar estatísticas de uso dos cupons do banco de dados
+      let couponUsageStats = {};
+      try {
+        const { data: usageData, error } = await window.supabaseClient
+          .from('fast_coupon_usage')
+          .select('coupon_code');
+
+        if (!error && usageData) {
+          // Contar usos por cupom
+          usageData.forEach(u => {
+            const code = u.coupon_code?.toUpperCase();
+            if (code) {
+              couponUsageStats[code] = (couponUsageStats[code] || 0) + 1;
+            }
+          });
+        }
+      } catch (e) {
+        console.warn('[Coupons] Erro ao buscar estatísticas:', e);
+      }
 
       // Separate active and inactive coupons
       const activeCoupons = coupons.filter(c => c.active !== false && !isCouponExhausted(c) && !isCouponExpired(c));
@@ -6653,22 +6797,65 @@
       // Render active coupons
       activeBox.innerHTML = activeCoupons.length ? activeCoupons.map((c, i) => {
         const originalIndex = coupons.indexOf(c);
-        const usageInfo = c.maxUsage ? `${c.currentUsage || 0}/${c.maxUsage} usos` : '';
-        const valueInfo = c.maxValue ? `R$ ${(c.currentTotal || 0).toFixed(2)}/${c.maxValue.toFixed(2)}` : '';
-        const limitsInfo = [usageInfo, valueInfo].filter(x => x).join(' • ');
+        const realUsageCount = couponUsageStats[c.code?.toUpperCase()] || 0;
+        const currentUsage = c.currentUsage || realUsageCount;
+
+        // Calcular porcentagem de uso
+        let usagePercent = 0;
+        let usageColor = 'green';
+        let usageWarning = '';
+
+        if (c.maxUsage) {
+          usagePercent = Math.round((currentUsage / c.maxUsage) * 100);
+          if (usagePercent >= 90) {
+            usageColor = 'red';
+            usageWarning = '🔥 Quase esgotado!';
+          } else if (usagePercent >= 70) {
+            usageColor = 'yellow';
+            usageWarning = '⚠️ Perto do limite';
+          }
+        }
+
+        // Valor total de desconto dado (estimativa baseada no valor do cupom)
+        const estimatedDiscountGiven = c.type === 'percentage'
+          ? `~${currentUsage} pedidos`
+          : `R$ ${((c.value || 0) * currentUsage).toFixed(2).replace('.', ',')}`;
+
+        const usageInfo = c.maxUsage
+          ? `${currentUsage}/${c.maxUsage} usos (${usagePercent}%)`
+          : `${currentUsage} usos`;
+        const valueInfo = c.maxValue
+          ? `R$ ${(c.currentTotal || 0).toFixed(2)}/${c.maxValue.toFixed(2)}`
+          : '';
+
+        // Barra de progresso de uso
+        const progressBar = c.maxUsage ? `
+          <div class="w-full bg-gray-200 rounded-full h-2 mt-1">
+            <div class="bg-${usageColor}-500 h-2 rounded-full transition-all" style="width: ${Math.min(usagePercent, 100)}%"></div>
+          </div>
+        ` : '';
+
         return `
         <div class='p-3 border rounded-lg bg-gradient-to-r from-purple-50 to-pink-50'>
           <div class='flex justify-between items-start'>
-            <div>
+            <div class='flex-1'>
               <p class='font-bold text-purple-700 text-lg'>${c.code}</p>
               <p class='text-sm text-gray-600'>
                 ${c.type === 'percentage' ? c.value + '%' : 'R$ ' + c.value.toFixed(2).replace('.', ',')} de desconto
               </p>
               ${c.minOrder > 0 ? `<p class='text-xs text-gray-500'>Mínimo: R$ ${c.minOrder.toFixed(2).replace('.', ',')}</p>` : ''}
               ${c.expiry ? `<p class='text-xs text-gray-500'>Válido até: ${safeDate(c.expiry).toLocaleDateString('pt-BR')}</p>` : ''}
-              ${limitsInfo ? `<p class='text-xs text-blue-600'>${limitsInfo}</p>` : ''}
+              
+              <!-- Estatísticas de Uso -->
+              <div class='mt-2 pt-2 border-t border-purple-200'>
+                <p class='text-xs font-medium text-gray-700'>📊 ${usageInfo}</p>
+                ${progressBar}
+                ${usageWarning ? `<p class='text-xs text-${usageColor}-600 font-bold mt-1'>${usageWarning}</p>` : ''}
+                ${valueInfo ? `<p class='text-xs text-blue-600'>${valueInfo}</p>` : ''}
+                <p class='text-xs text-green-600 mt-1'>💰 Total dado: ${estimatedDiscountGiven}</p>
+              </div>
             </div>
-            <div class='flex flex-col gap-1'>
+            <div class='flex flex-col gap-1 ml-2'>
               <button class='px-2 py-1 rounded bg-blue-500 hover:bg-blue-600 text-white text-xs' onclick='editCoupon(${originalIndex})'>Editar</button>
               <button class='px-2 py-1 rounded bg-orange-500 hover:bg-orange-600 text-white text-xs' onclick='inactivateCoupon(${originalIndex})'>Inativar</button>
             </div>
@@ -6680,12 +6867,14 @@
         inactiveBox.innerHTML = inactiveCoupons.length ? inactiveCoupons.map((c) => {
           const originalIndex = coupons.indexOf(c);
           const reason = isCouponExhausted(c) ? '(Esgotado)' : isCouponExpired(c) ? '(Vencido)' : '(Inativo)';
+          const realUsageCount = couponUsageStats[c.code?.toUpperCase()] || 0;
           return `
           <div class='p-2 border rounded-lg bg-gray-100 opacity-70'>
             <div class='flex justify-between items-center'>
               <div>
                 <span class='font-medium text-gray-600'>${c.code}</span>
                 <span class='text-xs text-red-500 ml-2'>${reason}</span>
+                <span class='text-xs text-gray-500 ml-2'>${realUsageCount} usos</span>
               </div>
               <button class='px-2 py-1 rounded bg-green-500 hover:bg-green-600 text-white text-xs' onclick='reactivateCoupon(${originalIndex})'>Reativar</button>
             </div>
@@ -7276,10 +7465,23 @@
 
     // Using character range instead of \p{Diacritic} for iOS/Safari compatibility
     function norm(s) { return (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim(); }
+    
+    // Verifica se entrega é permitida para o bairro - usa bairros cadastrados dinamicamente
     function isFastDeliveryAllowed(nei) {
       const n = norm(nei);
-      const allowed = ['novo prado', 'sao domingos', 'cristo redentor', 'cidade baixa', 'santo antonio', 'varzea alegre', 'centro'];
-      return allowed.includes(n);
+      if (!n) return false;
+      
+      // Buscar bairros cadastrados no localStorage (sincronizado com Supabase)
+      let fees = {};
+      try {
+        fees = JSON.parse(localStorage.getItem('fastDeliveryFees') || '{}');
+      } catch (e) {
+        fees = {};
+      }
+      
+      // Verificar se o bairro está cadastrado (comparação normalizada)
+      const registeredNeighborhoods = Object.keys(fees).map(k => norm(k));
+      return registeredNeighborhoods.includes(n);
     }
 
 
@@ -7324,7 +7526,7 @@
 
         if (data && data.length > 0) {
           products = data.map(mapProductData);
-          console.log('[Products] Carregados do Supabase:', products.length);
+          console.log('[Products] ✅ Carregados do Supabase:', products.length);
 
           // Salva no cache com versão atual
           const serverVersion = await VersionService.getServerVersion('products');
@@ -7332,23 +7534,55 @@
 
           // Backup local legado
           localStorage.setItem('fastProducts', JSON.stringify(products));
+
+          // Esconde aviso de cache (dados atualizados do servidor)
+          const cacheNotice = document.getElementById('cacheNotice');
+          if (cacheNotice) cacheNotice.classList.add('hidden');
         } else {
-          await seedDefaultProducts();
+          // ⚠️ CORREÇÃO CRÍTICA: NÃO sobrescrever dados!
+          // Se Supabase retornar vazio, manter dados existentes e logar erro
+          console.error('[Products] ⚠️ Supabase retornou vazio - mantendo dados existentes');
+          console.error('[Products] Verifique a conexão com o Supabase e as políticas RLS');
+
+          // Tenta usar dados do cache local se disponíveis
+          const cached = DataCache.get('products');
+          if (cached && cached.items && cached.items.length > 0) {
+            products = cached.items;
+            console.log('[Products] Usando dados do cache local:', products.length);
+          } else {
+            const saved = localStorage.getItem('fastProducts');
+            if (saved) {
+              products = JSON.parse(saved);
+              console.log('[Products] Usando localStorage legado:', products.length);
+            }
+          }
+          // NÃO chamar seedDefaultProducts() - isso reseta todos os dados!
         }
       } catch (error) {
         console.error('[Products] Erro ao carregar do Supabase:', error);
-        // Fallback para localStorage legado
+        // Fallback para localStorage legado - NÃO resetar dados!
         const saved = localStorage.getItem('fastProducts');
         if (saved) {
           products = JSON.parse(saved);
           console.log('[Products] Carregados do localStorage (fallback)');
         } else {
-          await seedDefaultProducts();
+          // Tenta cache novo
+          const cached = DataCache.get('products');
+          if (cached && cached.items && cached.items.length > 0) {
+            products = cached.items;
+            console.log('[Products] Usando cache após erro:', products.length);
+          } else {
+            // Último recurso: array vazio, mas NÃO sobrescrever o banco!
+            console.error('[Products] ❌ Nenhum dado disponível - NÃO resetando banco!');
+            products = [];
+          }
         }
       }
     }
 
-    // Carregamento principal com estratégia cache-first
+    // Carregamento principal com estratégia HÍBRIDA
+    // PREÇOS: Sempre buscados do servidor (dados críticos - evita prejuízo)
+    // IMAGENS: Cache usado como fallback se servidor não retornar
     async function loadProducts() {
       const isAdmin = sessionStorage.getItem('fastAdmin') === '1';
 
@@ -7359,37 +7593,77 @@
         return;
       }
 
-      // PÚBLICO: tenta cache primeiro
+      // PÚBLICO: Estratégia híbrida - SEMPRE busca preços do servidor
       try {
+        // Guarda cache atual para usar imagens como fallback
         const cached = DataCache.get('products');
+        const cachedItems = cached?.items || [];
 
-        if (cached && Array.isArray(cached.items) && cached.items.length > 0) {
-          // Cache encontrado → usa imediatamente
-          products = cached.items;
-          console.log('[Products] Carregados do cache:', products.length, 'versão:', cached.version);
+        console.log('[Products] 💰 Buscando PREÇOS ATUALIZADOS do servidor...');
 
-          // Manter backup local legado sincronizado
+        // Timeout menor para não travar a UI
+        const result = await promiseWithTimeout(
+          window.supabaseClient
+            .from('fast_products')
+            .select('*')
+            .order('id', { ascending: true }),
+          6000, // 6 segundos
+          null
+        );
+
+        if (result && result.data && result.data.length > 0) {
+          // Mapeia produtos do servidor
+          let serverProducts = result.data.map(mapProductData);
+
+          // CACHE HÍBRIDO: Mescla com cache para imagens (servidor sempre tem prioridade nos preços)
+          if (cachedItems.length > 0) {
+            serverProducts = DataCache.mergeWithCriticalData(serverProducts, cachedItems);
+          }
+
+          products = serverProducts;
+          console.log('[Products] ✅ Carregados do servidor com preços atuais:', products.length);
+
+          // Atualiza cache com dados novos
+          const serverVersion = await VersionService.getServerVersion('products');
+          DataCache.set('products', products, serverVersion || Date.now());
           localStorage.setItem('fastProducts', JSON.stringify(products));
 
-          // Em segundo plano: verifica se há versão nova
-          VersionService.checkAndRefresh('products', cached.version, fetchProductsFromSupabase);
-
-          // Inicia background sync para futuras atualizações
+          // Inicia background sync para verificar atualizações futuras
           startBackgroundVersionSync();
           return;
         }
 
-        // Sem cache válido → fallback para busca completa
-        console.log('[Products] Cache não encontrado, buscando do Supabase...');
-        await fetchProductsFromSupabase();
+        // Se servidor falhou mas tem cache, usa cache COM AVISO
+        if (cachedItems.length > 0) {
+          products = cachedItems;
+          console.warn('[Products] ⚠️ Servidor indisponível, usando cache (preços podem estar desatualizados)');
 
-        // Inicia background sync
+          // Mostra aviso sutil ao usuário
+          setTimeout(() => {
+            const notice = document.getElementById('cacheNotice');
+            if (notice) notice.classList.remove('hidden');
+          }, 1000);
+
+          startBackgroundVersionSync();
+          return;
+        }
+
+        // Sem servidor E sem cache → fallback completo
+        console.log('[Products] Cache não encontrado, buscando fallback...');
+        await fetchProductsFromSupabase();
         startBackgroundVersionSync();
 
       } catch (error) {
-        // Qualquer erro → comportamento original (busca do Supabase)
-        console.error('[Products] Erro no cache, fallback para Supabase:', error);
-        await fetchProductsFromSupabase();
+        console.error('[Products] Erro no carregamento híbrido:', error);
+
+        // Tenta cache local como último recurso
+        const cached = DataCache.get('products');
+        if (cached?.items?.length > 0) {
+          products = cached.items;
+          console.warn('[Products] ⚠️ Usando cache após erro (preços podem estar desatualizados)');
+        } else {
+          await fetchProductsFromSupabase();
+        }
       }
     }
 
@@ -9411,12 +9685,33 @@
         // Remove notice if exists
         document.getElementById('deliveryDisabledNotice')?.remove();
       }
-      // Fora do horário: encomenda + data
+      // Lógica de data/horário - sempre mostrar para permitir agendamento
       const open = isFastOpen();
       const dateBox = document.getElementById('orderDateBox');
       const encomendaWarn = document.getElementById('encomendaWarning');
-      if (!open) { deliveryTitle.textContent = 'Fazer Encomenda'; dateBox.classList.remove('hidden'); encomendaWarn.classList.remove('hidden'); const d = document.getElementById('orderDate'); const minDate = getMinEncomendaDateYYYYMMDD(); d.min = minDate; if (d.value && d.value < minDate) d.value = minDate; }
-      else { deliveryTitle.textContent = 'Entrega'; dateBox.classList.add('hidden'); encomendaWarn.classList.add('hidden'); }
+      const orderDateInput = document.getElementById('orderDate');
+      const orderTimeHint = document.getElementById('orderTimeHint');
+      
+      // Sempre mostrar os campos de data/horário para agendamento
+      dateBox.classList.remove('hidden');
+      
+      if (!open) {
+        // Loja fechada: encomenda obrigatória
+        deliveryTitle.textContent = 'Fazer Encomenda';
+        encomendaWarn.classList.remove('hidden');
+        const minDate = getMinEncomendaDateYYYYMMDD();
+        orderDateInput.min = minDate;
+        if (orderDateInput.value && orderDateInput.value < minDate) orderDateInput.value = minDate;
+        if (orderTimeHint) orderTimeHint.textContent = 'Informe o horário exato da entrega/retirada.';
+      } else {
+        // Loja aberta: agendamento opcional
+        deliveryTitle.textContent = 'Entrega';
+        encomendaWarn.classList.add('hidden');
+        // Permitir agendar para hoje ou dias futuros
+        const today = formatYYYYMMDD(getBrasiliaDate());
+        orderDateInput.min = today;
+        if (orderTimeHint) orderTimeHint.textContent = 'Escolha a data e horário desejado para entrega/retirada.';
+      }
 
       try {
         const deliverySel = document.querySelector('input[name="delivery"]:checked');
@@ -10176,6 +10471,7 @@
     document.addEventListener('change', (e) => {
       if (e.target.name === 'delivery') {
         const f = document.getElementById('addressForm');
+        const dateBox = document.getElementById('orderDateBox');
 
         // Check if cart contains kits or bolos (delivery not allowed)
         if (e.target.value === 'entrega') {
@@ -10199,6 +10495,10 @@
         } else {
           f.classList.add('hidden');
         }
+        
+        // Sempre mostrar campos de data/horário para agendamento
+        dateBox.classList.remove('hidden');
+        
         try {
           const slot = document.getElementById('orderTimeSlot');
           if (slot) {
@@ -10419,101 +10719,89 @@
       msg += `📱 *Telefone:* ${customerPhone}\n\n`;
 
       msg += `📋 *Itens do Pedido:*\n`;
+
+      // Verificar se há produtos em promoção (para bloquear cupons)
+      const hasPromoItems = cart.some(item => promotions.find(p => p.productId === item.id));
+
+      // CORREÇÃO DEFINITIVA: O preço no carrinho (i.price) JÁ É o preço com desconto!
+      // Para calcular a "Economia", precisamos buscar o preço ORIGINAL do produto
+      let productDiscount = 0;
+      let cartTotalWithPromo = 0; // Este é simplesmente a soma dos preços do carrinho
+
       cart.forEach(i => {
         const promotion = promotions.find(p => p.productId === i.id);
-        let itemPrice = i.price;
+        const originalProduct = products.find(p => p.id === i.id);
+        const originalPrice = originalProduct?.price || i.price;
         let discountText = '';
 
-        if (promotion) {
-          if (promotion.type === 'percentage') {
-            itemPrice = i.price * (1 - promotion.value / 100);
-            discountText = ` (-${promotion.value}%)`;
-          } else {
-            itemPrice = i.price - promotion.value;
-            discountText = ` (-R$ ${promotion.value.toFixed(2).replace('.', ',')})`;
+        if (promotion && originalProduct) {
+          // O preço no carrinho JÁ tem o desconto aplicado
+          // Calcular a economia para mostrar ao usuário
+          const savings = originalPrice - i.price;
+          if (savings > 0) {
+            productDiscount += savings * i.quantity;
+            if (promotion.type === 'percentage') {
+              discountText = ` (-${promotion.value}%)`;
+            } else {
+              discountText = ` (-R$ ${promotion.value.toFixed(2).replace('.', ',')})`;
+            }
           }
         }
 
-        msg += `${i.quantity}x ${i.name}${discountText} - R$ ${(itemPrice * i.quantity).toFixed(2).replace('.', ',')}\n`;
+        // O preço do carrinho já é o preço final (com desconto)
+        cartTotalWithPromo += i.price * i.quantity;
+
+        msg += `${i.quantity}x ${i.name}${discountText} - R$ ${(i.price * i.quantity).toFixed(2).replace('.', ',')}\n`;
         if (i.note) {
           msg += `   📝 Obs: ${i.note}\n`;
         }
       });
 
-      // Calculate discounts
-      // NOTE: productDiscount is already applied in cart item prices when added
-      // So we just calculate for display in WhatsApp message, not for subtraction
-      let productDiscount = 0;
-      cart.forEach(item => {
-        const promotion = promotions.find(p => p.productId === item.id);
-        if (promotion) {
-          // Calculate original price vs discounted to show savings
-          const originalPrice = products.find(p => p.id === item.id)?.price || item.price;
-          if (promotion.type === 'percentage') {
-            productDiscount += (originalPrice * item.quantity) * (promotion.value / 100);
-          } else {
-            productDiscount += promotion.value * item.quantity;
-          }
-        }
-      });
+      // CORREÇÃO CRÍTICA: Se há produtos em promoção, NENHUM outro desconto pode ser aplicado
+      // (cupom, fidelidade, aniversário, etc.)
 
       let clientDiscount = 0;
-      // SPECIAL DISCOUNT LOGIC (Replacing old clientDiscount logic)
-      const specialConfig = await SpecialDiscountService.getConfig();
-      if (specialConfig && specialConfig.active) {
-        const validOrderCount = await SpecialDiscountService.getValidOrderCount(normalizedPhone);
-        const minOrders = specialConfig.min_orders || 10;
-        const minVal = specialConfig.min_order_value || 0;
-
-        // Check if eligible (Every X orders)
-        // e.g. at 10, 20, 30...
-        // If validOrderCount is 10, and user is making 11th order... NO.
-        // Discount is usually given ON the 10th order? Or after 10?
-        // "Faltam 2 pedidos".
-        // If I have 9 orders. I make 10th. Do I get discount?
-        // Usually loyalty programs give reward AFTER accumulated points.
-        // So if I have 10 valid orders, I have a "reward" pending. 
-        // Unless it's automatically applied on the 10th order?
-        // Let's assume: When validOrderCount > 0 and validOrderCount % minOrders == 0.
-        // This means I have exactly 10, 20, 30 past orders.
-        // So this CURRENT order is the 11th, 21st... 
-        // WAIT. 
-        // If I have 9 orders. I place 10th. Count is still 9 (until this one is delivered).
-        // If I need to complete 10 to get discount.
-        // Then when count is 10, I get discount on the 11th.
-
-        if (validOrderCount > 0 && (validOrderCount % minOrders === 0)) {
-          if (cartTotal >= minVal) {
-            const type = specialConfig.discount_type;
-            const val = specialConfig.discount_value;
-
-            if (type === 'percentage') {
-              clientDiscount = (cartTotal - productDiscount) * (val / 100);
-            } else {
-              clientDiscount = val;
-            }
-            // Cap discount?
-            clientDiscount = Math.min(clientDiscount, (cartTotal - productDiscount));
-          }
-        }
-      } else if (customerPhone && clientDiscounts[customerPhone]) {
-        // Fallback to manual per-client discount if configured and special discount inactive
-        clientDiscount = (cartTotal - productDiscount) * (clientDiscounts[customerPhone] / 100);
-      }
-
-      // Birthday discount (10% - once per year, only on birthday)
       let birthdayDiscount = 0;
       let hasBirthdayDiscount = false;
-      const clientForBdayDiscount = clients.find(c => c.phone === customerPhone);
-      if (clientForBdayDiscount && isTodayBirthday(clientForBdayDiscount.birthdate)) {
-        // Check if already used this year (synchronous check via localStorage fallback)
-        const currentYear = new Date().getFullYear();
-        const usageKey = `birthdayDiscount_${customerPhone}_${currentYear}`;
-        const alreadyUsed = localStorage.getItem(usageKey) === 'used';
 
-        if (!alreadyUsed) {
-          birthdayDiscount = (cartTotal - productDiscount - clientDiscount) * 0.10;
-          hasBirthdayDiscount = true;
+      // Somente aplicar outros descontos se NÃO houver produtos em promoção
+      if (!hasPromoItems) {
+        // SPECIAL DISCOUNT LOGIC (Replacing old clientDiscount logic)
+        const specialConfig = await SpecialDiscountService.getConfig();
+        if (specialConfig && specialConfig.active) {
+          const validOrderCount = await SpecialDiscountService.getValidOrderCount(normalizedPhone);
+          const minOrders = specialConfig.min_orders || 10;
+          const minVal = specialConfig.min_order_value || 0;
+
+          if (validOrderCount > 0 && (validOrderCount % minOrders === 0)) {
+            if (cartTotalWithPromo >= minVal) {
+              const type = specialConfig.discount_type;
+              const val = specialConfig.discount_value;
+
+              if (type === 'percentage') {
+                clientDiscount = cartTotalWithPromo * (val / 100);
+              } else {
+                clientDiscount = val;
+              }
+              clientDiscount = Math.min(clientDiscount, cartTotalWithPromo);
+            }
+          }
+        } else if (customerPhone && clientDiscounts[customerPhone]) {
+          // Fallback to manual per-client discount if configured and special discount inactive
+          clientDiscount = cartTotalWithPromo * (clientDiscounts[customerPhone] / 100);
+        }
+
+        // Birthday discount (10% - once per year, only on birthday)
+        const clientForBdayDiscount = clients.find(c => c.phone === customerPhone);
+        if (clientForBdayDiscount && isTodayBirthday(clientForBdayDiscount.birthdate)) {
+          const currentYear = new Date().getFullYear();
+          const usageKey = `birthdayDiscount_${customerPhone}_${currentYear}`;
+          const alreadyUsed = localStorage.getItem(usageKey) === 'used';
+
+          if (!alreadyUsed) {
+            birthdayDiscount = (cartTotalWithPromo - clientDiscount) * 0.10;
+            hasBirthdayDiscount = true;
+          }
         }
       }
 
@@ -10545,22 +10833,28 @@
         msg += `🎂 Desconto Aniversariante (10%): -R$ ${birthdayDiscount.toFixed(2).replace('.', ',')}\n`;
       }
 
-      // Coupon discount
+      // Coupon discount - NÃO PODE ACUMULAR COM PROMOÇÕES
       let couponDiscountMsg = 0;
       let appliedCouponCode = null;
-      if (appliedCoupon) {
+      if (appliedCoupon && !hasPromoItems) {
+        // Cupom só é válido se NÃO houver produtos em promoção
         const validCoupon = findValidCouponByCode(appliedCoupon.code);
-        if (validCoupon && (!validCoupon.minOrder || cartTotal >= validCoupon.minOrder)) {
-          const baseForCoupon = cartTotal - productDiscount - clientDiscount - birthdayDiscount;
+        if (validCoupon && (!validCoupon.minOrder || cartTotalWithPromo >= validCoupon.minOrder)) {
+          const baseForCoupon = cartTotalWithPromo - clientDiscount - birthdayDiscount;
           couponDiscountMsg = computeCouponDiscount(baseForCoupon, validCoupon);
           appliedCouponCode = validCoupon.code;
           if (couponDiscountMsg > 0) {
             msg += `🎟️ Cupom (${validCoupon.code}): -R$ ${couponDiscountMsg.toFixed(2).replace('.', ',')}\n`;
           }
         }
+      } else if (appliedCoupon && hasPromoItems) {
+        // Limpar cupom se há promoção (não pode acumular)
+        msg += `⚠️ Cupom não aplicado (não acumula com promoções)\n`;
       }
 
-      const totalWithFees = cartTotal + deliveryFeeMsg + cardFeeMsg - productDiscount - clientDiscount - birthdayDiscount - couponDiscountMsg;
+      // CORREÇÃO: O total usa cartTotalWithPromo (que já tem as promoções aplicadas)
+      // NÃO subtrair productDiscount novamente!
+      const totalWithFees = cartTotalWithPromo + deliveryFeeMsg + cardFeeMsg - clientDiscount - birthdayDiscount - couponDiscountMsg;
       msg += `\n*Total: R$ ${totalWithFees.toFixed(2).replace('.', ',')}*\n\n`;
       const paymentMap = { dinheiro: '💵 Dinheiro', cartao1x: '💳 Cartão 1x', pix: '📱 PIX' }; msg += `*Pagamento:* ${paymentMap[payment.value] || payment.value}\n`;
       // Aviso especial para pagamento em cartão
@@ -10575,12 +10869,18 @@
         msg += `*Entrega:* 🚚 Delivery\n*Endereço:* ${s}, ${n} - ${nb}\n`;
         if (r) msg += `*Referência:* ${r}\n`;
       }
+      // Incluir data/horário na mensagem - sempre que preenchidos (agendamento)
+      const od = document.getElementById('orderDate').value;
+      const ot = document.getElementById('orderTimeSlot').value;
+      
       if (!isFastOpen()) {
-        const od = document.getElementById('orderDate').value;
-        const ot = document.getElementById('orderTimeSlot').value;
+        // Loja fechada: data/horário obrigatórios
         if (!od) { alert('Selecione a data da encomenda.'); return; }
-        if (!ot) { alert('Selecione o hor\u00e1rio desejado.'); return; }
-        msg += `\n\u26a0\ufe0f *Encomenda:* Pedido fora do hor\u00e1rio. Antec\u00eadencia m\u00ednima de 1 dia e 50% de entrada.\n*Data da encomenda:* ${od}\n*Hor\u00e1rio:* ${ot}\n`;
+        if (!ot) { alert('Selecione o horário desejado.'); return; }
+        msg += `\n⚠️ *Encomenda:* Pedido fora do horário. Antecêdencia mínima de 1 dia e 50% de entrada.\n*Data da encomenda:* ${od}\n*Horário:* ${ot}\n`;
+      } else if (od && ot) {
+        // Loja aberta com agendamento: incluir data/horário na mensagem
+        msg += `\n📅 *Agendamento:*\n*Data:* ${od}\n*Horário:* ${ot}\n`;
       }
       msg += `\n⚠️ *Este pedido só será válido após a confirmação da Fast Savory's.*\n\n`;
       msg += `🔍 *Acompanhar pedido:* ${buildTrackingLink(orderCode, customerPhone)}\n\n`;
@@ -10665,8 +10965,8 @@
           neighborhood: document.getElementById('neighborhood').value,
           reference: document.getElementById('reference').value
         } : null,
-        scheduled_date: !isFastOpen() ? document.getElementById('orderDate').value : null,
-        scheduled_time: !isFastOpen() ? document.getElementById('orderTimeSlot').value : null,
+        scheduled_date: document.getElementById('orderDate').value || null,
+        scheduled_time: document.getElementById('orderTimeSlot').value || null,
         status: 'pending'
       };
 
@@ -10681,24 +10981,24 @@
         showBirthdayModal();
       } else {
         // Client has birthdate - proceed directly
-        await saveOrderToSupabase(orderData);
+        // ⚠️ IMPORTANTE: Abrir WhatsApp PRIMEIRO (antes de operações assíncronas)
+        // Isso evita bloqueio de popup em dispositivos móveis (iOS/Android)
+        const number = '5573999366554';
+        const whatsappUrl = `https://wa.me/${number}?text=${encodeURIComponent(msg)}`;
 
-        // Notify ManyChat of new order (fire-and-forget, won't block checkout)
-        notifyManychatNewOrder(orderData).catch(err =>
-          console.warn('[ManyChat] Notification error (non-blocking):', err.message)
-        );
+        // Tentar abrir WhatsApp imediatamente
+        const whatsappWindow = window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
 
-        // Record birthday discount usage if applied
-        if (hasBirthdayDiscount && customerPhone) {
-          recordBirthdayDiscountUsage(customerPhone, birthdayDiscount, orderData.id);
+        // Fallback para dispositivos móveis que bloqueiam window.open
+        if (!whatsappWindow || whatsappWindow.closed || typeof whatsappWindow.closed === 'undefined') {
+          console.log('[WhatsApp] Popup bloqueado, usando redirect...');
+          window.location.href = whatsappUrl;
         }
 
-        // Mark coupon as used for this phone (single-use per client)
-        if (appliedCoupon && appliedCoupon.code && customerPhone) {
-          await CouponUsageService.markUsed(customerPhone, appliedCoupon.code, orderData.id);
-        }
+        // Salvar dados locais (síncrono - não bloqueia WhatsApp)
+        localStorage.setItem('fastLastPhone', customerPhone);
+        currentClientPhone = customerPhone;
 
-        // Salvar no histórico local para recompra rápida
         const orderForHistory = {
           id: Date.now().toString(),
           createdAt: new Date().toISOString(),
@@ -10713,27 +11013,32 @@
           isEncomenda: !isFastOpen(),
           deliveryType: delivery.value,
           neighborhood: document.getElementById('neighborhood').value || '',
-          encomendaDate: !isFastOpen() ? document.getElementById('orderDate').value : null,
-          encomendaSlot: !isFastOpen() ? document.getElementById('orderTimeSlot').value : null,
+          encomendaDate: document.getElementById('orderDate').value || null,
+          encomendaSlot: document.getElementById('orderTimeSlot').value || null,
           notes: ''
         };
         saveOrderToHistory(customerPhone, orderForHistory);
-        localStorage.setItem('fastLastPhone', customerPhone);
-        currentClientPhone = customerPhone;
 
-        const number = '5573999366554';
-        const url = `https://wa.me/${number}?text=${encodeURIComponent(msg)}`;
-        window.open(url, '_blank', 'noopener,noreferrer');
-
-        // Limpar dados do checkout após envio
+        // Limpar UI imediatamente
         clearCheckoutData();
         clearAppliedCoupon();
-
-        // Mark terms as accepted for this phone for future orders
         TermsAcceptanceService.markAccepted(customerPhone);
-
-        cart = []; updateCart(); document.getElementById('checkoutModal').classList.add('hidden');
+        cart = [];
+        updateCart();
+        document.getElementById('checkoutModal').classList.add('hidden');
         showInlineMessage('publicStore', '✅ Pedido enviado para o WhatsApp!', 'success');
+
+        // Operações assíncronas em background (não bloqueiam o WhatsApp)
+        saveOrderToSupabase(orderData).catch(err => console.warn('[Order] Erro ao salvar:', err));
+        notifyManychatNewOrder(orderData).catch(err => console.warn('[ManyChat] Notification error:', err.message));
+
+        if (hasBirthdayDiscount && customerPhone) {
+          recordBirthdayDiscountUsage(customerPhone, birthdayDiscount, orderData.id);
+        }
+
+        if (appliedCoupon && appliedCoupon.code && customerPhone) {
+          CouponUsageService.markUsed(customerPhone, appliedCoupon.code, orderData.id).catch(err => console.warn('[Coupon] Erro:', err));
+        }
       }
     });
 
@@ -10877,25 +11182,21 @@
     function proceedWithOrder() {
       if (!pendingOrderData || !pendingWhatsAppMessage) return;
 
-      // Save order to Supabase
-      saveOrderToSupabase(pendingOrderData);
+      // ⚠️ IMPORTANTE: Abrir WhatsApp PRIMEIRO (antes de operações assíncronas)
+      // Isso evita bloqueio de popup em dispositivos móveis (iOS/Android)
+      const number = '5573999366554';
+      const whatsappUrl = `https://wa.me/${number}?text=${encodeURIComponent(pendingWhatsAppMessage)}`;
 
-      // Notify ManyChat of new order (fire-and-forget, won't block checkout)
-      notifyManychatNewOrder(pendingOrderData).catch(err =>
-        console.warn('[ManyChat] Notification error (non-blocking):', err.message)
-      );
+      // Tentar abrir WhatsApp imediatamente
+      const whatsappWindow = window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
 
-      // Record birthday discount usage if applied
-      if (pendingOrderData.birthday_discount && pendingOrderData.birthday_discount > 0 && pendingOrderData.client_phone) {
-        recordBirthdayDiscountUsage(pendingOrderData.client_phone, pendingOrderData.birthday_discount, pendingOrderData.id);
+      // Fallback para dispositivos móveis que bloqueiam window.open
+      if (!whatsappWindow || whatsappWindow.closed || typeof whatsappWindow.closed === 'undefined') {
+        console.log('[WhatsApp] Popup bloqueado, usando redirect...');
+        window.location.href = whatsappUrl;
       }
 
-      // Open WhatsApp
-      const number = '5573999366554';
-      const url = `https://wa.me/${number}?text=${encodeURIComponent(pendingWhatsAppMessage)}`;
-      window.open(url, '_blank', 'noopener,noreferrer');
-
-      // Clear checkout
+      // Limpar UI imediatamente
       clearCheckoutData();
       clearAppliedCoupon();
       cart = [];
@@ -10903,6 +11204,14 @@
       document.getElementById('checkoutModal').classList.add('hidden');
       hideBirthdayModal();
       showInlineMessage('publicStore', '✅ Pedido enviado para o WhatsApp!', 'success');
+
+      // Operações assíncronas em background (não bloqueiam o WhatsApp)
+      saveOrderToSupabase(pendingOrderData).catch(err => console.warn('[Order] Erro ao salvar:', err));
+      notifyManychatNewOrder(pendingOrderData).catch(err => console.warn('[ManyChat] Notification error:', err.message));
+
+      if (pendingOrderData.birthday_discount && pendingOrderData.birthday_discount > 0 && pendingOrderData.client_phone) {
+        recordBirthdayDiscountUsage(pendingOrderData.client_phone, pendingOrderData.birthday_discount, pendingOrderData.id);
+      }
 
       // Clear pending data
       pendingOrderData = null;
@@ -11061,45 +11370,57 @@
         cardRow.classList.add('hidden');
       }
 
-      // NOTE: Product promotions are ALREADY applied to cart item prices when added
-      // So cartTotal already reflects discounted prices - we just show info, don't subtract again
+      // Verificar se há produtos em promoção
+      const hasPromoItems = cart.some(item => promotions.find(p => p.productId === item.id));
+
+      // CORREÇÃO DEFINITIVA: O preço no carrinho (item.price) JÁ É o preço com desconto!
+      // Para mostrar a "Economia", buscamos o preço ORIGINAL do produto
       let productDiscount = 0;
+      let cartTotalWithPromo = 0; // Este é simplesmente a soma dos preços do carrinho
+
       cart.forEach(item => {
         const promotion = promotions.find(p => p.productId === item.id);
-        if (promotion) {
-          // Calculate savings for display only (original price - discounted price)
-          const originalProduct = products.find(p => p.id === item.id);
-          if (originalProduct) {
-            const originalPrice = originalProduct.price;
-            const discountPerItem = originalPrice - item.price;
-            productDiscount += discountPerItem * item.quantity;
+        const originalProduct = products.find(p => p.id === item.id);
+        const originalPrice = originalProduct?.price || item.price;
+
+        if (promotion && originalProduct) {
+          // O preço no carrinho JÁ tem o desconto aplicado
+          // Calcular a economia para mostrar ao usuário
+          const savings = originalPrice - item.price;
+          if (savings > 0) {
+            productDiscount += savings * item.quantity;
           }
         }
+
+        // O preço do carrinho já é o preço final (com desconto)
+        cartTotalWithPromo += item.price * item.quantity;
       });
 
-      // Calculate client discount (Special Discount OR Manual)
-      // Client discount applies to cartTotal (which already has promo discounts)
+      // CORREÇÃO: Se há promoção, NENHUM outro desconto pode ser aplicado
       let clientDiscount = 0;
-      if (currentSpecialDiscount && currentSpecialDiscount.active) {
-        const minVal = currentSpecialDiscount.min_order_value || 0;
-        if (cartTotal >= minVal) {
-          if (currentSpecialDiscount.discount_type === 'percentage') {
-            clientDiscount = cartTotal * (currentSpecialDiscount.discount_value / 100);
-          } else {
-            clientDiscount = currentSpecialDiscount.discount_value;
+      if (!hasPromoItems) {
+        // Calculate client discount (Special Discount OR Manual)
+        if (currentSpecialDiscount && currentSpecialDiscount.active) {
+          const minVal = currentSpecialDiscount.min_order_value || 0;
+          if (cartTotalWithPromo >= minVal) {
+            if (currentSpecialDiscount.discount_type === 'percentage') {
+              clientDiscount = cartTotalWithPromo * (currentSpecialDiscount.discount_value / 100);
+            } else {
+              clientDiscount = currentSpecialDiscount.discount_value;
+            }
+            // Cap discount
+            clientDiscount = Math.min(clientDiscount, cartTotalWithPromo);
           }
-          // Cap discount
-          clientDiscount = Math.min(clientDiscount, cartTotal);
+        } else if (customerPhone && clientDiscounts[customerPhone]) {
+          clientDiscount = cartTotalWithPromo * (clientDiscounts[customerPhone] / 100);
         }
-      } else if (customerPhone && clientDiscounts[customerPhone]) {
-        clientDiscount = cartTotal * (clientDiscounts[customerPhone] / 100);
       }
 
       // Update discount rows
       const productDiscountRow = document.getElementById('productDiscountRow');
       const clientDiscountRow = document.getElementById('clientDiscountRow');
 
-      // Show product discount info (savings from promos - already in cart prices)
+      // Show product discount info (savings from promos)
       if (productDiscount > 0) {
         if (!productDiscountRow) {
           const checkoutTotal = document.getElementById('checkoutTotal').parentElement;
@@ -11128,27 +11449,22 @@
         clientDiscountRow.remove();
       }
 
-      // Calculate coupon discount
+      // Calculate coupon discount - NÃO PODE ACUMULAR COM PROMOÇÕES
       let couponDiscount = 0;
       const couponDiscountRow = document.getElementById('couponDiscountRow');
-      if (appliedCoupon) {
-        // Check if any cart item has a promotion - if so, coupon doesn't apply to those
-        const hasPromoItems = cart.some(item => promotions.find(p => p.productId === item.id));
 
+      // Cupom só permitido se NÃO houver produtos em promoção
+      if (appliedCoupon && !hasPromoItems) {
         const validCoupon = findValidCouponByCode(appliedCoupon.code);
         if (!validCoupon) {
           clearAppliedCoupon();
           setCouponMessage('O cupom ficou indisponível.', 'error');
-        } else if (validCoupon.minOrder && cartTotal < validCoupon.minOrder) {
+        } else if (validCoupon.minOrder && cartTotalWithPromo < validCoupon.minOrder) {
           clearAppliedCoupon();
           setCouponMessage('Cupom removido: pedido abaixo do mínimo.', 'error');
-        } else if (hasPromoItems && validCoupon.code !== 'ANIVERSARIO') {
-          // Products with promotions can't use coupons (except birthday)
-          clearAppliedCoupon();
-          setCouponMessage('Cupom não acumula com produtos em promoção.', 'error');
         } else {
           appliedCoupon = validCoupon;
-          const baseForCoupon = cartTotal - clientDiscount;
+          const baseForCoupon = cartTotalWithPromo - clientDiscount;
           couponDiscount = computeCouponDiscount(baseForCoupon, appliedCoupon);
 
           if (couponDiscount > 0) {
@@ -11165,12 +11481,17 @@
             document.getElementById('couponDiscountValue').textContent = `-R$ ${couponDiscount.toFixed(2).replace('.', ',')}`;
           }
         }
+      } else if (appliedCoupon && hasPromoItems) {
+        // Limpar cupom automaticamente se há promoção
+        clearAppliedCoupon();
+        setCouponMessage('Cupom não acumula com produtos em promoção.', 'error');
+        if (couponDiscountRow) couponDiscountRow.remove();
       } else if (couponDiscountRow) {
         couponDiscountRow.remove();
       }
 
-      // Total: cartTotal already has product discounts, so only subtract client and coupon discounts
-      const total = cartTotal + (isNaN(deliveryFee) ? 0 : deliveryFee) + cardFee - clientDiscount - couponDiscount;
+      // CORREÇÃO: Total usa cartTotalWithPromo (que já tem promoções aplicadas)
+      const total = cartTotalWithPromo + (isNaN(deliveryFee) ? 0 : deliveryFee) + cardFee - clientDiscount - couponDiscount;
       document.getElementById('checkoutTotal').textContent = `R$ ${total.toFixed(2).replace('.', ',')}`;
     }
 
@@ -11373,8 +11694,15 @@
         const time = new Date(order.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
         const date = new Date(order.created_at).toLocaleDateString('pt-BR');
         const items = order.items || [];
-        const itemsSummary = items.slice(0, 3).map(i => `${i.quantity}x ${i.name}`).join(', ');
-        const moreItems = items.length > 3 ? ` +${items.length - 3}` : '';
+        // Mostrar itens com observações/notas
+        const itemsSummary = items.slice(0, 5).map(i => {
+          let itemText = `${i.quantity}x ${i.name}`;
+          if (i.note) {
+            itemText += ` <span class="text-purple-600 text-xs">(${i.note})</span>`;
+          }
+          return itemText;
+        }).join('<br>');
+        const moreItems = items.length > 5 ? `<br><span class="text-gray-500">+${items.length - 5} itens</span>` : '';
         const deliveryType = order.delivery_type === 'entrega' ? '🚚 Entrega' : '🏪 Retirada';
         const address = order.address ? `${order.address.street}, ${order.address.number} - ${order.address.neighborhood}` : '';
 
