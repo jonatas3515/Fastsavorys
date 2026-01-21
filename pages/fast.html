@@ -2052,13 +2052,19 @@
     <div class="bg-white rounded-xl p-4 sm:p-6 max-w-md w-full mx-auto shadow-2xl relative my-auto">
       <h3 class="text-xl font-bold text-gray-800 mb-4">Finalizar Pedido</h3>
 
-      <!-- Dados do Cliente - Primeiro -->
+      <!-- Dados do Cliente - Telefone primeiro -->
       <div class="mb-6">
         <h4 class="font-semibold text-gray-800 mb-3">Seus Dados</h4>
         <div class="space-y-3">
-          <input id="customerName" placeholder="Seu nome e sobrenome" class="w-full px-3 py-2 border rounded-lg">
-          <input id="customerPhone" placeholder="(73)99999-9999" class="w-full px-3 py-2 border rounded-lg"
-            inputmode="numeric">
+          <div>
+            <input id="customerPhone" placeholder="(73)99999-9999" class="w-full px-3 py-2 border rounded-lg"
+              inputmode="numeric">
+            <p id="phoneSearchHint" class="text-xs text-gray-500 mt-1">Digite seu telefone para buscar seu cadastro</p>
+          </div>
+          <div id="customerNameBox" class="hidden">
+            <input id="customerName" placeholder="Seu nome completo (nome e sobrenome)" class="w-full px-3 py-2 border rounded-lg">
+            <p id="nameValidationHint" class="text-xs text-red-500 mt-1 hidden">Informe nome e sobrenome</p>
+          </div>
 
           <!-- Área de busca e endereços do cliente -->
           <div id="customerSearchArea" class="hidden">
@@ -9624,13 +9630,58 @@
       });
     }
 
-    // Event: Ao mudar o telefone do cliente, recarregar endereços
-    document.getElementById('customerPhone')?.addEventListener('blur', () => {
+    // Event: Ao mudar o telefone do cliente, buscar cadastro e recarregar endereços
+    document.getElementById('customerPhone')?.addEventListener('blur', async () => {
       const phone = document.getElementById('customerPhone').value.trim();
-      if (phone && phone.length >= 10) {
-        renderSavedAddresses(phone);
-        updateLoyaltyUI(phone);
+      const phoneDigits = phone.replace(/\D/g, '');
+      const nameBox = document.getElementById('customerNameBox');
+      const nameInput = document.getElementById('customerName');
+      const phoneHint = document.getElementById('phoneSearchHint');
+      
+      if (!phoneDigits || phoneDigits.length < 10) {
+        // Telefone incompleto - ocultar campo de nome
+        if (nameBox) nameBox.classList.add('hidden');
+        if (phoneHint) phoneHint.textContent = 'Digite seu telefone para buscar seu cadastro';
+        return;
       }
+      
+      // Buscar cliente cadastrado
+      if (phoneHint) phoneHint.textContent = '🔍 Buscando cadastro...';
+      
+      try {
+        const existingClient = clients.find(c => {
+          const clientPhone = (c.phone || '').replace(/\D/g, '');
+          return clientPhone === phoneDigits || clientPhone.endsWith(phoneDigits) || phoneDigits.endsWith(clientPhone);
+        });
+        
+        if (existingClient && existingClient.name) {
+          // Cliente encontrado - preencher nome automaticamente
+          if (nameInput) nameInput.value = existingClient.name;
+          if (nameBox) nameBox.classList.remove('hidden');
+          if (phoneHint) {
+            phoneHint.textContent = '✅ Cadastro encontrado!';
+            phoneHint.classList.remove('text-gray-500');
+            phoneHint.classList.add('text-green-600');
+          }
+        } else {
+          // Cliente não encontrado - liberar campo de nome
+          if (nameInput) nameInput.value = '';
+          if (nameBox) nameBox.classList.remove('hidden');
+          if (phoneHint) {
+            phoneHint.textContent = '📝 Novo cliente - preencha seu nome completo';
+            phoneHint.classList.remove('text-green-600');
+            phoneHint.classList.add('text-gray-500');
+          }
+        }
+      } catch (e) {
+        console.warn('[Checkout] Erro ao buscar cliente:', e);
+        if (nameBox) nameBox.classList.remove('hidden');
+        if (phoneHint) phoneHint.textContent = '📝 Preencha seu nome completo';
+      }
+      
+      // Carregar endereços e fidelidade
+      renderSavedAddresses(phone);
+      updateLoyaltyUI(phone);
     });
 
     document.getElementById('cartBtn')?.addEventListener('click', () => document.getElementById('cartModal').classList.remove('hidden'));
@@ -9640,6 +9691,28 @@
     document.getElementById('mobileCheckoutBtn')?.addEventListener('click', () => { document.getElementById('cartModal').classList.add('hidden'); showCheckout(); });
     function showCheckout() {
       if (cart.length === 0) return;
+      
+      // Resetar estado do modal - telefone primeiro
+      const nameBox = document.getElementById('customerNameBox');
+      const phoneHint = document.getElementById('phoneSearchHint');
+      const phoneInput = document.getElementById('customerPhone');
+      const nameInput = document.getElementById('customerName');
+      
+      // Se já tem telefone válido preenchido, manter nome visível
+      const existingPhone = phoneInput?.value?.replace(/\D/g, '') || '';
+      if (existingPhone.length >= 10) {
+        // Telefone já preenchido - manter nome visível
+        if (nameBox) nameBox.classList.remove('hidden');
+      } else {
+        // Sem telefone - ocultar nome
+        if (nameBox) nameBox.classList.add('hidden');
+        if (phoneHint) {
+          phoneHint.textContent = 'Digite seu telefone para buscar seu cadastro';
+          phoneHint.classList.remove('text-green-600');
+          phoneHint.classList.add('text-gray-500');
+        }
+      }
+      
       const ci = document.getElementById('checkoutItems');
       ci.innerHTML = cart.map(i => {
         let html = `<div class='flex justify-between'><span>${i.quantity}x ${i.name}</span><span>R$ ${(i.price * i.quantity).toFixed(2).replace('.', ',')}</span></div>`;
@@ -10362,6 +10435,16 @@
         return;
       }
 
+      // OBRIGATÓRIO: Verificar telefone válido antes de aplicar cupom
+      const customerPhone = document.getElementById('customerPhone')?.value?.trim() || '';
+      const phoneDigits = customerPhone.replace(/\D/g, '');
+      
+      if (!phoneDigits || phoneDigits.length < 10 || phoneDigits.length > 11) {
+        setCouponMessage('⚠️ Informe seu telefone completo antes de aplicar o cupom.', 'error');
+        document.getElementById('customerPhone')?.focus();
+        return;
+      }
+
       const coupon = findValidCouponByCode(code);
       if (!coupon) {
         setCouponMessage('Cupom inválido, vencido ou indisponível.', 'error');
@@ -10373,23 +10456,18 @@
         return;
       }
 
-      // Check if coupon was already used by this phone
-      const customerPhone = document.getElementById('customerPhone')?.value?.trim() || '';
-      const phoneDigits = customerPhone.replace(/\D/g, '');
+      // Verificar se o cupom já foi usado por este telefone
       console.log('[Coupon] Verificando uso para telefone:', phoneDigits, 'cupom:', code);
-
-      if (phoneDigits && phoneDigits.length === 11) {
-        try {
-          const alreadyUsed = await CouponUsageService.hasUsed(phoneDigits, code);
-          console.log('[Coupon] Resultado hasUsed:', alreadyUsed);
-          if (alreadyUsed) {
-            setCouponMessage('Cupom já utilizado pelo cliente.', 'error');
-            return;
-          }
-        } catch (e) {
-          console.warn('[Coupon] Erro ao verificar uso:', e);
-          // Continue anyway if check fails
+      try {
+        const alreadyUsed = await CouponUsageService.hasUsed(phoneDigits, code);
+        console.log('[Coupon] Resultado hasUsed:', alreadyUsed);
+        if (alreadyUsed) {
+          setCouponMessage('❌ Você já utilizou este cupom anteriormente.', 'error');
+          return;
         }
+      } catch (e) {
+        console.warn('[Coupon] Erro ao verificar uso:', e);
+        // Continue se falhar a verificação (evita bloquear pedidos se o Supabase falhar)
       }
 
       appliedCoupon = coupon;
@@ -13311,19 +13389,8 @@ Obrigado pela preferência! ❤️`;
     // Evento para salvar novo endereço
     document.getElementById('saveNewAddress')?.addEventListener('click', saveNewAddress);
 
-    // Seed default fees for Fast (same as Imperio)
-    function seedDefaultFastFees() {
-      const existing = readFastFees();
-      if (Object.keys(existing).length > 0) return;
-      const defaults = {
-        'novo prado': 0, 'sao domingos': 0, 'cristo redentor': 0, 'baixa fria': 0,
-        'varzea alegre': 2, 'sao bernardo': 2, 'santo antonio': 2, 'canaa': 2, 'centro': 2, 'fatima': 2, '31 de marco': 2, 'bnh': 2, 'vale do jucurucu': 2, 'jaqueira': 2, 'cidade baixa': 2,
-        'marotinho': 3, 'corujao': 3, 'primavera': 3, 'bela vista': 3, 'vista bela': 3, 'liberdade': 3, 'urbis 2': 3, 'urbis 3': 3, 'italage': 3,
-        'portal do monte': 4, 'alvorada': 4, 'monte pescoco': 4, 'tarcizao': 4, 'vista da pedra': 4, 'village das pedras': 4, 'itatiaia': 4, 'furlan': 4
-      };
-      writeFastFees(defaults);
-    }
-    seedDefaultFastFees();
+    // REMOVIDO: Seed de taxas hardcoded - taxas devem vir apenas do Supabase/painel admin
+    // As taxas são carregadas via loadFeesFromSupabase() que sincroniza com o banco de dados
 
     // Fees Panel Functions (Fast Admin)
     // Fees Panel Functions (Fast Admin)
