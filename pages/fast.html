@@ -3877,15 +3877,44 @@
       hasUsed: async function (phone, couponCode) {
         if (!phone || !couponCode) return false;
         const phoneDigits = phone.replace(/\D/g, '');
+        const couponUpper = couponCode.toUpperCase();
+        
         try {
-          const { data, error } = await window.supabaseClient
+          // 1. Verificar na tabela de uso de cupons
+          const { data: usageData } = await window.supabaseClient
             .from('fast_coupon_usage')
             .select('id')
             .eq('phone', phoneDigits)
-            .eq('coupon_code', couponCode.toUpperCase())
+            .eq('coupon_code', couponUpper)
             .maybeSingle();
 
-          return !!data;
+          if (usageData) {
+            console.log('[CouponUsage] Cupom já usado (tabela usage):', couponUpper);
+            return true;
+          }
+          
+          // 2. Verificar nos pedidos existentes (histórico)
+          // Busca pedidos deste telefone que usaram este cupom
+          const { data: ordersData } = await window.supabaseClient
+            .from('fast_orders')
+            .select('id, coupon_code, customer_phone')
+            .or(`customer_phone.eq.${phoneDigits},customer_phone.ilike.%${phoneDigits}%`)
+            .not('coupon_code', 'is', null);
+          
+          if (ordersData && ordersData.length > 0) {
+            // Verificar se algum pedido usou este cupom específico
+            const usedInOrder = ordersData.some(order => {
+              const orderCoupon = (order.coupon_code || '').toUpperCase();
+              return orderCoupon === couponUpper;
+            });
+            
+            if (usedInOrder) {
+              console.log('[CouponUsage] Cupom já usado em pedido anterior:', couponUpper);
+              return true;
+            }
+          }
+          
+          return false;
         } catch (e) {
           console.error('[CouponUsage] Erro ao verificar:', e);
           return false;
