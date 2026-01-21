@@ -3894,22 +3894,29 @@
           }
           
           // 2. Verificar nos pedidos existentes (histórico)
-          // Busca pedidos deste telefone que usaram este cupom
-          const { data: ordersData } = await window.supabaseClient
+          // Busca pedidos que usaram este cupom específico
+          const { data: ordersData, error: ordersError } = await window.supabaseClient
             .from('fast_orders')
             .select('id, coupon_code, customer_phone')
-            .or(`customer_phone.eq.${phoneDigits},customer_phone.ilike.%${phoneDigits}%`)
-            .not('coupon_code', 'is', null);
+            .ilike('coupon_code', couponUpper);
+          
+          if (ordersError) {
+            console.error('[CouponUsage] Erro na query de pedidos:', ordersError);
+          }
           
           if (ordersData && ordersData.length > 0) {
-            // Verificar se algum pedido usou este cupom específico
+            // Verificar se algum pedido deste telefone usou este cupom
             const usedInOrder = ordersData.some(order => {
-              const orderCoupon = (order.coupon_code || '').toUpperCase();
-              return orderCoupon === couponUpper;
+              const orderPhone = (order.customer_phone || '').replace(/\D/g, '');
+              // Comparar telefones (pode ter formatação diferente)
+              return orderPhone === phoneDigits || 
+                     orderPhone.endsWith(phoneDigits) || 
+                     phoneDigits.endsWith(orderPhone) ||
+                     (orderPhone.length >= 8 && phoneDigits.includes(orderPhone.slice(-8)));
             });
             
             if (usedInOrder) {
-              console.log('[CouponUsage] Cupom já usado em pedido anterior:', couponUpper);
+              console.log('[CouponUsage] Cupom já usado em pedido anterior:', couponUpper, 'telefone:', phoneDigits);
               return true;
             }
           }
