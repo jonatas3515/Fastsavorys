@@ -95,7 +95,7 @@ window.CustomerModule = {
 
     searchClientFromAPI: async function (normalizedPhone) {
         try {
-            const response = await fetch(`/api/client-profile?phone=${normalizedPhone}`);
+            const response = await fetch(`/api/client?phone=${normalizedPhone}`);
             const result = await response.json();
 
             if (result.success && result.found && result.client) {
