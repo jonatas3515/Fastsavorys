@@ -1,0 +1,1950 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Fast Savory's | Painel Administrativo</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
+    <script>
+        // Error handlers para debug (igual ao fast.html)
+        window._debugErrors = [];
+        window.addEventListener('error', function (e) {
+            console.error('[ADMIN ERROR] ' + e.message + ' at ' + e.filename + ':' + e.lineno);
+        });
+
+        // Helper para compatibilidade iOS com Datas
+        window.safeDate = function (value) {
+            if (value === undefined || value === null) return new Date();
+            if (value instanceof Date) return value;
+            if (typeof value === 'string') {
+                if (value.includes(' ') && value.includes(':') && !value.includes('T')) {
+                    value = value.replace(' ', 'T');
+                }
+            }
+            return new Date(value);
+        };
+    </script>
+    <link rel="stylesheet" href="../assets/css/styles.css" />
+    <style>
+        /* Admin specific styles */
+        .admin-card {
+            background: white;
+            border-radius: 0.75rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+
+        /* Inline Toast Notifications */
+        #toastContainer {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            max-width: 400px;
+        }
+
+        .toast {
+            padding: 1rem 1.5rem;
+            border-radius: 0.75rem;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+            animation: slideIn 0.3s ease-out, fadeOut 0.3s ease-in forwards;
+            animation-delay: 0s, var(--toast-duration, 4s);
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+        }
+
+        .toast.success {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+        }
+
+        .toast.error {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: white;
+        }
+
+        .toast.warning {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+            color: white;
+        }
+
+        .toast.info {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            color: white;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @keyframes fadeOut {
+            from {
+                opacity: 1;
+            }
+
+            to {
+                opacity: 0;
+            }
+        }
+
+        /* Inline Confirmation Modal */
+        #confirmModal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 10000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(4px);
+        }
+
+        #confirmModal.active {
+            display: flex;
+            animation: fadeIn 0.2s ease-out;
+        }
+
+        #confirmModal .modal-content {
+            background: white;
+            border-radius: 1rem;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
+            max-width: 400px;
+            width: 90%;
+            padding: 1.5rem;
+            animation: scaleIn 0.2s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        @keyframes scaleIn {
+            from {
+                transform: scale(0.9);
+                opacity: 0;
+            }
+
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        /* Inline Prompt Modal */
+        #promptModal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 10000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(4px);
+        }
+
+        #promptModal.active {
+            display: flex;
+            animation: fadeIn 0.2s ease-out;
+        }
+
+        #promptModal .modal-content {
+            background: white;
+            border-radius: 1rem;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.25);
+            max-width: 400px;
+            width: 90%;
+            padding: 1.5rem;
+            animation: scaleIn 0.2s ease-out;
+        }
+    </style>
+
+    <!-- Custom Update Status Modal -->
+    <div id="msgUpdateModal"
+        class="fixed inset-0 bg-black bg-opacity-50 z-[200] hidden flex items-center justify-center animate-fade-in">
+        <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-lg mx-4 transform transition-all scale-100">
+            <h3 class="text-xl font-bold text-gray-800 mb-4 border-b pb-2">Atualizar Pedido & Notificar</h3>
+            <input type="hidden" id="msgUpdateOrderId">
+
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Novo Status</label>
+                <select id="msgUpdateStatus"
+                    class="w-full border border-gray-300 rounded-lg p-2.5 bg-gray-50 focus:ring-2 focus:ring-rose-500 outline-none">
+                    <option value="preparing">🍳 Em Preparo</option>
+                    <option value="confirmed">✅ Confirmado / Pronto</option>
+                    <option value="out_for_delivery">🚚 Saiu para Entrega</option>
+                    <option value="delivered">✔️ Entregue</option>
+                    <option value="cancelled">❌ Cancelado</option>
+                </select>
+            </div>
+
+            <div id="cancellationReasonSection" class="mb-4 hidden">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Motivo do Cancelamento</label>
+                <select id="cancellationReason"
+                    class="w-full border border-gray-300 rounded-lg p-2.5 bg-gray-50 focus:ring-2 focus:ring-rose-500 outline-none">
+                    <option value="">Selecione...</option>
+                    <option value="item_unavailable">Item indisponível</option>
+                    <option value="address_unavailable">Endereço fora da área</option>
+                    <option value="customer_request">Solicitação do cliente</option>
+                    <option value="other">Outro</option>
+                </select>
+            </div>
+
+            <div class="mb-6">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Mensagem (Preview)</label>
+                <textarea id="msgUpdatePreview" rows="4"
+                    class="w-full border border-gray-300 rounded-lg p-3 bg-gray-100 text-gray-600 text-sm"
+                    readonly></textarea>
+                <div class="flex items-center gap-1 mt-1 text-xs text-green-600">
+                    <span>📱</span> Será enviada via WhatsApp
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-3">
+                <button id="cancelMsgUpdate" onclick="document.getElementById('msgUpdateModal').classList.add('hidden')"
+                    class="px-5 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium transition-colors">
+                    Cancelar
+                </button>
+                <button id="confirmMsgUpdate"
+                    class="px-5 py-2.5 bg-rose-600 text-white rounded-lg hover:bg-rose-700 font-medium shadow-lg hover:shadow-xl transition-all flex items-center gap-2">
+                    <span>🚀</span> Enviar e Atualizar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Core Scripts -->
+    <script src="../assets/js/utils.js"></script>
+    <script src="../assets/js/supabase-init.js"></script>
+    <script src="../assets/js/services.js"></script>
+    <script src="../assets/js/products.js"></script>
+    <!-- Admin Logic -->
+    <!-- Admin Logic moved to modules at the end of body -->
+</head>
+
+<body class="bg-gray-50 text-gray-800">
+
+    <!-- Login Modal (Admin Entry Point) -->
+    <div id="loginModal" class="fixed inset-0 bg-black bg-opacity-50 z-[100] flex items-center justify-center">
+        <div class="bg-white rounded-xl shadow-2xl p-8 w-full max-w-sm mx-4">
+            <div class="text-center mb-6">
+                <h2 class="text-2xl font-bold text-gray-800">Área Restrita</h2>
+                <p class="text-gray-500 text-sm mt-1">Fast Savory's Admin</p>
+            </div>
+            <form id="loginForm" class="space-y-4" onsubmit="handleLoginSubmit(event)">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">E-mail</label>
+                    <input type="email" id="adminEmail"
+                        class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
+                        placeholder="admin@fastsavorys.com" autocomplete="email">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Senha</label>
+                    <div class="relative">
+                        <input type="password" id="adminPass"
+                            class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-rose-500 focus:outline-none"
+                            placeholder="••••••" autocomplete="current-password">
+                        <button type="button"
+                            onclick="document.getElementById('adminPass').type = document.getElementById('adminPass').type === 'password' ? 'text' : 'password'"
+                            class="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600">
+                            👁️
+                        </button>
+                    </div>
+                </div>
+                <div id="loginError" class="hidden text-red-600 text-sm text-center bg-red-50 p-2 rounded">
+                    Usuário ou senha incorretos
+                </div>
+                <div class="flex items-center justify-between mt-4">
+                    <label class="flex items-center">
+                        <input type="checkbox" id="rememberMe" class="form-checkbox text-rose-600 rounded">
+                        <span class="ml-2 text-sm text-gray-600">Lembrar-me</span>
+                    </label>
+                </div>
+                <button type="submit"
+                    class="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold py-2 px-4 rounded-lg transition-colors shadow-lg shadow-rose-600/30">
+                    Entrar no Sistema
+                </button>
+                <div class="text-center mt-4">
+                    <a href="fast.html" class="text-sm text-gray-500 hover:text-gray-800 underline">Voltar para Loja</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Admin Wrapper (Hidden until login) -->
+    <div id="adminWrapper" class="hidden min-h-screen flex flex-col">
+
+        <!-- Header -->
+        <header class="bg-white shadow sticky top-0 z-40">
+            <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <h1 class="text-xl font-bold text-gray-800 hidden md:block">Fast Savory's Admin</h1>
+                    <span class="text-xs bg-rose-100 text-rose-800 px-2 py-1 rounded-full font-medium">v2.0</span>
+                </div>
+                <div class="flex items-center gap-4">
+                    <button onclick="window.location.href='fast.html'"
+                        class="text-sm text-gray-600 hover:text-gray-900 flex items-center gap-1">
+                        🏪 <span class="hidden sm:inline">Ver Loja</span>
+                    </button>
+                    <button id="logoutBtn"
+                        class="text-sm text-red-600 hover:text-red-800 font-medium flex items-center gap-1">
+                        🚪 <span class="hidden sm:inline">Sair</span>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <div class="flex-1 flex overflow-hidden">
+            <!-- Sidebar (Mobile & Desktop) -->
+            <aside class="w-16 md:w-64 bg-gray-900 text-white flex flex-col flex-shrink-0 transition-all">
+                <nav class="flex-1 overflow-y-auto py-4 space-y-1">
+                    <button onclick="showPanel('ordersPanelFast')"
+                        class="w-full text-left px-4 py-3 hover:bg-gray-800 flex items-center gap-3 transition-colors border-l-4 border-transparent hover:border-rose-500 focus:bg-gray-800 focus:border-rose-500 group"
+                        id="nav-orders">
+                        <span class="text-2xl">📦</span>
+                        <span class="hidden md:inline font-medium group-hover:text-white">Pedidos</span>
+                    </button>
+                    <button onclick="showPanel('productsPanelFast')"
+                        class="w-full text-left px-4 py-3 hover:bg-gray-800 flex items-center gap-3 transition-colors border-l-4 border-transparent hover:border-rose-500 focus:bg-gray-800 focus:border-rose-500 group"
+                        id="nav-products">
+                        <span class="text-2xl">🍔</span>
+                        <span class="hidden md:inline font-medium group-hover:text-white">Produtos</span>
+                    </button>
+                    <button onclick="showPanel('clientsPanelFast')"
+                        class="w-full text-left px-4 py-3 hover:bg-gray-800 flex items-center gap-3 transition-colors border-l-4 border-transparent hover:border-rose-500 focus:bg-gray-800 focus:border-rose-500 group"
+                        id="nav-clients">
+                        <span class="text-2xl">👥</span>
+                        <span class="hidden md:inline font-medium group-hover:text-white">Clientes</span>
+                    </button>
+                    <button onclick="showPanel('reportsPanelFast')"
+                        class="w-full text-left px-4 py-3 hover:bg-gray-800 flex items-center gap-3 transition-colors border-l-4 border-transparent hover:border-rose-500 focus:bg-gray-800 focus:border-rose-500 group"
+                        id="nav-reports">
+                        <span class="text-2xl">📊</span>
+                        <span class="hidden md:inline font-medium group-hover:text-white">Relatórios</span>
+                    </button>
+                    <div class="border-t border-gray-700 my-2"></div>
+                    <button onclick="showPanel('promotionsPanelFast')"
+                        class="w-full text-left px-4 py-3 hover:bg-gray-800 flex items-center gap-3 transition-colors border-l-4 border-transparent hover:border-rose-500 focus:bg-gray-800 focus:border-rose-500 group"
+                        id="nav-promos">
+                        <span class="text-2xl">🏷️</span>
+                        <span class="hidden md:inline font-medium group-hover:text-white">Promoções</span>
+                    </button>
+                    <button onclick="showPanel('bannerPanelFast')"
+                        class="w-full text-left px-4 py-3 hover:bg-gray-800 flex items-center gap-3 transition-colors border-l-4 border-transparent hover:border-rose-500 focus:bg-gray-800 focus:border-rose-500 group"
+                        id="nav-banner">
+                        <span class="text-2xl">🖼️</span>
+                        <span class="hidden md:inline font-medium group-hover:text-white">Banner</span>
+                    </button>
+                    <button onclick="showPanel('ratingsPanelFast')"
+                        class="w-full text-left px-4 py-3 hover:bg-gray-800 flex items-center gap-3 transition-colors border-l-4 border-transparent hover:border-rose-500 focus:bg-gray-800 focus:border-rose-500 group"
+                        id="nav-ratings">
+                        <span class="text-2xl">⭐</span>
+                        <span class="hidden md:inline font-medium group-hover:text-white">Avaliações</span>
+                    </button>
+                    <div class="border-t border-gray-700 my-2"></div>
+                    <button onclick="showPanel('configPanelFast')"
+                        class="w-full text-left px-4 py-3 hover:bg-gray-800 flex items-center gap-3 transition-colors border-l-4 border-transparent hover:border-rose-500 focus:bg-gray-800 focus:border-rose-500 group"
+                        id="nav-config">
+                        <span class="text-2xl">⚙️</span>
+                        <span class="hidden md:inline font-medium group-hover:text-white">Config</span>
+                    </button>
+                    <button onclick="showPanel('rulesPanelFast')"
+                        class="w-full text-left px-4 py-3 hover:bg-gray-800 flex items-center gap-3 transition-colors border-l-4 border-transparent hover:border-rose-500 focus:bg-gray-800 focus:border-rose-500 group"
+                        id="nav-rules">
+                        <span class="text-2xl">🛡️</span>
+                        <span class="hidden md:inline font-medium group-hover:text-white">Regras/Segurança</span>
+                    </button>
+                </nav>
+            </aside>
+
+            <!-- Main Content Area -->
+            <main class="flex-1 overflow-y-auto bg-gray-50 p-4 relative" id="mainContainer">
+                <!-- Products Panel -->
+                <main id="productsPanelFast"
+                    class="admin-panel admin-card p-6 hidden animate-fade-in mx-auto w-full max-w-7xl">
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                        <h2 class="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                            <span>🍔</span> Gerenciar Produtos
+                        </h2>
+                        <div class="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+                            <button id="refreshProductsBtn"
+                                class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg flex items-center justify-center gap-2 transition-colors">
+                                🔄 Atualizar
+                            </button>
+                            <button
+                                onclick="document.getElementById('productFormModal').classList.remove('hidden'); document.getElementById('productForm').reset(); document.getElementById('productId').value=''; document.getElementById('formTitle').textContent='Novo Produto'"
+                                class="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-lg font-medium flex items-center justify-center gap-2 shadow-lg shadow-rose-600/20 transition-all hover:-translate-y-0.5">
+                                <span>➕</span> Novo Produto
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Filters -->
+                    <div
+                        class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 bg-gray-50 p-4 rounded-xl border border-gray-100">
+                        <div class="relative">
+                            <span class="absolute left-3 top-2.5 text-gray-400">🔍</span>
+                            <input type="text" id="adminSearchInput" placeholder="Buscar produto..."
+                                class="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none transition-all">
+                        </div>
+                        <div>
+                            <select id="adminCategoryFilter"
+                                class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none bg-white transition-all">
+                                <option value="all">Todas as Categorias</option>
+                                <option value="salgados">Salgados</option>
+                                <option value="mini">Mini Salgados</option>
+                                <option value="kits">Kits Festa</option>
+                                <option value="bolos">Bolos</option>
+                                <option value="bebidas">Bebidas</option>
+                            </select>
+                        </div>
+                        <div>
+                            <select id="adminProductStatusFilter"
+                                class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none bg-white transition-all">
+                                <option value="all">Disponibilidade</option>
+                                <option value="active">Disponíveis</option>
+                                <option value="unavailable">Indisponíveis</option>
+                                <option value="hidden">Ocultos</option>
+                            </select>
+                        </div>
+                        <!-- Bulk Actions -->
+                        <div>
+                            <button onclick="deleteSelectedProducts()" id="deleteSelectedBtn"
+                                class="w-full px-4 py-2 bg-white border border-red-200 text-red-600 hover:bg-red-50 rounded-lg transition-colors hidden flex items-center justify-center gap-2">
+                                🗑️ Excluir Selecionados
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Products Table/Grid -->
+                    <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead class="bg-gray-50 text-gray-600 text-xs uppercase tracking-wider">
+                                    <tr>
+                                        <th class="p-4 border-b w-10">
+                                            <input type="checkbox" id="selectAllProducts"
+                                                class="rounded text-rose-600 focus:ring-rose-500">
+                                        </th>
+                                        <th class="p-4 border-b">Produto</th>
+                                        <th class="p-4 border-b">Categoria</th>
+                                        <th class="p-4 border-b">Preço</th>
+                                        <th class="p-4 border-b text-center">Disponível</th>
+                                        <th class="p-4 border-b text-right">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="productsList" class="divide-y divide-gray-100 text-sm">
+                                    <!-- Items injected by JS -->
+                                    <tr>
+                                        <td colspan="6" class="p-8 text-center text-gray-500">
+                                            Carregando produtos...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Mobile View (Hidden on desktop, logic handled in JS render) -->
+                    <div id="productsGridMobile" class="md:hidden grid grid-cols-1 gap-4 mt-4 hidden">
+                        <!-- Mobile cards injected by JS -->
+                    </div>
+
+                    <!-- Product Options Management Section -->
+                    <div class="mt-6 bg-white rounded-xl shadow p-3 sm:p-6">
+                        <h3 class="text-xl font-bold text-gray-800 mb-4">⚙️ Opções de Personalização</h3>
+                        <p class="text-sm text-gray-600 mb-4">Gerencie as opções disponíveis nos modais de Kits Festa,
+                            Bolos e Mini-Salgados.</p>
+
+                        <!-- Options Tabs -->
+                        <div class="flex flex-wrap gap-2 mb-4">
+                            <button class="options-tab px-3 py-2 rounded-lg bg-rose-600 text-white text-sm font-medium"
+                                data-type="cakeMass">🍰 Massas</button>
+                            <button
+                                class="options-tab px-3 py-2 rounded-lg bg-gray-200 text-gray-700 text-sm font-medium"
+                                data-type="filling">🎂 Recheios</button>
+                            <button
+                                class="options-tab px-3 py-2 rounded-lg bg-gray-200 text-gray-700 text-sm font-medium"
+                                data-type="salgados">🥟 Salgados</button>
+                            <button
+                                class="options-tab px-3 py-2 rounded-lg bg-gray-200 text-gray-700 text-sm font-medium"
+                                data-type="miniSalgadosFlavors">🍽️ Mini-Salgados</button>
+                        </div>
+
+                        <!-- Add New Option Form -->
+                        <div class="flex gap-2 mb-4">
+                            <input type="text" id="newOptionName" placeholder="Nome da nova opção..."
+                                class="flex-1 px-3 py-2 border rounded-lg text-sm">
+                            <button id="addNewOptionBtn"
+                                class="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium">+
+                                Adicionar</button>
+                        </div>
+
+                        <!-- Inline Message -->
+                        <div id="optionsMessage" class="hidden mb-4 p-3 rounded-lg text-sm"></div>
+
+                        <!-- Options List -->
+                        <div id="optionsListContainer" class="space-y-2 max-h-64 overflow-y-auto">
+                            <p class="text-gray-500 text-sm">Carregando opções...</p>
+                        </div>
+                    </div>
+                </main>
+
+                <!-- Ratings Panel -->
+                <main id="ratingsPanelFast"
+                    class="admin-panel admin-card p-6 hidden animate-fade-in mx-auto w-full max-w-7xl">
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                        <h2 class="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                            <span>⭐</span> Avaliações de Clientes
+                        </h2>
+                        <div class="flex gap-2">
+                            <span
+                                class="text-sm text-gray-500 bg-gray-100 px-3 py-1.5 rounded-lg flex items-center gap-2">
+                                <span>Note:</span> Aprovação necessária para aparecer no site
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Toolbar / Filters -->
+                    <div class="flex flex-wrap items-center gap-2 mb-4" id="ratingsFilterToolbar">
+                        <button onclick="RatingsModule.setFilter('all')" id="ratingsFilterAll"
+                            class="px-3 py-1.5 rounded-lg text-sm font-medium border border-rose-600 bg-rose-600 text-white transition-colors flex items-center gap-1">
+                            Todas
+                        </button>
+                        <button onclick="RatingsModule.setFilter('pending')" id="ratingsFilterPending"
+                            class="px-3 py-1.5 rounded-lg text-sm font-medium border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 transition-colors flex items-center gap-1">
+                            ⏳ Pendentes
+                        </button>
+                        <button onclick="RatingsModule.setFilter('published')" id="ratingsFilterPublished"
+                            class="px-3 py-1.5 rounded-lg text-sm font-medium border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 transition-colors flex items-center gap-1">
+                            ✅ Publicadas
+                        </button>
+                        <button onclick="RatingsModule.setFilter('archived')" id="ratingsFilterArchived"
+                            class="px-3 py-1.5 rounded-lg text-sm font-medium border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 transition-colors flex items-center gap-1">
+                            📦 Arquivadas
+                        </button>
+                    </div>
+
+                    <!-- Stats Cards -->
+                </main>
+
+                <!-- Orders Panel (Dashboard) -->
+                <main id="ordersPanelFast"
+                    class="admin-panel admin-card p-6 hidden animate-fade-in mx-auto w-full max-w-7xl">
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                        <h2 class="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                            <span>📦</span> Gerenciar Pedidos
+                            <span id="liveIndicator"
+                                class="hidden text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full animate-pulse flex items-center gap-1">
+                                <span class="w-2 h-2 bg-red-600 rounded-full"></span> AO VIVO
+                            </span>
+                        </h2>
+                        <div class="flex gap-2">
+                            <button id="toggleSoundBtn"
+                                class="p-2 text-gray-500 hover:text-gray-700 rounded-lg border border-gray-200"
+                                title="Som de Alerta">
+                                🔊
+                            </button>
+                            <button id="refreshOrdersBtn"
+                                class="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors">
+                                🔄 Atualizar
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Kanban / List Switch & Filters -->
+                    <div class="mb-6 space-y-4">
+                        <div class="flex flex-wrap items-center justify-between gap-4">
+                            <div class="bg-gray-100 p-1 rounded-lg flex items-center">
+                                <button id="viewModeKanban"
+                                    class="px-3 py-1.5 rounded-md text-sm font-medium bg-white text-gray-800 shadow-sm transition-all">Kanban</button>
+                                <button id="viewModeList"
+                                    class="px-3 py-1.5 rounded-md text-sm font-medium text-gray-600 hover:text-gray-900 transition-all">Lista</button>
+                            </div>
+
+                            <div class="flex-1 overflow-x-auto pb-1 flex flex-wrap gap-2">
+                                <select id="ordersFilterDate"
+                                    class="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-rose-500 outline-none">
+                                    <option value="today">Hoje</option>
+                                    <option value="yesterday">Ontem</option>
+                                    <option value="week">Esta Semana</option>
+                                    <option value="month">Este Mês</option>
+                                    <option value="all" selected>Todas as Datas</option>
+                                </select>
+                                <select id="ordersFilterStatus"
+                                    class="px-3 py-2 border border-gray-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-rose-500 outline-none w-full md:w-auto">
+                                    <option value="all">Todos os Status</option>
+                                    <option value="pending">Novos / Pendentes</option>
+                                    <option value="preparing">Em Preparo</option>
+                                    <option value="ready">Prontos</option>
+                                    <option value="delivery">Em Entrega</option>
+                                    <option value="completed">Concluídos</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-2">
+                            <input type="text" id="orderCodesToDelete" placeholder="Ex: FAST-1234, FAST-5678"
+                                class="px-3 py-1.5 border border-gray-200 rounded-lg text-sm w-64 focus:ring-2 focus:ring-red-500 outline-none">
+                            <button id="confirmDeleteOrdersBtn"
+                                class="px-3 py-1.5 bg-white border border-red-200 text-red-600 hover:bg-red-50 rounded-lg text-sm font-medium transition-colors">
+                                Excluir
+                            </button>
+                            <span id="deleteOrdersResult" class="text-xs ml-2 font-medium"></span>
+                        </div>
+                    </div>
+
+                    <!-- Kanban Board View -->
+                    <div id="ordersKanbanView" class="overflow-x-auto pb-4">
+                        <div class="flex gap-4 min-w-[1200px]">
+                            <!-- Column: Payment Pending -->
+                            <div
+                                class="flex-1 min-w-[300px] bg-gray-100 rounded-xl p-3 flex flex-col max-h-[calc(100vh-250px)]">
+                                <div class="flex items-center justify-between mb-3 px-1">
+                                    <h3 class="font-bold text-gray-700">Aguardando Pagamento</h3>
+                                    <span class="bg-gray-200 text-gray-700 text-xs px-2 py-0.5 rounded-full"
+                                        id="count-payment">0</span>
+                                </div>
+                                <div id="col-payment-pending"
+                                    class="flex-1 overflow-y-auto space-y-3 pr-1 scrollbar-thin">
+                                </div>
+                            </div>
+
+                            <!-- Column: Received (Paid/Confirmed) -->
+                            <div
+                                class="flex-1 min-w-[300px] bg-blue-50 rounded-xl p-3 flex flex-col max-h-[calc(100vh-250px)]">
+                                <div class="flex items-center justify-between mb-3 px-1">
+                                    <h3 class="font-bold text-blue-800">Recebidos / A Confirmar</h3>
+                                    <span class="bg-blue-200 text-blue-800 text-xs px-2 py-0.5 rounded-full"
+                                        id="count-received">0</span>
+                                </div>
+                                <div id="col-pending" class="flex-1 overflow-y-auto space-y-3 pr-1 scrollbar-thin">
+                                </div>
+                            </div>
+
+                            <!-- Column: Preparing -->
+                            <div
+                                class="flex-1 min-w-[300px] bg-orange-50 rounded-xl p-3 flex flex-col max-h-[calc(100vh-250px)]">
+                                <div class="flex items-center justify-between mb-3 px-1">
+                                    <h3 class="font-bold text-orange-800">Em Preparo</h3>
+                                    <span class="bg-orange-200 text-orange-800 text-xs px-2 py-0.5 rounded-full"
+                                        id="count-preparing">0</span>
+                                </div>
+                                <div id="col-preparing" class="flex-1 overflow-y-auto space-y-3 pr-1 scrollbar-thin">
+                                </div>
+                            </div>
+
+                            <!-- Column: Ready/Delivery -->
+                            <div
+                                class="flex-1 min-w-[300px] bg-purple-50 rounded-xl p-3 flex flex-col max-h-[calc(100vh-250px)]">
+                                <div class="flex items-center justify-between mb-3 px-1">
+                                    <h3 class="font-bold text-purple-800">Pronto / Entrega</h3>
+                                    <span class="bg-purple-200 text-purple-800 text-xs px-2 py-0.5 rounded-full"
+                                        id="count-delivery">0</span>
+                                </div>
+                                <div id="col-ready" class="flex-1 overflow-y-auto space-y-3 pr-1 scrollbar-thin">
+                                </div>
+                            </div>
+
+                            <!-- Column: Completed -->
+                            <div
+                                class="flex-1 min-w-[300px] bg-green-50 rounded-xl p-3 flex flex-col max-h-[calc(100vh-250px)]">
+                                <div class="flex items-center justify-between mb-3 px-1">
+                                    <h3 class="font-bold text-green-800">Concluídos</h3>
+                                    <span class="bg-green-200 text-green-800 text-xs px-2 py-0.5 rounded-full"
+                                        id="count-completed">0</span>
+                                </div>
+                                <div id="col-completed" class="flex-1 overflow-y-auto space-y-3 pr-1 scrollbar-thin">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- List View (Hidden by default) -->
+                    <div id="ordersListView" class="hidden overflow-x-auto bg-white rounded-lg border border-gray-200">
+                        <table class="w-full text-left border-collapse">
+                            <thead class="bg-gray-50 text-gray-600 text-xs uppercase">
+                                <tr>
+                                    <th class="p-4 border-b">Pedido</th>
+                                    <th class="p-4 border-b">Cliente</th>
+                                    <th class="p-4 border-b">Total</th>
+                                    <th class="p-4 border-b">Pagamento</th>
+                                    <th class="p-4 border-b">Status</th>
+                                    <th class="p-4 border-b">Data</th>
+                                    <th class="p-4 border-b text-right">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ordersListTableBody" class="divide-y divide-gray-100 text-sm">
+                            </tbody>
+                        </table>
+                    </div>
+                </main>
+
+                <!-- Clients Panel -->
+                <main id="clientsPanelFast"
+                    class="admin-panel admin-card p-6 hidden animate-fade-in mx-auto w-full max-w-7xl">
+                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                        <h2 class="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                            <span>👥</span> Gerenciar Clientes
+                        </h2>
+                        <div class="flex gap-2 w-full md:w-auto">
+                            <div class="relative flex-1 md:w-64">
+                                <span class="absolute left-3 top-2.5 text-gray-400">🔍</span>
+                                <input type="text" id="clientSearchInput" placeholder="Buscar por nome ou telefone..."
+                                    class="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none transition-all">
+                            </div>
+                            <select id="clientInitialFilter" onchange="renderClients()"
+                                class="px-3 py-2 border border-gray-200 rounded-lg bg-white text-sm text-gray-700 focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none">
+                                <option value="">A-Z</option>
+                                <option value="A">A</option>
+                                <option value="B">B</option>
+                                <option value="C">C</option>
+                                <option value="D">D</option>
+                                <option value="E">E</option>
+                                <option value="F">F</option>
+                                <option value="G">G</option>
+                                <option value="H">H</option>
+                                <option value="I">I</option>
+                                <option value="J">J</option>
+                                <option value="K">K</option>
+                                <option value="L">L</option>
+                                <option value="M">M</option>
+                                <option value="N">N</option>
+                                <option value="O">O</option>
+                                <option value="P">P</option>
+                                <option value="Q">Q</option>
+                                <option value="R">R</option>
+                                <option value="S">S</option>
+                                <option value="T">T</option>
+                                <option value="U">U</option>
+                                <option value="V">V</option>
+                                <option value="W">W</option>
+                                <option value="X">X</option>
+                                <option value="Y">Y</option>
+                                <option value="Z">Z</option>
+                            </select>
+                            <button id="refreshClientsBtn" onclick="renderClients()"
+                                class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg flex items-center justify-center gap-2 transition-colors">
+                                🔄
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead class="bg-gray-50 text-gray-600 text-xs uppercase tracking-wider">
+                                    <tr>
+                                        <th class="p-4 border-b">Nome</th>
+                                        <th class="p-4 border-b">Telefone</th>
+                                        <th class="p-4 border-b">Aniversário</th>
+                                        <th class="p-4 border-b">Pedidos</th>
+                                        <th class="p-4 border-b">Último Pedido</th>
+                                        <th class="p-4 border-b">Desconto Fixo</th>
+                                        <th class="p-4 border-b text-right">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="clientsList" class="divide-y divide-gray-100 text-sm">
+                                    <tr>
+                                        <td colspan="7" class="p-8 text-center text-gray-500">
+                                            Carregando clientes...
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </main>
+
+                <!-- Clients Panel -->
+                <main id="clientsPanelLegacy" class="admin-card p-6 hidden animate-fade-in mx-auto w-full max-w-7xl">
+                    <div class="flex justify-between items-center mb-6">
+                        <h2 class="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                            <span>👥</span> Base de Clientes
+                        </h2>
+                        <div class="relative">
+                            <input type="text" id="clientSearchLegacy" placeholder="Buscar cliente..."
+                                class="pl-8 pr-4 py-2 border rounded-lg">
+                            <span class="absolute left-2.5 top-2.5 text-gray-400">🔍</span>
+                        </div>
+                    </div>
+                    <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                        <table class="w-full text-left">
+                            <!-- ... -->
+                            <tbody id="clientsListLegacy" class="divide-y divide-gray-100 text-sm">
+                                <!-- Injected by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </main>
+
+                <!-- Promotions Panel -->
+                <main id="promotionsPanelFast"
+                    class="admin-panel admin-card p-6 hidden animate-fade-in mx-auto w-full max-w-7xl">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+                        <span>🏷️</span> Promoções e Cupons
+                        <!-- ... -->
+                    </h2>
+
+                    <!-- Tabs -->
+                    <div class="flex border-b border-gray-200 mb-6">
+                        <button id="promoTabBtnCoupons"
+                            class="px-4 py-2 text-rose-600 border-b-2 border-rose-600 font-medium"
+                            onclick="switchPromoTab('coupons')">Cupons</button>
+                        <button id="promoTabBtnAutomatic" class="px-4 py-2 text-gray-500 hover:text-gray-700"
+                            onclick="switchPromoTab('automatic')">Automáticas</button>
+                        <button id="promoTabBtnLoyalty" class="px-4 py-2 text-gray-500 hover:text-gray-700"
+                            onclick="switchPromoTab('loyalty')">Fidelidade</button>
+                        <button id="promoTabBtnProducts" class="px-4 py-2 text-gray-500 hover:text-gray-700"
+                            onclick="switchPromoTab('products')">Por Produto</button>
+                    </div>
+
+                    <!-- Coupons Tab -->
+                    <div id="promoTabCoupons" class="space-y-6">
+                        <div class="bg-white p-4 rounded-xl border border-gray-200">
+                            <h3 class="font-bold text-gray-800 mb-4">Novo Cupom</h3>
+                            <div class="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-500 mb-1">Código</label>
+                                    <input type="text" id="newCouponCode"
+                                        class="w-full px-3 py-2 border rounded-lg uppercase" placeholder="PROMO10">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-500 mb-1">Tipo</label>
+                                    <select id="newCouponType" class="w-full px-3 py-2 border rounded-lg">
+                                        <option value="percentage">Percentual (%)</option>
+                                        <option value="fixed">Fixo (R$)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-500 mb-1">Valor</label>
+                                    <input type="number" id="newCouponValue" class="w-full px-3 py-2 border rounded-lg"
+                                        placeholder="10.00">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-500 mb-1">Mínimo (R$)</label>
+                                    <input type="number" id="newCouponMin" class="w-full px-3 py-2 border rounded-lg"
+                                        placeholder="50.00">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-500 mb-1">Teto (R$)</label>
+                                    <input type="number" id="newCouponMaxDiscount"
+                                        class="w-full px-3 py-2 border rounded-lg" placeholder="30.00">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-500 mb-1">Limite de usos</label>
+                                    <input type="number" id="newCouponMaxUses"
+                                        class="w-full px-3 py-2 border rounded-lg" placeholder="10">
+                                </div>
+                                <div class="md:col-span-2">
+                                    <label class="block text-xs font-medium text-gray-500 mb-1">Validade</label>
+                                    <input type="date" id="newCouponExpiration"
+                                        class="w-full px-3 py-2 border rounded-lg">
+                                </div>
+                                <button id="addCouponBtn"
+                                    class="bg-rose-600 text-white px-4 py-2 rounded-lg hover:bg-rose-700 md:col-span-4">
+                                    Criar Cupom
+                                </button>
+                            </div>
+                        </div>
+                        <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                            <table class="w-full text-left">
+                                <thead class="bg-gray-50 text-gray-600 text-xs uppercase">
+                                    <tr>
+                                        <th class="p-4 border-b">Código</th>
+                                        <th class="p-4 border-b">Desconto</th>
+                                        <th class="p-4 border-b">Mínimo</th>
+                                        <th class="p-4 border-b">Uso</th>
+                                        <th class="p-4 border-b text-right">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="couponsList" class="divide-y divide-gray-100 text-sm"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Automatic Discounts Tab -->
+                    <div id="promoTabAutomatic" class="space-y-6 hidden">
+                        <div class="bg-white p-4 rounded-xl border border-gray-200">
+                            <h3 class="font-bold text-gray-800 mb-4">Desconto Automático (Pedidos)</h3>
+                            <div id="specialDiscountStatus"
+                                class="mb-4 p-3 rounded-lg bg-gray-100 border-l-4 border-gray-400">
+                                <p class="text-sm text-gray-600 font-medium">⚪ Configure abaixo</p>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-500 mb-1">A cada (pedidos)</label>
+                                    <input type="number" id="specialDiscountMinOrders"
+                                        class="w-full px-3 py-2 border rounded-lg" placeholder="10">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-500 mb-1">Pedido mínimo
+                                        (R$)</label>
+                                    <input type="number" id="specialDiscountMinVal"
+                                        class="w-full px-3 py-2 border rounded-lg" placeholder="0">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-500 mb-1">Tipo</label>
+                                    <select id="specialDiscountType" class="w-full px-3 py-2 border rounded-lg">
+                                        <option value="percentage">Percentual (%)</option>
+                                        <option value="fixed">Fixo (R$)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-500 mb-1">Valor</label>
+                                    <input type="number" id="specialDiscountValue"
+                                        class="w-full px-3 py-2 border rounded-lg" placeholder="10">
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <label class="flex items-center gap-2 text-sm text-gray-700">
+                                        <input type="checkbox" id="specialDiscountActive" class="w-4 h-4 text-rose-600"
+                                            checked>
+                                        Ativo
+                                    </label>
+                                </div>
+                                <div class="md:col-span-5 flex items-center gap-3">
+                                    <button id="saveSpecialDiscountConfig"
+                                        class="bg-rose-600 text-white px-4 py-2 rounded-lg hover:bg-rose-700">
+                                        Salvar
+                                    </button>
+                                    <span id="specialDiscountMsg" class="text-sm"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Loyalty (Birthday) Tab -->
+                    <div id="promoTabLoyalty" class="space-y-6 hidden">
+                        <div class="bg-white p-4 rounded-xl border border-gray-200">
+                            <h3 class="font-bold text-gray-800 mb-4">Desconto de Aniversário</h3>
+                            <div id="birthdayDiscountStatus"
+                                class="mb-4 p-3 rounded-lg bg-gray-100 border-l-4 border-gray-400">
+                                <p class="text-sm text-gray-600 font-medium">⚪ Configure abaixo</p>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-500 mb-1">Tipo</label>
+                                    <select id="birthdayDiscountType" class="w-full px-3 py-2 border rounded-lg">
+                                        <option value="percentage">Percentual (%)</option>
+                                        <option value="fixed">Fixo (R$)</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-500 mb-1">Valor</label>
+                                    <input type="number" id="birthdayDiscountValue"
+                                        class="w-full px-3 py-2 border rounded-lg" placeholder="10">
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <label class="flex items-center gap-2 text-sm text-gray-700">
+                                        <input type="checkbox" id="birthdayDiscountActive" class="w-4 h-4 text-rose-600"
+                                            checked>
+                                        Ativo
+                                    </label>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <button id="saveBirthdayDiscountConfig"
+                                        class="bg-rose-600 text-white px-4 py-2 rounded-lg hover:bg-rose-700">
+                                        Salvar
+                                    </button>
+                                    <span id="birthdayDiscountMsg" class="text-sm"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Product Promotions Tab -->
+                    <div id="promoTabProducts" class="space-y-6 hidden">
+                        <div class="bg-white p-4 rounded-xl border border-gray-200">
+                            <div
+                                class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+                                <div>
+                                    <h3 class="font-bold text-gray-800">Promoções por Produto</h3>
+                                    <p class="text-sm text-gray-500">Defina preços promocionais individuais para
+                                        produtos.</p>
+                                </div>
+                                <button id="savePromotionsBtn" onclick="saveProductPromotions()"
+                                    class="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2">
+                                    <span>💾</span> Salvar Promoções
+                                </button>
+                            </div>
+
+                            <div class="flex gap-2 mb-4">
+                                <input type="text" id="promoProductSearch" placeholder="Buscar produto..."
+                                    class="flex-1 px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-rose-500"
+                                    onkeyup="if(window.renderProductPromotions && window._productsCacheForPromo) window.renderProductPromotions(window._productsCacheForPromo)">
+                                <select id="promoProductCategory"
+                                    class="px-3 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-rose-500 bg-white"
+                                    onchange="if(window.renderProductPromotions && window._productsCacheForPromo) window.renderProductPromotions(window._productsCacheForPromo)">
+                                    <option value="">Todas as Categorias</option>
+                                    <option value="salgados">Salgados</option>
+                                    <option value="mini">Mini Salgados</option>
+                                    <option value="kits">Kits Festa</option>
+                                    <option value="bebidas">Bebidas</option>
+                                    <option value="adicionais">Adicionais</option>
+                                    <option value="bolos">Bolos</option>
+                                </select>
+                            </div>
+
+                            <div class="overflow-x-auto rounded-lg border border-gray-200">
+                                <table class="w-full text-left text-sm">
+                                    <thead class="bg-gray-50 text-gray-600 uppercase text-xs">
+                                        <tr>
+                                            <th class="p-3 border-b">Produto</th>
+                                            <th class="p-3 border-b">Preço Original</th>
+                                            <th class="p-3 border-b">Preço Promocional</th>
+                                            <th class="p-3 border-b text-center">Ativo</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="productPromotionsList" class="divide-y divide-gray-100">
+                                        <tr>
+                                            <td colspan="4" class="p-4 text-center text-gray-500">Carregando produtos...
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </main>
+
+                <!-- Banner Panel -->
+                <main id="bannerPanelFast"
+                    class="admin-panel admin-card p-6 hidden animate-fade-in mx-auto w-full max-w-7xl">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+                        <span>🖼️</span> Banner da Loja
+                    </h2>
+                    <div class="bg-white p-6 rounded-xl border border-gray-200">
+                        <div class="space-y-4 max-w-lg">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Habilitar Banner</label>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="bannerEnabled" class="sr-only peer">
+                                    <div
+                                        class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-rose-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-rose-600">
+                                    </div>
+                                </label>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Imagem do Banner</label>
+                                <input type="file" id="bannerImageUpload" accept="image/*"
+                                    class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-rose-50 file:text-rose-700 hover:file:bg-rose-100">
+                                <input type="hidden" id="bannerImageUrl">
+                            </div>
+                            <div id="bannerImagePreview" class="hidden mt-2">
+                                <img id="bannerPreviewImg" src="" alt="Preview"
+                                    class="w-full h-32 object-cover rounded-lg border border-gray-200">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Link (Opcional)</label>
+                                <input type="text" id="bannerLink" placeholder="https://..."
+                                    class="w-full px-3 py-2 border rounded-lg">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Texto Alternativo</label>
+                                <p class="text-xs text-gray-500 mb-2">Exibido quando não houver imagem de banner</p>
+                                <textarea id="bannerFallbackText" rows="2"
+                                    placeholder="Ex: 🎉 Promoção de Verão! Até 15% OFF em todos os salgados!"
+                                    class="w-full px-3 py-2 border rounded-lg resize-none"></textarea>
+                            </div>
+                            <button id="saveBannerBtn"
+                                class="bg-rose-600 text-white px-6 py-2 rounded-lg hover:bg-rose-700">Salvar
+                                Banner</button>
+                        </div>
+                    </div>
+                </main>
+
+                <!-- Ratings Panel -->
+                <main id="ratingsPanelFast"
+                    class="admin-panel admin-card p-6 hidden animate-fade-in mx-auto w-full max-w-7xl">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+                        <span>⭐</span> Avaliações de Clientes
+                    </h2>
+                    <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                        <table class="w-full text-left">
+                            <thead class="bg-gray-50 text-gray-600 text-xs uppercase">
+                                <tr>
+                                    <th class="p-4 border-b">Data</th>
+                                    <th class="p-4 border-b">Cliente</th>
+                                    <th class="p-4 border-b">Nota</th>
+                                    <th class="p-4 border-b">Comentário</th>
+                                    <th class="p-4 border-b">Status</th>
+                                    <th class="p-4 border-b text-right">Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ratingsList" class="divide-y divide-gray-100 text-sm"></tbody>
+                        </table>
+                    </div>
+                </main>
+
+                <!-- Reports Panel -->
+                <main id="reportsPanelFast"
+                    class="admin-panel admin-card p-6 hidden animate-fade-in mx-auto w-full max-w-7xl">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+                        <span>📊</span> Relatórios e Métricas
+                    </h2>
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                        <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                            <p class="text-sm text-gray-500">Vendas Hoje</p>
+                            <p class="text-2xl font-bold text-gray-800" id="reportSalesToday">R$ 0,00</p>
+                        </div>
+                        <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                            <p class="text-sm text-gray-500">Total de Pedidos</p>
+                            <p class="text-2xl font-bold text-gray-800" id="reportOrdersToday">0</p>
+                        </div>
+                        <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                            <p class="text-sm text-gray-500">Vendas Mês</p>
+                            <p class="text-2xl font-bold text-gray-800" id="reportSalesMonth">R$ 0,00</p>
+                        </div>
+                        <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+                            <p class="text-sm text-gray-500">Ticket Médio</p>
+                            <p class="text-2xl font-bold text-gray-800" id="reportTicketAvg">R$ 0,00</p>
+                        </div>
+                    </div>
+                    <!-- Period Filter -->
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Período</label>
+                        <div class="flex flex-wrap gap-2">
+                            <button id="reportPeriodMonth" onclick="setReportPeriod('month')"
+                                class="px-4 py-2 bg-rose-600 text-white rounded-lg text-sm font-medium transition-colors">Mensal</button>
+                            <button id="reportPeriodSemester" onclick="setReportPeriod('semester')"
+                                class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 transition-colors">Semestral</button>
+                            <button id="reportPeriodYear" onclick="setReportPeriod('year')"
+                                class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 transition-colors">Anual</button>
+                        </div>
+                    </div>
+
+                    <div class="grid md:grid-cols-2 gap-6">
+                        <!-- Client Ranking -->
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-4">🏆 Ranking de Clientes</h3>
+                            <p class="text-sm text-gray-600 mb-4">Clientes que mais gastaram no período selecionado:</p>
+                            <div id="clientRankingList" class="space-y-2 max-h-80 overflow-y-auto pr-2 scrollbar-thin">
+                                <div class="text-center py-8 text-gray-500">
+                                    <p class="text-4xl mb-2">📈</p>
+                                    <p>Nenhum pedido registrado ainda.</p>
+                                    <p class="text-xs mt-2">Os pedidos serão registrados no Supabase para análise.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Order History -->
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-4">📋 Histórico de Pedidos</h3>
+                            <div class="mb-4">
+                                <input type="text" id="orderSearchClient" placeholder="Buscar por cliente..."
+                                    class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-rose-500 outline-none" />
+                            </div>
+                            <div id="orderHistoryList" class="space-y-2 max-h-80 overflow-y-auto pr-2 scrollbar-thin">
+                                <div class="text-center py-8 text-gray-500">
+                                    <p class="text-4xl mb-2">🛒</p>
+                                    <p>Nenhum pedido registrado ainda.</p>
+                                    <p class="text-xs mt-2">Os pedidos enviados via WhatsApp serão salvos aqui.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Charts Section (2 Columns) -->
+                    <div class="mt-6 grid lg:grid-cols-2 gap-6">
+                        <!-- Top Products -->
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-4">🔥 Produtos Mais Pedidos</h3>
+                            <div id="topProductsList" class="grid grid-cols-2 gap-3">
+                                <div class="text-center py-6 text-gray-500 col-span-full">
+                                    <p class="text-4xl mb-2">🍽️</p>
+                                    <p>Aguardando dados de pedidos...</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Neighborhood Orders Chart -->
+                        <div class="bg-gray-50 rounded-lg p-4">
+                            <div class="flex flex-wrap items-center justify-between mb-4 gap-2">
+                                <h3 class="text-lg font-semibold text-gray-800">🗺️ Pedidos por Bairro</h3>
+                                <div class="flex gap-2">
+                                    <select id="neighborhoodFilterYear" class="text-xs border rounded p-1 bg-white">
+                                        <option value="2024">2024</option>
+                                        <option value="2025">2025</option>
+                                        <option value="2026" selected>2026</option>
+                                    </select>
+                                    <select id="neighborhoodFilterPeriod" class="text-xs border rounded p-1 bg-white">
+                                        <option value="all">Todo o ano</option>
+                                        <option value="1">1º Semestre</option>
+                                        <option value="2">2º Semestre</option>
+                                        <option value="jan">Janeiro</option>
+                                        <option value="feb">Fevereiro</option>
+                                        <option value="mar">Março</option>
+                                        <option value="apr">Abril</option>
+                                        <option value="may">Maio</option>
+                                        <option value="jun">Junho</option>
+                                        <option value="jul">Julho</option>
+                                        <option value="aug">Agosto</option>
+                                        <option value="sep">Setembro</option>
+                                        <option value="oct">Outubro</option>
+                                        <option value="nov">Novembro</option>
+                                        <option value="dec">Dezembro</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div id="neighborhoodChartContainer" class="space-y-2">
+                                <div class="text-center py-6 text-gray-500">
+                                    <p class="text-4xl mb-2">📍</p>
+                                    <p>Aguardando dados de pedidos...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </main>
+
+                <!-- Config Panel -->
+                <main id="configPanelFast"
+                    class="admin-panel admin-card p-6 hidden animate-fade-in mx-auto w-full max-w-7xl">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+                        <span>⚙️</span> Configurações da Loja
+                    </h2>
+
+                    <div class="grid lg:grid-cols-2 gap-6">
+                        <!-- Delivery Fees Section -->
+                        <div class="bg-white p-6 rounded-xl border border-gray-200">
+                            <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                                🚚 Taxas de Entrega
+                            </h3>
+                            <p class="text-sm text-gray-500 mb-4">Gerencie as taxas por bairro.</p>
+                            <div class="grid grid-cols-3 gap-2 mb-3">
+                                <input type="text" id="feeNeighborhoodFastPanel" placeholder="Bairro"
+                                    class="col-span-1 px-3 py-2 border rounded-lg text-sm">
+                                <input type="number" step="0.01" id="feeValueFastPanel" placeholder="Taxa (R$)"
+                                    class="px-3 py-2 border rounded-lg text-sm">
+                                <input type="number" step="0.01" id="feeMinValueFastPanel" placeholder="Mín. (R$)"
+                                    class="px-3 py-2 border rounded-lg text-sm">
+                            </div>
+                            <div class="flex gap-2 mb-4">
+                                <button onclick="handleAddFeePanel()"
+                                    class="flex-1 bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
+                                    + Adicionar
+                                </button>
+                                <button onclick="handleSaveAllFeesPanel()"
+                                    class="flex-1 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
+                                    💾 Salvar Taxas
+                                </button>
+                            </div>
+                            <div class="flex gap-2 mb-4">
+                                <button onclick="handleBatchUpdateMin()"
+                                    class="text-xs text-gray-600 hover:text-gray-800 underline">
+                                    Atualizar mínimo em massa
+                                </button>
+                            </div>
+                            <div id="feesListFastPanel" class="max-h-64 overflow-y-auto divide-y border rounded-lg">
+                                <p class="text-sm text-gray-500 p-4 text-center">Carregando taxas...</p>
+                            </div>
+                        </div>
+
+                        <!-- PIX Configuration -->
+                        <div class="bg-white p-6 rounded-xl border border-gray-200">
+                            <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                                💳 Configuração PIX
+                            </h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Chave PIX</label>
+                                    <input type="text" id="pixKey" placeholder="email@exemplo.com ou CPF/CNPJ"
+                                        class="w-full px-3 py-2 border rounded-lg text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Nome do
+                                        Recebedor</label>
+                                    <input type="text" id="pixMerchantName" placeholder="FAST SAVORYS"
+                                        class="w-full px-3 py-2 border rounded-lg text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Cidade</label>
+                                    <input type="text" id="pixMerchantCity" placeholder="CIDADE"
+                                        class="w-full px-3 py-2 border rounded-lg text-sm">
+                                </div>
+                                <button onclick="handleSavePixConfig()"
+                                    class="w-full bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
+                                    💾 Salvar PIX
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Delivery Settings -->
+                        <div class="bg-white p-6 rounded-xl border border-gray-200">
+                            <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                                📦 Configurações de Entrega
+                            </h3>
+                            <div class="space-y-4">
+                                <div class="flex items-center justify-between">
+                                    <label class="text-sm font-medium text-gray-700">Entregas Ativas</label>
+                                    <label class="relative inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" id="deliveryEnabled" class="sr-only peer" checked>
+                                        <div
+                                            class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-rose-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-rose-600">
+                                        </div>
+                                    </label>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Motivo (se
+                                        desativado)</label>
+                                    <input type="text" id="deliveryDisabledReason" placeholder="Chuva forte..."
+                                        class="w-full px-3 py-2 border rounded-lg text-sm">
+                                </div>
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-xs text-gray-600 mb-1">Preparo Mín (min)</label>
+                                        <input type="number" id="prepTimeMin" placeholder="30"
+                                            class="w-full px-3 py-2 border rounded-lg text-sm">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs text-gray-600 mb-1">Preparo Máx (min)</label>
+                                        <input type="number" id="prepTimeMax" placeholder="60"
+                                            class="w-full px-3 py-2 border rounded-lg text-sm">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs text-gray-600 mb-1">Entrega Mín (min)</label>
+                                        <input type="number" id="deliveryTimeMin" placeholder="15"
+                                            class="w-full px-3 py-2 border rounded-lg text-sm">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs text-gray-600 mb-1">Entrega Máx (min)</label>
+                                        <input type="number" id="deliveryTimeMax" placeholder="45"
+                                            class="w-full px-3 py-2 border rounded-lg text-sm">
+                                    </div>
+                                </div>
+                                <button onclick="handleSaveDeliverySettings()"
+                                    class="w-full bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
+                                    💾 Salvar Configurações
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Card Fees -->
+                        <div class="bg-white p-6 rounded-xl border border-gray-200">
+                            <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                                💳 Taxa do Cartão
+                            </h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Taxa Cartão (%)</label>
+                                    <input type="number" step="0.01" id="cardFee1x" placeholder="5"
+                                        class="w-full px-3 py-2 border rounded-lg text-sm">
+                                    <p class="text-xs text-gray-500 mt-1">Aplicada a pagamentos no cartão.</p>
+                                </div>
+                                <button onclick="handleSaveCardFees()"
+                                    class="w-full bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
+                                    💾 Salvar Taxa
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </main>
+
+                <!-- Rules/Security Panel -->
+                <main id="rulesPanelFast"
+                    class="admin-panel admin-card p-6 hidden animate-fade-in mx-auto w-full max-w-7xl">
+                    <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+                        <span>🛡️</span> Regras e Segurança
+                    </h2>
+
+                    <div class="grid lg:grid-cols-2 gap-6">
+                        <!-- Minimum Order Values -->
+                        <div class="bg-white p-6 rounded-xl border border-gray-200">
+                            <h3 class="font-bold text-gray-800 mb-4">💰 Valores Mínimos de Pedido</h3>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Mínimo para Entrega
+                                        (R$)</label>
+                                    <input type="number" step="0.01" id="ruleMinDelivery" placeholder="15.00"
+                                        class="w-full px-3 py-2 border rounded-lg text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Mínimo para Retirada
+                                        (R$)</label>
+                                    <input type="number" step="0.01" id="ruleMinPickup" placeholder="8.00"
+                                        class="w-full px-3 py-2 border rounded-lg text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Mínimo Retirada
+                                        Fora-Horário (R$)</label>
+                                    <input type="number" step="0.01" id="ruleMinPickupOffhours" placeholder="15.00"
+                                        class="w-full px-3 py-2 border rounded-lg text-sm">
+                                    <p class="text-xs text-gray-500 mt-1">Aplicado fora do horário comercial.</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Same Day Orders -->
+                        <div class="bg-white p-6 rounded-xl border border-gray-200">
+                            <h3 class="font-bold text-gray-800 mb-4">📅 Pedidos Para Hoje</h3>
+                            <div class="space-y-4">
+                                <div class="flex items-center justify-between">
+                                    <label class="text-sm font-medium text-gray-700">Permitir Pedidos Mesmo Dia</label>
+                                    <label class="relative inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" id="ruleSameDayEnabled" class="sr-only peer" checked>
+                                        <div
+                                            class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-rose-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-rose-600">
+                                        </div>
+                                    </label>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Valor Mínimo
+                                        (R$)</label>
+                                    <input type="number" step="0.01" id="ruleSameDayMinValue" placeholder="15.00"
+                                        class="w-full px-3 py-2 border rounded-lg text-sm">
+                                </div>
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-xs text-gray-600 mb-1">Retirada a partir de</label>
+                                        <input type="time" id="ruleSameDayStart" value="12:00"
+                                            class="w-full px-3 py-2 border rounded-lg text-sm">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs text-gray-600 mb-1">Retirada até</label>
+                                        <input type="time" id="ruleSameDayEnd" value="18:00"
+                                            class="w-full px-3 py-2 border rounded-lg text-sm">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Morning Rule -->
+                        <div class="bg-white p-6 rounded-xl border border-gray-200">
+                            <h3 class="font-bold text-gray-800 mb-4">🌅 Regra da Manhã</h3>
+                            <p class="text-sm text-gray-500 mb-4">Restrições especiais para pedidos matinais.</p>
+                            <div class="space-y-4">
+                                <div class="flex items-center justify-between">
+                                    <label class="text-sm font-medium text-gray-700">Ativar Regra da Manhã</label>
+                                    <label class="relative inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" id="ruleMorningEnabled" class="sr-only peer" checked>
+                                        <div
+                                            class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-rose-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-rose-600">
+                                        </div>
+                                    </label>
+                                </div>
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-xs text-gray-600 mb-1">Regra até horário</label>
+                                        <input type="time" id="ruleMorningEndTime" value="12:00"
+                                            class="w-full px-3 py-2 border rounded-lg text-sm">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs text-gray-600 mb-1">Valor Mínimo (R$)</label>
+                                        <input type="number" step="0.01" id="ruleMorningMinValue" placeholder="25.00"
+                                            class="w-full px-3 py-2 border rounded-lg text-sm">
+                                    </div>
+                                </div>
+                                <p class="text-xs text-gray-500">Antes deste horário, pedidos devem conter bolo OU
+                                    atingir valor mínimo.</p>
+                            </div>
+                        </div>
+
+                        <!-- Order Window -->
+                        <div class="bg-white p-6 rounded-xl border border-gray-200">
+                            <h3 class="font-bold text-gray-800 mb-4">⏰ Janela de Pedidos</h3>
+                            <div class="space-y-4">
+                                <div class="grid grid-cols-2 gap-3">
+                                    <div>
+                                        <label class="block text-xs text-gray-600 mb-1">Início</label>
+                                        <input type="time" id="ruleOrderWindowStart" value="07:00"
+                                            class="w-full px-3 py-2 border rounded-lg text-sm">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs text-gray-600 mb-1">Fim</label>
+                                        <input type="time" id="ruleOrderWindowEnd" value="18:00"
+                                            class="w-full px-3 py-2 border rounded-lg text-sm">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Máx. Pedidos
+                                        Simultâneos</label>
+                                    <input type="number" id="ruleMaxConcurrentOrders" placeholder="10"
+                                        class="w-full px-3 py-2 border rounded-lg text-sm">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Blocked Dates -->
+                        <div class="bg-white p-6 rounded-xl border border-gray-200 lg:col-span-2">
+                            <h3 class="font-bold text-gray-800 mb-4">🚫 Datas Bloqueadas</h3>
+                            <p class="text-sm text-gray-500 mb-4">Feriados ou dias que a loja não funcionará.</p>
+                            <div class="grid md:grid-cols-3 gap-3 mb-4">
+                                <input type="date" id="ruleBlockedDateInput"
+                                    class="px-3 py-2 border rounded-lg text-sm">
+                                <input type="text" id="ruleBlockedDateReason" placeholder="Motivo (opcional)"
+                                    class="px-3 py-2 border rounded-lg text-sm">
+                                <button onclick="handleAddBlockedDate()"
+                                    class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
+                                    🚫 Bloquear Data
+                                </button>
+                            </div>
+                            <div id="blockedDatesList" class="max-h-48 overflow-y-auto">
+                                <p class="text-sm text-gray-500 py-4 text-center">Carregando datas bloqueadas...</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Save Button -->
+                    <div class="mt-6 flex justify-end">
+                        <button onclick="handleSaveRules()"
+                            class="bg-rose-600 hover:bg-rose-700 text-white px-8 py-3 rounded-lg font-bold shadow-lg shadow-rose-600/20 transition-all hover:-translate-y-0.5 flex items-center gap-2">
+                            💾 Salvar Todas as Regras
+                        </button>
+                    </div>
+                </main>
+
+            </main>
+        </div>
+
+    </div>
+
+    <!-- Modals -->
+    <!-- Msg Update Modal -->
+    <div id="msgUpdateModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center">
+        <div class="bg-white rounded-xl p-6 w-full max-w-md mx-4">
+            <h3 class="text-xl font-bold text-gray-800 mb-4">Atualizar Pedido & Notificar</h3>
+            <input type="hidden" id="msgUpdateOrderId">
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Novo Status</label>
+                    <select id="msgUpdateStatus" class="w-full px-3 py-2 border rounded-lg">
+                        <option value="recebido">🆕 Recebido</option>
+                        <option value="em_preparo">🍳 Em Preparo</option>
+                        <option value="pronto">✅ Pronto</option>
+                        <option value="saiu_entrega">🚚 Saiu para Entrega</option>
+                        <option value="entregue">✔️ Entregue</option>
+                        <option value="cancelado">❌ Cancelado</option>
+                    </select>
+                </div>
+                <!-- Cancellation reason selector (only visible when status = cancelado) -->
+                <div id="cancellationReasonSection" class="hidden">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Motivo do Cancelamento</label>
+                    <select id="cancellationReason" class="w-full px-3 py-2 border rounded-lg">
+                        <option value="">📝 Selecione um motivo (ou escreva manualmente)...</option>
+                        <option value="kitchen">🍳 Imprevisto na cozinha</option>
+                        <option value="no_driver">🏍️ Sem motoboy disponível</option>
+                        <option value="weather">🌧️ Chuva forte / condições climáticas</option>
+                        <option value="ingredient">🥗 Falta de ingrediente</option>
+                        <option value="operational">⚙️ Problema operacional interno</option>
+                        <option value="queue">⏰ Fila acima da capacidade</option>
+                    </select>
+                    <p class="text-xs text-gray-500 mt-1">Você pode editar a mensagem abaixo livremente.</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Mensagem (Preview)</label>
+                    <textarea id="msgUpdatePreview" rows="4"
+                        class="w-full px-3 py-2 border rounded-lg text-sm bg-gray-50"></textarea>
+                </div>
+
+                <div class="flex gap-2 justify-end mt-4">
+                    <button type="button" id="closeMsgUpdate"
+                        class="px-4 py-2 text-gray-600 hover:text-gray-800">Cancelar</button>
+                    <button type="button" id="confirmMsgUpdate"
+                        class="px-4 py-2 bg-rose-600 text-white rounded-lg hover:bg-rose-700">Enviar e
+                        Atualizar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Fees Modal Fast (Admin) -->
+    <div id="feesModalFast" class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center"
+        onclick="if(event.target===this) closeFeesFastModal();">
+        <div class="bg-white rounded-xl p-6 w-full max-w-xl mx-4 max-h-[90vh] overflow-y-auto"
+            onclick="event.stopPropagation();">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-xl font-bold text-gray-800">Taxas de Entrega</h3>
+                <button type="button" id="closeFeesFast"
+                    class="text-gray-600 hover:text-gray-800 text-3xl font-bold leading-none">×</button>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+                <input type="text" id="feeNeighborhoodFast" class="md:col-span-2 w-full px-3 py-2 border rounded"
+                    placeholder="Bairro" />
+                <input type="number" step="0.01" id="feeValueFast" class="w-full px-3 py-2 border rounded"
+                    placeholder="Valor (R$)" />
+            </div>
+            <div class="mb-3 flex gap-2">
+                <button type="button" id="addFeeFast"
+                    class="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded">Adicionar/Atualizar</button>
+                <button type="button" id="saveAllFeesFast"
+                    class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded">Salvar Todas as Taxas</button>
+            </div>
+            <div id="feesListFast" class="divide-y"></div>
+        </div>
+    </div>
+    <!-- Banner Management Panel (Legacy Style) -->
+    <main id="bannerPanelLegacy" class="admin-card p-6 hidden animate-fade-in mx-auto w-full max-w-4xl">
+        <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+            <span class="text-purple-600">📢</span> Banner de Propaganda
+        </h2>
+
+        <div class="bg-white border border-gray-100 shadow-sm rounded-xl p-6">
+            <!-- Header Toggle -->
+            <div class="flex items-center justify-between mb-6 bg-gray-50 p-4 rounded-lg">
+                <div>
+                    <h3 class="font-bold text-gray-800">Exibir Banner</h3>
+                    <p class="text-xs text-gray-500">Se desativado, nenhum banner aparece (nem fallback)</p>
+                </div>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="bannerActive" class="sr-only peer">
+                    <div
+                        class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600">
+                    </div>
+                </label>
+            </div>
+
+            <div class="space-y-6">
+                <!-- Image Section -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Imagem do Banner</label>
+                    <p class="text-xs text-gray-500 mb-2">📏 Dimensões recomendadas: 728x90 (desktop) ou 320x50 (mobile)
+                    </p>
+                    <div class="flex gap-2 mb-3">
+                        <input type="text" id="bannerImageLink"
+                            class="flex-1 px-4 py-2 border rounded-lg text-sm bg-gray-50"
+                            placeholder="Cole o link da imagem ou faça upload...">
+                        <label
+                            class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg cursor-pointer font-medium transition-colors">
+                            Upload
+                            <input type="file" id="bannerImageFile" accept="image/*" class="hidden">
+                        </label>
+                    </div>
+                    <div id="currentBannerPreview"
+                        class="h-48 w-full bg-gray-900 rounded-lg flex items-center justify-center overflow-hidden border border-gray-800 relative">
+                        <!-- Preview content injected by JS -->
+                        <span class="text-gray-500 text-sm">Preview</span>
+                    </div>
+                </div>
+
+                <!-- Link Section -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Link de Destino (opcional)</label>
+                    <input type="url" id="bannerLinkUrl"
+                        class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
+                        placeholder="https://...">
+                </div>
+
+                <!-- Alt Text -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Texto Alternativo</label>
+                    <input type="text" id="bannerAltText"
+                        class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
+                        placeholder="Anuncie aqui">
+                </div>
+
+                <!-- Save Button -->
+                <button onclick="BannerModule.save()"
+                    class="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-lg font-bold shadow-lg shadow-purple-200 transition-all transform hover:scale-[1.01] flex items-center justify-center gap-2">
+                    💾 Salvar Configuração
+                </button>
+            </div>
+
+            <!-- Extra Preview Area (Pink in screenshot) -->
+            <div class="mt-8">
+                <h4 class="font-bold text-gray-800 mb-2">Preview do Banner</h4>
+                <div class="bg-pink-100 p-6 rounded-xl flex justify-center">
+                    <div id="bannerRealPreview" class="max-w-full shadow-lg rounded">
+                        <!-- JS will mirror image here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Product Form Modal -->
+    <div id="productFormModal"
+        class="fixed inset-0 bg-black bg-opacity-50 z-[200] hidden flex items-center justify-center"
+        onclick="if(event.target===this) this.classList.add('hidden')">
+        <div class="bg-white rounded-xl shadow-2xl p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between mb-6">
+                <h3 class="text-xl font-bold text-gray-800" id="formTitle">Novo Produto</h3>
+                <button onclick="document.getElementById('productFormModal').classList.add('hidden')"
+                    class="text-gray-400 hover:text-gray-600">
+                    ✕
+                </button>
+            </div>
+
+            <form id="productForm" class="space-y-4">
+                <input type="hidden" id="productId">
+
+                <!-- Basic Info -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Nome</label>
+                    <input id="productName" class="w-full px-3 py-2 border rounded-lg" required />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Descrição</label>
+                    <textarea id="productDescription" class="w-full px-3 py-2 border rounded-lg" rows="3"></textarea>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Preço (R$)</label>
+                        <input type="number" id="productPrice" step="0.01" class="w-full px-3 py-2 border rounded-lg"
+                            required />
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Categoria</label>
+                        <select id="productCategory" class="w-full px-3 py-2 border rounded-lg" required>
+                            <option value="salgados">Salgados</option>
+                            <option value="mini">Mini-Salgados</option>
+                            <option value="kits">Kits Festa</option>
+                            <option value="bolos">Bolos</option>
+                            <option value="bebidas">Bebidas</option>
+                            <option value="adicionais">Adicionais</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Imagem</label>
+                    <input type="file" id="productImage" accept="image/*" class="w-full" />
+                </div>
+
+                <!-- Disponibilidade (Sazonalidade + Indisponível hoje) -->
+                <div class="border-t pt-4 mt-2">
+                    <h5 class="text-sm font-medium text-gray-700 mb-3">📅 Disponibilidade</h5>
+                    <div class="grid grid-cols-2 gap-3 mb-3">
+                        <div>
+                            <label class="text-xs text-gray-600">Disponível a partir de</label>
+                            <input type="date" id="productStartDate" class="w-full px-2 py-1 border rounded text-sm">
+                        </div>
+                        <div>
+                            <label class="text-xs text-gray-600">Disponível até</label>
+                            <input type="date" id="productEndDate" class="w-full px-2 py-1 border rounded text-sm">
+                        </div>
+                    </div>
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" id="productUnavailableToday" class="w-4 h-4 text-rose-600">
+                        <span class="text-sm text-gray-700">Indisponível hoje</span>
+                    </label>
+                    <p class="text-xs text-gray-500 mt-1">Deixe as datas vazias para disponibilidade contínua.</p>
+                </div>
+
+                <!-- Promoção -->
+                <div class="border-t pt-4 mt-2">
+                    <h5 class="text-sm font-medium text-gray-700 mb-3">🏷️ Promoção</h5>
+                    <label class="flex items-center gap-2 cursor-pointer mb-3">
+                        <input type="checkbox" id="productPromoActive" class="w-4 h-4 text-rose-600"
+                            onchange="document.getElementById('promoDetailsFields').classList.toggle('hidden', !this.checked)">
+                        <span class="text-sm text-gray-700">Produto em promoção</span>
+                    </label>
+                    <div id="promoDetailsFields" class="hidden grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="text-xs text-gray-600">Tipo de desconto</label>
+                            <select id="productPromoType" class="w-full px-2 py-1 border rounded text-sm">
+                                <option value="percent">% Percentual</option>
+                                <option value="value">R$ Valor fixo</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="text-xs text-gray-600">Valor do desconto</label>
+                            <input type="number" id="productPromoValue" step="0.01" placeholder="0"
+                                class="w-full px-2 py-1 border rounded text-sm">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Encomenda -->
+                <div class="border-t pt-4 mt-2">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" id="productIsEncomenda" class="w-4 h-4 text-rose-600">
+                        <span class="text-sm text-gray-700">📅 Típico de encomenda (exige agendamento)</span>
+                    </label>
+                    <p class="text-xs text-gray-500 mt-1">Ex.: Kits festa, bolos personalizados.</p>
+                </div>
+
+                <!-- Exige Antecedência -->
+                <div class="border-t pt-4 mt-2">
+                    <label class="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" id="productRequiresPreorder" class="w-4 h-4 text-orange-600">
+                        <span class="text-sm text-gray-700">⏰ Exige antecedência (não pode ser hoje)</span>
+                    </label>
+                    <p class="text-xs text-gray-500 mt-1">Quando marcado, este produto NÃO pode ser pedido para retirada
+                        no mesmo dia.</p>
+                </div>
+
+                <!-- Bloqueio de Opções (Bolos) -->
+                <div id="blockOptionsSection" class="border-t pt-4 mt-2 hidden">
+                    <h5 class="text-sm font-medium text-gray-700 mb-3">🚫 Bloquear Opções de Personalização</h5>
+                    <div class="space-y-2">
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" id="productBlockMassa" class="w-4 h-4 text-rose-600">
+                            <span class="text-sm text-gray-700">Bloquear escolha de massa</span>
+                        </label>
+                        <label class="flex items-center gap-2 cursor-pointer">
+                            <input type="checkbox" id="productBlockRecheio" class="w-4 h-4 text-rose-600">
+                            <span class="text-sm text-gray-700">Bloquear escolha de recheio</span>
+                        </label>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-2">Útil para bolos com receita fixa (ex.: Vulcão Mini).</p>
+                </div>
+
+                <!-- Flavor Selection (Mini-Salgados only) -->
+                <div id="flavorSelectionSection" class="border-t pt-4 mt-2 hidden">
+                    <h5 class="text-sm font-medium text-gray-700 mb-3">🍽️ Seleção de Sabores (Mini-Salgados)</h5>
+                    <label class="flex items-center gap-2 cursor-pointer mb-3">
+                        <input type="checkbox" id="flavorSelectionEnabled" class="w-4 h-4 text-rose-600">
+                        <span class="text-sm text-gray-700">Cliente escolhe sabores?</span>
+                    </label>
+                    <div id="flavorSelectionDetails" class="hidden space-y-3 pl-4 border-l-2 border-rose-200">
+                        <div>
+                            <label class="text-xs text-gray-600">Quantos sabores o cliente pode escolher?</label>
+                            <input type="number" id="flavorSelectionMax" min="1" max="20" value="3"
+                                class="w-20 px-2 py-1 border rounded text-sm">
+                        </div>
+                        <div>
+                            <label class="text-xs text-gray-600 block mb-2">Sabores disponíveis para este
+                                produto:</label>
+                            <div id="flavorSelectionFlavors" class="space-y-1 max-h-40 overflow-y-auto">
+                                <!-- Rendered dynamically -->
+                            </div>
+                        </div>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-2">Se ativado, o cliente poderá escolher os sabores no momento da
+                        compra.</p>
+                </div>
+
+                <!-- CATALOG SECTION -->
+                <div class="border-t pt-4 mt-2">
+                    <h5 class="text-sm font-medium text-gray-700 mb-3">📚 Catálogo</h5>
+                    <label class="flex items-center gap-2 cursor-pointer mb-3">
+                        <input type="checkbox" id="productCatalogEnabled" class="w-4 h-4 text-rose-600" checked>
+                        <span class="text-sm text-gray-700">Mostrar no catálogo</span>
+                    </label>
+                    <div class="grid grid-cols-2 gap-3 mb-3">
+                        <div>
+                            <label class="text-xs text-gray-600 block mb-1">Opções de tamanho</label>
+                            <div class="space-y-1">
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" id="catalogSizeSmall" class="w-3 h-3 text-rose-600">
+                                    <span class="text-xs text-gray-700">Pequeno</span>
+                                </label>
+                                <label class="flex items-center gap-2 cursor-pointer">
+                                    <input type="checkbox" id="catalogSizeLarge" class="w-3 h-3 text-rose-600">
+                                    <span class="text-xs text-gray-700">Grande</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="flex items-center gap-2 cursor-pointer mt-4">
+                                <input type="checkbox" id="catalogVegan" class="w-4 h-4 text-green-600">
+                                <span class="text-sm text-gray-700">🌱 Vegano</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="text-xs text-gray-600 block mb-1">Frase para o catálogo</label>
+                        <textarea id="catalogPhrase" rows="2" placeholder="Ex: Perfeito para festas de aniversário!"
+                            class="w-full px-2 py-1 border rounded text-sm"></textarea>
+                    </div>
+                    <div>
+                        <label class="text-xs text-gray-600 block mb-1">Posição no catálogo (ordem)</label>
+                        <input type="number" id="catalogOrder" min="0" placeholder="0"
+                            class="w-20 px-2 py-1 border rounded text-sm">
+                    </div>
+                    <p class="text-xs text-gray-500 mt-2">Menor número = aparece primeiro no catálogo.</p>
+                </div>
+
+                <button type="submit"
+                    class="w-full bg-rose-600 hover:bg-rose-700 text-white py-2 rounded-lg font-medium">Salvar
+                    Produto</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Toast Container for inline notifications -->
+    <div id="toastContainer"></div>
+
+    <!-- Inline Confirmation Modal (replaces browser confirm()) -->
+    <div id="confirmModal">
+        <div class="modal-content">
+            <div class="flex items-center gap-3 mb-4">
+                <span class="text-3xl" id="confirmIcon">⚠️</span>
+                <h3 class="text-lg font-bold text-gray-800" id="confirmTitle">Confirmar ação</h3>
+            </div>
+            <p class="text-gray-600 mb-6" id="confirmMessage">Deseja continuar?</p>
+            <div class="flex gap-3 justify-end">
+                <button id="confirmCancelBtn"
+                    class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors">
+                    Cancelar
+                </button>
+                <button id="confirmOkBtn"
+                    class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-medium transition-colors">
+                    Confirmar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Inline Prompt Modal (replaces browser prompt()) -->
+    <div id="promptModal">
+        <div class="modal-content">
+            <div class="flex items-center gap-3 mb-4">
+                <span class="text-3xl">✏️</span>
+                <h3 class="text-lg font-bold text-gray-800" id="promptTitle">Editar</h3>
+            </div>
+            <p class="text-gray-600 mb-3" id="promptMessage">Digite o novo valor:</p>
+            <input type="text" id="promptInput"
+                class="w-full px-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-rose-500 focus:border-rose-500 outline-none mb-4">
+            <div class="flex gap-3 justify-end">
+                <button id="promptCancelBtn"
+                    class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors">
+                    Cancelar
+                </button>
+                <button id="promptOkBtn"
+                    class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-medium transition-colors">
+                    Salvar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modularized Admin Scripts -->
+    <script src="../assets/js/admin/clients.js"></script>
+    <script src="../assets/js/admin/auth.js"></script>
+    <script src="../assets/js/admin/config.js"></script>
+    <script src="../assets/js/admin/products.js"></script>
+    <script src="../assets/js/admin/promotions.js"></script>
+    <script src="../assets/js/admin/reports.js"></script>
+    <script src="../assets/js/admin/rules.js"></script>
+    <script src="../assets/js/admin/ratings.js"></script>
+    <script src="../assets/js/admin/stripe.js"></script>
+    <script src="../assets/js/admin/orders.js"></script>
+    <script src="../assets/js/services.js"></script>
+    <script src="../assets/js/admin/core.js"></script>
+
+    <!-- Modal de confirmação de exclusão de pedidos -->
+    <div id="deleteOrdersModal"
+        class="fixed inset-0 bg-black bg-opacity-50 z-50 hidden flex items-center justify-center">
+        <div class="bg-white rounded-xl p-6 max-w-md w-full mx-4 text-gray-800">
+            <h3 class="text-xl font-bold text-amber-700 mb-4">⚠️ Confirmar Exclusão de Pedidos</h3>
+            <p id="deleteOrdersModalText" class="text-gray-700 mb-4"></p>
+            <div class="flex gap-3 justify-end">
+                <button id="cancelDeleteOrdersModalBtn"
+                    class="px-4 py-2 bg-gray-200 hover:bg-gray-300 rounded-lg font-medium">Cancelar</button>
+                <button id="confirmDeleteOrdersModalBtn"
+                    class="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium">Excluir</button>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

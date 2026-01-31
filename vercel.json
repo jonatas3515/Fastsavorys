@@ -3,6 +3,12 @@
     "buildCommand": "npm run build",
     "outputDirectory": ".",
     "framework": null,
+    "crons": [
+        {
+            "path": "/api/birthday-broadcast",
+            "schedule": "0 12 * * *"
+        }
+    ],
     "rewrites": [
         {
             "source": "/",

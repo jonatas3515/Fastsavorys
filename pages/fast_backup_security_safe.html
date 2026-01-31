@@ -4,13 +4,10 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="manifest" href="../manifest.json" />
   <title>Fast Savory's | Delivery</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js"></script>
   <script src="../assets/js/utils.js"></script>
   <script src="../assets/js/services.js"></script>
-  <script src="../assets/js/fast/options.js"></script>
-  <script src="../assets/js/fast/ad-banner.js"></script>
   <script>
     // Error handlers para debug iOS (tela branca)
     window._debugErrors = [];
@@ -46,18 +43,31 @@
     };
 
     // Service Worker: desregistrar em ambiente local para evitar cache antigo
-    // Service Worker Registration for PWA
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', function () {
-        // Register SW at root scope (../service-worker.js)
-        navigator.serviceWorker.register('../service-worker.js')
-          .then(function (registration) {
-            console.log('[SW] ServiceWorker registered with scope:', registration.scope);
-          }, function (err) {
-            console.log('[SW] ServiceWorker registration failed:', err);
-          });
-      });
-    }
+    (function () {
+      try {
+        var hostname = location.hostname;
+        var isLocal = hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1';
+        var isPrivateIP = hostname.indexOf('192.168.') === 0 || hostname.indexOf('10.') === 0 ||
+          (hostname.indexOf('172.') === 0 && parseInt(hostname.split('.')[1]) >= 16 && parseInt(hostname.split('.')[1]) <= 31);
+        if ((isLocal || isPrivateIP) && 'serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then(function (regs) {
+            regs.forEach(function (reg) {
+              reg.unregister();
+              console.log('[SW] Desregistrado automaticamente em ambiente local');
+            });
+          }).catch(function (e) { console.log('[SW] Erro ao desregistrar:', e); });
+          // Limpar caches antigos
+          if ('caches' in window) {
+            caches.keys().then(function (names) {
+              names.forEach(function (name) { caches.delete(name); });
+              if (names.length) console.log('[CACHE] Limpo automaticamente em ambiente local');
+            }).catch(function (e) { console.log('[CACHE] Erro ao limpar:', e); });
+          }
+        }
+      } catch (e) {
+        console.log('[SW/CACHE] Erro geral:', e);
+      }
+    })();
   </script>
   <link rel="stylesheet" href="../assets/css/styles.css" />
   <link rel="stylesheet" href="../assets/css/catalog-3d.css" />
@@ -284,7 +294,11 @@
           </div>
           <div class="text-xs text-white font-bold">📞 73 99936-6554</div>
           <div class="flex items-center gap-2">
-
+            <!-- Back to Admin button (mobile, hidden by default) -->
+            <button id="backToAdminBtnMobile" onclick="goBackToAdmin()"
+              class="hidden bg-rose-600 hover:bg-rose-700 text-white text-xs px-2 py-1 rounded">
+              ← Admin
+            </button>
             <a href="admin.html" class="bg-white/20 hover:bg-white/30 text-white text-xs px-2 py-1 rounded">
               Entrar
             </a>
@@ -310,7 +324,11 @@
               📍 Rua Palmeiras, 105, Novo Prado, Itamaraju-BA</div>
           </div>
           <div class="flex items-center gap-2">
-
+            <!-- Back to Admin button (hidden by default, shown if coming from admin) -->
+            <button id="backToAdminBtn" onclick="goBackToAdmin()"
+              class="hidden bg-rose-600 hover:bg-rose-700 text-white px-3 py-1 rounded-lg font-medium">
+              ← Admin
+            </button>
             <a href="admin.html" class="bg-white/20 hover:bg-white/30 text-white px-3 py-1 rounded-lg font-medium">
               Entrar
             </a>
@@ -638,11 +656,11 @@
   <!-- Public Ad Banner (Fixed Bottom) -->
   <div id="adBannerPublic" class="fixed bottom-0 left-0 right-0 z-[55] hidden">
     <div class="relative">
-      <!-- Close Button (Enhanced Visibility) -->
+      <!-- Close Button -->
       <button id="closeBannerBtn"
-        class="absolute top-2 right-2 z-20 bg-white/95 hover:bg-white text-gray-800 rounded-full w-10 h-10 flex items-center justify-center shadow-xl border border-gray-200 active:scale-95 transition-transform"
+        class="absolute top-1 right-1 sm:top-2 sm:right-2 z-10 bg-black/60 hover:bg-black/80 text-white rounded-full w-6 h-6 sm:w-7 sm:h-7 flex items-center justify-center shadow-lg text-sm font-bold"
         aria-label="Fechar banner">
-        <span class="text-xl font-bold font-sans">✕</span>
+        ✕
       </button>
 
       <!-- Banner Content (Image or Fallback) -->
@@ -1225,21 +1243,6 @@
     </div>
   </div>
 
-  <!-- Generic Confirmation Modal -->
-  <div id="confirmationModal"
-    class="fixed inset-0 bg-black bg-opacity-50 z-[100] hidden flex items-center justify-center p-4">
-    <div class="bg-white rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl">
-      <h3 class="text-lg font-bold text-gray-800 mb-3" id="confirmationModalTitle">Confirmação</h3>
-      <p class="text-gray-600 mb-4" id="confirmationModalText">Confirmar ação?</p>
-      <div class="flex gap-3">
-        <button type="button" id="confirmationModalCancel"
-          class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 py-2 rounded-lg font-medium">Cancelar</button>
-        <button type="button" id="confirmationModalConfirm"
-          class="flex-1 bg-rose-600 hover:bg-rose-700 text-white py-2 rounded-lg font-medium">Confirmar</button>
-      </div>
-    </div>
-  </div>
-
   <!-- ========================================
        CATALOG OVERLAY (REVISTA/FOLHETO)
        ======================================== -->
@@ -1492,17 +1495,23 @@
         try { loadPublicRatings(); } catch (e) { console.warn('[Ratings] Failed to load:', e); }
 
         // Initialize Options Admin UI (for products panel)
-        // try { OptionsAdminUI.init(); } catch (e) { console.warn('[OptionsAdmin] Failed to init:', e); }
+        try { OptionsAdminUI.init(); } catch (e) { console.warn('[OptionsAdmin] Failed to init:', e); }
 
         // Initialize Flavor Selection UI (for product form)
-        // try { FlavorSelectionUI.init(); } catch (e) { console.warn('[FlavorSelection] Failed to init:', e); }
+        try { FlavorSelectionUI.init(); } catch (e) { console.warn('[FlavorSelection] Failed to init:', e); }
 
         // Initialize Catalog Module (for magazine-style catalog)
         try { CatalogModule.init(); } catch (e) { console.warn('[Catalog] Failed to init:', e); }
 
-
-        // Admin auto-load removed. Use admin.html for administration.
-
+        // Admin Auto-Load: Se estiver logado como admin, garanta que os pedidos sejam carregados
+        if (sessionStorage.getItem('fastAdmin') === '1') {
+          setTimeout(() => {
+            if (typeof loadDashboardOrders === 'function') {
+              console.log('[INIT] Admin detectado, carregando pedidos...');
+              loadDashboardOrders();
+            }
+          }, 1000); // Pequeno delay para garantir que scripts externos carregaram
+        }
 
         // Logout Handler (Backup para fast.html)
         document.getElementById('logoutBtn')?.addEventListener('click', () => {
@@ -1571,43 +1580,275 @@
         console.error('Erro ao salvar usuários no Supabase:', error);
       }
     }
+    function renderUsers() {
+      const box = document.getElementById('usersList'); if (!box) return;
+      box.innerHTML = users.map((u, i) => `
+        <div class='p-3 border rounded-lg'>
+          <div id='userView${i}' class='flex flex-col sm:flex-row sm:items-center justify-between gap-2'>
+            <div>
+              <p class='font-medium text-gray-800'>${u.username}</p>
+              <p class='text-xs text-gray-600'>Papel: ${u.role}</p>
+            </div>
+            <div class='flex gap-2'>
+              <button class='flex-1 sm:flex-none px-2 py-1 rounded bg-blue-500 hover:bg-blue-600 text-white text-xs' onclick='showEditUserForm(${i})'>Editar</button>
+              <button class='flex-1 sm:flex-none px-2 py-1 rounded bg-red-500 hover:bg-red-600 text-white text-xs' onclick='deleteUser(${i})'>Excluir</button>
+            </div>
+          </div>
+          <div id='userEditForm${i}' class='hidden mt-3 p-3 bg-gray-50 rounded-lg'>
+            <div class='space-y-3'>
+              <div>
+                <label class='block text-xs font-medium text-gray-700 mb-1'>Nome de usuário</label>
+                <input type='text' id='editUsername${i}' value='${u.username}' class='w-full px-2 py-1 border rounded text-sm' />
+              </div>
+              <div>
+                <label class='block text-xs font-medium text-gray-700 mb-1'>Nova senha (vazio = manter)</label>
+                <input type='password' id='editPassword${i}' class='w-full px-2 py-1 border rounded text-sm' placeholder='••••••' />
+              </div>
+              <div>
+                <label class='block text-xs font-medium text-gray-700 mb-1'>Papel</label>
+                <select id='editRole${i}' class='w-full px-2 py-1 border rounded text-sm'>
+                  <option value='admin' ${u.role === 'admin' ? 'selected' : ''}>Admin</option>
+                  <option value='gerente' ${u.role === 'gerente' ? 'selected' : ''}>Gerente</option>
+                  <option value='garcom' ${u.role === 'garcom' ? 'selected' : ''}>Garçom</option>
+                  <option value='caixa' ${u.role === 'caixa' ? 'selected' : ''}>Caixa</option>
+                </select>
+              </div>
+              <div id='editUserMsg${i}' class='text-xs hidden'></div>
+              <div class='flex gap-2'>
+                <button class='flex-1 px-2 py-1 rounded bg-gray-300 hover:bg-gray-400 text-gray-800 text-xs' onclick='cancelEditUser(${i})'>Cancelar</button>
+                <button class='flex-1 px-2 py-1 rounded bg-green-500 hover:bg-green-600 text-white text-xs' onclick='saveEditUser(${i})'>Salvar</button>
+              </div>
+            </div>
+          </div>
+        </div>`).join('');
+    }
 
-    // User management functions removed (Admin only)
+    function showEditUserForm(i) {
+      document.getElementById('userView' + i).classList.add('hidden');
+      document.getElementById('userEditForm' + i).classList.remove('hidden');
+    }
 
+    function cancelEditUser(i) {
+      document.getElementById('userView' + i).classList.remove('hidden');
+      document.getElementById('userEditForm' + i).classList.add('hidden');
+      // Reset values
+      document.getElementById('editUsername' + i).value = users[i].username;
+      document.getElementById('editPassword' + i).value = '';
+    }
+
+    function saveEditUser(i) {
+      const newUsername = document.getElementById('editUsername' + i).value.trim();
+      const newPassword = document.getElementById('editPassword' + i).value;
+      const newRole = document.getElementById('editRole' + i).value;
+      const msgBox = document.getElementById('editUserMsg' + i);
+
+      if (!newUsername) {
+        msgBox.textContent = '❌ Nome de usuário não pode ser vazio';
+        msgBox.className = 'text-xs text-red-600';
+        msgBox.classList.remove('hidden');
+        return;
+      }
+
+      // Check duplicate username
+      if (newUsername !== users[i].username && users.some(u => u.username === newUsername)) {
+        msgBox.textContent = '❌ Este nome de usuário já existe!';
+        msgBox.className = 'text-xs text-red-600';
+        msgBox.classList.remove('hidden');
+        return;
+      }
+
+      // Impedir remoção do último admin
+      if (users[i].role === 'admin' && newRole !== 'admin' && users.filter(u => u.role === 'admin').length === 1) {
+        msgBox.textContent = '❌ Mantenha ao menos um administrador!';
+        msgBox.className = 'text-xs text-red-600';
+        msgBox.classList.remove('hidden');
+        return;
+      }
+
+      users[i].username = newUsername;
+      if (newPassword) users[i].password = newPassword;
+      users[i].role = newRole;
+
+      saveUsers();
+      renderUsers();
+
+      // Show success message
+      showToast('✅ Usuário atualizado com sucesso!', 'success');
+    }
+
+    function editUser(i) { showEditUserForm(i); } // Compatibility alias
+
+    function changeUserPassword(i) { editUser(i); } // Mantém compatibilidade
+    function deleteUser(i) { if (users[i].role === 'admin' && users.filter(u => u.role === 'admin').length === 1) { alert('Mantenha ao menos um administrador.'); return; } if (confirm('Excluir usuário ' + users[i].username + '?')) { users.splice(i, 1); saveUsers(); renderUsers(); } }
 
     // Client Management Functions
-    // NOTA: loadClients agora usa apenas cache local.
-    // A busca por telefone individual é feita via API /api/client-profile (seguro)
     async function loadClients() {
       try {
-        // Carrega do localStorage como cache inicial
-        const saved = localStorage.getItem('fastClients');
-        if (saved) {
-          clients = JSON.parse(saved);
-          console.log('[Clients] Carregados do cache local:', clients.length);
-        } else {
-          clients = [];
-        }
+        const { data, error } = await window.supabaseClient
+          .from('fast_clients')
+          .select('*');
+
+        if (error) throw error;
+        clients = data || [];
       } catch (error) {
         console.error('Erro ao carregar clientes:', error);
-        clients = [];
+        // Fallback para localStorage
+        const saved = localStorage.getItem('fastClients');
+        if (saved) { clients = JSON.parse(saved); }
+        else { clients = []; }
       }
     }
 
-    // saveClients agora salva apenas no localStorage (cache)
-    // O salvamento no Supabase é feito via endpoints seguros no checkout
     async function saveClients() {
       try {
+        // Sincroniza com Supabase
+        for (const client of clients) {
+          const { error } = await window.supabaseClient
+            .from('fast_clients')
+            .upsert(client, { onConflict: 'phone' });
+
+          if (error) throw error;
+        }
+
+        // Mantém backup no localStorage
         localStorage.setItem('fastClients', JSON.stringify(clients));
       } catch (error) {
-        console.error('Erro ao salvar clientes no cache:', error);
+        console.error('Erro ao salvar clientes:', error);
+        // Fallback para localStorage
+        localStorage.setItem('fastClients', JSON.stringify(clients));
       }
     }
 
+    // ========================================
+    // COURIER (ENTREGADOR) MANAGEMENT
+    // ========================================
+    async function loadCouriers() {
+      try {
+        const { data, error } = await window.supabaseClient
+          .from('fast_couriers')
+          .select('*')
+          .order('name');
+        if (error) throw error;
+        couriers = data || [];
+      } catch (e) {
+        console.warn('[Couriers] Erro ao carregar do Supabase:', e);
+        const saved = localStorage.getItem('fastCouriers');
+        couriers = saved ? JSON.parse(saved) : [];
+      }
+      renderCouriersList();
+    }
 
-    // Courier management functions removed (Admin only)
-    // couriers definition removed (already defined globally)
+    async function saveCourier(courier) {
+      try {
+        const { error } = await window.supabaseClient
+          .from('fast_couriers')
+          .upsert(courier, { onConflict: 'id' });
+        if (error) throw error;
+      } catch (e) {
+        console.warn('[Couriers] Erro ao salvar no Supabase:', e);
+      }
+      localStorage.setItem('fastCouriers', JSON.stringify(couriers));
+    }
 
+    async function deleteCourier(courierId) {
+      try {
+        await window.supabaseClient
+          .from('fast_couriers')
+          .update({ active: false })
+          .eq('id', courierId);
+      } catch (e) {
+        console.warn('[Couriers] Erro ao desativar:', e);
+      }
+      couriers = couriers.filter(c => c.id !== courierId);
+      localStorage.setItem('fastCouriers', JSON.stringify(couriers));
+      renderCouriersList();
+    }
+
+    function renderCouriersList() {
+      const container = document.getElementById('couriersList');
+      if (!container) return;
+
+      const activeCouriers = couriers.filter(c => c.active !== false);
+
+      if (activeCouriers.length === 0) {
+        container.innerHTML = '<p class="text-gray-400 text-sm text-center py-4">Nenhum entregador cadastrado</p>';
+        return;
+      }
+
+      container.innerHTML = activeCouriers.map(c => `
+        <div class="flex items-center justify-between p-2 bg-gray-50 rounded-lg border">
+          <div class="flex items-center gap-2">
+            <span class="text-lg">🏍️</span>
+            <div>
+              <p class="font-medium text-gray-800 text-sm">${c.name}</p>
+              <p class="text-xs text-gray-500">${c.phone || 'Sem telefone'}</p>
+            </div>
+          </div>
+          <div class="flex gap-1">
+            <button onclick="editCourier(${c.id})" class="text-blue-600 hover:text-blue-800 text-xs px-2 py-1">✏️</button>
+            <button onclick="confirmDeleteCourier(${c.id})" class="text-red-600 hover:text-red-800 text-xs px-2 py-1">🗑️</button>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function editCourier(courierId) {
+      const courier = couriers.find(c => c.id === courierId);
+      if (!courier) return;
+      document.getElementById('courierName').value = courier.name;
+      document.getElementById('courierPhone').value = courier.phone || '';
+      document.getElementById('courierEditId').value = courierId;
+    }
+
+    function confirmDeleteCourier(courierId) {
+      const courier = couriers.find(c => c.id === courierId);
+      if (confirm(`Deseja remover o entregador "${courier?.name}"?`)) {
+        deleteCourier(courierId);
+      }
+    }
+
+    function getActiveCouriers() {
+      return couriers.filter(c => c.active !== false);
+    }
+
+    // Courier form handler
+    document.getElementById('courierForm')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('courierName').value.trim();
+      const phone = document.getElementById('courierPhone').value.trim();
+      const editId = document.getElementById('courierEditId').value;
+
+      if (!name) {
+        alert('Informe o nome do entregador.');
+        return;
+      }
+
+      if (editId) {
+        // Editar existente
+        const idx = couriers.findIndex(c => c.id === parseInt(editId));
+        if (idx !== -1) {
+          couriers[idx].name = name;
+          couriers[idx].phone = phone;
+          await saveCourier(couriers[idx]);
+        }
+      } else {
+        // Novo entregador
+        const newCourier = {
+          id: Date.now(),
+          name,
+          phone,
+          active: true
+        };
+        couriers.push(newCourier);
+        await saveCourier(newCourier);
+      }
+
+      // Reset form
+      document.getElementById('courierForm').reset();
+      document.getElementById('courierEditId').value = '';
+      renderCouriersList();
+      showToast('✅ Entregador salvo!', 'success');
+    });
 
     // Função de selecionar endereço substituída por CustomerModule (se implementada) ou mantida aqui se específica de UI
     // Mas como o módulo CustomerModule não implementou selectAddress/deleteAddress explicitamente na versão inicial,
@@ -1631,10 +1872,227 @@
     //    Então podemos remover tranquilamente.
 
 
+    // Variáveis globais para filtros de clientes
+    let currentNameInitial = '';
+    let currentBirthMonth = '';
 
-    // Client management (Admin UI) removed.
-    // Public store uses CustomerModule for user's own data.
+    function renderClients(searchTerm = '') {
+      const box = document.getElementById('clientsList'); if (!box) return;
 
+      // Filtra por texto de busca (nome/telefone)
+      let filtered = clients.filter(c =>
+        c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        c.phone.includes(searchTerm)
+      );
+
+      // Filtra por inicial do nome
+      if (currentNameInitial) {
+        filtered = filtered.filter(c => {
+          const firstName = (c.name || '').trim().toUpperCase();
+          return firstName.startsWith(currentNameInitial);
+        });
+      }
+
+      // Filtra por mês de aniversário
+      if (currentBirthMonth) {
+        if (currentBirthMonth === 'no-date') {
+          filtered = filtered.filter(c => !c.birthdate);
+        } else {
+          filtered = filtered.filter(c => {
+            if (!c.birthdate) return false;
+            let month = '';
+            if (c.birthdate.includes('/')) {
+              const parts = c.birthdate.split('/');
+              month = parts[1];
+            } else if (c.birthdate.includes('-')) {
+              const parts = c.birthdate.split('-');
+              month = parts[1];
+            }
+            return month === currentBirthMonth;
+          });
+        }
+      }
+
+      // Renderiza a lista filtrada
+      box.innerHTML = filtered.length ? filtered.map((c, i) => {
+        // Encontra o índice original no array clients para as funções edit/delete
+        const originalIndex = clients.findIndex(client => client.phone === c.phone);
+        return `
+        <div class='flex items-center justify-between p-4 border rounded-lg'>
+          <div class='flex-1'>
+            <p class='font-medium text-gray-800'>${c.name}</p>
+            <p class='text-sm text-gray-600'>📱 ${c.phone}</p>
+            ${c.email ? `<p class='text-sm text-gray-600'>📧 ${c.email}</p>` : ''}
+            ${c.address ? `<p class='text-sm text-gray-600'>📍 ${c.address}</p>` : ''}
+            <p class='text-xs text-gray-500'>🎂 ${c.birthdate ? c.birthdate.split('-').reverse().join('/') : 'Não informado'}</p>
+            ${clientDiscounts[c.phone] ? `<p class='text-xs text-green-600 font-semibold'>Desconto: ${clientDiscounts[c.phone]}%</p>` : ''}
+          </div>
+          <div class='flex gap-2'>
+            <button class='px-3 py-1 rounded bg-blue-500 hover:bg-blue-600 text-white text-sm' onclick='editClient(${originalIndex})'>Editar</button>
+            <button class='px-3 py-1 rounded bg-red-500 hover:bg-red-600 text-white text-sm' onclick='deleteClient(${originalIndex})'>Excluir</button>
+          </div>
+        </div>`;
+      }).join('') : '<p class="text-gray-500 text-center py-8">Nenhum cliente encontrado com os filtros aplicados.</p>';
+    }
+    function editClient(i) {
+      const c = clients[i];
+      document.getElementById('clientName').value = c.name;
+      document.getElementById('clientBirthdate').value = c.birthdate;
+      document.getElementById('clientPhone').value = c.phone;
+      document.getElementById('clientEmail').value = c.email || '';
+      document.getElementById('clientAddress').value = c.address || '';
+      editingClientId = i;
+    }
+    // Variável para armazenar cliente pendente de exclusão
+    let clientToDelete = null;
+    let clientToDeleteIndex = null;
+
+    function deleteClient(i) {
+      const client = clients[i];
+      if (!client) return;
+
+      clientToDelete = client;
+      clientToDeleteIndex = i;
+
+      // Conta pedidos do cliente
+      const ordersCount = orders.filter(o => o.client_phone === client.phone).length;
+
+      // Monta texto do modal
+      const deleteClientModalText = document.getElementById('deleteClientModalText');
+      deleteClientModalText.innerHTML = `
+        <p><strong>Nome:</strong> ${client.name || 'Cliente'}</p>
+        <p><strong>Telefone:</strong> ${client.phone}</p>
+        ${client.birthdate ? `<p><strong>Aniversário:</strong> ${client.birthdate}</p>` : ''}
+        <div class="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm">
+          ⚠️ Este cliente possui <strong>${ordersCount} pedido(s)</strong> no histórico.
+          ${ordersCount > 0 ? '<br>Os pedidos NÃO serão excluídos, apenas o cadastro do cliente.' : ''}
+        </div>
+        <p class="mt-3">Deseja realmente excluir este cliente?</p>
+      `;
+
+      // Abre o modal
+      document.getElementById('deleteClientModal').classList.remove('hidden');
+    }
+
+    // Executa exclusão de cliente após confirmação no modal
+    async function executeDeleteClient() {
+      if (!clientToDelete) return;
+
+      const deleteClientModal = document.getElementById('deleteClientModal');
+      deleteClientModal.classList.add('hidden');
+
+      try {
+        // Exclui do Supabase
+        const { error } = await window.supabaseClient
+          .from('fast_clients')
+          .delete()
+          .eq('phone', clientToDelete.phone);
+
+        if (error) throw error;
+
+        // Remove da lista local
+        const phone = clientToDelete.phone;
+        clients = clients.filter(c => c.phone !== phone);
+        delete clientDiscounts[phone];
+
+        // Salva no localStorage como backup
+        saveClients();
+        saveClientDiscounts();
+
+        // Recarrega lista
+        renderClients();
+
+        // Limpa variáveis
+        clientToDelete = null;
+        clientToDeleteIndex = null;
+
+        // Feedback visual
+        showToast('✅ Cliente excluído com sucesso!', 'success');
+
+      } catch (error) {
+        console.error('Erro ao excluir cliente:', error);
+
+        // Mesmo com erro no Supabase, tenta excluir localmente
+        if (clientToDeleteIndex !== null && clients[clientToDeleteIndex]) {
+          const phone = clients[clientToDeleteIndex].phone;
+          clients.splice(clientToDeleteIndex, 1);
+          delete clientDiscounts[phone];
+          saveClients();
+          saveClientDiscounts();
+          renderClients();
+        }
+
+        clientToDelete = null;
+        clientToDeleteIndex = null;
+
+        showToast(`⚠️ Cliente removido localmente. Erro no servidor: ${error.message}`, 'warning');
+      }
+    }
+
+    // Event listeners para modal de exclusão de cliente
+    document.getElementById('cancelDeleteClientModalBtn')?.addEventListener('click', () => {
+      document.getElementById('deleteClientModal').classList.add('hidden');
+      clientToDelete = null;
+      clientToDeleteIndex = null;
+    });
+
+    document.getElementById('confirmDeleteClientModalBtn')?.addEventListener('click', executeDeleteClient);
+
+    // Fechar modal ao clicar fora
+    document.getElementById('deleteClientModal')?.addEventListener('click', (e) => {
+      if (e.target.id === 'deleteClientModal') {
+        e.target.classList.add('hidden');
+        clientToDelete = null;
+        clientToDeleteIndex = null;
+      }
+    });
+    document.addEventListener('submit', (e) => {
+      if (e.target && e.target.id === 'clientForm') {
+        e.preventDefault();
+        const name = document.getElementById('clientName').value.trim();
+        const birthdate = document.getElementById('clientBirthdate').value;
+        const phone = document.getElementById('clientPhone').value.trim();
+        const email = document.getElementById('clientEmail').value.trim();
+        const address = document.getElementById('clientAddress').value.trim();
+
+        // VALIDATION: Require Name + Surname for NEW phones
+        const isNewPhone = !clients.some(c => c.phone === phone);
+        if (isNewPhone) {
+          const nameParts = name.split(/\s+/).filter(w => w.length > 0);
+          if (nameParts.length < 2) {
+            alert('Por favor, informe nome e sobrenome do cliente.');
+            return;
+          }
+        }
+
+        // Check for duplicate
+        const duplicate = clients.find(c =>
+          c.name.toLowerCase() === name.toLowerCase() && c.phone === phone
+        );
+        if (duplicate && editingClientId !== undefined) {
+          alert('Cadastro já existente para este nome e telefone.');
+          return;
+        }
+
+        if (editingClientId !== undefined) {
+          const oldPhone = clients[editingClientId].phone;
+          clients[editingClientId] = { name, birthdate, phone, email, address };
+          // Migrate discount if phone changed
+          if (oldPhone !== phone && clientDiscounts[oldPhone]) {
+            clientDiscounts[phone] = clientDiscounts[oldPhone];
+            delete clientDiscounts[oldPhone];
+            saveClientDiscounts();
+          }
+          editingClientId = undefined;
+        } else {
+          clients.push({ name, birthdate, phone, email, address });
+        }
+        saveClients();
+        renderClients();
+        e.target.reset();
+        alert('Cliente salvo com sucesso!');
+      }
+    });
 
     // =============================================
     // ORDER MANAGEMENT AND REPORTS
@@ -1735,10 +2193,373 @@
 
 
 
+    async function loadOrders() {
+      try {
+        const { data, error } = await window.supabaseClient
+          .from('fast_orders')
+          .select('*')
+          .order('created_at', { ascending: false });
 
-    // Admin functions removed from public store
-    function renderReportsData() { console.warn('Reports are admin-only'); }
+        if (error) throw error;
+        orders = data || [];
 
+        // Merge with local fallback orders
+        const localOrders = JSON.parse(localStorage.getItem('fastOrders') || '[]');
+        if (localOrders.length > 0) {
+          orders = [...orders, ...localOrders.filter(lo => !orders.find(o => o.id === lo.id))];
+        }
+      } catch (error) {
+        console.error('Erro ao carregar pedidos:', error);
+        orders = JSON.parse(localStorage.getItem('fastOrders') || '[]');
+      }
+    }
+
+    function getOrdersInPeriod(period) {
+      const now = new Date();
+      let startDate;
+
+      switch (period) {
+        case 'month':
+          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+          break;
+        case 'semester':
+          startDate = new Date(now.getFullYear(), now.getMonth() - 6, 1);
+          break;
+        case 'year':
+          startDate = new Date(now.getFullYear(), 0, 1);
+          break;
+        default:
+          startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      }
+
+      return orders.filter(o => safeDate(o.created_at || o.id) >= startDate);
+    }
+
+    function calculateClientRanking(periodOrders) {
+      // Filtra apenas pedidos pagos/entregues/prontos (exclui pendentes e cancelados)
+      const validOrders = periodOrders.filter(order => {
+        const status = (order.status || '').toLowerCase();
+        return status.includes('paid') || status.includes('delivered') || status.includes('confirmed') ||
+          status.includes('pago') || status.includes('entregue') || status.includes('pronto') ||
+          status === 'preparing' || status === 'out_for_delivery';
+      });
+
+      const clientTotals = {};
+
+      validOrders.forEach(order => {
+        const key = order.client_phone || order.client_name;
+        if (!clientTotals[key]) {
+          clientTotals[key] = {
+            name: order.client_name,
+            phone: order.client_phone,
+            total: 0,
+            orderCount: 0
+          };
+        }
+        clientTotals[key].total += parseFloat(order.total || 0);
+        clientTotals[key].orderCount++;
+      });
+
+      return Object.values(clientTotals)
+        .sort((a, b) => b.total - a.total)
+        .slice(0, 10);
+    }
+
+    function calculateTopProducts(periodOrders) {
+      const productCounts = {};
+
+      periodOrders.forEach(order => {
+        const items = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || []);
+        items.forEach(item => {
+          if (!productCounts[item.name]) {
+            productCounts[item.name] = { name: item.name, quantity: 0, revenue: 0 };
+          }
+          productCounts[item.name].quantity += item.quantity || 1;
+          productCounts[item.name].revenue += (item.price || 0) * (item.quantity || 1);
+        });
+      });
+
+      return Object.values(productCounts)
+        .sort((a, b) => b.quantity - a.quantity)
+        .slice(0, 8);
+    }
+
+    function calculateNeighborhoodStats(periodOrders) {
+      const neighborhoodCounts = {};
+
+      periodOrders.forEach(order => {
+        let neighborhood = null;
+
+        // Extract neighborhood from address if delivery
+        if (order.address) {
+          const addr = typeof order.address === 'string' ? JSON.parse(order.address) : order.address;
+          neighborhood = addr.neighborhood || addr.bairro;
+        }
+
+        if (neighborhood) {
+          const key = neighborhood.toLowerCase().trim();
+          if (!neighborhoodCounts[key]) {
+            neighborhoodCounts[key] = { name: neighborhood, count: 0, total: 0 };
+          }
+          neighborhoodCounts[key].count++;
+          neighborhoodCounts[key].total += parseFloat(order.total || 0);
+        }
+      });
+
+      return Object.values(neighborhoodCounts)
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 10);
+    }
+
+    function renderReportsData() {
+      const periodOrders = getOrdersInPeriod(currentReportPeriod);
+
+      // Client Ranking
+      const ranking = calculateClientRanking(periodOrders);
+      const rankingList = document.getElementById('clientRankingList');
+      if (rankingList) {
+        if (ranking.length > 0) {
+          rankingList.innerHTML = ranking.map((c, i) => `
+            <div class="flex items-center justify-between p-2 ${i < 3 ? 'bg-yellow-50 border border-yellow-200' : 'bg-white border'} rounded-lg">
+              <div class="flex items-center gap-3">
+                <span class="text-lg font-bold ${i === 0 ? 'text-yellow-500' : i === 1 ? 'text-gray-400' : i === 2 ? 'text-orange-400' : 'text-gray-600'}">${i + 1}º</span>
+                <div>
+                  <p class="font-medium text-gray-800 text-sm">${c.name}</p>
+                  <p class="text-xs text-gray-500">${c.orderCount} pedidos</p>
+                </div>
+              </div>
+              <span class="font-bold text-green-600">R$ ${c.total.toFixed(2).replace('.', ',')}</span>
+            </div>
+          `).join('');
+        } else {
+          rankingList.innerHTML = `<div class="text-center py-8 text-gray-500"><p class="text-4xl mb-2">📈</p><p>Nenhum pedido no período.</p></div>`;
+        }
+      }
+
+      // Order History
+      const historyList = document.getElementById('orderHistoryList');
+      if (historyList) {
+        if (periodOrders.length > 0) {
+          historyList.innerHTML = periodOrders.slice(0, 20).map(o => {
+            const date = safeDate(o.created_at || o.id).toLocaleDateString('pt-BR');
+            const items = typeof o.items === 'string' ? JSON.parse(o.items) : (o.items || []);
+            return `
+              <div class="p-2 bg-white border rounded-lg">
+                <div class="flex justify-between items-start">
+                  <div>
+                    <p class="font-medium text-gray-800 text-sm">${o.client_name}</p>
+                    <p class="text-xs text-gray-500">${date} | ${items.length} itens</p>
+                  </div>
+                  <span class="font-bold text-green-600 text-sm">R$ ${parseFloat(o.total || 0).toFixed(2).replace('.', ',')}</span>
+                </div>
+              </div>
+            `;
+          }).join('');
+        } else {
+          historyList.innerHTML = `<div class="text-center py-8 text-gray-500"><p class="text-4xl mb-2">🛒</p><p>Nenhum pedido no período.</p></div>`;
+        }
+      }
+
+      // Top Products
+      const topProducts = calculateTopProducts(periodOrders);
+      const topProductsList = document.getElementById('topProductsList');
+      if (topProductsList) {
+        if (topProducts.length > 0) {
+          topProductsList.innerHTML = topProducts.map((p, i) => `
+            <div class="bg-white border rounded-lg p-3 text-center">
+              <p class="text-2xl mb-1">${i < 3 ? '🔥' : '📦'}</p>
+              <p class="font-medium text-gray-800 text-sm truncate">${p.name}</p>
+              <p class="text-xs text-gray-500">${p.quantity}x vendidos</p>
+              <p class="text-xs text-green-600 font-bold">R$ ${p.revenue.toFixed(2).replace('.', ',')}</p>
+            </div>
+          `).join('');
+        } else {
+          topProductsList.innerHTML = `<div class="text-center py-6 text-gray-500 col-span-full"><p class="text-4xl mb-2">🍽️</p><p>Sem dados de produtos.</p></div>`;
+        }
+      }
+
+      // Neighborhood Chart
+      const neighborhoodStats = calculateNeighborhoodStats(periodOrders);
+      const neighborhoodContainer = document.getElementById('neighborhoodChartContainer');
+      if (neighborhoodContainer) {
+        if (neighborhoodStats.length > 0) {
+          const maxCount = Math.max(...neighborhoodStats.map(n => n.count));
+          neighborhoodContainer.innerHTML = neighborhoodStats.map((n, i) => {
+            const percentage = (n.count / maxCount) * 100;
+            const colors = ['bg-rose-500', 'bg-rose-400', 'bg-rose-300', 'bg-pink-400', 'bg-pink-300'];
+            const bgColor = colors[Math.min(i, colors.length - 1)];
+            return `
+              <div class="flex items-center gap-3">
+                <div class="w-24 text-right text-sm font-medium text-gray-700 truncate capitalize">${n.name}</div>
+                <div class="flex-1 bg-gray-200 rounded-full h-6 relative overflow-hidden">
+                  <div class="${bgColor} h-full rounded-full transition-all duration-500" style="width: ${percentage}%"></div>
+                  <span class="absolute inset-0 flex items-center justify-center text-xs font-bold ${percentage > 50 ? 'text-white' : 'text-gray-700'}">${n.count} pedidos</span>
+                </div>
+                <div class="w-20 text-right text-xs text-green-600 font-bold">R$ ${n.total.toFixed(2).replace('.', ',')}</div>
+              </div>
+            `;
+          }).join('');
+        } else {
+          neighborhoodContainer.innerHTML = `<div class="text-center py-6 text-gray-500"><p class="text-4xl mb-2">📍</p><p>Nenhum pedido com entrega no período.</p></div>`;
+        }
+      }
+
+      // Summary Cards
+      // Filtrar apenas pedidos pagos/entregues para faturamento (excluir pending/accepted)
+      const paidOrders = periodOrders.filter(o => {
+        const status = (o.status || '').toLowerCase();
+        return status === 'delivered' || status === 'confirmed' ||
+          status === 'preparing' || status === 'out_for_delivery' ||
+          o.payment_status === 'paid' || o.payment_status === 'paid_full';
+      });
+      const totalRevenue = paidOrders.reduce((sum, o) => sum + parseFloat(o.total || 0), 0);
+      const totalOrders = periodOrders.length;
+      const avgOrder = paidOrders.length > 0 ? totalRevenue / paidOrders.length : 0;
+      const uniqueClients = new Set(periodOrders.map(o => o.client_phone || o.client_name)).size;
+
+      document.getElementById('totalRevenueCard').textContent = `R$ ${totalRevenue.toFixed(2).replace('.', ',')}`;
+      document.getElementById('totalOrdersCard').textContent = totalOrders;
+      document.getElementById('avgOrderCard').textContent = `R$ ${avgOrder.toFixed(2).replace('.', ',')}`;
+      document.getElementById('uniqueClientsCard').textContent = uniqueClients;
+    }
+
+    // Period filter buttons
+    document.getElementById('reportPeriodMonth')?.addEventListener('click', () => {
+      currentReportPeriod = 'month';
+      updatePeriodButtons();
+      renderReportsData();
+    });
+    document.getElementById('reportPeriodSemester')?.addEventListener('click', () => {
+      currentReportPeriod = 'semester';
+      updatePeriodButtons();
+      renderReportsData();
+    });
+    document.getElementById('reportPeriodYear')?.addEventListener('click', () => {
+      currentReportPeriod = 'year';
+      updatePeriodButtons();
+      renderReportsData();
+    });
+
+    // ===========================================
+    // NEIGHBORHOOD FILTER EVENT LISTENERS
+    // ===========================================
+    document.getElementById('neighborhoodFilterYear')?.addEventListener('change', () => {
+      renderNeighborhoodChart();
+    });
+    document.getElementById('neighborhoodFilterPeriod')?.addEventListener('change', () => {
+      renderNeighborhoodChart();
+    });
+
+    // Função para renderizar gráfico de bairros com filtros
+    function renderNeighborhoodChart() {
+      const yearSelect = document.getElementById('neighborhoodFilterYear');
+      const periodSelect = document.getElementById('neighborhoodFilterPeriod');
+      const container = document.getElementById('neighborhoodChartContainer');
+
+      if (!container) return;
+
+      const selectedYear = parseInt(yearSelect?.value || new Date().getFullYear());
+      const selectedPeriod = periodSelect?.value || 'all';
+
+      // Filtrar pedidos pelo ano e período selecionados
+      const filteredOrders = orders.filter(order => {
+        const orderDate = new Date(order.created_at);
+        const orderYear = orderDate.getFullYear();
+        const orderMonth = orderDate.getMonth() + 1; // 1-12
+
+        // Filtro de ano
+        if (orderYear !== selectedYear) return false;
+
+        // Filtro de período
+        if (selectedPeriod === 'all') return true;
+        if (selectedPeriod === '1') return orderMonth >= 1 && orderMonth <= 6; // 1º semestre
+        if (selectedPeriod === '2') return orderMonth >= 7 && orderMonth <= 12; // 2º semestre
+
+        // Meses individuais
+        const monthMap = {
+          'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'may': 5, 'jun': 6,
+          'jul': 7, 'aug': 8, 'sep': 9, 'oct': 10, 'nov': 11, 'dec': 12
+        };
+        if (monthMap[selectedPeriod]) return orderMonth === monthMap[selectedPeriod];
+
+        return true;
+      });
+
+      // Calcular estatísticas de bairro
+      const neighborhoodStats = calculateNeighborhoodStats(filteredOrders);
+
+      if (neighborhoodStats.length > 0) {
+        const maxCount = Math.max(...neighborhoodStats.map(n => n.count));
+        container.innerHTML = neighborhoodStats.map((n, i) => {
+          const percentage = (n.count / maxCount) * 100;
+          const colors = ['bg-rose-500', 'bg-rose-400', 'bg-rose-300', 'bg-pink-400', 'bg-pink-300'];
+          const bgColor = colors[Math.min(i, colors.length - 1)];
+          return `
+            <div class="flex items-center gap-3">
+              <div class="w-24 text-right text-sm font-medium text-gray-700 truncate capitalize">${n.name}</div>
+              <div class="flex-1 bg-gray-200 rounded-full h-6 relative overflow-hidden">
+                <div class="${bgColor} h-full rounded-full transition-all duration-500" style="width: ${percentage}%"></div>
+                <span class="absolute inset-0 flex items-center justify-center text-xs font-bold ${percentage > 50 ? 'text-white' : 'text-gray-700'}">${n.count} pedidos</span>
+              </div>
+              <div class="w-20 text-right text-xs text-green-600 font-bold">R$ ${n.total.toFixed(2).replace('.', ',')}</div>
+            </div>
+          `;
+        }).join('');
+      } else {
+        container.innerHTML = `<div class="text-center py-6 text-gray-500"><p class="text-4xl mb-2">📍</p><p>Nenhum pedido com entrega no período selecionado.</p></div>`;
+      }
+    }
+
+    function updatePeriodButtons() {
+      const buttons = {
+        'reportPeriodMonth': 'month',
+        'reportPeriodSemester': 'semester',
+        'reportPeriodYear': 'year'
+      };
+      Object.entries(buttons).forEach(([id, period]) => {
+        const btn = document.getElementById(id);
+        if (btn) {
+          if (currentReportPeriod === period) {
+            btn.classList.remove('bg-gray-200', 'text-gray-700');
+            btn.classList.add('bg-rose-600', 'text-white');
+          } else {
+            btn.classList.remove('bg-rose-600', 'text-white');
+            btn.classList.add('bg-gray-200', 'text-gray-700');
+          }
+        }
+      });
+    }
+
+    // Search order history
+    document.getElementById('orderSearchClient')?.addEventListener('input', (e) => {
+      const search = e.target.value.toLowerCase().trim();
+      const periodOrders = getOrdersInPeriod(currentReportPeriod);
+      const filtered = search ? periodOrders.filter(o =>
+        o.client_name?.toLowerCase().includes(search) ||
+        o.client_phone?.includes(search)
+      ) : periodOrders;
+
+      const historyList = document.getElementById('orderHistoryList');
+      if (historyList && filtered.length > 0) {
+        historyList.innerHTML = filtered.slice(0, 20).map(o => {
+          const date = safeDate(o.created_at || o.id).toLocaleDateString('pt-BR');
+          const items = typeof o.items === 'string' ? JSON.parse(o.items) : (o.items || []);
+          return `
+            <div class="p-2 bg-white border rounded-lg">
+              <div class="flex justify-between items-start">
+                <div>
+                  <p class="font-medium text-gray-800 text-sm">${o.client_name}</p>
+                  <p class="text-xs text-gray-500">${date} | ${items.length} itens</p>
+                </div>
+                <span class="font-bold text-green-600 text-sm">R$ ${parseFloat(o.total || 0).toFixed(2).replace('.', ',')}</span>
+              </div>
+            </div>
+          `;
+        }).join('');
+      } else if (historyList) {
+        historyList.innerHTML = `<div class="text-center py-8 text-gray-500"><p>Nenhum resultado encontrado.</p></div>`;
+      }
+    });
 
     // ========== STORE CONFIG MANAGEMENT ==========
 
@@ -2165,10 +2986,7 @@
       }
     }
 
-    async function initializePublicStore() {
-      // Carregar opções de produtos (sabores, recheios)
-      if (window.ProductOptionsModule) await window.ProductOptionsModule.load();
-
+    function initializePublicStore() {
       // Mostrar carrinho na loja pública
       document.getElementById('cartBtn')?.classList.remove('hidden');
       document.getElementById('cartBtnDesktop')?.classList.remove('hidden');
@@ -2177,7 +2995,7 @@
       updateCart();
 
       // Initialize ad banner
-      if (window.AdBannerModule) window.AdBannerModule.init();
+      BannerModule.init();
 
       // Se tem itens no carrinho, mostrar FAB explicitamente
       const floatingBtn = document.getElementById('floatingCartButton');
@@ -2835,6 +3653,715 @@
     }
 
     // Upload de imagem para Supabase Storage (com compressão)
+    async function uploadImageToStorage(file) {
+      try {
+        // Comprimir imagem antes do upload
+        const compressedFile = await compressImage(file, 800, 800, 0.8);
+
+        const fileExt = 'jpg'; // Sempre JPEG após compressão
+        const fileName = `product_${Date.now()}.${fileExt}`;
+        const filePath = `products/${fileName}`;
+
+        const { data, error } = await window.supabaseClient.storage
+          .from('fast-images')
+          .upload(filePath, compressedFile, {
+            cacheControl: '3600',
+            upsert: false,
+            contentType: 'image/jpeg'
+          });
+
+        if (error) throw error;
+
+        // Retornar URL pública da imagem
+        const { data: urlData } = window.supabaseClient.storage
+          .from('fast-images')
+          .getPublicUrl(filePath);
+
+        console.log('Imagem enviada:', urlData.publicUrl);
+        return urlData.publicUrl;
+      } catch (error) {
+        console.error('Erro ao enviar imagem:', error);
+        // Fallback: retornar base64 se o upload falhar
+        return null;
+      }
+    }
+
+    document.getElementById('productForm')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const name = document.getElementById('productName').value.trim();
+      const description = document.getElementById('productDescription').value.trim();
+      const price = parseFloat(document.getElementById('productPrice').value || '0');
+      const category = document.getElementById('productCategory').value;
+      const imageFile = document.getElementById('productImage').files[0];
+
+      let imageUrl = null;
+
+      if (imageFile) {
+        // Tentar upload para Supabase Storage
+        const uploadedUrl = await uploadImageToStorage(imageFile);
+        if (uploadedUrl) {
+          imageUrl = uploadedUrl;
+        } else {
+          // Não usar base64 para evitar estouro do localStorage
+          alert('⚠️ Não foi possível enviar a imagem. Verifique se o bucket "fast-images" foi criado no Supabase Storage!\n\nO produto será salvo sem imagem.');
+          imageUrl = null;
+        }
+      }
+
+      await saveProduct(name, description, price, category, imageUrl);
+    });
+
+    async function saveProduct(name, description, price, category, image) {
+      const emojiMap = { salgados: '🥟', mini: '🧁', kits: '🎁', bolos: '🎂', adicionais: '➕', bebidas: '🥤' };
+      const emoji = emojiMap[category] || '🥟';
+
+      // Campos de disponibilidade
+      const startDate = document.getElementById('productStartDate').value || null;
+      const endDate = document.getElementById('productEndDate').value || null;
+      const unavailableToday = document.getElementById('productUnavailableToday').checked;
+
+      // Campos de promoção
+      const promoActive = document.getElementById('productPromoActive').checked;
+      const promo = {
+        active: promoActive,
+        type: document.getElementById('productPromoType').value || 'percent',
+        value: parseFloat(document.getElementById('productPromoValue').value) || 0
+      };
+
+      // Encomenda
+      const isEncomenda = document.getElementById('productIsEncomenda').checked;
+
+      // Exige antecedência (não pode ser pedido para hoje)
+      const requires_preorder = document.getElementById('productRequiresPreorder')?.checked || false;
+
+      // Bloqueio de opções (Bolos/Kits)
+      const blockMassa = document.getElementById('productBlockMassa')?.checked || false;
+      const blockRecheio = document.getElementById('productBlockRecheio')?.checked || false;
+
+      // Flavor Selection (Mini-Salgados)
+      let flavorSelection = null;
+      if (category === 'mini' && document.getElementById('flavorSelectionEnabled')?.checked) {
+        const maxFlavors = parseInt(document.getElementById('flavorSelectionMax')?.value) || 3;
+        const availableFlavors = Array.from(document.querySelectorAll('.flavor-checkbox:checked'))
+          .map(cb => parseInt(cb.value));
+
+        if (availableFlavors.length > 0 && maxFlavors > 0) {
+          flavorSelection = {
+            enabled: true,
+            maxFlavors: Math.min(maxFlavors, availableFlavors.length),
+            availableFlavors: availableFlavors
+          };
+        }
+      }
+
+      // Catalog fields - Added for catalog feature
+      const catalog_enabled = document.getElementById('productCatalogEnabled')?.checked !== false;
+      const catalog_vegan = document.getElementById('catalogVegan')?.checked || false;
+      const catalog_phrase = document.getElementById('catalogPhrase')?.value?.trim() || null;
+      const catalog_order = parseInt(document.getElementById('catalogOrder')?.value) || 0;
+
+      // Build size options array from checkboxes
+      const sizeOptionsArr = [];
+      if (document.getElementById('catalogSizeSmall')?.checked) sizeOptionsArr.push('Pequeno');
+      if (document.getElementById('catalogSizeLarge')?.checked) sizeOptionsArr.push('Grande');
+      const catalog_size_options = sizeOptionsArr.length > 0 ? JSON.stringify(sizeOptionsArr) : null;
+
+      if (editingProductId) {
+        const i = products.findIndex(p => p.id === editingProductId);
+        if (i !== -1) {
+          products[i] = {
+            ...products[i],
+            name, description, price, category,
+            image: image || products[i].image,
+            emoji, startDate, endDate, unavailableToday,
+            promo, isEncomenda, flavor_selection: flavorSelection,
+            blockMassa, blockRecheio, requires_preorder,
+            // Catalog fields
+            catalog_enabled, catalog_size_options, catalog_vegan, catalog_phrase, catalog_order
+          };
+        }
+        editingProductId = null;
+      } else {
+        products.push({
+          id: Date.now(), name, description, price, category,
+          image, emoji, visible: true, startDate, endDate, unavailableToday,
+          promo, isEncomenda, flavor_selection: flavorSelection,
+          blockMassa, blockRecheio, requires_preorder,
+          // Catalog fields
+          catalog_enabled, catalog_size_options, catalog_vegan, catalog_phrase, catalog_order
+        });
+      }
+
+      await saveProducts();
+      loadProductsAdmin();
+      loadProductsPublic();
+      document.getElementById('productForm').reset();
+      showToast('✅ Produto salvo com sucesso!', 'success');
+    }
+    let productAdminFilter = 'all';
+    document.addEventListener('click', (e) => {
+      if (e.target.classList.contains('admin-filter')) {
+        productAdminFilter = e.target.getAttribute('data-filter');
+        loadProductsAdmin();
+      }
+    });
+    function loadProductsAdmin() {
+      const c = document.getElementById('productsList');
+      const role = currentUserRole || sessionStorage.getItem('fastRole') || 'admin';
+      const filtered = products.filter(p => {
+        const isVisible = (p.visible !== false);
+        if (productAdminFilter === 'hidden') return !isVisible;
+        if (productAdminFilter === 'seasonal') return p.startDate && p.endDate;
+        if (productAdminFilter === 'unavailable') return p.unavailableToday;
+        if (productAdminFilter === 'all') return true;
+        return p.category === productAdminFilter;
+      });
+      c.innerHTML = filtered.map(p => {
+        const isVisible = (p.visible !== false);
+        // Badges de disponibilidade
+        let badges = [];
+        if (p.startDate && p.endDate) {
+          const start = safeDate(p.startDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+          const end = safeDate(p.endDate).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+          badges.push(`<span class='text-xs bg-blue-100 text-blue-800 px-1 rounded ml-1'>📅 ${start}-${end}</span>`);
+        }
+        if (p.unavailableToday) {
+          badges.push(`<span class='text-xs bg-red-100 text-red-800 px-1 rounded ml-1'>❌ Indisponível</span>`);
+        }
+        const badgesHtml = badges.join('');
+
+        return `<div class='p-3 border rounded-lg ${isVisible ? '' : 'opacity-60'}'>
+      <!-- Product Info Row -->
+      <div class='flex items-start gap-3 mb-3'>
+        ${(window.isValidImageUrl ? window.isValidImageUrl(p.image) : !!p.image) ? `<img src='${p.image}' class='w-12 h-12 sm:w-14 sm:h-14 object-cover rounded flex-shrink-0'>` : `<span class='text-2xl sm:text-3xl'>${p.emoji}</span>`}
+        <div class='flex-1 min-w-0'>
+          <h4 class='font-semibold text-gray-800 text-sm truncate'>${p.name}</h4>
+          <p class='text-xs text-gray-700 truncate'>${p.description || ''}</p>
+          <p class='text-sm font-medium text-gray-900'>R$ ${p.price.toFixed(2).replace('.', ',')}</p>
+          <div class='flex flex-wrap items-center gap-1 mt-1'>
+            <span class='text-xs fs-chip px-2 py-0.5 rounded'>${p.category}${isVisible ? '' : ' • oculto'}</span>
+            ${badgesHtml}
+          </div>
+        </div>
+      </div>
+      <!-- Action Buttons Row -->
+      <div class='grid grid-cols-3 gap-2'>
+        ${(role === 'admin' || role === 'gerente') ? `<button class='bg-rose-600 hover:bg-rose-700 text-white px-2 py-2 rounded text-xs' onclick='editProduct(${p.id})'>Editar</button>` : '<div></div>'}
+        ${(role === 'admin' || role === 'gerente' || role === 'garcom') ? `<button class='bg-gray-200 hover:bg-gray-300 text-gray-800 px-2 py-2 rounded text-xs' onclick='toggleVisibility(${p.id})'>${isVisible ? 'Ocultar' : 'Mostrar'}</button>` : '<div></div>'}
+        ${(role === 'admin' || role === 'gerente') ? `<button class='bg-red-500 hover:bg-red-600 text-white px-2 py-2 rounded text-xs' onclick='deleteProduct(${p.id})'>Excluir</button>` : '<div></div>'}
+      </div>
+    </div>`}).join('');
+    }
+    function toggleVisibility(id) { const i = products.findIndex(p => p.id === id); if (i !== -1) { products[i].visible = !products[i].visible; saveProducts(); loadProductsAdmin(); loadProductsPublic(); } }
+    function editProduct(id) {
+      const p = products.find(x => x.id === id);
+      if (p) {
+        document.getElementById('productName').value = p.name;
+        document.getElementById('productDescription').value = p.description;
+        document.getElementById('productPrice').value = p.price;
+        document.getElementById('productCategory').value = p.category;
+        // Campos de disponibilidade
+        document.getElementById('productStartDate').value = p.startDate || '';
+        document.getElementById('productEndDate').value = p.endDate || '';
+        document.getElementById('productUnavailableToday').checked = !!p.unavailableToday;
+        // Campos de promoção
+        const promoActive = p.promo?.active || false;
+        document.getElementById('productPromoActive').checked = promoActive;
+        document.getElementById('productPromoType').value = p.promo?.type || 'percent';
+        document.getElementById('productPromoValue').value = p.promo?.value || '';
+        document.getElementById('promoDetailsFields').classList.toggle('hidden', !promoActive);
+        // Encomenda
+        document.getElementById('productIsEncomenda').checked = !!p.isEncomenda;
+
+        // Exige antecedência (não pode ser pedido para hoje)
+        const preorderCheckbox = document.getElementById('productRequiresPreorder');
+        if (preorderCheckbox) preorderCheckbox.checked = !!p.requires_preorder;
+
+        // Bloqueio de opções (Bolos/Kits)
+        const blockSection = document.getElementById('blockOptionsSection');
+        if (p.category === 'bolos' || p.category === 'kits') {
+          blockSection?.classList.remove('hidden');
+          document.getElementById('productBlockMassa').checked = !!p.blockMassa;
+          document.getElementById('productBlockRecheio').checked = !!p.blockRecheio;
+        } else {
+          blockSection?.classList.add('hidden');
+          document.getElementById('productBlockMassa').checked = false;
+          document.getElementById('productBlockRecheio').checked = false;
+        }
+
+        // Catalog fields - Added for catalog feature
+        document.getElementById('productCatalogEnabled').checked = p.catalog_enabled !== false;
+        document.getElementById('catalogVegan').checked = !!p.catalog_vegan;
+        document.getElementById('catalogPhrase').value = p.catalog_phrase || '';
+        document.getElementById('catalogOrder').value = p.catalog_order || 0;
+        // Parse size options
+        const sizeOpts = p.catalog_size_options ? (typeof p.catalog_size_options === 'string' ? JSON.parse(p.catalog_size_options) : p.catalog_size_options) : [];
+        document.getElementById('catalogSizeSmall').checked = Array.isArray(sizeOpts) && sizeOpts.includes('Pequeno');
+        document.getElementById('catalogSizeLarge').checked = Array.isArray(sizeOpts) && sizeOpts.includes('Grande');
+
+        editingProductId = id;
+        // Scroll to form
+        document.getElementById('productForm').scrollIntoView({ behavior: 'smooth' });
+      }
+    }
+
+    // ========================================
+    // PRODUCT DELETE - INLINE CONFIRMATION
+    // ========================================
+    // CONFLICT REMOVED: let pendingDeleteProductId = null;
+
+    function deleteProduct(id) {
+      const product = products.find(p => p.id === id);
+      pendingDeleteProductId = id;
+      document.getElementById('deleteProductName').textContent = product?.name || 'este produto';
+      document.getElementById('deleteProductModal').classList.remove('hidden');
+    }
+
+    function cancelDeleteProduct() {
+      pendingDeleteProductId = null;
+      document.getElementById('deleteProductModal').classList.add('hidden');
+    }
+
+    async function confirmDeleteProduct() {
+      if (pendingDeleteProductId) {
+        // Delete from Supabase first
+        try {
+          const { error } = await window.supabaseClient
+            .from('fast_products')
+            .delete()
+            .eq('id', pendingDeleteProductId);
+
+          if (error) {
+            console.error('Erro ao excluir produto do Supabase:', error);
+          } else {
+            console.log('Produto excluído do Supabase:', pendingDeleteProductId);
+          }
+        } catch (e) {
+          console.error('Erro ao excluir produto:', e);
+        }
+
+        // Remove from local array
+        products = products.filter(p => p.id !== pendingDeleteProductId);
+
+        // Update localStorage
+        localStorage.setItem('fastProducts', JSON.stringify(products));
+
+        // Reload UI
+        loadProductsAdmin();
+        loadProductsPublic();
+      }
+      pendingDeleteProductId = null;
+      document.getElementById('deleteProductModal').classList.add('hidden');
+    }
+
+    // ========================================
+    // CUSTOM PRODUCT OPTIONS MODAL (Kits/Bolos)
+    // ========================================
+    // CONFLICT REMOVED: let pendingCustomProduct = null;
+
+    function openCustomOptionsModal(id, name, description, price, category) {
+      // Buscar produto para obter configurações de bloqueio
+      const product = products.find(p => p.id === id);
+      const blockMassa = product?.blockMassa || false;
+      const blockRecheio = product?.blockRecheio || false;
+
+      pendingCustomProduct = { id, name, description, price, category, blockMassa, blockRecheio };
+
+      // Set product info
+      document.getElementById('customOptionsProductName').textContent = name;
+      document.getElementById('customOptionsProductPrice').textContent = `R$ ${price.toFixed(2).replace('.', ',')}`;
+
+      // Configure modal based on category
+      if (category === 'kits') {
+        document.getElementById('customOptionsTitle').textContent = '🎉 Personalizar Kit Festa';
+        document.getElementById('salgadosSection').classList.remove('hidden');
+      } else {
+        document.getElementById('customOptionsTitle').textContent = '🎂 Personalizar Bolo';
+        document.getElementById('salgadosSection').classList.add('hidden');
+      }
+
+      // Render dynamic options from ProductOptionsModule
+      renderDynamicCakeMassOptions();
+      renderDynamicFillingOptions();
+      renderDynamicSalgadosOptions();
+
+      // Mostrar/esconder seções baseado nas configurações de bloqueio do produto
+      const cakeMassSection = document.getElementById('cakeMassSection');
+      const fillingSection = document.getElementById('fillingSection');
+
+      if (cakeMassSection) {
+        if (blockMassa) {
+          cakeMassSection.classList.add('hidden');
+        } else {
+          cakeMassSection.classList.remove('hidden');
+        }
+      }
+
+      if (fillingSection) {
+        if (blockRecheio) {
+          fillingSection.classList.add('hidden');
+        } else {
+          fillingSection.classList.remove('hidden');
+        }
+      }
+
+      // Reset form
+      document.getElementById('customOptionsError').classList.add('hidden');
+      updateSalgadosCounter();
+
+      document.getElementById('customOptionsModal').classList.remove('hidden');
+    }
+
+    function renderDynamicCakeMassOptions() {
+      const container = document.querySelector('#cakeMassSection .space-y-2');
+      if (!container) return;
+
+      const options = ProductOptionsModule.getVisible('cakeMass');
+      if (options.length === 0) {
+        container.innerHTML = '<p class="text-gray-500 text-sm">Nenhuma opção disponível</p>';
+        return;
+      }
+
+      container.innerHTML = options.map(opt => `
+        <label class="flex items-center p-2 border rounded-lg hover:bg-gray-50 cursor-pointer">
+          <input type="radio" name="cakeMass" value="${opt.name}" class="mr-3 text-rose-600">
+          <span>${opt.name}</span>
+        </label>
+      `).join('');
+    }
+
+    function renderDynamicFillingOptions() {
+      const container = document.querySelector('#fillingSection .space-y-2');
+      if (!container) return;
+
+      const options = ProductOptionsModule.getVisible('filling');
+      if (options.length === 0) {
+        container.innerHTML = '<p class="text-gray-500 text-sm">Nenhuma opção disponível</p>';
+        return;
+      }
+
+      container.innerHTML = options.map(opt => `
+        <label class="flex items-center p-2 border rounded-lg hover:bg-gray-50 cursor-pointer">
+          <input type="radio" name="filling" value="${opt.name}" class="mr-3 text-rose-600">
+          <span>${opt.name}</span>
+        </label>
+      `).join('');
+    }
+
+    function renderDynamicSalgadosOptions() {
+      const container = document.querySelector('#salgadosSection .space-y-2');
+      if (!container) return;
+
+      const options = ProductOptionsModule.getVisible('salgados');
+      if (options.length === 0) {
+        container.innerHTML = '<p class="text-gray-500 text-sm">Nenhuma opção disponível</p>';
+        return;
+      }
+
+      container.innerHTML = options.map(opt => `
+        <label class="flex items-center p-2 border rounded-lg hover:bg-gray-50 cursor-pointer">
+          <input type="checkbox" name="salgados" value="${opt.name}" class="mr-3 text-rose-600 salgado-checkbox">
+          <span>${opt.name}</span>
+        </label>
+      `).join('');
+    }
+
+    // ========================================
+    // OPTIONS ADMIN UI FUNCTIONS
+    // ========================================
+    const OptionsAdminUI = {
+      currentType: 'cakeMass',
+      pendingDeleteId: null,
+
+      init: function () {
+        // Tab switching
+        document.querySelectorAll('.options-tab').forEach(tab => {
+          tab.addEventListener('click', () => {
+            this.switchTab(tab.dataset.type);
+          });
+        });
+
+        // Add new option
+        document.getElementById('addNewOptionBtn')?.addEventListener('click', () => this.handleAdd());
+
+        // Initial render
+        this.render();
+      },
+
+      switchTab: function (type) {
+        this.currentType = type;
+        // Update tab styles
+        document.querySelectorAll('.options-tab').forEach(tab => {
+          if (tab.dataset.type === type) {
+            tab.classList.remove('bg-gray-200', 'text-gray-700');
+            tab.classList.add('bg-rose-600', 'text-white');
+          } else {
+            tab.classList.remove('bg-rose-600', 'text-white');
+            tab.classList.add('bg-gray-200', 'text-gray-700');
+          }
+        });
+        this.render();
+      },
+
+      render: function () {
+        const container = document.getElementById('optionsListContainer');
+        if (!container) return;
+
+        const options = ProductOptionsModule.getAll(this.currentType);
+
+        if (options.length === 0) {
+          container.innerHTML = '<p class="text-gray-500 text-sm text-center py-4">Nenhuma opção cadastrada nesta categoria.</p>';
+          return;
+        }
+
+        container.innerHTML = options.map(opt => `
+          <div class="flex items-center justify-between p-3 border rounded-lg ${opt.visible ? 'bg-white' : 'bg-gray-100 opacity-60'}" data-option-id="${opt.id}">
+            <div class="flex items-center gap-3 flex-1">
+              <span id="optName_${opt.id}" class="${opt.visible ? 'text-gray-800' : 'text-gray-500 line-through'}">${opt.name}</span>
+              ${!opt.visible ? '<span class="text-xs bg-gray-200 text-gray-600 px-2 py-0.5 rounded">Oculto</span>' : ''}
+            </div>
+            <div class="flex gap-2">
+              <button onclick="OptionsAdminUI.showEditForm(${opt.id}, '${opt.name.replace(/'/g, "\\'")}')" class="px-3 py-1 text-sm rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200">
+                ✏️ Editar
+              </button>
+              <button onclick="OptionsAdminUI.toggleVisibility(${opt.id})" class="px-3 py-1 text-sm rounded-lg ${opt.visible ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200' : 'bg-green-100 text-green-700 hover:bg-green-200'}">
+                ${opt.visible ? '👁️ Ocultar' : '👁️ Mostrar'}
+              </button>
+              <button onclick="OptionsAdminUI.confirmDelete(${opt.id}, '${opt.name.replace(/'/g, "\\'")}')" class="px-3 py-1 text-sm rounded-lg bg-red-100 text-red-700 hover:bg-red-200">
+                🗑️
+              </button>
+            </div>
+          </div>
+          <div id="editForm_${opt.id}" class="hidden p-3 bg-blue-50 border border-blue-200 rounded-lg mt-1">
+            <div class="flex gap-2 items-center">
+              <input type="text" id="editInput_${opt.id}" value="${opt.name}" class="flex-1 px-3 py-2 border rounded-lg text-sm">
+              <button onclick="OptionsAdminUI.saveEdit(${opt.id})" class="px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700">Salvar</button>
+              <button onclick="OptionsAdminUI.cancelEdit(${opt.id})" class="px-3 py-1 text-sm bg-gray-300 text-gray-700 rounded hover:bg-gray-400">Cancelar</button>
+            </div>
+          </div>
+          <div id="deleteConfirm_${opt.id}" class="hidden p-3 bg-red-50 border border-red-200 rounded-lg mt-1">
+            <p class="text-sm text-red-700 mb-2">⚠️ Excluir "${opt.name}"? Esta opção deixará de aparecer para clientes.</p>
+            <div class="flex gap-2">
+              <button onclick="OptionsAdminUI.handleDelete(${opt.id})" class="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700">Confirmar</button>
+              <button onclick="OptionsAdminUI.cancelDelete(${opt.id})" class="px-3 py-1 text-sm bg-gray-300 text-gray-700 rounded hover:bg-gray-400">Cancelar</button>
+            </div>
+          </div>
+        `).join('');
+      },
+
+      showMessage: function (text, type) {
+        const el = document.getElementById('optionsMessage');
+        if (!el) return;
+        el.textContent = text;
+        el.className = 'mb-4 p-3 rounded-lg text-sm';
+        if (type === 'success') el.classList.add('bg-green-100', 'text-green-700');
+        else if (type === 'error') el.classList.add('bg-red-100', 'text-red-700');
+        else el.classList.add('bg-blue-100', 'text-blue-700');
+        el.classList.remove('hidden');
+        setTimeout(() => el.classList.add('hidden'), 3000);
+      },
+
+      handleAdd: async function () {
+        const input = document.getElementById('newOptionName');
+        const name = input?.value?.trim();
+        if (!name) {
+          this.showMessage('Digite o nome da opção.', 'error');
+          return;
+        }
+
+        const result = await ProductOptionsModule.add(this.currentType, name);
+        if (result.success) {
+          input.value = '';
+          this.showMessage(`"${name}" adicionado com sucesso!`, 'success');
+          this.render();
+        } else {
+          this.showMessage(`Erro ao adicionar: ${result.error}`, 'error');
+        }
+      },
+
+      toggleVisibility: async function (id) {
+        const result = await ProductOptionsModule.toggleVisibility(id);
+        if (result.success) {
+          this.showMessage('Visibilidade alterada!', 'success');
+          this.render();
+        } else {
+          this.showMessage(`Erro: ${result.error}`, 'error');
+        }
+      },
+
+      showEditForm: function (id, currentName) {
+        // Hide other edit/delete forms
+        document.querySelectorAll('[id^="editForm_"]').forEach(el => el.classList.add('hidden'));
+        document.querySelectorAll('[id^="deleteConfirm_"]').forEach(el => el.classList.add('hidden'));
+        // Show this edit form
+        const form = document.getElementById(`editForm_${id}`);
+        if (form) {
+          form.classList.remove('hidden');
+          const input = document.getElementById(`editInput_${id}`);
+          if (input) {
+            input.value = currentName;
+            input.focus();
+          }
+        }
+      },
+
+      cancelEdit: function (id) {
+        const form = document.getElementById(`editForm_${id}`);
+        if (form) form.classList.add('hidden');
+      },
+
+      saveEdit: async function (id) {
+        const input = document.getElementById(`editInput_${id}`);
+        const newName = input?.value?.trim();
+        if (!newName) {
+          this.showMessage('Nome não pode estar vazio.', 'error');
+          return;
+        }
+
+        const result = await ProductOptionsModule.update(id, { name: newName });
+        if (result.success) {
+          this.showMessage('Nome atualizado!', 'success');
+          this.render();
+        } else {
+          this.showMessage(`Erro ao atualizar: ${result.error}`, 'error');
+        }
+      },
+
+      confirmDelete: function (id, name) {
+        // Hide any other confirm dialogs
+        document.querySelectorAll('[id^="deleteConfirm_"]').forEach(el => el.classList.add('hidden'));
+        // Show this one
+        const confirmEl = document.getElementById(`deleteConfirm_${id}`);
+        if (confirmEl) confirmEl.classList.remove('hidden');
+        this.pendingDeleteId = id;
+      },
+
+      cancelDelete: function (id) {
+        const confirmEl = document.getElementById(`deleteConfirm_${id}`);
+        if (confirmEl) confirmEl.classList.add('hidden');
+        this.pendingDeleteId = null;
+      },
+
+      handleDelete: async function (id) {
+        const result = await ProductOptionsModule.delete(id);
+        if (result.success) {
+          this.showMessage('Opção excluída!', 'success');
+          this.render();
+        } else {
+          this.showMessage(`Erro ao excluir: ${result.error}`, 'error');
+        }
+        this.pendingDeleteId = null;
+      }
+    };
+
+    // ========================================
+    // FLAVOR SELECTION UI (Product Form)
+    // ========================================
+    const FlavorSelectionUI = {
+      init: function () {
+        // Listen for category changes
+        document.getElementById('productCategory')?.addEventListener('change', (e) => {
+          this.toggleSectionVisibility(e.target.value);
+          this.toggleBlockOptionsVisibility(e.target.value);
+        });
+
+        // Listen for enabled checkbox toggle
+        document.getElementById('flavorSelectionEnabled')?.addEventListener('change', (e) => {
+          this.toggleDetailsVisibility(e.target.checked);
+        });
+      },
+
+      toggleSectionVisibility: function (category) {
+        const section = document.getElementById('flavorSelectionSection');
+        if (!section) return;
+
+        if (category === 'mini') {
+          section.classList.remove('hidden');
+          this.renderAvailableFlavors();
+        } else {
+          section.classList.add('hidden');
+        }
+      },
+
+      // Mostrar opções de bloqueio para bolos e kits
+      toggleBlockOptionsVisibility: function (category) {
+        const section = document.getElementById('blockOptionsSection');
+        if (!section) return;
+
+        if (category === 'bolos' || category === 'kits') {
+          section.classList.remove('hidden');
+        } else {
+          section.classList.add('hidden');
+          // Resetar checkboxes quando esconde
+          document.getElementById('productBlockMassa').checked = false;
+          document.getElementById('productBlockRecheio').checked = false;
+        }
+      },
+
+      toggleDetailsVisibility: function (enabled) {
+        const details = document.getElementById('flavorSelectionDetails');
+        if (details) {
+          details.classList.toggle('hidden', !enabled);
+        }
+      },
+
+      renderAvailableFlavors: function (selectedIds = []) {
+        const container = document.getElementById('flavorSelectionFlavors');
+        if (!container) return;
+
+        const flavors = ProductOptionsModule.getVisible('miniSalgadosFlavors');
+        if (flavors.length === 0) {
+          container.innerHTML = '<p class="text-xs text-gray-500">Nenhum sabor cadastrado. Adicione sabores na seção "Opções de Personalização".</p>';
+          return;
+        }
+
+        container.innerHTML = flavors.map(f => `
+          <label class="flex items-center gap-2 cursor-pointer text-sm">
+            <input type="checkbox" value="${f.id}" class="flavor-checkbox text-rose-600" ${selectedIds.includes(f.id) ? 'checked' : ''}>
+            <span>${f.name}</span>
+          </label>
+        `).join('');
+      },
+
+      loadForProduct: function (product) {
+        const section = document.getElementById('flavorSelectionSection');
+        const enabledCb = document.getElementById('flavorSelectionEnabled');
+        const maxInput = document.getElementById('flavorSelectionMax');
+
+        // Show section only for mini category
+        if (product.category === 'mini') {
+          section?.classList.remove('hidden');
+
+          if (product.flavor_selection && product.flavor_selection.enabled) {
+            enabledCb && (enabledCb.checked = true);
+            maxInput && (maxInput.value = product.flavor_selection.maxFlavors || 3);
+            this.toggleDetailsVisibility(true);
+            this.renderAvailableFlavors(product.flavor_selection.availableFlavors || []);
+          } else {
+            enabledCb && (enabledCb.checked = false);
+            maxInput && (maxInput.value = 3);
+            this.toggleDetailsVisibility(false);
+            this.renderAvailableFlavors([]);
+          }
+        } else {
+          section?.classList.add('hidden');
+        }
+      },
+
+      reset: function () {
+        document.getElementById('flavorSelectionSection')?.classList.add('hidden');
+        document.getElementById('flavorSelectionEnabled') && (document.getElementById('flavorSelectionEnabled').checked = false);
+        document.getElementById('flavorSelectionMax') && (document.getElementById('flavorSelectionMax').value = 3);
+        this.toggleDetailsVisibility(false);
+      }
+    };
+
+    // ========================================
+    // MINI-SALGADOS MODAL (Public - Flavor Selection)
+    // ========================================
+    // CONFLICT REMOVED: let pendingMiniProduct = null;
+    // CONFLICT REMOVED: let miniMaxFlavors = 3;
+
     function openMiniSalgadosModal(product) {
       pendingMiniProduct = product;
       const fs = product.flavor_selection;
@@ -4232,7 +5759,16 @@
       box.textContent = '';
     }
 
-    // function findValidCouponByCode(code) removed to use global version from data.js for strict date checking
+    function findValidCouponByCode(code) {
+      const c = String(code || '').trim().toUpperCase();
+      if (!c) return null;
+      const coupon = (coupons || []).find(x => String(x.code || '').toUpperCase() === c);
+      if (!coupon) return null;
+      if (coupon.active === false) return null;
+      if (typeof isCouponExpired === 'function' && isCouponExpired(coupon)) return null;
+      if (typeof isCouponExhausted === 'function' && isCouponExhausted(coupon)) return null;
+      return coupon;
+    }
 
     function computeCouponDiscount(baseAmount, coupon) {
       if (!coupon) return 0;
@@ -4772,7 +6308,732 @@
       document.getElementById('checkoutTotal').textContent = `R$ ${total.toFixed(2).replace('.', ',')}`;
     }
 
+    // Fees modal UI
+    function openFeesFastModal() { const modal = document.getElementById('feesModalFast'); if (modal) { modal.classList.remove('hidden'); renderFastFeesList(); } }
+    function closeFeesFastModal() { const modal = document.getElementById('feesModalFast'); if (modal) { modal.classList.add('hidden'); } }
+    function renderFastFeesList() { const list = document.getElementById('feesListFast'); if (!list) return; const m = readFastFees(); const entries = Object.entries(m).sort((a, b) => a[1] - b[1] || a[0].localeCompare(b[0])); list.innerHTML = entries.length ? entries.map(([k, v]) => `<div class='flex items-center justify-between py-2 border-b'><div class='flex-1'><span class='font-medium capitalize text-gray-900'>${k}</span></div><input data-k='${k}' class='w-24 px-2 py-1 border rounded text-right' value='${v}'/><button data-del='${k}' class='ml-3 text-red-600 text-sm hover:text-red-800'>Excluir</button></div>`).join('') : `<p class='text-sm text-gray-600'>Nenhum bairro cadastrado.</p>`; }
+    document.getElementById('openFeesFast')?.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); openFeesFastModal(); });
+    document.getElementById('closeFeesFast')?.addEventListener('click', (e) => { e.preventDefault(); e.stopPropagation(); closeFeesFastModal(); });
+    document.getElementById('addFeeFast')?.addEventListener('click', (e) => { e.preventDefault(); const b = document.getElementById('feeNeighborhoodFast').value.trim(); const v = parseFloat(document.getElementById('feeValueFast').value.replace(',', '.')); if (!b || isNaN(v)) { alert('Preencha bairro e valor.'); return; } const m = readFastFees(); m[norm(b)] = v; writeFastFees(m); document.getElementById('feeNeighborhoodFast').value = ''; document.getElementById('feeValueFast').value = ''; renderFastFeesList(); });
+    // saveAllFeesFast listener movido para final do arquivo para incluir lógica de sincronização com Supabase
+    document.getElementById('feesListFast')?.addEventListener('click', (e) => { if (e.target.dataset.del) { e.preventDefault(); const m = readFastFees(); delete m[e.target.dataset.del]; writeFastFees(m); renderFastFeesList(); } });
+    document.getElementById('feesListFast')?.addEventListener('change', (e) => { if (e.target.dataset.k) { const m = readFastFees(); const val = parseFloat(e.target.value.replace(',', '.')); if (!isNaN(val)) { m[e.target.dataset.k] = val; writeFastFees(m); } } });
 
+    // Panel Navigation (Fast Admin)
+    function showPanel(panelName) {
+      const panels = ['productsPanelFast', 'clientsPanelFast', 'promotionsPanelFast', 'configPanelFast', 'reportsPanelFast', 'ordersPanelFast', 'ratingsPanelFast', 'bannerPanelFast', 'rulesPanelFast'];
+      panels.forEach(p => {
+        const el = document.getElementById(p);
+        if (el) el.classList.toggle('hidden', p !== panelName);
+      });
+      // Auto-load orders when opening orders panel
+      if (panelName === 'ordersPanelFast') {
+        loadDashboardOrders();
+      }
+    }
+
+    // ========================================
+    // ORDER DASHBOARD MANAGEMENT
+    // ========================================
+    // Logic moved to assets/js/admin.js
+
+    // ========================================
+    // ORDER ARCHIVING SERVICE
+    // ========================================
+    // Logic moved to assets/js/admin.js
+
+    // ========================================
+    // ORDER LOG (AUDITORIA)
+    // ========================================
+    // Logic moved to assets/js/admin.js
+
+    // ========================================
+    // STATUS UPDATE LOGIC
+    // ========================================
+    // Logic moved to assets/js/admin.js
+
+    // ========================================
+    // BANNER MODULE (Ad Banner Management)
+    // ========================================
+    // Logic moved to assets/js/fast/ad-banner.js
+    // Using AdBannerModule from external file
+    const BannerModule = window.AdBannerModule || {
+      config: null,
+      SESSION_KEY: 'fastAdBannerClosed',
+      _initialized: false, // Flag para prevenir inicialização múltipla
+
+      // Load banner config from Supabase
+      async loadConfig() {
+        try {
+          const { data, error } = await window.supabaseClient
+            .from('fast_banner_config')
+            .select('*')
+            .eq('store_id', 1)
+            .single();
+
+          if (error && error.code !== 'PGRST116') throw error;
+          this.config = data || { enabled: true, image_url: null, link_url: null, alt_text: 'Anuncie aqui' };
+          return this.config;
+        } catch (e) {
+          console.warn('[Banner] Error loading config:', e);
+          this.config = { enabled: true, image_url: null, link_url: null, alt_text: 'Anuncie aqui' };
+          return this.config;
+        }
+      },
+
+      // Save banner config to Supabase
+      async saveConfig(config) {
+        try {
+          const { error } = await window.supabaseClient
+            .from('fast_banner_config')
+            .upsert({
+              store_id: 1,
+              image_url: config.image_url || null,
+              link_url: config.link_url || null,
+              alt_text: config.alt_text || 'Anuncie aqui',
+              enabled: config.enabled !== false,
+              updated_at: new Date().toISOString()
+            }, { onConflict: 'store_id' });
+
+          if (error) throw error;
+          this.config = config;
+          return true;
+        } catch (e) {
+          console.error('[Banner] Error saving config:', e);
+          return false;
+        }
+      },
+
+      // Check if banner should be shown (sessionStorage)
+      shouldShow() {
+        try {
+          return !sessionStorage.getItem(this.SESSION_KEY);
+        } catch (e) {
+          return true; // Show by default if sessionStorage fails
+        }
+      },
+
+      // Mark banner as closed for this session
+      markClosed() {
+        try {
+          sessionStorage.setItem(this.SESSION_KEY, 'true');
+        } catch (e) {
+          console.warn('[Banner] Could not save close state');
+        }
+      },
+
+      // Show public banner
+      showPublicBanner() {
+        if (!this.config || !this.config.enabled || !this.shouldShow()) {
+          return;
+        }
+
+        const container = document.getElementById('adBannerPublic');
+        const image = document.getElementById('adBannerImage');
+        const fallback = document.getElementById('adBannerFallback');
+        const link = document.getElementById('adBannerLink');
+
+        if (!container) return;
+
+        // Set link URL
+        if (this.config.link_url) {
+          link.href = this.config.link_url;
+          link.style.cursor = 'pointer';
+        } else {
+          link.removeAttribute('href');
+          link.style.cursor = 'default';
+        }
+
+        // Show image or fallback
+        const validImageUrl = (window.isValidImageUrl ? window.isValidImageUrl(this.config.image_url) : !!this.config.image_url);
+        if (validImageUrl) {
+          image.src = this.config.image_url;
+          image.alt = this.config.alt_text || 'Banner publicitário';
+          image.classList.remove('hidden');
+          fallback.classList.add('hidden');
+        } else {
+          image.classList.add('hidden');
+          fallback.classList.remove('hidden');
+        }
+
+        container.classList.remove('hidden');
+      },
+
+      // Hide public banner
+      hideBanner() {
+        const container = document.getElementById('adBannerPublic');
+        if (container) {
+          container.classList.add('hidden');
+        }
+        this.markClosed();
+      },
+
+      // Admin: Load config into form
+      loadAdminForm() {
+        if (!this.config) return;
+
+        const enabledEl = document.getElementById('bannerEnabled');
+        const imageUrlEl = document.getElementById('bannerImageUrl');
+        const linkUrlEl = document.getElementById('bannerLinkUrl');
+        const altTextEl = document.getElementById('bannerAltText');
+        const previewEl = document.getElementById('bannerImagePreview');
+        const previewImgEl = document.getElementById('bannerPreviewImg');
+        const livePreviewEl = document.getElementById('bannerLivePreview');
+
+        if (enabledEl) enabledEl.checked = this.config.enabled !== false;
+        if (imageUrlEl) imageUrlEl.value = this.config.image_url || '';
+        if (linkUrlEl) linkUrlEl.value = this.config.link_url || '';
+        if (altTextEl) altTextEl.value = this.config.alt_text || 'Anuncie aqui';
+
+        // Show image preview
+        const validPreviewUrl = (window.isValidImageUrl ? window.isValidImageUrl(this.config.image_url) : !!this.config.image_url);
+        if (validPreviewUrl && previewEl && previewImgEl) {
+          previewImgEl.src = this.config.image_url;
+          previewEl.classList.remove('hidden');
+        } else if (previewEl) {
+          previewEl.classList.add('hidden');
+        }
+
+        // Update live preview
+        this.updateLivePreview();
+      },
+
+      // Admin: Update live preview
+      updateLivePreview() {
+        const imageUrl = document.getElementById('bannerImageUrl')?.value;
+        const altText = document.getElementById('bannerAltText')?.value || 'Anuncie aqui';
+        const livePreviewEl = document.getElementById('bannerLivePreview');
+
+        if (!livePreviewEl) return;
+
+        const validImageUrl = (window.isValidImageUrl ? window.isValidImageUrl(imageUrl) : !!imageUrl);
+        if (validImageUrl) {
+          livePreviewEl.innerHTML = `<img src="${imageUrl}" alt="${altText}" class="mx-auto max-h-20 rounded">`;
+        } else {
+          livePreviewEl.innerHTML = `
+            <p class="text-purple-600 font-medium">${altText}</p>
+            <p class="text-xs text-gray-500 mt-1">Configure uma imagem para substituir este placeholder</p>
+          `;
+        }
+      },
+
+      // Admin: Save from form
+      async saveFromForm() {
+        const config = {
+          enabled: document.getElementById('bannerEnabled')?.checked !== false,
+          image_url: document.getElementById('bannerImageUrl')?.value || null,
+          link_url: document.getElementById('bannerLinkUrl')?.value || null,
+          alt_text: document.getElementById('bannerAltText')?.value || 'Anuncie aqui'
+        };
+
+        const success = await this.saveConfig(config);
+
+        const msgEl = document.getElementById('bannerAdminMessage');
+        if (msgEl) {
+          msgEl.textContent = success ? '✅ Configuração salva com sucesso!' : '❌ Erro ao salvar configuração';
+          msgEl.className = success
+            ? 'mb-4 p-3 rounded-lg text-sm bg-green-100 text-green-700'
+            : 'mb-4 p-3 rounded-lg text-sm bg-red-100 text-red-700';
+          msgEl.classList.remove('hidden');
+          setTimeout(() => msgEl.classList.add('hidden'), 3000);
+        }
+
+        return success;
+      },
+
+      // Admin: Image URL change handler
+      adminImageUrlChangeHandler() {
+        const url = document.getElementById('bannerImageUrl').value;
+        const previewEl = document.getElementById('bannerImagePreview');
+        const previewImgEl = document.getElementById('bannerPreviewImg');
+
+        const validPreviewUrl = (window.isValidImageUrl ? window.isValidImageUrl(url) : !!url);
+        if (validPreviewUrl && previewEl && previewImgEl) {
+          previewImgEl.src = url;
+          previewEl.classList.remove('hidden');
+        } else if (previewEl) {
+          previewEl.classList.add('hidden');
+        }
+
+        this.updateLivePreview();
+      },
+
+      // Initialize banner module
+      async init() {
+        // Carregar config sempre (pode ter mudado)
+        await this.loadConfig();
+
+        // Mostrar banner público
+        this.showPublicBanner();
+
+        // Registrar event listeners apenas UMA vez
+        if (this._initialized) return;
+        this._initialized = true;
+
+        // Public: Close button handler
+        document.getElementById('closeBannerBtn')?.addEventListener('click', () => {
+          this.hideBanner();
+        });
+
+        // Admin: Save button handler
+        document.getElementById('saveBannerConfig')?.addEventListener('click', async () => {
+          await this.saveFromForm();
+        });
+
+        // Admin: Image URL change handler
+        document.getElementById('bannerImageUrl')?.addEventListener('input', () => {
+          this.adminImageUrlChangeHandler();
+        });
+
+        // Admin: Alt text change handler
+        document.getElementById('bannerAltText')?.addEventListener('input', () => {
+          this.updateLivePreview();
+        });
+
+        // Admin: Image upload handler
+        document.getElementById('bannerImageUpload')?.addEventListener('change', async (e) => {
+          const file = e.target.files[0];
+          if (!file) return;
+
+          // Convert to base64 for simplicity (or upload to Supabase Storage)
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            const base64 = event.target.result;
+            document.getElementById('bannerImageUrl').value = base64;
+            const previewEl = document.getElementById('bannerImagePreview');
+            const previewImgEl = document.getElementById('bannerPreviewImg');
+            if (previewEl && previewImgEl) {
+              previewImgEl.src = base64;
+              previewEl.classList.remove('hidden');
+            }
+            this.updateLivePreview();
+          };
+          reader.readAsDataURL(file);
+        });
+
+        console.log('[Banner] Module initialized');
+      }
+    };
+
+    // ========================================
+    // STRIPE PAYMENT SERVICE
+    // ========================================
+    // Logic moved to assets/js/fast/stripe.js
+    // Using window.StripeService from external file
+    // Keeping getStripeServerBaseUrl as compatibility fallback if module not loaded
+    if (typeof getStripeServerBaseUrl === 'undefined') {
+      function getStripeServerBaseUrl() {
+        return '/api';
+      }
+    }
+
+    const StripeService = window.StripeService || {
+      config: null,
+
+      async loadConfig() {
+        try {
+          const { data, error } = await window.supabaseClient
+            .from('fast_stripe_config')
+            .select('*')
+            .eq('store_id', 1)
+            .single();
+
+          if (error) throw error;
+          this.config = data || null;
+
+          if (!this.config) {
+            console.warn('[Stripe] Config não encontrada (store_id=1).');
+          } else {
+            console.log('[Stripe] Config carregada do Supabase:', {
+              enabled: this.config.enabled,
+              min_payment_percent: this.config.min_payment_percent,
+              has_public_key: !!this.config.stripe_public_key
+            });
+          }
+
+          return this.config;
+        } catch (e) {
+          console.warn('[Stripe] Erro ao carregar config do Supabase:', e);
+          this.config = null;
+          return null;
+        }
+      },
+
+      async saveConfig(config) {
+        try {
+          const { error } = await window.supabaseClient
+            .from('fast_stripe_config')
+            .upsert({ ...config, store_id: 1, updated_at: new Date().toISOString() }, { onConflict: 'store_id' });
+
+          if (error) throw error;
+          this.config = config;
+          return true;
+        } catch (e) {
+          console.error('[Stripe] Erro ao salvar config:', e);
+          return false;
+        }
+      },
+
+      // Gera saudação dinâmica baseada no horário
+      getGreeting() {
+        const hour = new Date().getHours();
+        if (hour >= 5 && hour < 12) return 'Bom dia';
+        if (hour >= 12 && hour < 18) return 'Boa tarde';
+        return 'Boa noite';
+      },
+
+      // Gera mensagem de pagamento para WhatsApp
+      generatePaymentMessage(order, paymentLink) {
+        const greeting = this.getGreeting();
+        const firstName = MsgTemplateService.getFirstName(order.client_name);
+        // Use already formatted code if available, otherwise format the ID
+        const orderCode = order.order_code || formatOrderCode(order.id);
+
+        return `${greeting}, ${firstName}! 🎉
+
+Seu pedido ${orderCode} foi *ACEITO* pela Fast Savory's!
+
+Para confirmar sua encomenda, realize o pagamento pelo link abaixo:
+${paymentLink}
+
+Após a confirmação do pagamento, seu pedido será preparado com muito carinho! 🥟
+
+*Valor total:* R$ ${(order.total || 0).toFixed(2).replace('.', ',')}
+
+Obrigado pela preferência! ❤️`;
+      },
+
+      // Gera Checkout Session do Stripe usando servidor local
+      async generatePaymentLink(order) {
+        if (!this.config || !this.config.enabled) {
+          console.warn('[Stripe] Stripe não configurado ou desabilitado (Supabase). Tentando gerar link via servidor local mesmo assim...');
+        }
+
+        try {
+          console.log('[Stripe] Gerando link para pedido:', order.id);
+
+          const baseUrl = getStripeServerBaseUrl();
+          if (!baseUrl) {
+            throw new Error('Stripe server URL não configurada. Defina localStorage.fastStripeServerUrl em produção.');
+          }
+
+          const response = await fetch(baseUrl + '/create-checkout-session', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              orderId: order.id,
+              amount: order.total,
+              customerEmail: order.client_email || '',
+              customerName: order.client_name
+            })
+          });
+
+          if (!response.ok) {
+            const error = await response.json().catch(function () { return {}; });
+            throw new Error(error.error || 'Erro ao gerar link');
+          }
+
+          const data = await response.json();
+          console.log('[Stripe] Link gerado com sucesso:', data.url);
+
+          return data.url;
+        } catch (error) {
+          console.error('[Stripe] Erro ao gerar link:', error);
+          // Fallback para modo de teste
+          return `https://buy.stripe.com/test_order_${order.id}`;
+        }
+      }
+    };
+
+    // Aceitar pedido com cartão e gerar link de pagamento
+    // Function moved to assets/js/fast/stripe.js
+    const acceptCardOrder = window.acceptCardOrder || async function (orderId) {
+      // Fallback if module not loaded
+      const btn = document.getElementById(`acceptBtn_${orderId}`);
+      const originalText = btn ? btn.innerHTML : '';
+
+      try {
+        // Mostrar loading no botão
+        if (btn) {
+          btn.innerHTML = '⏳ Gerando link...';
+          btn.disabled = true;
+          btn.classList.add('opacity-75', 'cursor-wait');
+        }
+
+        // Busca dados completos do pedido
+        const { data: order, error: fetchError } = await window.supabaseClient
+          .from('fast_orders')
+          .select('*')
+          .eq('id', orderId)
+          .single();
+
+        if (fetchError || !order) {
+          alert('Erro ao buscar pedido');
+          return;
+        }
+
+        // Carrega config do Stripe se necessário
+        if (!StripeService.config) {
+          await StripeService.loadConfig();
+        }
+
+        // Gera o link de pagamento
+        const paymentLink = await StripeService.generatePaymentLink(order);
+
+        // Atualiza o pedido com o link de pagamento
+        const { error: updateError } = await window.supabaseClient
+          .from('fast_orders')
+          .update({
+            status: 'accepted',
+            payment_status: 'awaiting_payment',
+            payment_link: paymentLink,
+            accepted_at: new Date().toISOString()
+          })
+          .eq('id', orderId);
+
+        if (updateError) throw updateError;
+
+        // Gera mensagem para WhatsApp
+        const message = StripeService.generatePaymentMessage(order, paymentLink);
+
+        // Abre WhatsApp com a mensagem
+        if (order.client_phone) {
+          const cleanPhone = order.client_phone.replace(/\D/g, '');
+          const url = `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(message)}`;
+          window.open(url, '_blank');
+        }
+
+        // Atualiza a lista de pedidos
+        loadDashboardOrders();
+
+      } catch (error) {
+        console.error('Erro ao aceitar pedido:', error);
+        alert('Erro ao aceitar pedido: ' + error.message);
+      } finally {
+        // Restaurar botão ao estado original
+        if (btn) {
+          btn.innerHTML = originalText;
+          btn.disabled = false;
+          btn.classList.remove('opacity-75', 'cursor-wait');
+        }
+      }
+    }
+
+    // Reenviar link de pagamento via WhatsApp
+    async function resendPaymentLink(orderId, phone, clientName, orderCode, paymentLink) {
+      try {
+        // Sempre busca dados completos do pedido para ter o valor correto
+        let order = null;
+        try {
+          const { data } = await window.supabaseClient
+            .from('fast_orders')
+            .select('*')
+            .eq('id', orderId)
+            .single();
+          if (data) order = data;
+        } catch (e) {
+          console.warn('[Stripe] Erro ao buscar pedido:', e);
+        }
+
+        // Fallback se não conseguir buscar
+        if (!order) {
+          order = { client_name: clientName, order_code: orderCode, payment_link: paymentLink, total: 0 };
+        }
+
+        // Usa o paymentLink passado se o pedido não tiver
+        if (paymentLink && !order.payment_link) {
+          order.payment_link = paymentLink;
+        }
+
+        // Carrega config do Stripe se necessário
+        if (!StripeService.config) {
+          await StripeService.loadConfig();
+        }
+
+        // Gera mensagem para WhatsApp
+        const message = StripeService.generatePaymentMessage(order, order.payment_link);
+
+        // Abre WhatsApp com a mensagem
+        const cleanPhone = (phone || '').replace(/\D/g, '');
+        if (cleanPhone) {
+          const url = `https://wa.me/55${cleanPhone}?text=${encodeURIComponent(message)}`;
+          window.open(url, '_blank');
+        }
+      } catch (error) {
+        console.error('Erro ao reenviar link:', error);
+        alert('Erro ao reenviar link: ' + error.message);
+      }
+    }
+
+    // Marcar pagamento como recebido (parcial ou total)
+    async function markPaymentReceived(orderId, paymentType) {
+      try {
+        const { data: order } = await window.supabaseClient
+          .from('fast_orders')
+          .select('total, amount_paid')
+          .eq('id', orderId)
+          .single();
+
+        const updateData = {
+          payment_status: paymentType === 'full' ? 'paid_full' : 'paid_partial',
+          amount_paid: paymentType === 'full' ? order.total : (order.total * 0.5)
+        };
+
+        const { error } = await window.supabaseClient
+          .from('fast_orders')
+          .update(updateData)
+          .eq('id', orderId);
+
+        if (error) throw error;
+
+        alert(paymentType === 'full' ? '✅ Pagamento total registrado!' : '✅ Entrada de 50% registrada!');
+        loadDashboardOrders();
+      } catch (error) {
+        console.error('Erro ao registrar pagamento:', error);
+        alert('Erro ao registrar pagamento');
+      }
+    }
+
+    function openWhatsAppForOrder(phone) {
+      if (!phone) return;
+      const cleanPhone = phone.replace(/\D/g, '');
+      const url = `https://wa.me/55${cleanPhone}`;
+      window.open(url, '_blank');
+    }
+
+    // ========================================
+    // ORDER DELETION FUNCTIONS
+    // ========================================
+    // Logic moved to assets/js/fast/order-admin.js
+    // Functions available: window.deleteOrdersByCodes, window.executeDeleteOrders
+    // Event listeners are initialized in the external module
+
+    // Desktop buttons
+    document.getElementById('showProductsPanelFast')?.addEventListener('click', () => {
+      showPanel('productsPanelFast');
+      loadProductsAdmin();
+    });
+    document.getElementById('showClientsPanelFast')?.addEventListener('click', () => {
+      showPanel('clientsPanelFast');
+      renderClients();
+      updateClientDiscountSelect();
+    });
+    document.getElementById('showPromotionsPanelFast')?.addEventListener('click', async () => {
+      showPanel('promotionsPanelFast');
+      renderPromotions();
+      updatePromotionProductSelect();
+      updateClientDiscountSelect();
+      renderCoupons();
+
+      // Load Special Discount Config
+      try {
+        const config = await SpecialDiscountService.getConfig();
+        if (config) {
+          document.getElementById('specialDiscountMinOrders').value = config.min_orders || '';
+          document.getElementById('specialDiscountMinVal').value = config.min_order_value || '';
+          document.getElementById('specialDiscountType').value = config.discount_type || 'percentage';
+          document.getElementById('specialDiscountValue').value = config.discount_value || '';
+
+          // Update status card
+          const statusCard = document.getElementById('specialDiscountStatus');
+          if (statusCard && config.active && config.discount_value > 0) {
+            const typeText = config.discount_type === 'percentage' ? `${config.discount_value}%` : `R$ ${config.discount_value?.toFixed(2).replace('.', ',')}`;
+            statusCard.className = 'mb-4 p-3 rounded-lg bg-green-50 border-l-4 border-green-500';
+            statusCard.innerHTML = `
+              <p class="text-sm font-bold text-green-800">✅ Desconto Ativo</p>
+              <p class="text-xs text-green-700 mt-1">A cada <strong>${config.min_orders}</strong> pedidos pagos, cliente ganha <strong>${typeText}</strong> de desconto</p>
+              ${config.min_order_value > 0 ? `<p class="text-xs text-green-600 mt-1">Pedido mínimo: R$ ${config.min_order_value?.toFixed(2).replace('.', ',')}</p>` : ''}
+            `;
+          } else if (statusCard) {
+            statusCard.className = 'mb-4 p-3 rounded-lg bg-gray-100 border-l-4 border-gray-400';
+            statusCard.innerHTML = '<p class="text-sm text-gray-600 font-medium">⚪ Nenhum desconto configurado</p>';
+          }
+        }
+      } catch (e) {
+        console.error('[SpecialDiscount] Erro ao carregar:', e);
+        const statusCard = document.getElementById('specialDiscountStatus');
+        if (statusCard) {
+          statusCard.className = 'mb-4 p-3 rounded-lg bg-gray-100 border-l-4 border-gray-400';
+          statusCard.innerHTML = '<p class="text-sm text-gray-600 font-medium">⚪ Configure acima</p>';
+        }
+      }
+
+      // Load Birthday Discount Config
+      try {
+        const config = await BirthdayDiscountService.getConfig();
+        if (config) {
+          document.getElementById('birthdayDiscountType').value = config.discount_type || 'percentage';
+          document.getElementById('birthdayDiscountValue').value = config.discount_value || '';
+
+          // Update status card
+          const statusCard = document.getElementById('birthdayDiscountStatus');
+          if (statusCard && config.active && config.discount_value > 0) {
+            const typeText = config.discount_type === 'percentage' ? `${config.discount_value}%` : `R$ ${config.discount_value?.toFixed(2).replace('.', ',')}`;
+            statusCard.className = 'mb-4 p-3 rounded-lg bg-pink-50 border-l-4 border-pink-500';
+            statusCard.innerHTML = `
+              <p class="text-sm font-bold text-pink-800">🎂 Desconto Ativo</p>
+              <p class="text-xs text-pink-700 mt-1">Cliente aniversariante ganha <strong>${typeText}</strong> de desconto (uso único por ano)</p>
+            `;
+          } else if (statusCard) {
+            statusCard.className = 'mb-4 p-3 rounded-lg bg-gray-100 border-l-4 border-gray-400';
+            statusCard.innerHTML = '<p class="text-sm text-gray-600 font-medium">⚪ Nenhum desconto configurado</p>';
+          }
+        }
+      } catch (e) {
+        console.error('[BirthdayDiscount] Erro ao carregar:', e);
+        const statusCard = document.getElementById('birthdayDiscountStatus');
+        if (statusCard) {
+          statusCard.className = 'mb-4 p-3 rounded-lg bg-gray-100 border-l-4 border-gray-400';
+          statusCard.innerHTML = '<p class="text-sm text-gray-600 font-medium">⚪ Configure acima</p>';
+        }
+      }
+    });
+
+    // Special Discount Save Listener
+    document.getElementById('saveSpecialDiscountConfig')?.addEventListener('click', async () => {
+      const minOrders = parseInt(document.getElementById('specialDiscountMinOrders').value);
+      const minVal = parseFloat(document.getElementById('specialDiscountMinVal').value);
+      const type = document.getElementById('specialDiscountType').value;
+      const val = parseFloat(document.getElementById('specialDiscountValue').value);
+      const msg = document.getElementById('specialDiscountMsg');
+
+      if (isNaN(minOrders) || isNaN(val)) {
+        msg.textContent = 'Preencha os campos corretamente.';
+        msg.className = 'text-red-600 text-sm ml-2';
+        return;
+      }
+
+      const config = {
+        min_orders: minOrders,
+        discount_type: type,
+        discount_value: val,
+        min_order_value: isNaN(minVal) ? 0 : minVal,
+        active: true
+      };
+
+      msg.textContent = 'Salvando...';
+      const success = await SpecialDiscountService.saveConfig(config);
+      if (success) {
+        msg.textContent = 'Configuração salva!';
+        msg.className = 'text-green-600 text-sm ml-2';
+        // Update global
+        currentSpecialDiscount = config;
+        // Update status card
+        const statusCard = document.getElementById('specialDiscountStatus');
+        const typeText = config.discount_type === 'percentage' ? `${config.discount_value}%` : `R$ ${config.discount_value?.toFixed(2).replace('.', ',')}`;
+        statusCard.className = 'mb-4 p-3 rounded-lg bg-green-50 border-l-4 border-green-500';
+        statusCard.innerHTML = `
+          <p class="text-sm font-bold text-green-800">✅ Desconto Ativo</p>
+          <p class="text-xs text-green-700 mt-1">A cada <strong>${config.min_orders}</strong> pedidos pagos, cliente ganha <strong>${typeText}</strong> de desconto</p>
+          ${config.min_order_value > 0 ? `<p class="text-xs text-green-600 mt-1">Pedido mínimo: R$ ${config.min_order_value?.toFixed(2).replace('.', ',')}</p>` : ''}
+        `;
+      } else {
+        msg.textContent = 'Erro ao salvar.';
+        msg.className = 'text-red-600 text-sm ml-2';
+      }
+    });
 
     // Welcome Screen - Enter buttons (desktop and mobile)
     document.getElementById('enterStoreBtn')?.addEventListener('click', () => {

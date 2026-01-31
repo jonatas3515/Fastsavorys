@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Debug Promotions</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+
+<body>
+    <h1>Debug Promotions</h1>
+    <pre id="output"></pre>
+
+    <script>
+        const supabaseUrl = 'https://vqjyjdllapqbqpylshkw.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxanlqZGxsYXBxYnFweWxzaGt3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY0MzgyNDUsImV4cCI6MjA4MjAxNDI0NX0.tfTR9YnM5l0do7FJfxML6i05KTSrMInQMqFrWXx6aAU';
+
+        const sb = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+        async function debug() {
+            const output = document.getElementById('output');
+
+            output.textContent = 'Loading...\n\n';
+
+            try {
+                // Load promotions
+                const { data: promos, error: pErr } = await sb
+                    .from('fast_promotions')
+                    .select('*');
+
+                output.textContent += '=== FAST_PROMOTIONS TABLE ===\n';
+                if (pErr) {
+                    output.textContent += 'Error: ' + JSON.stringify(pErr) + '\n';
+                } else {
+                    output.textContent += JSON.stringify(promos, null, 2) + '\n\n';
+                }
+
+                // Load products named "rissole"
+                const { data: products, error: prodErr } = await sb
+                    .from('fast_products')
+                    .select('id, name, price, promo')
+                    .ilike('name', '%rissole%');
+
+                output.textContent += '=== PRODUCTS WITH "RISSOLE" ===\n';
+                if (prodErr) {
+                    output.textContent += 'Error: ' + JSON.stringify(prodErr) + '\n';
+                } else {
+                    output.textContent += JSON.stringify(products, null, 2) + '\n\n';
+                }
+
+                // Check for any matching promotions
+                if (promos && products) {
+                    output.textContent += '=== MATCHING ANALYSIS ===\n';
+                    products.forEach(product => {
+                        const promo = promos.find(p =>
+                            String(p.product_id) === String(product.id) ||
+                            Number(p.product_id) === Number(product.id)
+                        );
+                        output.textContent += `Product: ${product.name} (id: ${product.id}, type: ${typeof product.id})\n`;
+                        if (promo) {
+                            output.textContent += `  -> Found promo id ${promo.id}: ${promo.discount_type} - ${promo.value}\n`;
+                        } else {
+                            output.textContent += `  -> No matching promo found\n`;
+                            output.textContent += `  -> Promo IDs in table: ${promos.map(p => p.product_id + '(' + typeof p.product_id + ')').join(', ')}\n`;
+                        }
+                    });
+                }
+
+            } catch (e) {
+                output.textContent += 'Exception: ' + e.message + '\n';
+            }
+        }
+
+        debug();
+    </script>
+</body>
+
+</html>

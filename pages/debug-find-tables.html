@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Debug - Encontrar Tabelas</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+
+        pre {
+            background: #f5f5f5;
+            padding: 10px;
+            overflow-x: auto;
+            max-height: 300px;
+        }
+
+        .section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+
+        h2 {
+            color: #333;
+            border-bottom: 2px solid #e91e63;
+            padding-bottom: 5px;
+        }
+
+        .found {
+            background: #d4edda;
+        }
+
+        .error {
+            background: #f8d7da;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>🔍 Buscando Tabelas com Birthdates e Ratings</h1>
+    <div id="output"></div>
+
+    <script>
+        const supabaseUrl = 'https://vqjyjdllapqbqpylshkw.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxanlqZGxsYXBxYnFweWxzaGt3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY0MzgyNDUsImV4cCI6MjA4MjAxNDI0NX0.tfTR9YnM5l0do7FJfxML6i05KTSrMInQMqFrWXx6aAU';
+
+        const sb = window.supabase.createClient(supabaseUrl, supabaseKey);
+        const output = document.getElementById('output');
+
+        const possibleTables = [
+            'fast_clients',
+            'clients',
+            'fast_customer_birthdays',
+            'fast_client_birthdays',
+            'fast_birthdays',
+            'fast_birthday',
+            'fast_aniversario',
+            'fast_aniversarios',
+            'fast_ratings',
+            'ratings',
+            'fast_reviews',
+            'reviews',
+            'fast_testimonials'
+        ];
+
+        async function checkTable(table) {
+            try {
+                const { data, error } = await sb.from(table).select('*').limit(10);
+                if (error) {
+                    return { table, found: false, error: error.message, data: null };
+                }
+                return { table, found: true, error: null, data, count: data?.length || 0 };
+            } catch (e) {
+                return { table, found: false, error: e.message, data: null };
+            }
+        }
+
+        async function debug() {
+            output.innerHTML = '<p>Buscando tabelas...</p>';
+            let html = '';
+
+            for (const table of possibleTables) {
+                const result = await checkTable(table);
+                const cls = result.found ? 'found' : 'error';
+                html += `<div class="section ${cls}">`;
+                html += `<h2>${result.found ? '✅' : '❌'} ${table}</h2>`;
+
+                if (result.found) {
+                    html += `<p><strong>${result.count} registros encontrados</strong></p>`;
+                    if (result.data && result.data.length > 0) {
+                        // Check if any column might contain birthdate
+                        const cols = Object.keys(result.data[0]);
+                        const bdayCols = cols.filter(c =>
+                            c.toLowerCase().includes('birth') ||
+                            c.toLowerCase().includes('aniver') ||
+                            c.toLowerCase().includes('nascimento') ||
+                            c.toLowerCase().includes('bday')
+                        );
+                        if (bdayCols.length > 0) {
+                            html += `<p style="color:green;"><strong>🎂 Colunas de aniversário encontradas: ${bdayCols.join(', ')}</strong></p>`;
+                        }
+                        html += '<pre>' + JSON.stringify(result.data, null, 2) + '</pre>';
+                    }
+                } else {
+                    html += `<p>Erro: ${result.error}</p>`;
+                }
+                html += '</div>';
+            }
+
+            // Also check for column 'birthdate' on fast_clients specifically
+            html += '<div class="section">';
+            html += '<h2>📋 Verificando colunas da fast_clients</h2>';
+            try {
+                const { data, error } = await sb.from('fast_clients').select('*').limit(1);
+                if (!error && data && data.length > 0) {
+                    const cols = Object.keys(data[0]);
+                    html += '<p><strong>Colunas disponíveis:</strong> ' + cols.join(', ') + '</p>';
+                } else if (error) {
+                    html += `<p style="color:red;">${error.message}</p>`;
+                }
+            } catch (e) {
+                html += `<p style="color:red;">${e.message}</p>`;
+            }
+            html += '</div>';
+
+            output.innerHTML = html;
+        }
+
+        debug();
+    </script>
+</body>
+
+</html>

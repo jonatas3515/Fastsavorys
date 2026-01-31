@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Debug Ratings & Birthdays</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+        }
+
+        pre {
+            background: #f5f5f5;
+            padding: 10px;
+            overflow-x: auto;
+        }
+
+        .section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+
+        h2 {
+            color: #333;
+            border-bottom: 2px solid #e91e63;
+            padding-bottom: 5px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>🔍 Debug Ratings & Birthdays</h1>
+    <div id="output"></div>
+
+    <script>
+        const supabaseUrl = 'https://vqjyjdllapqbqpylshkw.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxanlqZGxsYXBxYnFweWxzaGt3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY0MzgyNDUsImV4cCI6MjA4MjAxNDI0NX0.tfTR9YnM5l0do7FJfxML6i05KTSrMInQMqFrWXx6aAU';
+
+        const sb = window.supabase.createClient(supabaseUrl, supabaseKey);
+        const output = document.getElementById('output');
+
+        async function debug() {
+            output.innerHTML = '<p>Carregando...</p>';
+            let html = '';
+
+            // 1. Check fast_ratings table
+            html += '<div class="section">';
+            html += '<h2>⭐ Avaliações (fast_ratings)</h2>';
+            try {
+                const { data, error } = await sb.from('fast_ratings').select('*').order('created_at', { ascending: false });
+                if (error) {
+                    html += `<p style="color:red;">Erro: ${JSON.stringify(error)}</p>`;
+                } else if (!data || data.length === 0) {
+                    html += '<p>Nenhuma avaliação encontrada na tabela fast_ratings.</p>';
+                } else {
+                    html += `<p><strong>${data.length} avaliações encontradas.</strong></p>`;
+                    html += '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+                }
+            } catch (e) {
+                html += `<p style="color:red;">Exception: ${e.message}</p>`;
+            }
+            html += '</div>';
+
+            // 2. Check fast_clients for birth_date
+            html += '<div class="section">';
+            html += '<h2>🎂 Clientes com Data de Nascimento (fast_clients)</h2>';
+            try {
+                const { data, error } = await sb.from('fast_clients').select('phone, name, birth_date, discount_percentage');
+                if (error) {
+                    html += `<p style="color:red;">Erro: ${JSON.stringify(error)}</p>`;
+                    if (error.message && error.message.includes('birth_date')) {
+                        html += '<p style="color:orange;">A coluna birth_date pode não existir ainda. Execute a migration SQL.</p>';
+                    }
+                } else if (!data || data.length === 0) {
+                    html += '<p>Nenhum cliente encontrado na tabela fast_clients.</p>';
+                } else {
+                    const withBday = data.filter(c => c.birth_date);
+                    html += `<p><strong>${data.length} clientes totais, ${withBday.length} com data de nascimento.</strong></p>`;
+                    html += '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+                }
+            } catch (e) {
+                html += `<p style="color:red;">Exception: ${e.message}</p>`;
+            }
+            html += '</div>';
+
+            // 3. Check if there's a separate clients table in orders
+            html += '<div class="section">';
+            html += '<h2>📋 Buscando birthdates em outras tabelas possíveis</h2>';
+
+            // Check clients embedded in DB if there's another table
+            const possibleTables = ['clients', 'fast_birthday_clients', 'fast_client_birthdays'];
+            for (const table of possibleTables) {
+                try {
+                    const { data, error } = await sb.from(table).select('*').limit(5);
+                    if (!error && data) {
+                        html += `<p><strong>Tabela '${table}' encontrada!</strong></p>`;
+                        html += '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+                    }
+                } catch (e) { }
+            }
+            html += '</div>';
+
+            // 4. Check fast_client_discounts for birthdate column
+            html += '<div class="section">';
+            html += '<h2>💰 Tabela fast_client_discounts</h2>';
+            try {
+                const { data, error } = await sb.from('fast_client_discounts').select('*').limit(10);
+                if (error) {
+                    html += `<p style="color:red;">Erro: ${JSON.stringify(error)}</p>`;
+                } else {
+                    html += '<pre>' + JSON.stringify(data, null, 2) + '</pre>';
+                }
+            } catch (e) {
+                html += `<p style="color:red;">Exception: ${e.message}</p>`;
+            }
+            html += '</div>';
+
+            output.innerHTML = html;
+        }
+
+        debug();
+    </script>
+</body>
+
+</html>
