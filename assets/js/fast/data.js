@@ -57,6 +57,8 @@ async function loadStoreConfig() {
                 morning_rule_enabled: data.morning_rule_enabled !== false,
                 morning_rule_end_time: data.morning_rule_end_time || '14:00',
                 morning_rule_min_value: parseFloat(data.morning_rule_min_value) || 30.00,
+                order_window_start: data.order_window_start || '07:00',
+                order_window_end: data.order_window_end || '18:00',
             };
             window.storeConfig.card_fee_2x = window.storeConfig.card_fee_1x;
             localStorage.setItem('fastStoreConfig', JSON.stringify(window.storeConfig));

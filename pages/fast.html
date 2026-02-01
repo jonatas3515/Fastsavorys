@@ -3757,18 +3757,12 @@
       ci.innerHTML = cart.map(i => {
         let html = `<div class='flex justify-between'><span>${i.quantity}x ${i.name}</span><span>R$ ${(i.price * i.quantity).toFixed(2).replace('.', ',')}</span></div>`;
         if (i.note) {
-          html += `<p class='text-xs text-gray-500 italic ml-4'>📝 ${i.note}</p>`;
+          html += `<p class='text-xs text-gray-500 italic ml-4'> ${i.note}</p>`;
         }
         return html;
       }).join('');
-      // Kits e Bolos: desabilitar entrega
+      // Kits: desabilitar entrega (bolos PODEM ter entrega, só precisam de antecedência)
       const containsKit = cart.some(i => { const p = products.find(x => x.id === i.id); return p && p.category === 'kits'; });
-      const containsBolo = cart.some(i => {
-        const p = products.find(x => x.id === i.id);
-        if (!p) return false;
-        const name = p.name.toLowerCase();
-        return p.category === 'bolos' || name.includes('bolo p') || name.includes('bolo g') || name.match(/bolo\s*[pg]/i);
-      });
       const onlyBeverages = cart.every(i => { const p = products.find(x => x.id === i.id); return p && p.category === 'bebidas'; });
       const deliveryTitle = document.getElementById('deliveryTitle');
       const entregaRadio = document.querySelector('input[name="delivery"][value="entrega"]');
@@ -3777,7 +3771,8 @@
       // Check if delivery is globally disabled
       const deliveryDisabled = !storeConfig.delivery_enabled;
 
-      if (containsKit || containsBolo || onlyBeverages || deliveryDisabled) {
+      // Apenas kits e bebidas sozinhas desabilitam entrega (bolos podem ter entrega)
+      if (containsKit || onlyBeverages || deliveryDisabled) {
         entregaRadio.checked = false;
         entregaRadio.disabled = true;
         retiradaRadio.checked = true;
@@ -3789,7 +3784,7 @@
             const notice = document.createElement('div');
             notice.id = 'deliveryDisabledNotice';
             notice.className = 'mt-2 p-3 rounded-lg bg-orange-100 border border-orange-300 text-orange-800 text-sm';
-            notice.innerHTML = `🚚 <strong>Entregas suspensas:</strong> ${storeConfig.delivery_disabled_reason}`;
+            notice.innerHTML = ` <strong>Entregas suspensas:</strong> ${storeConfig.delivery_disabled_reason}`;
             entregaRadio.parentElement.parentElement.appendChild(notice);
           }
         }

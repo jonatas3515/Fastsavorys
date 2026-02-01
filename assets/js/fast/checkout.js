@@ -268,15 +268,10 @@ window.CheckoutModule = {
             console.log('[Checkout] Step 1.1: Product restrictions...');
             // Product Restrictions
             const containsKit = window.cart.some(i => window.products.find(p => p.id === i.id)?.category === 'kits');
-            const containsBolo = window.cart.some(i => {
-                const p = window.products.find(x => x.id === i.id);
-                if (!p) return false;
-                const name = p.name.toLowerCase();
-                return p.category === 'bolos' || name.includes('bolo p') || name.includes('bolo g') || name.match(/bolo\s*[pg]/i);
-            });
 
-            if ((containsKit || containsBolo) && delivery && delivery.value === 'entrega') {
-                this.showWarning('Kits festa e bolos grandes não possuem entrega. Altere para retirada na loja.');
+            // Apenas kits festa não têm entrega (bolos podem ter entrega com antecedência)
+            if (containsKit && delivery && delivery.value === 'entrega') {
+                this.showWarning('Kits festa não possuem entrega. Altere para retirada na loja.');
                 return;
             }
 
@@ -326,28 +321,54 @@ window.CheckoutModule = {
 
                 // Time Window Logic
                 const timeNum = parseInt(orderTimeSlot.replace(/:/g, ''), 10);
-                if (isOrderForToday && !window.cartContainsBolo()) {
-                    if (timeNum < 1100 || timeNum > 1800) { this.showWarning('Para retirada no mesmo dia, o horário deve ser entre 11h e 18h.'); return; }
+                const hasBolo = window.cartContainsBolo();
+                
+                if (isOrderForToday && !hasBolo) {
+                    // Pedido mesmo dia SEM bolo: usa janela same_day (11:00-18:00)
+                    const startStr = (window.storeConfig?.same_day_pickup_start || '11:00').replace(':', '');
+                    const endStr = (window.storeConfig?.same_day_pickup_end || '18:00').replace(':', '');
+                    const startNum = parseInt(startStr, 10) || 1100;
+                    const endNum = parseInt(endStr, 10) || 1800;
+                    
+                    if (timeNum < startNum || timeNum > endNum) {
+                        const startFormatted = window.storeConfig?.same_day_pickup_start || '11:00';
+                        const endFormatted = window.storeConfig?.same_day_pickup_end || '18:00';
+                        this.showWarning(`Para retirada no mesmo dia, o horário deve ser entre ${startFormatted} e ${endFormatted}.`);
+                        return;
+                    }
                 } else {
-                    // DYNAMIC SCHEDULING RULES (Admin Panel)
+                    // Encomenda (data futura) OU pedido com bolo
                     let minTime = 700;
                     let maxTime = 1800;
 
-                    // Attempt to get business hours for the selected date
-                    try {
-                        const [y, m, d] = orderDateStr.split('-').map(Number);
-                        const dateObj = new Date(y, m - 1, d);
-                        const dayOfWeek = dateObj.getDay(); // 0-6
-                        const rules = (window.businessHours || []).find(b => b.day_of_week === dayOfWeek);
+                    if (hasBolo) {
+                        // BOLO: usa Janela de Pedidos do admin (07:00-18:00)
+                        const orderWindowStart = (window.storeConfig?.order_window_start || '07:00').replace(':', '');
+                        const orderWindowEnd = (window.storeConfig?.order_window_end || '18:00').replace(':', '');
+                        minTime = parseInt(orderWindowStart, 10) || 700;
+                        maxTime = parseInt(orderWindowEnd, 10) || 1800;
+                    } else {
+                        // SEM BOLO: usa businessHours (horário comercial normal)
+                        try {
+                            const [y, m, d] = orderDateStr.split('-').map(Number);
+                            const dateObj = new Date(y, m - 1, d);
+                            const dayOfWeek = dateObj.getDay();
+                            const rules = (window.businessHours || []).find(b => b.day_of_week === dayOfWeek);
 
-                        if (rules && rules.is_open) {
-                            const openStr = (rules.open_time || '07:00').replace(':', '');
-                            const closeStr = (rules.close_time || '18:00').replace(':', '');
-                            minTime = parseInt(openStr, 10);
-                            maxTime = parseInt(closeStr, 10);
+                            if (rules && rules.is_open) {
+                                const openStr = (rules.open_time || '14:00').replace(':', '');
+                                const closeStr = (rules.close_time || '18:00').replace(':', '');
+                                minTime = parseInt(openStr, 10);
+                                maxTime = parseInt(closeStr, 10);
+                            } else {
+                                minTime = 1400;
+                                maxTime = 1800;
+                            }
+                        } catch (e) {
+                            console.warn('[Checkout] Erro ao calcular horário dinâmico:', e);
+                            minTime = 1400;
+                            maxTime = 1800;
                         }
-                    } catch (e) {
-                        console.warn('[Checkout] Erro ao calcular horário dinâmico:', e);
                     }
 
                     if (timeNum < minTime || timeNum > maxTime) {
@@ -357,7 +378,9 @@ window.CheckoutModule = {
                         this.showWarning(`Para ${tipo} nesta data, o horário permitido é das ${minStr} às ${maxStr}.`);
                         return;
                     }
-                    if (window.isOrderAllowedAtTime) {
+                    
+                    // Regra da manhã: se NÃO tem bolo, valida valor mínimo antes das 14h
+                    if (!hasBolo && window.isOrderAllowedAtTime) {
                         const tVal = window.isOrderAllowedAtTime(orderTimeSlot, window.cartTotal, window.cart);
                         if (!tVal.allowed) { this.showWarning(tVal.reason); return; }
                     }
