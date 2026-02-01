@@ -1390,6 +1390,7 @@
             loadCoupons().catch(function (e) { console.error('[INIT] loadCoupons erro:', e); }),
             loadStoreConfig().catch(function (e) { console.error('[INIT] loadStoreConfig erro:', e); }),
             loadBusinessHours().catch(function (e) { console.error('[INIT] loadBusinessHours erro:', e); }),
+            (typeof loadDeliveryFees === 'function' ? loadDeliveryFees() : Promise.resolve()).catch(function (e) { console.error('[INIT] loadDeliveryFees erro:', e); }),
             ProductOptionsModule.load().catch(function (e) { console.error('[INIT] ProductOptionsModule erro:', e); }),
             StoreStatusService.isClosedToday().catch(function (e) { console.error('[INIT] StoreStatusService erro:', e); })
           ]),

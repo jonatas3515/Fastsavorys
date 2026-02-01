@@ -460,3 +460,37 @@ window.findValidCouponByCode = function (code) {
 
 window.recordBirthdayDiscountUsage = recordBirthdayDiscountUsage;
 window.findValidCouponByCode = findValidCouponByCode;
+
+// ========================================
+// DELIVERY FEES - Load from Supabase
+// ========================================
+async function loadDeliveryFees() {
+    try {
+        if (!window.supabaseClient) {
+            console.warn('[Data] Supabase indisponível para carregar taxas');
+            return;
+        }
+        
+        const { data, error } = await window.supabaseClient
+            .from('fast_delivery_fees')
+            .select('*');
+
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+            const feesObj = {};
+            data.forEach(row => {
+                feesObj[row.neighborhood] = {
+                    fee: row.fee,
+                    min: row.min_order_value || 0
+                };
+            });
+            localStorage.setItem('fastDeliveryFees', JSON.stringify(feesObj));
+            console.log('[Data] Taxas de entrega carregadas do Supabase:', Object.keys(feesObj).length, 'bairros');
+        }
+    } catch (e) {
+        console.warn('[Data] Erro ao carregar taxas de entrega:', e.message);
+    }
+}
+
+window.loadDeliveryFees = loadDeliveryFees;
