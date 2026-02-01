@@ -301,7 +301,7 @@ async function handleSaveCoupon() {
         return;
     }
 
-    const btn = document.querySelector('button[onclick="handleSaveCoupon()"]');
+    const btn = document.getElementById('addCouponBtn');
     if (btn) {
         btn.disabled = true;
         btn.innerText = 'Salvando...';
@@ -351,9 +351,12 @@ async function handleSaveCoupon() {
         if (expiryEl) expiryEl.value = '';
 
         if (btn) btn.innerText = 'Criar Cupom';
+        
+        // Reset code field to be editable
+        if (codeEl) codeEl.disabled = false;
 
         // Remove cancel button if exists
-        const formDiv = codeEl.closest('.grid')?.parentElement || codeEl.parentElement;
+        const formDiv = codeEl?.closest('.grid')?.parentElement || codeEl?.parentElement;
         const cancelBtn = document.getElementById('cancelEditCouponBtn');
         if (cancelBtn) cancelBtn.remove();
 
@@ -365,7 +368,7 @@ async function handleSaveCoupon() {
     } finally {
         if (btn) {
             btn.disabled = false;
-            if (_editingCouponId) btn.innerText = 'Atualizar Cupom';
+            if (_editingCouponId) btn.innerText = 'Salvar Alterações';
             else btn.innerText = 'Criar Cupom';
         }
     }
@@ -472,9 +475,9 @@ window.handleEditCoupon = async function (id) {
         if (expiryEl) expiryEl.value = data.expiry_date || '';
 
         // Update Button Text
-        const btn = document.querySelector('button[onclick="handleSaveCoupon()"]');
+        const btn = document.getElementById('addCouponBtn');
         if (btn) {
-            btn.innerText = 'Atualizar Cupom';
+            btn.innerText = 'Salvar Alterações';
 
             // Add Cancel Button if not exists
             const formContainer = btn.parentElement;
@@ -500,7 +503,7 @@ window.handleEditCoupon = async function (id) {
 
 window.cancelEditCoupon = function () {
     _editingCouponId = null;
-    const btn = document.querySelector('button[onclick="handleSaveCoupon()"]');
+    const btn = document.getElementById('addCouponBtn');
     if (btn) btn.innerText = 'Criar Cupom';
 
     // Clear inputs
@@ -935,6 +938,9 @@ window.saveBirthdayDiscountConfig = async function () {
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('saveSpecialDiscountConfig')?.addEventListener('click', window.saveSpecialDiscountConfig);
     document.getElementById('saveBirthdayDiscountConfig')?.addEventListener('click', window.saveBirthdayDiscountConfig);
+    
+    // Conectar botão de criar/salvar cupom
+    document.getElementById('addCouponBtn')?.addEventListener('click', window.handleSaveCoupon);
 });
 
 window.renderPromotions = renderPromotions;
