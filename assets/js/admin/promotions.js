@@ -177,16 +177,26 @@ async function renderCoupons() {
 
         let usageCountMap = {};
         try {
-            const { data: usageData } = await window.supabaseClient
-                .from('fast_coupon_usage')
-                .select('coupon_code');
-            if (usageData) {
-                usageData.forEach(u => {
-                    const code = String(u.coupon_code || '').toUpperCase().trim();
-                    usageCountMap[code] = (usageCountMap[code] || 0) + 1;
+            // Buscar pedidos ENTREGUES que usaram cupom (contagem real)
+            const { data: ordersWithCoupon } = await window.supabaseClient
+                .from('fast_orders')
+                .select('coupon_code, status')
+                .not('coupon_code', 'is', null)
+                .neq('coupon_code', '')
+                .eq('status', 'delivered');
+            
+            if (ordersWithCoupon) {
+                ordersWithCoupon.forEach(o => {
+                    const code = String(o.coupon_code || '').toUpperCase().trim();
+                    if (code) {
+                        usageCountMap[code] = (usageCountMap[code] || 0) + 1;
+                    }
                 });
             }
-        } catch (e) { }
+            console.log('[Coupons] Contagem de usos (pedidos entregues):', usageCountMap);
+        } catch (e) {
+            console.warn('[Coupons] Erro ao contar usos:', e);
+        }
 
         const { data: coupons, error } = await window.supabaseClient
             .from('fast_coupons')
@@ -209,8 +219,8 @@ async function renderCoupons() {
             const minOrderNum = Number(c.min_order || 0);
             const code = String(c.code || '').toUpperCase().trim();
             const realUsageCount = usageCountMap[code] || 0;
-            const usesCount = Number(c.usage_count || 0) > 0 ? Number(c.usage_count || 0) : realUsageCount;
-            const uses = `${usesCount}/${c.max_usage_count ?? '∞'}`;
+            // SEMPRE usar contagem real da tabela fast_coupon_usage
+            const uses = `${realUsageCount}/${c.max_usage_count ?? '∞'}`;
             const expiry = c.expiry_date ? new Date(c.expiry_date).toLocaleDateString('pt-BR') : 'Sem validade';
 
             const activeClass = c.active !== false ? 'text-green-600 bg-green-50 border-green-200' : 'text-gray-400 bg-gray-50 border-gray-200';
@@ -862,6 +872,7 @@ async function loadBirthdayDiscountConfig() {
         if (document.getElementById('birthdayDiscountActive')) document.getElementById('birthdayDiscountActive').checked = config.active !== false;
         if (document.getElementById('birthdayDiscountType')) document.getElementById('birthdayDiscountType').value = config.discount_type || 'percentage';
         if (document.getElementById('birthdayDiscountValue')) document.getElementById('birthdayDiscountValue').value = config.discount_value || 0;
+        if (document.getElementById('birthdayDiscountValidDays')) document.getElementById('birthdayDiscountValidDays').value = config.valid_days ?? 6;
 
         if (container) {
             if ((config.active !== false) && Number(config.discount_value || 0) > 0) {
@@ -915,11 +926,13 @@ window.saveBirthdayDiscountConfig = async function () {
     const active = document.getElementById('birthdayDiscountActive').checked;
     const type = document.getElementById('birthdayDiscountType').value;
     const val = parseFloat(document.getElementById('birthdayDiscountValue').value) || 0;
+    const validDays = parseInt(document.getElementById('birthdayDiscountValidDays')?.value) || 6;
 
     const config = {
         active,
         discount_type: type,
-        discount_value: val
+        discount_value: val,
+        valid_days: validDays
     };
 
     const success = await window.BirthdayDiscountService.saveConfig(config);

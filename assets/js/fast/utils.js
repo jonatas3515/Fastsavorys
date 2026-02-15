@@ -88,14 +88,20 @@ window.hasBlockedProductsForSameDay = function () {
         const name = (item.name || '').toLowerCase();
         const category = (product?.category || '').toLowerCase();
 
-        // Bolos bloqueados
-        if (category === 'bolos' || name.includes('bolo')) return true;
-
         // Kits Festa bloqueados
         if (category === 'kits' || name.includes('kit festa') || name.includes('kit ')) return true;
 
-        // Vulcão comum bloqueado (Mini Vulcão permitido)
-        if (name.includes('vulcão') && !name.includes('mini')) return true;
+        // Vulcão Mini é PERMITIDO - verificar antes de bloquear bolos
+        if (name.includes('vulcão mini') || name.includes('vulcao mini') || 
+            name.includes('mini vulcão') || name.includes('mini vulcao')) {
+            return false; // Vulcão Mini NÃO bloqueia
+        }
+
+        // Bolos grandes bloqueados (exceto vulcão mini já tratado acima)
+        if (category === 'bolos' || name.includes('bolo')) return true;
+
+        // Vulcão comum bloqueado (Mini Vulcão já foi permitido acima)
+        if (name.includes('vulcão') || name.includes('vulcao')) return true;
 
         return false;
     });
@@ -103,6 +109,7 @@ window.hasBlockedProductsForSameDay = function () {
 
 /**
  * Verifica se pedido pode ser feito para hoje (mesmo dia)
+ * NOTA: Vulcão Mini pode ter entrega desde que atenda valor mínimo do bairro
  */
 window.canOrderTodayWithoutBolo = function (isRetirada, cartTotal, timeSlot) {
     if (storeConfig.same_day_orders_enabled === false) {
@@ -113,8 +120,13 @@ window.canOrderTodayWithoutBolo = function (isRetirada, cartTotal, timeSlot) {
         return { allowed: false, reason: 'Pedidos com bolos, kits festa ou vulcão exigem 1 dia de antecedência. Apenas salgados, mini salgados, refrigerantes e Mini Vulcão podem ser pedidos para hoje.' };
     }
 
-    if (!isRetirada) {
-        return { allowed: false, reason: 'Pedidos para o mesmo dia são apenas para retirada na loja.' };
+    // Verificar se carrinho tem APENAS vulcão mini (permite entrega com valor mínimo)
+    const analysis = window.analyzeCart ? window.analyzeCart(window.cart) : null;
+    const hasOnlyMiniOrSalgados = analysis && !analysis.hasBoloGrande && (analysis.hasBoloMini || analysis.hasSalgados);
+    
+    // Se tem vulcão mini ou salgados e é entrega, permitir (validação de valor mínimo feita em canUseDelivery)
+    if (!isRetirada && !hasOnlyMiniOrSalgados) {
+        return { allowed: false, reason: 'Pedidos para o mesmo dia são apenas para retirada na loja (exceto Vulcão Mini com valor mínimo).' };
     }
 
     if (timeSlot) {

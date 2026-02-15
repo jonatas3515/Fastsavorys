@@ -66,6 +66,11 @@ window.updateCart = function () {
     if (typeof window.renderUpsellSuggestions === 'function') {
         window.renderUpsellSuggestions();
     }
+    
+    // Atualiza regras de pedido (desabilita entrega para bolos, etc.)
+    if (typeof window.updateOrderRulesUI === 'function') {
+        window.updateOrderRulesUI();
+    }
 };
 
 // Renderiza itens do carrinho em um container específico
@@ -359,6 +364,14 @@ document.addEventListener('click', function (e) {
         if (product && product.category === 'mini' && product.flavor_selection?.enabled) {
             if (window.openMiniSalgadosModal) {
                 window.openMiniSalgadosModal(product);
+            }
+            return;
+        }
+
+        // Verifica Combo Explosão (permite escolher 2 salgados)
+        if (product && product.name && product.name.toLowerCase().includes('combo explos')) {
+            if (window.openComboSalgadosModal) {
+                window.openComboSalgadosModal(product);
             }
             return;
         }

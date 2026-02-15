@@ -4,9 +4,10 @@
   "description": "FastSavory's - Sistema de Delivery e Encomendas",
   "main": "index.html",
   "scripts": {
+    "prebuild": "node scripts/generate-version.js",
     "dev": "npm run build:css:watch",
     "build:css:watch": "tailwindcss -i ./assets/css/tailwind.css -o ./assets/css/styles.css --watch",
-    "build": "tailwindcss -i ./assets/css/tailwind.css -o ./assets/css/styles.css --minify",
+    "build": "node scripts/generate-version.js && tailwindcss -i ./assets/css/tailwind.css -o ./assets/css/styles.css --minify",
     "preview": "npx serve .",
     "start": "npm run build && npm run preview",
     "android:build": "npx cap copy android && npx cap sync android && npx cap open android",

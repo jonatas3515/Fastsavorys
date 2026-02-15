@@ -36,6 +36,14 @@ try {
     console.error('[manychat-order-action] Supabase init error:', err.message);
 }
 
+function generateWhatsAppLink(phone, message) {
+    let formattedPhone = (phone || '').replace(/\D/g, '');
+    if (formattedPhone.length === 11) {
+        formattedPhone = '55' + formattedPhone;
+    }
+    return `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message || '')}`;
+}
+
 function extractOrderCode(message) {
     if (!message) return null;
     const match = message.match(/FAST-(\d{4})/i);
@@ -114,18 +122,60 @@ async function handleAccept(body, res) {
         flowSent = flowResult.success;
     }
 
+    let order = null;
+    let clientManychatId = null;
+    let clientPhone = null;
+    let clientName = null;
+
     if (supabaseAdmin) {
+        const { data: orders } = await supabaseAdmin
+            .from('fast_orders')
+            .select('id, order_code, client_phone, client_name, manychat_id')
+            .eq('order_code', orderCode)
+            .limit(1);
+
+        order = orders?.[0] || null;
+        clientManychatId = order?.manychat_id || null;
+        clientPhone = order?.client_phone || null;
+        clientName = order?.client_name || null;
+
         await supabaseAdmin
             .from('fast_orders')
             .update({ status: 'accepted', accepted_at: new Date().toISOString() })
             .eq('order_code', orderCode);
+
+        if (!clientManychatId && clientPhone) {
+            const { data: clients } = await supabaseAdmin
+                .from('fast_clients')
+                .select('manychat_id')
+                .eq('phone', clientPhone)
+                .limit(1);
+            clientManychatId = clients?.[0]?.manychat_id || null;
+        }
     }
+
+    const acceptanceMsg = body.mensagem_para_cliente || body.mensagem_com_aceite_do_pedido || '✅ Seu pedido foi aceito! Já estamos preparando.';
+    const flowIdClient = body.id_fluxo_para_envio_pedido_aceito || body.ID_fluxo_enviar_ao_cliente || null;
+
+    let clientFlowSent = false;
+    if (clientManychatId && flowIdClient) {
+        const flowResult = await sendFlow(clientManychatId, flowIdClient);
+        clientFlowSent = flowResult.success;
+    }
+
+    const whatsappLink = clientPhone ? generateWhatsAppLink(clientPhone, acceptanceMsg) : null;
 
     return res.status(200).json({
         success: true,
         order_code: orderCode,
         field_updated: fieldUpdated,
-        flow_sent: flowSent
+        flow_sent: flowSent,
+        client_manychat_id: clientManychatId,
+        client_name: clientName,
+        client_phone: clientPhone,
+        whatsapp_link: whatsappLink,
+        client_flow_sent: clientFlowSent,
+        mensagem_para_cliente: acceptanceMsg
     });
 }
 

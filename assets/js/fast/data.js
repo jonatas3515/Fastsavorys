@@ -88,10 +88,10 @@ async function loadBusinessHours() {
 
         if (error) throw error;
         if (data && data.length > 0) {
-            window.businessHours = data;
+            businessHours = data;
         } else {
             // Defaults
-            window.businessHours = [
+            businessHours = [
                 { day_of_week: 0, day_name: 'Domingo', is_open: false, open_time: '14:00', close_time: '18:00' },
                 { day_of_week: 1, day_name: 'Segunda', is_open: true, open_time: '14:00', close_time: '18:00' },
                 { day_of_week: 2, day_name: 'Terça', is_open: true, open_time: '14:00', close_time: '18:00' },
@@ -103,6 +103,15 @@ async function loadBusinessHours() {
         }
     } catch (error) {
         console.log('Using default business hours:', error.message);
+        businessHours = [
+            { day_of_week: 0, day_name: 'Domingo', is_open: false, open_time: '14:00', close_time: '18:00' },
+            { day_of_week: 1, day_name: 'Segunda', is_open: true, open_time: '14:00', close_time: '18:00' },
+            { day_of_week: 2, day_name: 'Terça', is_open: true, open_time: '14:00', close_time: '18:00' },
+            { day_of_week: 3, day_name: 'Quarta', is_open: true, open_time: '14:00', close_time: '18:00' },
+            { day_of_week: 4, day_name: 'Quinta', is_open: true, open_time: '14:00', close_time: '18:00' },
+            { day_of_week: 5, day_name: 'Sexta', is_open: true, open_time: '14:00', close_time: '19:30' },
+            { day_of_week: 6, day_name: 'Sábado', is_open: true, open_time: '14:00', close_time: '18:00' }
+        ];
     }
 }
 
@@ -115,7 +124,7 @@ async function loadPromotions() {
 
         if (error) throw error;
 
-        window.promotions = (data || []).map(p => ({
+        promotions = (data || []).map(p => ({
             id: p.id,
             productId: p.product_id,
             productName: p.product_name,
@@ -123,12 +132,31 @@ async function loadPromotions() {
             value: parseFloat(p.value),
             description: p.description
         }));
-        console.log('Promoções carregadas do Supabase:', window.promotions.length);
+        console.log('Promoções carregadas do Supabase:', promotions.length);
     } catch (e) {
         console.warn('Erro ao carregar promoções do Supabase, usando localStorage:', e);
         const saved = localStorage.getItem('fastPromotions');
-        if (saved) { window.promotions = JSON.parse(saved); }
-        else { window.promotions = []; }
+        if (saved) { promotions = JSON.parse(saved); }
+        else { promotions = []; }
+    }
+
+    // Load client discounts from Supabase (sync across devices)
+    try {
+        const loadedDiscounts = await ClientDiscountsService.load();
+        if (loadedDiscounts && Object.keys(loadedDiscounts).length > 0) {
+            clientDiscounts = loadedDiscounts;
+            saveClientDiscounts(); // Update localStorage as fallback
+        } else {
+            // Fallback to localStorage
+            const discountsSaved = localStorage.getItem('fastClientDiscounts');
+            if (discountsSaved) { clientDiscounts = JSON.parse(discountsSaved); }
+            else { clientDiscounts = {}; }
+        }
+    } catch (e) {
+        console.warn('[ClientDiscounts] Erro ao carregar do Supabase:', e);
+        const discountsSaved = localStorage.getItem('fastClientDiscounts');
+        if (discountsSaved) { clientDiscounts = JSON.parse(discountsSaved); }
+        else { clientDiscounts = {}; saveClientDiscounts(); }
     }
 }
 
@@ -141,7 +169,7 @@ async function loadCoupons() {
 
         if (error) throw error;
 
-        window.coupons = (data || []).map(c => ({
+        coupons = (data || []).map(c => ({
             id: c.id,
             code: c.code,
             type: c.discount_type,
@@ -155,12 +183,14 @@ async function loadCoupons() {
             active: c.active !== false
         }));
 
-        localStorage.setItem('fastCoupons', JSON.stringify(window.coupons));
+        // Sync to localStorage
+        localStorage.setItem('fastCoupons', JSON.stringify(coupons));
     } catch (error) {
         console.error('Erro ao carregar cupons do Supabase:', error);
+        // Fallback to localStorage
         const saved = localStorage.getItem('fastCoupons');
-        if (saved) { window.coupons = JSON.parse(saved); }
-        else { window.coupons = []; }
+        if (saved) { coupons = JSON.parse(saved); }
+        else { coupons = []; }
     }
 }
 
@@ -288,29 +318,67 @@ async function loadProducts() {
 // ========================================
 
 async function getNextOrderSequence() {
+    // 1. Tentar ler do localStorage para fallback de emergência
+    let maxLocal = 0;
     try {
-        const { data, error } = await window.supabaseClient
-            .from('fast_orders')
-            .select('order_sequence')
-            .not('order_sequence', 'is', null)
-            .order('order_sequence', { ascending: false })
-            .limit(1);
-
-        if (error) throw error;
-        const lastSeq = (data && data.length > 0 && data[0].order_sequence) ? data[0].order_sequence : 0;
-        return lastSeq + 1;
+        const localOrders = JSON.parse(localStorage.getItem('fastOrders') || '[]');
+        localOrders.forEach(o => {
+            if (o.order_sequence && o.order_sequence > maxLocal) maxLocal = o.order_sequence;
+            if (o.order_code) {
+                const match = o.order_code.match(/FAST-(\d+)/);
+                if (match) {
+                    const num = parseInt(match[1], 10);
+                    if (!isNaN(num) && num > maxLocal) maxLocal = num;
+                }
+            }
+        });
     } catch (e) {
-        console.warn('[OrderSequence] Erro ao buscar sequência:', e);
-        try {
-            const { count, error: countError } = await window.supabaseClient
-                .from('fast_orders')
-                .select('*', { count: 'exact', head: true });
-            if (countError) throw countError;
-            return (count || 0) + 1;
-        } catch (e2) {
-            return Math.floor(Date.now() / 1000) % 10000;
-        }
+        console.warn('[OrderSequence] Erro ao ler localStorage:', e);
     }
+
+    // 2. Tentar via RPC (Método Principal e Mais Seguro)
+    try {
+        if (!window.supabaseClient) throw new Error("Supabase client not initialized");
+
+        const { data, error } = await window.supabaseClient.rpc('get_next_order_sequence');
+
+        if (error) {
+            console.error('[OrderSequence] RPC Error:', error);
+            throw error;
+        }
+
+        if (data && data > 0) {
+            // Se o RPC retornou um valor, confiamos nele.
+            // Mas por segurança, se o local for maior (ex: offline recent), usamos o maior.
+            const nextSeq = Math.max(data, maxLocal + 1);
+            console.log('[OrderSequence] Sequência gerada:', nextSeq, `(RPC: ${data}, LocalMax: ${maxLocal})`);
+            return nextSeq;
+        }
+    } catch (e) {
+        console.warn('[OrderSequence] RPC falhou ou indisponível:', e.message);
+
+        // Se temos um maxLocal confiável (> 0), usamos ele + 1 como fallback temporário
+        if (maxLocal > 0) {
+            console.warn('[OrderSequence] Usando fallback local:', maxLocal + 1);
+            return maxLocal + 1;
+        }
+
+        // SE TUDO FALHAR: Não retornar 1 se já existem pedidos na loja.
+        // Melhor lançar erro e pedir para tentar novamente do que gerar FAST-0001
+        // Mas se for o PRIMEIRO pedido da loja? (deploy novo)
+        // Assumimos que a loja já roda. 
+        // Vamos tentar uma query direta de "count" na tabela orders pública (se RLS permitir count?)
+        // RLS padrão bloqueia count.
+
+        // Último recurso: Timestamp (para evitar colisão visual, trigger arruma depois)
+        // Gera um número aleatório alto temporário para não confundir com FAST-0001
+        // Ex: 90000 + segundos
+        const tempSeq = Math.floor(Date.now() / 1000) % 10000 + 90000;
+        console.warn('[OrderSequence] FALHA CRÍTICA. Usando sequência temporária alta:', tempSeq);
+        return tempSeq;
+    }
+
+    return 1; // Se realmente nada funcionar e não houver histórico nenhum.
 }
 
 async function generateOrderCode() {
@@ -339,26 +407,86 @@ async function notifyManychatNewOrder(order) {
 
 async function saveOrderToSupabase(orderData) {
     try {
-        const { error } = await window.supabaseClient
+        console.log('[SaveOrder] Iniciando salvamento...', { orderCode: orderData.order_code, clientName: orderData.client_name });
+
+        if (!window.supabaseClient) {
+            throw new Error('supabaseClient não está disponível');
+        }
+
+        // Construir objeto apenas com colunas que existem na tabela fast_orders
+        const cleanData = {
+            id: orderData.id,
+            order_sequence: orderData.order_sequence || 0,
+            order_code: orderData.order_code || null,
+            client_name: orderData.client_name || '',
+            client_phone: orderData.client_phone || '',
+            items: orderData.items || [],
+            total: orderData.total || 0,
+            delivery_fee: orderData.delivery_fee || 0,
+            card_fee: orderData.card_fee || 0,
+            discount: orderData.discount || 0,
+            coupon_code: orderData.coupon_code || null,
+            coupon_discount: orderData.coupon_discount || 0,
+            birthday_discount: orderData.birthday_discount || 0,
+            payment_method: orderData.payment_method || 'dinheiro',
+            delivery_type: orderData.delivery_type || 'retirada',
+            status: orderData.status || 'pending',
+            payment_status: orderData.payment_status || 'pending'
+        };
+
+        // scheduled_date: converter DD/MM/YYYY para YYYY-MM-DD (formato PostgreSQL DATE)
+        if (orderData.scheduled_date) {
+            const parts = orderData.scheduled_date.split('/');
+            if (parts.length === 3) {
+                cleanData.scheduled_date = `${parts[2]}-${parts[1]}-${parts[0]}`;
+            } else {
+                cleanData.scheduled_date = orderData.scheduled_date;
+            }
+        }
+
+        if (orderData.scheduled_time) {
+            cleanData.scheduled_time = orderData.scheduled_time;
+        }
+
+        // address: salvar como JSONB
+        if (orderData.address && typeof orderData.address === 'object') {
+            cleanData.address = orderData.address;
+        }
+
+        if (orderData.subtotal) {
+            cleanData.subtotal = orderData.subtotal;
+        }
+
+        console.log('[SaveOrder] Dados para inserção:', JSON.stringify(cleanData, null, 2));
+
+        const { data, error } = await window.supabaseClient
             .from('fast_orders')
-            .insert([orderData]);
+            .insert([cleanData])
+            .select()
+            .single();
 
-        if (error) throw error;
-        console.log('Pedido salvo com sucesso:', orderData.id);
+        if (error) {
+            console.error('[SaveOrder] ERRO Supabase:', error.message, error.details, error.hint, error.code);
+            throw error;
+        }
 
-        // Notify ManyChat
-        notifyManychatNewOrder(orderData);
+        console.log('[SaveOrder] Pedido salvo com sucesso! ID:', data.id, 'Código:', data.order_code);
+        return data;
 
     } catch (error) {
-        console.error('Erro ao salvar pedido:', error);
+        console.error('[SaveOrder] ERRO CRÍTICO:', error.message || error);
+
+        // Fallback: save locally
         const localOrders = JSON.parse(localStorage.getItem('fastOrders') || '[]');
         localOrders.push(orderData);
         localStorage.setItem('fastOrders', JSON.stringify(localOrders));
+        console.log('[SaveOrder] Pedido salvo localmente como fallback');
 
-        // Add to offline queue if available
         if (window.OfflineSyncService) {
             window.OfflineSyncService.addToQueue('order', orderData);
         }
+
+        throw error;
     }
 }
 
@@ -459,7 +587,7 @@ window.findValidCouponByCode = function (code) {
 };
 
 window.recordBirthdayDiscountUsage = recordBirthdayDiscountUsage;
-window.findValidCouponByCode = findValidCouponByCode;
+// findValidCouponByCode já está exposta na linha 439
 
 // ========================================
 // DELIVERY FEES - Load from Supabase
@@ -470,7 +598,7 @@ async function loadDeliveryFees() {
             console.warn('[Data] Supabase indisponível para carregar taxas');
             return;
         }
-        
+
         const { data, error } = await window.supabaseClient
             .from('fast_delivery_fees')
             .select('*');

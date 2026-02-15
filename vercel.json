@@ -1,52 +1,47 @@
 {
-    "$schema": "https://openapi.vercel.sh/vercel.json",
-    "buildCommand": "npm run build",
-    "outputDirectory": ".",
-    "framework": null,
-    "crons": [
-        {
-            "path": "/api/birthday-broadcast",
-            "schedule": "0 12 * * *"
-        }
-    ],
     "rewrites": [
         {
-            "source": "/",
-            "destination": "/index.html"
+            "source": "/api/manychat-reject-order",
+            "destination": "/api/manychat-order-action"
+        },
+        {
+            "source": "/api/manychat-accept-order",
+            "destination": "/api/manychat-order-action"
         }
     ],
     "headers": [
         {
-            "source": "/api/(.*)",
+            "source": "/(.*)",
             "headers": [
                 {
-                    "key": "Access-Control-Allow-Credentials",
-                    "value": "true"
+                    "key": "Cache-Control",
+                    "value": "no-cache, no-store, must-revalidate"
                 },
                 {
-                    "key": "Access-Control-Allow-Origin",
-                    "value": "*"
+                    "key": "Pragma",
+                    "value": "no-cache"
                 },
                 {
-                    "key": "Access-Control-Allow-Methods",
-                    "value": "GET,POST,OPTIONS"
-                },
-                {
-                    "key": "Access-Control-Allow-Headers",
-                    "value": "Content-Type, stripe-signature"
+                    "key": "Expires",
+                    "value": "0"
                 }
             ]
         },
         {
-            "source": "/(.*)",
+            "source": "/assets/js/(.*)",
             "headers": [
                 {
-                    "key": "X-Content-Type-Options",
-                    "value": "nosniff"
-                },
+                    "key": "Cache-Control",
+                    "value": "public, max-age=0, must-revalidate"
+                }
+            ]
+        },
+        {
+            "source": "/assets/css/(.*)",
+            "headers": [
                 {
-                    "key": "X-Frame-Options",
-                    "value": "DENY"
+                    "key": "Cache-Control",
+                    "value": "public, max-age=0, must-revalidate"
                 }
             ]
         }

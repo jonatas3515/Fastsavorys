@@ -73,30 +73,44 @@ function createProductCard(product) {
     // Image logic
     const hasImage = (window.isValidImageUrl ? window.isValidImageUrl(product.image) : !!product.image);
     const imageHtml = hasImage
-        ? `<img src='${product.image}' class='w-14 h-14 object-cover rounded mr-3'>`
-        : `<span class='${isAdditional ? "text-2xl" : "text-3xl"} mr-3'>${product.emoji || '📦'}</span>`;
+        ? `<img src='${product.image}' class='product-img-mobile'>`
+        : `<div class='product-emoji-mobile'><span class='${isAdditional ? "text-3xl" : "text-4xl"}'>${product.emoji || '📦'}</span></div>`;
+
+    // Top seller badge
+    let topBadge = '';
+    const topIds = window._topProductIds || [];
+    const topIdx = topIds.findIndex(id => id === product.id || id === parseInt(product.id, 10) || String(id) === String(product.id));
+    if (topIdx !== -1) {
+        const medals = { 0: '🥇', 1: '🥈', 2: '🥉' };
+        topBadge = `<span class='absolute -top-1 -left-1 text-lg z-10' title='Top ${topIdx + 1} mais pedido'>${medals[topIdx] || '🔥'}</span>`;
+    }
 
     return `
-    <div class='bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow p-4 border ${borderClass} relative'>
+    <div class='bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow p-3 border ${borderClass} relative'>
         ${promoBadge}
-        <div class='flex items-center mb-3'>
+        ${topBadge}
+        <div class='flex items-stretch gap-3'>
             ${imageHtml}
-            <div class='flex-1'>
-            <h3 class='font-semibold text-gray-800 ${isAdditional ? 'text-sm' : ''}'>${product.name}</h3>
-            <p class='text-xs text-gray-600 line-clamp-2'>${product.description || ''}</p>
+            <div class='flex-1 min-w-0 flex flex-col justify-between'>
+                <div>
+                    <div class='flex items-start justify-between gap-1'>
+                        <h3 class='font-semibold text-gray-800 ${isAdditional ? 'text-sm' : 'text-sm'} leading-tight'>${product.name}</h3>
+                        <button class='favorite-btn text-lg p-0.5 hover:scale-110 transition-transform flex-shrink-0' data-id='${product.id}' title='Favorito'>${heartIcon}</button>
+                    </div>
+                    <p class='text-xs text-gray-500 line-clamp-2 mt-0.5'>${product.description || ''}</p>
+                </div>
+                <div class='flex items-center justify-between mt-2 flex-wrap gap-2'>
+                    <div class='whitespace-nowrap'>${priceHtml}</div>
+                    <button class='add-to-cart bg-rose-600 hover:bg-rose-700 text-white px-3 py-2 rounded-lg text-xs font-medium flex-shrink-0' 
+                        data-id='${product.id}' 
+                        data-name='${product.name}' 
+                        data-description='${product.description || ''}' 
+                        data-price='${displayPrice}' 
+                        data-category='${product.category}'>
+                        Adicionar
+                    </button>
+                </div>
             </div>
-            <button class='favorite-btn text-xl p-1 hover:scale-110 transition-transform' data-id='${product.id}' title='Favorito'>${heartIcon}</button>
-        </div>
-        <div class='flex items-center justify-between'>
-            ${priceHtml}
-            <button class='add-to-cart bg-rose-600 hover:bg-rose-700 text-white px-3 py-2 rounded-lg text-xs font-medium' 
-                data-id='${product.id}' 
-                data-name='${product.name}' 
-                data-description='${product.description || ''}' 
-                data-price='${displayPrice}' 
-                data-category='${product.category}'>
-                Adicionar
-            </button>
         </div>
     </div>`;
 }
@@ -117,6 +131,10 @@ function renderProducts() {
         mini: document.getElementById('miniContainer'),
         kits: document.getElementById('kitsContainer'),
         bolos: document.getElementById('bolosContainer'),
+        combo: document.getElementById('comboContainer'),
+        combos: document.getElementById('comboContainer'),
+        combosalgado: document.getElementById('comboContainer'),
+        combosalgados: document.getElementById('comboContainer'),
         adicionais: document.getElementById('adicionaisContainer'),
         bebidas: document.getElementById('bebidasContainer')
     };
@@ -124,10 +142,21 @@ function renderProducts() {
     // Clear containers
     Object.values(map).forEach(el => { if (el) el.innerHTML = ''; });
 
+    // Debug categories
+    const categoriesFound = new Set();
+    (window.products || []).forEach(p => categoriesFound.add(`"${p.category}"`));
+    console.log('[UI] Categories found in products:', Array.from(categoriesFound));
+
     // Filter and render
     (window.products || []).filter(isProductAvailable).forEach(product => {
-        if (map[product.category]) {
-            map[product.category].innerHTML += createProductCard(product);
+        const catKey = (product.category || '').toLowerCase().trim();
+        if (map[catKey]) {
+            map[catKey].innerHTML += createProductCard(product);
+        } else {
+            // Debug missing mapping
+            if (product.category && product.category.toLowerCase().includes('combo')) {
+                console.warn('[UI] Combo product not mapped:', product.name, 'Category:', product.category, 'Normalized:', catKey);
+            }
         }
     });
 
@@ -138,13 +167,19 @@ function renderProducts() {
 }
 
 // Render Filtered Products
+// Render Filtered Products
 function renderFilteredProducts(filter) {
-    const categories = ['salgados', 'mini', 'kits', 'bolos', 'bebidas', 'adicionais'];
+    const categories = ['salgados', 'mini', 'kits', 'bolos', 'combo', 'combos', 'bebidas', 'adicionais'];
     const containers = {};
     categories.forEach(cat => {
         const el = document.getElementById(`${cat}Container`);
         if (el) containers[cat] = el;
     });
+    // Manual mapping for aliases
+    if (containers['combo']) {
+        containers['combosalgado'] = containers['combo'];
+        containers['combosalgados'] = containers['combo'];
+    }
 
     // Toggle logic for sections usually handled by UI clicks, but here we enforce visibility
     document.querySelectorAll('.category-section').forEach(section => {
@@ -161,6 +196,9 @@ function renderFilteredProducts(filter) {
         if (!isProductAvailable(p)) return false;
         if (filter === 'promo') return (p.promo?.active === true) || (window.promotions || []).some(promo => promo.productId === p.id);
         if (filter === 'encomenda') return p.isEncomenda === true || p.category === 'kits';
+        // If filter is a category name, maybe we should filter by it?
+        // Current logic seems to be "Show All" if not promo/encomenda.
+        // We will keep it as "Show All" but ensure mapping works.
         return true;
     });
 
@@ -171,7 +209,12 @@ function renderFilteredProducts(filter) {
     }
 
     filtered.forEach(product => {
-        const container = containers[product.category];
+        const catKey = (product.category || '').toLowerCase().trim();
+        // Try catKey, then aliases
+        let container = containers[catKey];
+        if (!container && catKey === 'combos') container = containers['combo'];
+        if (!container && catKey === 'combo') container = containers['combos'];
+
         if (container) {
             container.innerHTML += createProductCard(product);
         }
@@ -194,7 +237,9 @@ function renderPromosSection() {
     }
 
     section.classList.remove('hidden');
-    container.innerHTML = promoProducts.map(createProductCard).join('');
+    container.innerHTML = promoProducts.map(p =>
+        `<div class="promo-card-scroll snap-start">${createProductCard(p)}</div>`
+    ).join('');
 }
 
 function renderFavoritosSection() {
@@ -274,6 +319,5 @@ window.renderFilteredProducts = renderFilteredProducts;
 window.createProductCard = createProductCard; // Expose if needed elsewhere
 window.showToast = showToast;
 window.showInlineMessage = showInlineMessage;
-window.loadProductsPublic = renderProducts; // Alias for compatibility
+window.loadProductsPublic = renderProducts; // Enforce UI module authority
 window.isProductAvailable = isProductAvailable; // Used by cart.js
-

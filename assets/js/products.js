@@ -347,7 +347,7 @@ async function uploadImageToStorage(file) {
 
 
 async function saveProduct(name, description, price, category, image) {
-    const emojiMap = { salgados: '🥟', mini: '🧁', kits: '🎁', bolos: '🎂', adicionais: '➕', bebidas: '🥤' };
+    const emojiMap = { salgados: '🥟', mini: '🧁', kits: '🎁', bolos: '🎂', combo: '🔥', adicionais: '➕', bebidas: '🥤' };
     const emoji = emojiMap[category] || '🥟';
 
     // Campos de disponibilidade
@@ -576,263 +576,16 @@ function isProductAvailableToday(product) {
 // ========================================
 // PUBLIC RENDER LOGIC
 // ========================================
-function loadProductsPublic() {
-    // Debounce: evitar chamadas muito frequentes (min 100ms)
-    const now = Date.now();
-    if (now - _loadProductsPublicLastRun < 100) {
-        if (_loadProductsPublicTimeout) clearTimeout(_loadProductsPublicTimeout);
-        _loadProductsPublicTimeout = setTimeout(loadProductsPublic, 100);
-        return;
-    }
-    _loadProductsPublicLastRun = now;
+// ========================================
+// PUBLIC RENDER LOGIC
+// ========================================
+// Moved to ui.js
 
-    const map = {
-        salgados: document.getElementById('salgadosContainer'),
-        mini: document.getElementById('miniContainer'),
-        kits: document.getElementById('kitsContainer'),
-        bolos: document.getElementById('bolosContainer'),
-        adicionais: document.getElementById('adicionaisContainer'),
-        bebidas: document.getElementById('bebidasContainer')
-    };
-
-    Object.values(map).forEach(el => { if (el) el.innerHTML = ''; });
-    products.filter(p => isProductAvailableToday(p)).forEach(product => {
-        const isAdditional = product.category === 'adicionais';
-        // FavoritesService must be available globally
-        const isFav = (typeof FavoritesService !== 'undefined') ? FavoritesService.isFavorite(currentClientPhone, product.id) : false;
-        const heartIcon = isFav ? '❤️' : '🤍';
-
-        // Check for promotion from promotions table
-        const promotion = (typeof promotions !== 'undefined') ? promotions.find(p => p.productId === product.id) : null;
-        let displayPrice = product.price;
-        let priceHtml = '';
-        let promoBadge = '';
-        let borderClass = '';
-
-        if (promotion) {
-            if (promotion.type === 'percentage') {
-                displayPrice = product.price * (1 - promotion.value / 100);
-                promoBadge = `<span class='absolute -top-2 -right-2 bg-yellow-400 text-yellow-900 text-xs font-bold px-2 py-1 rounded-full shadow'>-${promotion.value}%</span>`;
-            } else {
-                displayPrice = product.price - promotion.value;
-                promoBadge = `<span class='absolute -top-2 -right-2 bg-yellow-400 text-yellow-900 text-xs font-bold px-2 py-1 rounded-full shadow'>-R$${promotion.value}</span>`;
-            }
-            priceHtml = `<span class='line-through text-gray-400 text-sm mr-1'>R$ ${product.price.toFixed(2).replace('.', ',')}</span><span class='text-rose-600 font-bold'>R$ ${displayPrice.toFixed(2).replace('.', ',')}</span>`;
-            borderClass = 'border-yellow-400 border-2';
-        } else {
-            priceHtml = `<span class='text-rose-600 ${isAdditional ? "text-sm" : "text-lg"} font-bold'>R$ ${product.price.toFixed(2).replace('.', ',')}</span>`;
-        }
-
-        const html = `<div class='bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow p-4 border ${borderClass} relative'>
-    ${promoBadge}
-      <div class='flex items-center mb-3'>
-        ${(window.isValidImageUrl ? window.isValidImageUrl(product.image) : !!product.image) ? `<img src='${product.image}' class='w-14 h-14 object-cover rounded mr-3'>` : `<span class='${isAdditional ? "text-2xl" : "text-3xl"} mr-3'>${product.emoji}</span>`}
-        <div class='flex-1'>
-          <h3 class='font-semibold text-gray-800 ${isAdditional ? 'text-sm' : ''}'>${product.name}</h3>
-          <p class='text-xs text-gray-600'>${product.description}</p>
-        </div>
-        <button class='favorite-btn text-xl p-1 hover:scale-110 transition-transform' data-id='${product.id}' title='Favorito'>${heartIcon}</button>
-      </div>
-    <div class='flex items-center justify-between'>
-        ${priceHtml}
-        <button class='add-to-cart bg-rose-600 hover:bg-rose-700 text-white px-3 py-2 rounded-lg text-xs font-medium' data-id='${product.id}' data-name='${product.name}' data-description='${product.description}' data-price='${displayPrice}' data-category='${product.category}'>Adicionar</button>
-    </div>
-    </div>`;
-
-        if (map[product.category]) {
-            map[product.category].innerHTML += html;
-        }
-    });
-
-    // Load other sections if functions exist
-    if (typeof loadFavoritosSection === 'function') loadFavoritosSection();
-    if (typeof renderRecentOrders === 'function') renderRecentOrders();
-    if (typeof renderPromosSection === 'function') renderPromosSection();
-    if (typeof renderTopProductsSection === 'function') renderTopProductsSection();
-}
-
-function loadFilteredProducts(filter) {
-    // Get all category containers
-    const categories = ['salgados', 'mini', 'kits', 'bolos', 'bebidas', 'adicionais'];
-    const containers = {};
-    categories.forEach(cat => {
-        const el = document.getElementById(`${cat}Container`);
-        if (el) containers[cat] = el;
-    });
-
-    // Show all category sections
-    document.querySelectorAll('.category-section').forEach(section => {
-        if (section.id !== 'favoritos') {
-            section.classList.remove('hidden');
-        } else {
-            section.classList.add('hidden');
-        }
-    });
-
-    // Clear all containers
-    Object.values(containers).forEach(c => c.innerHTML = '');
-
-    // Filter products
-    const filtered = products.filter(p => {
-        if (!isProductAvailableToday(p)) return false;
-        if (filter === 'promo') return p.promo?.active === true;
-        if (filter === 'encomenda') return p.isEncomenda === true || p.category === 'kits';
-        return true;
-    });
-
-    if (filtered.length === 0) {
-        const firstContainer = Object.values(containers)[0];
-        if (firstContainer) firstContainer.innerHTML = `<p class='text-gray-500 text-center py-8 col-span-2'>Nenhum produto encontrado para este filtro.</p>`;
-        return;
-    }
-
-    // Render filtered products
-    filtered.forEach(product => {
-        const container = containers[product.category];
-        if (!container) return;
-
-        const isAdditional = product.category === 'adicionais';
-        const isFav = (typeof FavoritesService !== 'undefined') ? FavoritesService.isFavorite(currentClientPhone, product.id) : false;
-        const heartIcon = isFav ? '❤️' : '🤍';
-
-        // Promo price calculation
-        let priceDisplay = `R$ ${product.price.toFixed(2).replace('.', ',')} `;
-        let promoBadge = '';
-        let finalPrice = product.price;
-
-        if (product.promo?.active && product.promo?.value > 0) {
-            if (product.promo.type === 'percent') {
-                finalPrice = product.price * (1 - product.promo.value / 100);
-                promoBadge = `<span class='bg-yellow-400 text-yellow-900 text-xs px-1 rounded'>-${product.promo.value}%</span>`;
-            } else {
-                finalPrice = product.price - product.promo.value;
-                promoBadge = `<span class='bg-yellow-400 text-yellow-900 text-xs px-1 rounded'>-R$${product.promo.value}</span>`;
-            }
-            finalPrice = Math.max(0, finalPrice);
-            priceDisplay = `<span class='line-through text-gray-400 text-sm'>R$ ${product.price.toFixed(2).replace('.', ',')}</span><span class='text-rose-600 font-bold'>R$ ${finalPrice.toFixed(2).replace('.', ',')}</span>`;
-        }
-
-        const html = `<div class='bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow p-4 border ${product.promo?.active ? 'border-yellow-400' : ''}'>
-      <div class='flex items-center mb-3'>
-        ${(window.isValidImageUrl ? window.isValidImageUrl(product.image) : !!product.image) ? `<img src='${product.image}' class='w-14 h-14 object-cover rounded mr-3'>` : `<span class='${isAdditional ? "text-2xl" : "text-3xl"} mr-3'>${product.emoji}</span>`}
-        <div class='flex-1'>
-          <h3 class='font-semibold text-gray-800 ${isAdditional ? 'text-sm' : ''}'>${product.name} ${promoBadge}</h3>
-          <p class='text-xs text-gray-600'>${product.description}</p>
-        </div>
-        <button class='favorite-btn text-xl p-1 hover:scale-110 transition-transform' data-id='${product.id}' title='Favorito'>${heartIcon}</button>
-      </div>
-    <div class='flex items-center justify-between'>
-        <span class='${isAdditional ? "text-sm" : "text-lg"}'>${priceDisplay}</span>
-        <button class='add-to-cart bg-rose-600 hover:bg-rose-700 text-white px-3 py-2 rounded-lg text-xs font-medium' data-id='${product.id}' data-name='${product.name}' data-description='${product.description}' data-price='${finalPrice}'>Adicionar</button>
-    </div>
-    </div>`;
-        container.innerHTML += html;
-    });
-}
-
-function loadFavoritosSection() {
-    const container = document.getElementById('favoritosContainer');
-    if (!container) return;
-
-    if (typeof FavoritesService === 'undefined') return;
-
-    const favIds = FavoritesService.getFavorites(currentClientPhone);
-    const favProducts = products.filter(p => favIds.includes(p.id) && isProductAvailableToday(p));
-
-    if (favProducts.length === 0) {
-        container.innerHTML = '<p class="text-gray-500 text-center py-8 col-span-2">Você ainda não marcou nenhum item como favorito. Toque no 🤍 para adicionar!</p>';
-        return;
-    }
-
-    container.innerHTML = favProducts.map(product => {
-        const priceDisplay = `R$ ${product.price.toFixed(2).replace('.', ',')} `;
-        return `<div class='bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow p-4 border border-pink-200'>
-      <div class='flex items-center mb-3'>
-        ${(window.isValidImageUrl ? window.isValidImageUrl(product.image) : !!product.image) ? `<img src='${product.image}' class='w-14 h-14 object-cover rounded mr-3'>` : `<span class='text-3xl mr-3'>${product.emoji}</span>`}
-        <div class='flex-1'>
-          <h3 class='font-semibold text-gray-800'>${product.name}</h3>
-          <p class='text-xs text-gray-600'>${product.description}</p>
-        </div>
-        <button class='favorite-btn text-xl p-1 hover:scale-110 transition-transform' data-id='${product.id}' title='Remover dos favoritos'>❤️</button>
-      </div>
-      <div class='flex items-center justify-between'>
-        <span class='text-rose-600 text-lg font-bold'>${priceDisplay}</span>
-        <button class='add-to-cart bg-rose-600 hover:bg-rose-700 text-white px-3 py-2 rounded-lg text-xs font-medium' data-id='${product.id}' data-name='${product.name}' data-description='${product.description}' data-price='${product.price}'>Adicionar</button>
-      </div>
-    </div>`;
-    }).join('');
-}
-
-function renderPromosSection() {
-    const section = document.getElementById('promosSection');
-    const container = document.getElementById('promosContainer');
-    if (!section || !container) return;
-
-    if (typeof promotions === 'undefined') return;
-
-    const promoProductIds = promotions.map(p => p.productId);
-    const promoProducts = products.filter(p =>
-        promoProductIds.includes(p.id) &&
-        isProductAvailableToday(p) &&
-        p.visible !== false
-    );
-
-    if (promoProducts.length === 0) {
-        section.classList.add('hidden');
-        return;
-    }
-
-    section.classList.remove('hidden');
-
-    container.innerHTML = promoProducts.map(product => {
-        const promotion = promotions.find(p => p.productId === product.id);
-        const originalPrice = product.price;
-        let discountedPrice = originalPrice;
-        let discountBadge = '';
-
-        if (promotion) {
-            if (promotion.type === 'percentage') {
-                discountedPrice = originalPrice * (1 - promotion.value / 100);
-                discountBadge = `- ${promotion.value}% `;
-            } else {
-                discountedPrice = originalPrice - promotion.value;
-                discountBadge = `- R$${promotion.value.toFixed(0)} `;
-            }
-        }
-
-        const originalDisplay = `R$ ${originalPrice.toFixed(2).replace('.', ',')} `;
-        const discountedDisplay = `R$ ${discountedPrice.toFixed(2).replace('.', ',')} `;
-        const isFav = (typeof FavoritesService !== 'undefined') ? FavoritesService.isFavorite(currentClientPhone, product.id) : false;
-        const heartIcon = isFav ? '❤️' : '🤍';
-
-        return `
-    <div class="flex-shrink-0 w-[200px] bg-white rounded-xl shadow-sm border border-yellow-200 p-3 snap-start relative overflow-visible mt-3">
-        <div class="absolute -top-3 -right-2 bg-red-500 text-white text-xs font-bold px-2 py-1 rounded-full shadow">${discountBadge}</div>
-        <div class="flex items-center mb-2">
-          ${(window.isValidImageUrl ? window.isValidImageUrl(product.image) : !!product.image) ? `<img src="${product.image}" class="w-12 h-12 object-cover rounded mr-2">` : `<span class="text-2xl mr-2">${product.emoji}</span>`}
-          <div class="flex-1 min-w-0">
-            <h3 class="font-semibold text-gray-800 text-sm truncate">${product.name}</h3>
-          </div>
-        </div>
-        <div class="flex items-center justify-between gap-2">
-          <div class="flex flex-col">
-            <span class="text-xs text-gray-400 line-through">${originalDisplay}</span>
-            <span class="text-rose-600 text-base font-bold">${discountedDisplay}</span>
-          </div>
-          <button class="add-to-cart bg-rose-600 hover:bg-rose-700 text-white px-2 py-1 rounded-lg text-xs font-medium" 
-            data-id="${product.id}" data-name="${product.name}" data-description="${product.description}" data-price="${discountedPrice}">
-            +
-          </button>
-        </div>
-      </div >
-    `;
-    }).join('');
-}
 
 async function renderTopProductsSection() {
+    // Hide the dedicated card section — top products are now shown as badges on individual cards
     const section = document.getElementById('topProductsSection');
-    const container = document.getElementById('topProductsContainer');
-    if (!section || !container) return;
+    if (section) section.classList.add('hidden');
 
     if (_topProductsLoading) return;
     _topProductsLoading = true;
@@ -861,66 +614,17 @@ async function renderTopProductsSection() {
 
         const topProductIds = Object.entries(productCounts)
             .sort((a, b) => b[1] - a[1])
-            .slice(0, 4)
+            .slice(0, 3)
             .map(([id]) => parseInt(id, 10) || id);
 
-        const topProducts = topProductIds
-            .map(id => products.find(p => p.id === id || p.id === String(id)))
-            .filter(p => p && p.visible !== false && isProductAvailableToday(p));
+        // Store globally so product card renderers can add badges
+        window._topProductIds = topProductIds;
+        window._topProductMedals = { 0: '🥇', 1: '🥈', 2: '🥉' };
 
-        if (topProducts.length < 3) {
-            section.classList.add('hidden');
-            return;
-        }
-
-        section.classList.remove('hidden');
-
-        container.innerHTML = topProducts.map((product, index) => {
-            const medals = ['🥇', '🥈', '🥉', '4️⃣'];
-            const medal = medals[index] || '';
-
-            // Check for promotion
-            const promotion = (typeof promotions !== 'undefined') ? promotions.find(p => p.productId === product.id) : null;
-            let displayPrice = product.price;
-            let priceHtml = '';
-            let promoBadge = '';
-
-            if (promotion) {
-                if (promotion.type === 'percentage') {
-                    displayPrice = product.price * (1 - promotion.value / 100);
-                    promoBadge = `<span class='absolute -top-2 -right-2 bg-yellow-400 text-yellow-900 text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow'>-${promotion.value}%</span>`;
-                } else {
-                    displayPrice = product.price - promotion.value;
-                    promoBadge = `<span class='absolute -top-2 -right-2 bg-yellow-400 text-yellow-900 text-[10px] font-bold px-1.5 py-0.5 rounded-full shadow'>-R$${promotion.value}</span>`;
-                }
-                priceHtml = `<span class='line-through text-gray-400 text-xs mr-1'>R$ ${product.price.toFixed(2).replace('.', ',')}</span><span class='text-rose-600 font-bold'>R$ ${displayPrice.toFixed(2).replace('.', ',')}</span>`;
-            } else {
-                priceHtml = `<span class='text-rose-600 text-base font-bold'>R$ ${product.price.toFixed(2).replace('.', ',')}</span>`;
-            }
-
-            return `
-    <div class="bg-white rounded-xl shadow-sm border ${promotion ? 'border-yellow-400' : 'border-rose-200'} p-3 relative">
-          ${promoBadge}
-          <div class="absolute ${promoBadge ? 'top-0 left-0' : '-top-2 -left-2'} text-2xl">${medal}</div>
-          <div class="flex items-center mb-2">
-            ${(window.isValidImageUrl ? window.isValidImageUrl(product.image) : !!product.image) ? `<img src="${product.image}" class="w-12 h-12 object-cover rounded mr-2">` : `<span class="text-2xl mr-2">${product.emoji}</span>`}
-            <div class="flex-1 min-w-0">
-              <h3 class="font-semibold text-gray-800 text-sm truncate">${product.name}</h3>
-            </div>
-          </div>
-          <div class="flex items-center justify-between gap-2">
-            ${priceHtml}
-            <button class="add-to-cart bg-rose-600 hover:bg-rose-700 text-white px-2 py-1 rounded-lg text-xs font-medium" 
-              data-id="${product.id}" data-name="${product.name}" data-description="${product.description}" data-price="${displayPrice}">
-              +
-            </button>
-          </div>
-        </div>
-    `;
-        }).join('');
+        console.log('[TopProducts] Top 3 IDs:', topProductIds);
     } catch (e) {
         console.warn('[TopProducts] Erro ao carregar:', e);
-        section.classList.add('hidden');
+        window._topProductIds = [];
     } finally {
         _topProductsLoading = false;
     }
@@ -1032,11 +736,11 @@ function openMiniSalgadosModal(product) {
         container.innerHTML = '<p class="text-gray-500 text-sm text-center py-4">Nenhum sabor disponível para este produto.</p>';
     } else {
         container.innerHTML = flavors.map(f => `
-    < label class="flex items-center p-2 border rounded-lg hover:bg-gray-50 cursor-pointer" >
-        <input type="checkbox" name="miniFlavor" value="${f.name}" class="mr-3 text-rose-600 mini-flavor-checkbox">
-            <span>${f.name}</span>
-        </label>
-`).join('');
+            <label class="flex items-center p-2 border rounded-lg hover:bg-gray-50 cursor-pointer">
+                <input type="checkbox" name="miniFlavor" value="${f.name}" class="mr-3 text-rose-600 mini-flavor-checkbox">
+                <span>${f.name}</span>
+            </label>
+        `).join('');
     }
 
     document.getElementById('miniSalgadosError').classList.add('hidden');
@@ -1143,7 +847,7 @@ function openCustomOptionsModal(id, name, description, price, category) {
 
     renderDynamicCakeMassOptions();
     renderDynamicFillingOptions();
-    renderDynamicSalgadosOptions();
+    renderDynamicSalgadosOptions(category === 'kits' ? 'miniSalgadosFlavors' : 'salgados');
 
     const cakeMassSection = document.getElementById('cakeMassSection');
     const fillingSection = document.getElementById('fillingSection');
@@ -1206,11 +910,11 @@ function renderDynamicFillingOptions() {
   `).join('');
 }
 
-function renderDynamicSalgadosOptions() {
+function renderDynamicSalgadosOptions(type = 'salgados') {
     const container = document.querySelector('#salgadosSection .space-y-2');
     if (!container) return;
 
-    const options = ProductOptionsModule.getVisible('salgados');
+    const options = ProductOptionsModule.getVisible(type);
     if (options.length === 0) {
         container.innerHTML = '<p class="text-gray-500 text-sm">Nenhuma opção disponível</p>';
         return;

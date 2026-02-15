@@ -9,7 +9,8 @@ window.ProductOptionsModule = {
         cakeMass: [],
         filling: [],
         salgados: [],
-        miniSalgadosFlavors: []
+        miniSalgadosFlavors: [],
+        comboSalgados: []
     },
     loaded: false,
     defaults: {
@@ -40,7 +41,14 @@ window.ProductOptionsModule = {
             { name: 'Bolinha de Carne', visible: true, sort_order: 4 },
             { name: 'Bolinha de Queijo', visible: true, sort_order: 5 },
             { name: 'Risole de Carne', visible: true, sort_order: 6 },
-            { name: 'Risole de Queijo', visible: true, sort_order: 7 }
+            { name: 'Risole de Queijo', visible: true, sort_order: 7 },
+            { name: 'Rissole de Queijo e Presunto', visible: true, sort_order: 8 }
+        ],
+        comboSalgados: [
+            { name: 'Coxinha', visible: true, sort_order: 1 },
+            { name: 'Enroladinho', visible: true, sort_order: 2 },
+            { name: 'Rissole de Queijo e Presunto', visible: true, sort_order: 3 },
+            { name: 'Rissole de Carne', visible: true, sort_order: 4 }
         ]
     },
 
@@ -55,12 +63,15 @@ window.ProductOptionsModule = {
             if (error) throw error;
 
             if (data && data.length > 0) {
-                this.options = { cakeMass: [], filling: [], salgados: [], miniSalgadosFlavors: [] };
+                this.options = { cakeMass: [], filling: [], salgados: [], miniSalgadosFlavors: [], comboSalgados: [] };
                 data.forEach(opt => {
                     if (this.options[opt.type]) {
                         this.options[opt.type].push(opt);
                     }
                 });
+                // Always load comboSalgados from defaults (not stored in DB)
+                this.options.comboSalgados = JSON.parse(JSON.stringify(this.defaults.comboSalgados));
+                this.options.comboSalgados.forEach((o, i) => o.id = -(i + 400));
                 console.log('[ProductOptions] Opções carregadas:', Object.keys(this.options).map(k => `${k}: ${this.options[k].length}`).join(', '));
             } else {
                 console.log('[ProductOptions] Tabela vazia, usando padrões...');
@@ -70,6 +81,7 @@ window.ProductOptionsModule = {
                 this.options.filling.forEach((o, i) => o.id = -(i + 100));
                 this.options.salgados.forEach((o, i) => o.id = -(i + 200));
                 this.options.miniSalgadosFlavors.forEach((o, i) => o.id = -(i + 300));
+                this.options.comboSalgados.forEach((o, i) => o.id = -(i + 400));
             }
             localStorage.setItem('fastProductOptions', JSON.stringify(this.options));
             this.loaded = true;
@@ -85,6 +97,7 @@ window.ProductOptionsModule = {
                 this.options.filling.forEach((o, i) => o.id = -(i + 100));
                 this.options.salgados.forEach((o, i) => o.id = -(i + 200));
                 this.options.miniSalgadosFlavors.forEach((o, i) => o.id = -(i + 300));
+                this.options.comboSalgados.forEach((o, i) => o.id = -(i + 400));
             }
             this.loaded = true;
             return this.options;

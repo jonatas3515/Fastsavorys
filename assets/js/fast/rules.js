@@ -51,7 +51,7 @@ window.RulesModule = {
     },
 
     // Birthday Logic
-    isBirthdayDiscountValid: function (birthdate) {
+    isBirthdayDiscountValid: function (birthdate, config = null) {
         if (!birthdate) return false;
         // Parses YYYY-MM-DD
         const parts = birthdate.split('-');
@@ -59,6 +59,10 @@ window.RulesModule = {
 
         const birthMonth = parseInt(parts[1], 10) - 1; // 0-based
         const birthDay = parseInt(parts[2], 10);
+
+        // Get valid days from config or use default (6)
+        const cfg = config || (window.BirthdayDiscountService?.config);
+        const validDays = (cfg && cfg.valid_days !== undefined) ? cfg.valid_days : 6;
 
         const today = new Date(); // Local time ok for comparison
         today.setHours(0, 0, 0, 0);
@@ -69,8 +73,8 @@ window.RulesModule = {
         const diffTime = today.getTime() - birthdayThisYear.getTime();
         const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
-        // Valid if: today is birthday (diffDays = 0) OR up to 6 days after (diffDays 1-6)
-        if (diffDays >= 0 && diffDays <= 6) return true;
+        // Valid if: today is birthday (diffDays = 0) OR up to validDays after
+        if (diffDays >= 0 && diffDays <= validDays) return true;
 
         // Check last year's birthday (for late December birthdays in early January)
         const birthdayLastYear = new Date(today.getFullYear() - 1, birthMonth, birthDay);
@@ -78,12 +82,25 @@ window.RulesModule = {
         const diffTimeLast = today.getTime() - birthdayLastYear.getTime();
         const diffDaysLast = Math.floor(diffTimeLast / (1000 * 60 * 60 * 24));
 
-        if (diffDaysLast >= 0 && diffDaysLast <= 6) return true;
+        if (diffDaysLast >= 0 && diffDaysLast <= validDays) return true;
 
         return false;
     },
 
-    calculateBirthdayDiscount: function (subtotal) {
+    calculateBirthdayDiscount: function (subtotal, config = null) {
+        // Use dynamic config from BirthdayDiscountService if available
+        const cfg = config || (window.BirthdayDiscountService?.config);
+        
+        if (cfg && cfg.discount_value) {
+            if (cfg.discount_type === 'percentage') {
+                return subtotal * (cfg.discount_value / 100);
+            } else {
+                // Fixed discount
+                return Math.min(cfg.discount_value, subtotal);
+            }
+        }
+        
+        // Fallback to legacy rule: 10% >= R$50, 5% < R$50
         return (subtotal >= 50) ? subtotal * 0.10 : subtotal * 0.05;
     }
 };

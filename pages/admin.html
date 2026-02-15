@@ -415,7 +415,9 @@
                                 <option value="mini">Mini Salgados</option>
                                 <option value="kits">Kits Festa</option>
                                 <option value="bolos">Bolos</option>
+                                <option value="combo">Combo</option>
                                 <option value="bebidas">Bebidas</option>
+                                <option value="adicionais">Adicionais</option>
                             </select>
                         </div>
                         <div>
@@ -446,6 +448,7 @@
                                             <input type="checkbox" id="selectAllProducts"
                                                 class="rounded text-rose-600 focus:ring-rose-500">
                                         </th>
+                                        <th class="p-4 border-b text-center w-16" title="Posição no Catálogo">Pos.</th>
                                         <th class="p-4 border-b">Produto</th>
                                         <th class="p-4 border-b">Categoria</th>
                                         <th class="p-4 border-b">Preço</th>
@@ -456,7 +459,7 @@
                                 <tbody id="productsList" class="divide-y divide-gray-100 text-sm">
                                     <!-- Items injected by JS -->
                                     <tr>
-                                        <td colspan="6" class="p-8 text-center text-gray-500">
+                                        <td colspan="7" class="p-8 text-center text-gray-500">
                                             Carregando produtos...
                                         </td>
                                     </tr>
@@ -826,8 +829,8 @@
                             <div class="grid grid-cols-1 md:grid-cols-6 gap-4 items-end">
                                 <div>
                                     <label class="block text-xs font-medium text-gray-500 mb-1">Código</label>
-                                    <input type="text" id="newCouponCode"
-                                        class="w-full px-3 py-2 border rounded-lg uppercase" placeholder="PROMO10">
+                                    <input type="text" id="newCouponCode" placeholder="PROMO10"
+                                        class="w-full px-3 py-2 border rounded-lg uppercase" />
                                 </div>
                                 <div>
                                     <label class="block text-xs font-medium text-gray-500 mb-1">Tipo</label>
@@ -838,28 +841,28 @@
                                 </div>
                                 <div>
                                     <label class="block text-xs font-medium text-gray-500 mb-1">Valor</label>
-                                    <input type="number" id="newCouponValue" class="w-full px-3 py-2 border rounded-lg"
-                                        placeholder="10.00">
+                                    <input type="number" id="newCouponValue" placeholder="10.00"
+                                        class="w-full px-3 py-2 border rounded-lg" />
                                 </div>
                                 <div>
                                     <label class="block text-xs font-medium text-gray-500 mb-1">Mínimo (R$)</label>
-                                    <input type="number" id="newCouponMin" class="w-full px-3 py-2 border rounded-lg"
-                                        placeholder="50.00">
+                                    <input type="number" id="newCouponMin" placeholder="50.00"
+                                        class="w-full px-3 py-2 border rounded-lg" />
                                 </div>
                                 <div>
                                     <label class="block text-xs font-medium text-gray-500 mb-1">Teto (R$)</label>
-                                    <input type="number" id="newCouponMaxDiscount"
-                                        class="w-full px-3 py-2 border rounded-lg" placeholder="30.00">
+                                    <input type="number" id="newCouponMaxDiscount" placeholder="30.00"
+                                        class="w-full px-3 py-2 border rounded-lg" />
                                 </div>
                                 <div>
                                     <label class="block text-xs font-medium text-gray-500 mb-1">Limite de usos</label>
-                                    <input type="number" id="newCouponMaxUses"
-                                        class="w-full px-3 py-2 border rounded-lg" placeholder="10">
+                                    <input type="number" id="newCouponMaxUses" placeholder="10"
+                                        class="w-full px-3 py-2 border rounded-lg" />
                                 </div>
                                 <div class="md:col-span-2">
                                     <label class="block text-xs font-medium text-gray-500 mb-1">Validade</label>
                                     <input type="date" id="newCouponExpiration"
-                                        class="w-full px-3 py-2 border rounded-lg">
+                                        class="w-full px-3 py-2 border rounded-lg" />
                                 </div>
                                 <button id="addCouponBtn"
                                     class="bg-rose-600 text-white px-4 py-2 rounded-lg hover:bg-rose-700 md:col-span-4">
@@ -894,14 +897,14 @@
                             <div class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
                                 <div>
                                     <label class="block text-xs font-medium text-gray-500 mb-1">A cada (pedidos)</label>
-                                    <input type="number" id="specialDiscountMinOrders"
-                                        class="w-full px-3 py-2 border rounded-lg" placeholder="10">
+                                    <input type="number" id="specialDiscountMinOrders" placeholder="10"
+                                        class="w-full px-3 py-2 border rounded-lg" />
                                 </div>
                                 <div>
                                     <label class="block text-xs font-medium text-gray-500 mb-1">Pedido mínimo
                                         (R$)</label>
-                                    <input type="number" id="specialDiscountMinVal"
-                                        class="w-full px-3 py-2 border rounded-lg" placeholder="0">
+                                    <input type="number" id="specialDiscountMinVal" placeholder="0"
+                                        class="w-full px-3 py-2 border rounded-lg" />
                                 </div>
                                 <div>
                                     <label class="block text-xs font-medium text-gray-500 mb-1">Tipo</label>
@@ -912,13 +915,13 @@
                                 </div>
                                 <div>
                                     <label class="block text-xs font-medium text-gray-500 mb-1">Valor</label>
-                                    <input type="number" id="specialDiscountValue"
-                                        class="w-full px-3 py-2 border rounded-lg" placeholder="10">
+                                    <input type="number" id="specialDiscountValue" placeholder="10"
+                                        class="w-full px-3 py-2 border rounded-lg" />
                                 </div>
                                 <div class="flex items-center gap-3">
                                     <label class="flex items-center gap-2 text-sm text-gray-700">
                                         <input type="checkbox" id="specialDiscountActive" class="w-4 h-4 text-rose-600"
-                                            checked>
+                                            checked />
                                         Ativo
                                     </label>
                                 </div>
@@ -941,7 +944,7 @@
                                 class="mb-4 p-3 rounded-lg bg-gray-100 border-l-4 border-gray-400">
                                 <p class="text-sm text-gray-600 font-medium">⚪ Configure abaixo</p>
                             </div>
-                            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                            <div class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
                                 <div>
                                     <label class="block text-xs font-medium text-gray-500 mb-1">Tipo</label>
                                     <select id="birthdayDiscountType" class="w-full px-3 py-2 border rounded-lg">
@@ -951,13 +954,19 @@
                                 </div>
                                 <div>
                                     <label class="block text-xs font-medium text-gray-500 mb-1">Valor</label>
-                                    <input type="number" id="birthdayDiscountValue"
-                                        class="w-full px-3 py-2 border rounded-lg" placeholder="10">
+                                    <input type="number" id="birthdayDiscountValue" placeholder="10"
+                                        class="w-full px-3 py-2 border rounded-lg" />
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-500 mb-1">Dias de Validade</label>
+                                    <input type="number" id="birthdayDiscountValidDays" placeholder="6" min="0" max="30"
+                                        class="w-full px-3 py-2 border rounded-lg" />
+                                    <p class="text-xs text-gray-400 mt-1">Após o aniversário</p>
                                 </div>
                                 <div class="flex items-center gap-3">
                                     <label class="flex items-center gap-2 text-sm text-gray-700">
                                         <input type="checkbox" id="birthdayDiscountActive" class="w-4 h-4 text-rose-600"
-                                            checked>
+                                            checked />
                                         Ativo
                                     </label>
                                 </div>
@@ -999,9 +1008,10 @@
                                     <option value="salgados">Salgados</option>
                                     <option value="mini">Mini Salgados</option>
                                     <option value="kits">Kits Festa</option>
+                                    <option value="bolos">Bolos</option>
+                                    <option value="combo">Combo</option>
                                     <option value="bebidas">Bebidas</option>
                                     <option value="adicionais">Adicionais</option>
-                                    <option value="bolos">Bolos</option>
                                 </select>
                             </div>
 
@@ -1038,7 +1048,7 @@
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">Habilitar Banner</label>
                                 <label class="relative inline-flex items-center cursor-pointer">
-                                    <input type="checkbox" id="bannerEnabled" class="sr-only peer">
+                                    <input type="checkbox" id="bannerEnabled" class="sr-only peer" />
                                     <div
                                         class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-rose-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-rose-600">
                                     </div>
@@ -1048,16 +1058,16 @@
                                 <label class="block text-sm font-medium text-gray-700 mb-1">Imagem do Banner</label>
                                 <input type="file" id="bannerImageUpload" accept="image/*"
                                     class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-rose-50 file:text-rose-700 hover:file:bg-rose-100">
-                                <input type="hidden" id="bannerImageUrl">
+                                <input type="hidden" id="bannerImageUrl" />
                             </div>
                             <div id="bannerImagePreview" class="hidden mt-2">
                                 <img id="bannerPreviewImg" src="" alt="Preview"
-                                    class="w-full h-32 object-cover rounded-lg border border-gray-200">
+                                    class="w-full h-32 object-cover rounded-lg border border-gray-200" />
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">Link (Opcional)</label>
                                 <input type="text" id="bannerLink" placeholder="https://..."
-                                    class="w-full px-3 py-2 border rounded-lg">
+                                    class="w-full px-3 py-2 border rounded-lg" />
                             </div>
                             <div>
                                 <label class="block text-sm font-medium text-gray-700 mb-1">Texto Alternativo</label>
@@ -1122,7 +1132,7 @@
                     </div>
                     <!-- Period Filter -->
                     <div class="mb-6">
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Período</label>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Período Geral</label>
                         <div class="flex flex-wrap gap-2">
                             <button id="reportPeriodMonth" onclick="setReportPeriod('month')"
                                 class="px-4 py-2 bg-rose-600 text-white rounded-lg text-sm font-medium transition-colors">Mensal</button>
@@ -1136,7 +1146,33 @@
                     <div class="grid md:grid-cols-2 gap-6">
                         <!-- Client Ranking -->
                         <div class="bg-gray-50 rounded-lg p-4">
-                            <h3 class="text-lg font-semibold text-gray-800 mb-4">🏆 Ranking de Clientes</h3>
+                            <div class="flex flex-wrap items-center justify-between mb-4 gap-2">
+                                <h3 class="text-lg font-semibold text-gray-800">🏆 Ranking de Clientes</h3>
+                                <div class="flex gap-2">
+                                    <select id="rankingFilterYear" class="text-xs border rounded p-1 bg-white" onchange="updateClientRanking()">
+                                        <option value="2024">2024</option>
+                                        <option value="2025">2025</option>
+                                        <option value="2026" selected>2026</option>
+                                    </select>
+                                    <select id="rankingFilterPeriod" class="text-xs border rounded p-1 bg-white" onchange="updateClientRanking()">
+                                        <option value="all">Todo o ano</option>
+                                        <option value="1">1º Semestre</option>
+                                        <option value="2">2º Semestre</option>
+                                        <option value="jan">Janeiro</option>
+                                        <option value="feb">Fevereiro</option>
+                                        <option value="mar">Março</option>
+                                        <option value="apr">Abril</option>
+                                        <option value="may">Maio</option>
+                                        <option value="jun">Junho</option>
+                                        <option value="jul">Julho</option>
+                                        <option value="aug">Agosto</option>
+                                        <option value="sep">Setembro</option>
+                                        <option value="oct">Outubro</option>
+                                        <option value="nov">Novembro</option>
+                                        <option value="dec">Dezembro</option>
+                                    </select>
+                                </div>
+                            </div>
                             <p class="text-sm text-gray-600 mb-4">Clientes que mais gastaram no período selecionado:</p>
                             <div id="clientRankingList" class="space-y-2 max-h-80 overflow-y-auto pr-2 scrollbar-thin">
                                 <div class="text-center py-8 text-gray-500">
@@ -1232,11 +1268,11 @@
                             <p class="text-sm text-gray-500 mb-4">Gerencie as taxas por bairro.</p>
                             <div class="grid grid-cols-3 gap-2 mb-3">
                                 <input type="text" id="feeNeighborhoodFastPanel" placeholder="Bairro"
-                                    class="col-span-1 px-3 py-2 border rounded-lg text-sm">
+                                    class="col-span-1 px-3 py-2 border rounded-lg text-sm" />
                                 <input type="number" step="0.01" id="feeValueFastPanel" placeholder="Taxa (R$)"
-                                    class="px-3 py-2 border rounded-lg text-sm">
+                                    class="px-3 py-2 border rounded-lg text-sm" />
                                 <input type="number" step="0.01" id="feeMinValueFastPanel" placeholder="Mín. (R$)"
-                                    class="px-3 py-2 border rounded-lg text-sm">
+                                    class="px-3 py-2 border rounded-lg text-sm" />
                             </div>
                             <div class="flex gap-2 mb-4">
                                 <button onclick="handleAddFeePanel()"
@@ -1268,18 +1304,18 @@
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">Chave PIX</label>
                                     <input type="text" id="pixKey" placeholder="email@exemplo.com ou CPF/CNPJ"
-                                        class="w-full px-3 py-2 border rounded-lg text-sm">
+                                        class="w-full px-3 py-2 border rounded-lg text-sm" />
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">Nome do
                                         Recebedor</label>
                                     <input type="text" id="pixMerchantName" placeholder="FAST SAVORYS"
-                                        class="w-full px-3 py-2 border rounded-lg text-sm">
+                                        class="w-full px-3 py-2 border rounded-lg text-sm" />
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">Cidade</label>
                                     <input type="text" id="pixMerchantCity" placeholder="CIDADE"
-                                        class="w-full px-3 py-2 border rounded-lg text-sm">
+                                        class="w-full px-3 py-2 border rounded-lg text-sm" />
                                 </div>
                                 <button onclick="handleSavePixConfig()"
                                     class="w-full bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
@@ -1297,7 +1333,7 @@
                                 <div class="flex items-center justify-between">
                                     <label class="text-sm font-medium text-gray-700">Entregas Ativas</label>
                                     <label class="relative inline-flex items-center cursor-pointer">
-                                        <input type="checkbox" id="deliveryEnabled" class="sr-only peer" checked>
+                                        <input type="checkbox" id="deliveryEnabled" class="sr-only peer" checked />
                                         <div
                                             class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-rose-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-rose-600">
                                         </div>
@@ -1307,28 +1343,28 @@
                                     <label class="block text-sm font-medium text-gray-700 mb-1">Motivo (se
                                         desativado)</label>
                                     <input type="text" id="deliveryDisabledReason" placeholder="Chuva forte..."
-                                        class="w-full px-3 py-2 border rounded-lg text-sm">
+                                        class="w-full px-3 py-2 border rounded-lg text-sm" />
                                 </div>
                                 <div class="grid grid-cols-2 gap-3">
                                     <div>
                                         <label class="block text-xs text-gray-600 mb-1">Preparo Mín (min)</label>
                                         <input type="number" id="prepTimeMin" placeholder="30"
-                                            class="w-full px-3 py-2 border rounded-lg text-sm">
+                                            class="w-full px-3 py-2 border rounded-lg text-sm" />
                                     </div>
                                     <div>
                                         <label class="block text-xs text-gray-600 mb-1">Preparo Máx (min)</label>
                                         <input type="number" id="prepTimeMax" placeholder="60"
-                                            class="w-full px-3 py-2 border rounded-lg text-sm">
+                                            class="w-full px-3 py-2 border rounded-lg text-sm" />
                                     </div>
                                     <div>
                                         <label class="block text-xs text-gray-600 mb-1">Entrega Mín (min)</label>
                                         <input type="number" id="deliveryTimeMin" placeholder="15"
-                                            class="w-full px-3 py-2 border rounded-lg text-sm">
+                                            class="w-full px-3 py-2 border rounded-lg text-sm" />
                                     </div>
                                     <div>
                                         <label class="block text-xs text-gray-600 mb-1">Entrega Máx (min)</label>
                                         <input type="number" id="deliveryTimeMax" placeholder="45"
-                                            class="w-full px-3 py-2 border rounded-lg text-sm">
+                                            class="w-full px-3 py-2 border rounded-lg text-sm" />
                                     </div>
                                 </div>
                                 <button onclick="handleSaveDeliverySettings()"
@@ -1347,7 +1383,7 @@
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">Taxa Cartão (%)</label>
                                     <input type="number" step="0.01" id="cardFee1x" placeholder="5"
-                                        class="w-full px-3 py-2 border rounded-lg text-sm">
+                                        class="w-full px-3 py-2 border rounded-lg text-sm" />
                                     <p class="text-xs text-gray-500 mt-1">Aplicada a pagamentos no cartão.</p>
                                 </div>
                                 <button onclick="handleSaveCardFees()"
@@ -1375,19 +1411,19 @@
                                     <label class="block text-sm font-medium text-gray-700 mb-1">Mínimo para Entrega
                                         (R$)</label>
                                     <input type="number" step="0.01" id="ruleMinDelivery" placeholder="15.00"
-                                        class="w-full px-3 py-2 border rounded-lg text-sm">
+                                        class="w-full px-3 py-2 border rounded-lg text-sm" />
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">Mínimo para Retirada
                                         (R$)</label>
                                     <input type="number" step="0.01" id="ruleMinPickup" placeholder="8.00"
-                                        class="w-full px-3 py-2 border rounded-lg text-sm">
+                                        class="w-full px-3 py-2 border rounded-lg text-sm" />
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">Mínimo Retirada
                                         Fora-Horário (R$)</label>
                                     <input type="number" step="0.01" id="ruleMinPickupOffhours" placeholder="15.00"
-                                        class="w-full px-3 py-2 border rounded-lg text-sm">
+                                        class="w-full px-3 py-2 border rounded-lg text-sm" />
                                     <p class="text-xs text-gray-500 mt-1">Aplicado fora do horário comercial.</p>
                                 </div>
                             </div>
@@ -1400,7 +1436,7 @@
                                 <div class="flex items-center justify-between">
                                     <label class="text-sm font-medium text-gray-700">Permitir Pedidos Mesmo Dia</label>
                                     <label class="relative inline-flex items-center cursor-pointer">
-                                        <input type="checkbox" id="ruleSameDayEnabled" class="sr-only peer" checked>
+                                        <input type="checkbox" id="ruleSameDayEnabled" class="sr-only peer" checked />
                                         <div
                                             class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-rose-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-rose-600">
                                         </div>
@@ -1410,18 +1446,18 @@
                                     <label class="block text-sm font-medium text-gray-700 mb-1">Valor Mínimo
                                         (R$)</label>
                                     <input type="number" step="0.01" id="ruleSameDayMinValue" placeholder="15.00"
-                                        class="w-full px-3 py-2 border rounded-lg text-sm">
+                                        class="w-full px-3 py-2 border rounded-lg text-sm" />
                                 </div>
                                 <div class="grid grid-cols-2 gap-3">
                                     <div>
                                         <label class="block text-xs text-gray-600 mb-1">Retirada a partir de</label>
                                         <input type="time" id="ruleSameDayStart" value="12:00"
-                                            class="w-full px-3 py-2 border rounded-lg text-sm">
+                                            class="w-full px-3 py-2 border rounded-lg text-sm" />
                                     </div>
                                     <div>
                                         <label class="block text-xs text-gray-600 mb-1">Retirada até</label>
                                         <input type="time" id="ruleSameDayEnd" value="18:00"
-                                            class="w-full px-3 py-2 border rounded-lg text-sm">
+                                            class="w-full px-3 py-2 border rounded-lg text-sm" />
                                     </div>
                                 </div>
                             </div>
@@ -1435,7 +1471,7 @@
                                 <div class="flex items-center justify-between">
                                     <label class="text-sm font-medium text-gray-700">Ativar Regra da Manhã</label>
                                     <label class="relative inline-flex items-center cursor-pointer">
-                                        <input type="checkbox" id="ruleMorningEnabled" class="sr-only peer" checked>
+                                        <input type="checkbox" id="ruleMorningEnabled" class="sr-only peer" checked />
                                         <div
                                             class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-rose-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-rose-600">
                                         </div>
@@ -1445,12 +1481,12 @@
                                     <div>
                                         <label class="block text-xs text-gray-600 mb-1">Regra até horário</label>
                                         <input type="time" id="ruleMorningEndTime" value="12:00"
-                                            class="w-full px-3 py-2 border rounded-lg text-sm">
+                                            class="w-full px-3 py-2 border rounded-lg text-sm" />
                                     </div>
                                     <div>
                                         <label class="block text-xs text-gray-600 mb-1">Valor Mínimo (R$)</label>
                                         <input type="number" step="0.01" id="ruleMorningMinValue" placeholder="25.00"
-                                            class="w-full px-3 py-2 border rounded-lg text-sm">
+                                            class="w-full px-3 py-2 border rounded-lg text-sm" />
                                     </div>
                                 </div>
                                 <p class="text-xs text-gray-500">Antes deste horário, pedidos devem conter bolo OU
@@ -1466,19 +1502,19 @@
                                     <div>
                                         <label class="block text-xs text-gray-600 mb-1">Início</label>
                                         <input type="time" id="ruleOrderWindowStart" value="07:00"
-                                            class="w-full px-3 py-2 border rounded-lg text-sm">
+                                            class="w-full px-3 py-2 border rounded-lg text-sm" />
                                     </div>
                                     <div>
                                         <label class="block text-xs text-gray-600 mb-1">Fim</label>
                                         <input type="time" id="ruleOrderWindowEnd" value="18:00"
-                                            class="w-full px-3 py-2 border rounded-lg text-sm">
+                                            class="w-full px-3 py-2 border rounded-lg text-sm" />
                                     </div>
                                 </div>
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 mb-1">Máx. Pedidos
                                         Simultâneos</label>
                                     <input type="number" id="ruleMaxConcurrentOrders" placeholder="10"
-                                        class="w-full px-3 py-2 border rounded-lg text-sm">
+                                        class="w-full px-3 py-2 border rounded-lg text-sm" />
                                 </div>
                             </div>
                         </div>
@@ -1489,9 +1525,9 @@
                             <p class="text-sm text-gray-500 mb-4">Feriados ou dias que a loja não funcionará.</p>
                             <div class="grid md:grid-cols-3 gap-3 mb-4">
                                 <input type="date" id="ruleBlockedDateInput"
-                                    class="px-3 py-2 border rounded-lg text-sm">
+                                    class="px-3 py-2 border rounded-lg text-sm" />
                                 <input type="text" id="ruleBlockedDateReason" placeholder="Motivo (opcional)"
-                                    class="px-3 py-2 border rounded-lg text-sm">
+                                    class="px-3 py-2 border rounded-lg text-sm" />
                                 <button onclick="handleAddBlockedDate()"
                                     class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
                                     🚫 Bloquear Data
@@ -1605,7 +1641,7 @@
                     <p class="text-xs text-gray-500">Se desativado, nenhum banner aparece (nem fallback)</p>
                 </div>
                 <label class="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" id="bannerActive" class="sr-only peer">
+                    <input type="checkbox" id="bannerActive" class="sr-only peer" />
                     <div
                         class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-purple-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-purple-600">
                     </div>
@@ -1621,11 +1657,11 @@
                     <div class="flex gap-2 mb-3">
                         <input type="text" id="bannerImageLink"
                             class="flex-1 px-4 py-2 border rounded-lg text-sm bg-gray-50"
-                            placeholder="Cole o link da imagem ou faça upload...">
+                            placeholder="Cole o link da imagem ou faça upload..." />
                         <label
                             class="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg cursor-pointer font-medium transition-colors">
                             Upload
-                            <input type="file" id="bannerImageFile" accept="image/*" class="hidden">
+                            <input type="file" id="bannerImageFile" accept="image/*" class="hidden" />
                         </label>
                     </div>
                     <div id="currentBannerPreview"
@@ -1640,7 +1676,7 @@
                     <label class="block text-sm font-medium text-gray-700 mb-1">Link de Destino (opcional)</label>
                     <input type="url" id="bannerLinkUrl"
                         class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
-                        placeholder="https://...">
+                        placeholder="https://..." />
                 </div>
 
                 <!-- Alt Text -->
@@ -1648,7 +1684,7 @@
                     <label class="block text-sm font-medium text-gray-700 mb-1">Texto Alternativo</label>
                     <input type="text" id="bannerAltText"
                         class="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500 outline-none"
-                        placeholder="Anuncie aqui">
+                        placeholder="Anuncie aqui" />
                 </div>
 
                 <!-- Save Button -->
@@ -1708,6 +1744,7 @@
                             <option value="mini">Mini-Salgados</option>
                             <option value="kits">Kits Festa</option>
                             <option value="bolos">Bolos</option>
+                            <option value="combo">Combo</option>
                             <option value="bebidas">Bebidas</option>
                             <option value="adicionais">Adicionais</option>
                         </select>
@@ -1928,7 +1965,6 @@
     <script src="../assets/js/admin/ratings.js"></script>
     <script src="../assets/js/admin/stripe.js"></script>
     <script src="../assets/js/admin/orders.js"></script>
-    <script src="../assets/js/services.js"></script>
     <script src="../assets/js/admin/core.js"></script>
 
     <!-- Modal de confirmação de exclusão de pedidos -->

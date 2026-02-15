@@ -603,56 +603,9 @@ window.SpecialDiscountService = {
 };
 
 // ========================================
-// COUPON USAGE SERVICE
+// COUPON USAGE SERVICE (versão principal está mais abaixo)
 // ========================================
-window.CouponUsageService = {
-  markUsed: async function (phone, couponCode, orderId, discountAmount) {
-    if (!phone || !couponCode) return false;
-    const phoneDigits = phone.replace(/\D/g, '');
-    try {
-      // 1. Log usage in fast_coupon_usage (history)
-      const { error: usageError } = await window.supabaseClient
-        .from('fast_coupon_usage')
-        .insert({
-          client_phone: phoneDigits,
-          coupon_code: couponCode,
-          order_id: orderId,
-          discount_amount: discountAmount || 0,
-          used_at: new Date().toISOString()
-        });
-
-      if (usageError) console.warn('[CouponUsage] Error logging specific usage:', usageError);
-
-      // 2. Increment global usage count in fast_coupons (for limits/display)
-      // This requires an RPC or finding the coupon ID first. 
-      // Simplified: Find coupon by code, then update usage_count.
-
-      const { data: coupon, error: fetchError } = await window.supabaseClient
-        .from('fast_coupons')
-        .select('id, usage_count')
-        .eq('code', couponCode)
-        .single();
-
-      if (fetchError || !coupon) {
-        console.warn('[CouponUsage] Coupon not found for increment:', couponCode);
-        return false;
-      }
-
-      const { error: updateError } = await window.supabaseClient
-        .from('fast_coupons')
-        .update({ usage_count: (coupon.usage_count || 0) + 1 })
-        .eq('id', coupon.id);
-
-      if (updateError) throw updateError;
-
-      console.log('[CouponUsage] Count incremented for:', couponCode);
-      return true;
-    } catch (e) {
-      console.error('[CouponUsage] Error in markUsed:', e);
-      return false;
-    }
-  }
-};
+// REMOVIDO: Definição duplicada que causava conflito
 
 // ========================================
 // BIRTHDAY DISCOUNT SERVICE
@@ -947,12 +900,14 @@ window.CouponUsageService = {
   markUsed: async function (phone, couponCode, orderId, discountValue) {
     if (!phone || !couponCode) return false;
     const phoneDigits = phone.replace(/\D/g, '');
+    const couponUpper = couponCode.toUpperCase();
     try {
+      // 1. Registrar uso na tabela fast_coupon_usage
       const { error } = await window.supabaseClient
         .from('fast_coupon_usage')
         .insert({
           client_phone: phoneDigits,
-          coupon_code: couponCode.toUpperCase(),
+          coupon_code: couponUpper,
           order_id: orderId,
           discount_applied: discountValue || 0
         });
@@ -961,6 +916,26 @@ window.CouponUsageService = {
         console.error('[CouponUsage] Erro SQL ao marcar:', error);
         throw error;
       }
+
+      // 2. Incrementar usage_count no cupom (fast_coupons)
+      try {
+        const { data: coupon, error: fetchError } = await window.supabaseClient
+          .from('fast_coupons')
+          .select('id, usage_count')
+          .eq('code', couponUpper)
+          .single();
+
+        if (!fetchError && coupon) {
+          await window.supabaseClient
+            .from('fast_coupons')
+            .update({ usage_count: (coupon.usage_count || 0) + 1 })
+            .eq('id', coupon.id);
+          console.log('[CouponUsage] usage_count incrementado para:', couponUpper);
+        }
+      } catch (e2) {
+        console.warn('[CouponUsage] Erro ao incrementar usage_count:', e2);
+      }
+
       return true;
     } catch (e) {
       console.error('[CouponUsage] Erro geral ao marcar:', e);

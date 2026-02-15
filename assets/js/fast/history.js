@@ -88,12 +88,15 @@ const HistoryModule = {
         container.classList.remove('hidden');
 
         // Build order cards
-        const orderCards = history.slice(0, 2).map((order, idx) => {
-            const resumo = order.items.slice(0, 2).map(i => `${i.quantity}x ${i.name}`).join(', ');
-            const more = order.items.length > 2 ? ` +${order.items.length - 2}` : '';
-            const data = (window.safeDate ? safeDate(order.createdAt) : new Date(order.createdAt)).toLocaleDateString('pt-BR');
-            const total = (order.total || 0).toFixed(2).replace('.', ',');
-            return `
+        const orderCards = history
+            .filter(o => o.order_code !== 'FAST-0001' && o.id !== '1' && o.id !== 1) // Hard filter for test order
+            .slice(0, 2)
+            .map((order, idx) => {
+                const resumo = order.items.slice(0, 2).map(i => `${i.quantity}x ${i.name}`).join(', ');
+                const more = order.items.length > 2 ? ` +${order.items.length - 2}` : '';
+                const data = (window.safeDate ? safeDate(order.createdAt) : new Date(order.createdAt)).toLocaleDateString('pt-BR');
+                const total = (order.total || 0).toFixed(2).replace('.', ',');
+                return `
           <div class="w-full sm:flex-1 p-3 rounded-lg bg-white border border-rose-200 shadow-sm">
             <div class="flex flex-col h-full">
               <div class="flex-1 min-w-0 mb-2">
@@ -110,7 +113,7 @@ const HistoryModule = {
             </div>
           </div>
         `;
-        }).join('');
+            }).join('');
 
         container.innerHTML = `
         <div class="bg-gradient-to-r from-rose-50 to-orange-50 rounded-xl p-4 border border-rose-100 shadow-sm">

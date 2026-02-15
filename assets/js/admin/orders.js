@@ -195,6 +195,15 @@ function updateKPIsDashboard(orders, dateFilter) {
 function createOrderCardHtml(order) {
     const status = STATUS_LABELS[order.status] || STATUS_LABELS.pending;
     const time = new Date(order.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    
+    // Data e horário de entrega/retirada
+    let deliveryDateTimeHtml = '';
+    if (order.order_date || order.scheduled_date) {
+        const dateStr = order.order_date || order.scheduled_date;
+        const timeStr = order.order_time || order.scheduled_time || '';
+        const dateFormatted = new Date(dateStr + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+        deliveryDateTimeHtml = `<div class="text-xs bg-amber-50 text-amber-700 px-2 py-1 rounded mb-1 border border-amber-200">📅 ${order.delivery_type === 'entrega' ? 'Entrega' : 'Retirada'}: <strong>${dateFormatted}</strong>${timeStr ? ` às <strong>${timeStr}</strong>` : ''}</div>`;
+    }
 
     // Items Summary
     const items = order.items || [];
@@ -250,6 +259,10 @@ function createOrderCardHtml(order) {
         <div class="mb-2 space-y-0.5 border-l-2 border-rose-100 pl-2">
             ${itemsHtml}
         </div>
+        
+        ${order.coupon_code ? `<div class="text-[10px] bg-purple-50 text-purple-700 px-2 py-1 rounded mb-1 border border-purple-200">🎟️ Cupom: <strong>${order.coupon_code}</strong> ${order.coupon_discount ? `(-R$ ${Number(order.coupon_discount).toFixed(2).replace('.', ',')})` : ''}</div>` : ''}
+        
+        ${deliveryDateTimeHtml}
         
         <div class="flex justify-between items-end border-t border-gray-100 pt-2 mt-2">
             <div>
@@ -461,9 +474,16 @@ async function executeStatusUpdate(orderId, newStatus, orderData = null) {
             }
         }
 
+        // Se marcar como entregue, também marcar como pago (lógica: se entregou, recebeu)
+        const updatePayload = { status: newStatus };
+        if (newStatus === 'delivered') {
+            updatePayload.payment_status = 'paid_full';
+            updatePayload.delivered_at = new Date().toISOString();
+        }
+
         const { error } = await window.supabaseClient
             .from('fast_orders')
-            .update({ status: newStatus })
+            .update(updatePayload)
             .eq('id', orderId);
 
         if (error) throw error;

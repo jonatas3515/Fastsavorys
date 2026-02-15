@@ -411,11 +411,97 @@ function renderNeighborhoodChart(orders) {
     }
 }
 
+// ========================================
+// FILTER HELPERS
+// ========================================
+
+const MONTH_MAP = {
+    jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
+    jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11
+};
+
+function filterOrdersByYearAndPeriod(orders, year, period) {
+    return orders.filter(o => {
+        const d = new Date(o.created_at);
+        if (isNaN(d.getTime())) return false;
+        if (d.getFullYear() !== parseInt(year)) return false;
+        
+        if (period === 'all') return true;
+        if (period === '1') return d.getMonth() < 6; // 1º Semestre
+        if (period === '2') return d.getMonth() >= 6; // 2º Semestre
+        if (MONTH_MAP[period] !== undefined) return d.getMonth() === MONTH_MAP[period];
+        return true;
+    });
+}
+
+// ========================================
+// CLIENT RANKING WITH FILTERS
+// ========================================
+
+window.updateClientRanking = function() {
+    const yearSelect = document.getElementById('rankingFilterYear');
+    const periodSelect = document.getElementById('rankingFilterPeriod');
+    const rankingList = document.getElementById('clientRankingList');
+    
+    if (!rankingList) return;
+    
+    const year = yearSelect?.value || new Date().getFullYear().toString();
+    const period = periodSelect?.value || 'all';
+    
+    const orders = window.orders || [];
+    const filteredOrders = filterOrdersByYearAndPeriod(orders, year, period);
+    const ranking = calculateClientRanking(filteredOrders);
+    
+    if (ranking.length > 0) {
+        rankingList.innerHTML = ranking.map((c, i) => `
+        <div class="flex items-center justify-between p-2 ${i < 3 ? 'bg-yellow-50 border border-yellow-200' : 'bg-white border'} rounded-lg">
+            <div class="flex items-center gap-3">
+            <span class="text-lg font-bold ${i === 0 ? 'text-yellow-500' : i === 1 ? 'text-gray-400' : i === 2 ? 'text-orange-400' : 'text-gray-600'}">${i + 1}º</span>
+            <div>
+                <p class="font-medium text-gray-800 text-sm">${c.name}</p>
+                <p class="text-xs text-gray-500">${c.orderCount} pedidos</p>
+            </div>
+            </div>
+            <span class="font-bold text-green-600">R$ ${c.total.toFixed(2).replace('.', ',')}</span>
+        </div>
+        `).join('');
+    } else {
+        rankingList.innerHTML = `<div class="text-center py-8 text-gray-500"><p class="text-4xl mb-2">🔄</p><p>Nenhum pedido no período.</p></div>`;
+    }
+};
+
+// ========================================
+// NEIGHBORHOOD CHART WITH FILTERS
+// ========================================
+
+window.updateNeighborhoodChart = function() {
+    const yearSelect = document.getElementById('neighborhoodFilterYear');
+    const periodSelect = document.getElementById('neighborhoodFilterPeriod');
+    const container = document.getElementById('neighborhoodChartContainer');
+    
+    if (!container) return;
+    
+    const year = yearSelect?.value || new Date().getFullYear().toString();
+    const period = periodSelect?.value || 'all';
+    
+    const orders = window.orders || [];
+    const filteredOrders = filterOrdersByYearAndPeriod(orders, year, period);
+    
+    renderNeighborhoodChart(filteredOrders);
+};
+
+// Add event listeners for neighborhood filters
+document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('neighborhoodFilterYear')?.addEventListener('change', window.updateNeighborhoodChart);
+    document.getElementById('neighborhoodFilterPeriod')?.addEventListener('change', window.updateNeighborhoodChart);
+});
+
 // Expose globals
 window.renderReportsData = renderReportsData;
-window.currentReportPeriod = currentReportPeriod; // expose for onclicks if needed, or wrap setter
+window.currentReportPeriod = currentReportPeriod;
 window.setReportPeriod = function (p) {
     currentReportPeriod = p;
     renderReportsData();
 };
-window.renderNeighborhoodChart = renderNeighborhoodChart; // expose for onclicks if needed, or wrap setter
+window.renderNeighborhoodChart = renderNeighborhoodChart;
+window.filterOrdersByYearAndPeriod = filterOrdersByYearAndPeriod;

@@ -198,6 +198,14 @@ async function handleSaveAllFeesPanel() {
 async function saveFeesToSupabase() {
     try {
         const fees = readFastFees();
+        console.log('[Admin] Salvando taxas no Supabase:', fees);
+        
+        if (Object.keys(fees).length === 0) {
+            console.warn('[Admin] Nenhuma taxa para salvar');
+            showInlineMessage('feesListFastPanel', '⚠️ Nenhuma taxa para salvar', 'warning');
+            return;
+        }
+        
         const rows = Object.entries(fees).map(([neighborhood, entry]) => {
             let feeValue = entry;
             let minValue = 0;
@@ -235,13 +243,23 @@ async function saveFeesToSupabase() {
 // Load fees from Supabase (Admin implementation)
 async function loadFeesFromSupabase() {
     try {
-        if (!window.supabaseClient) return;
+        if (!window.supabaseClient) {
+            console.warn('[Admin] Supabase não disponível para carregar taxas');
+            return;
+        }
+        
+        console.log('[Admin] Carregando taxas do Supabase...');
         const { data, error } = await window.supabaseClient
             .from('fast_delivery_fees')
             .select('*');
 
-        if (error) throw error;
+        if (error) {
+            console.error('[Admin] Erro ao carregar taxas:', error);
+            throw error;
+        }
 
+        console.log('[Admin] Taxas carregadas do Supabase:', data?.length || 0, 'registros');
+        
         if (data && data.length > 0) {
             const feesObj = {};
             data.forEach(row => {
@@ -250,11 +268,14 @@ async function loadFeesFromSupabase() {
                     min: row.min_order_value || 0
                 };
             });
+            console.log('[Admin] Taxas processadas:', feesObj);
             writeFastFees(feesObj);
             renderFastFeesListPanel(); // Update UI
+        } else {
+            console.log('[Admin] Nenhuma taxa encontrada no Supabase');
         }
     } catch (e) {
-        console.warn('[Admin] Erro ao carregar taxas:', e);
+        console.error('[Admin] Erro ao carregar taxas:', e);
     }
 }
 
@@ -577,6 +598,15 @@ document.addEventListener('input', function (e) {
             const fileInput = document.getElementById('bannerImageFile');
             if (fileInput) fileInput.value = '';
         }
+    }
+});
+
+// Setup Event Listeners for Fees Panel
+document.addEventListener('DOMContentLoaded', () => {
+    const feesList = document.getElementById('feesListFastPanel');
+    if (feesList) {
+        feesList.addEventListener('click', handleFeeListClick);
+        feesList.addEventListener('input', handleFeeListChange);
     }
 });
 

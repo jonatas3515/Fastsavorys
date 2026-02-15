@@ -41,12 +41,35 @@ window.CheckoutModule = {
 
             // Auto-search client
             if (e.target.id === 'customerName' || e.target.id === 'customerPhone') this.handleClientSearch(e);
+
+            // Atualiza aviso de valor mínimo quando bairro muda
+            if (e.target.id === 'neighborhood') {
+                if (window.updateNeighborhoodMinValueWarning) window.updateNeighborhoodMinValueWarning();
+                if (window.updateCheckoutFeeAndTotalFast) window.updateCheckoutFeeAndTotalFast();
+            }
+        });
+
+        // Listener para input de bairro (blur para capturar digitação)
+        document.getElementById('neighborhood')?.addEventListener('blur', () => {
+            if (window.updateNeighborhoodMinValueWarning) window.updateNeighborhoodMinValueWarning();
+        });
+
+        // Listener para atualizar horário mínimo quando data muda
+        document.getElementById('orderDate')?.addEventListener('change', (e) => {
+            this.updateMinTimeForDate(e.target.value);
+        });
+
+        // Listener para validar horário ao sair do campo
+        document.getElementById('orderTimeSlot')?.addEventListener('blur', (e) => {
+            this.validateTimeSlotNotPast(e.target.value);
         });
 
         // Confirmation Modal Listeners
         document.getElementById('confirmationModalCancel')?.addEventListener('click', () => {
             console.log('[Checkout] Modal Cancel clicked');
             document.getElementById('confirmationModal').classList.add('hidden');
+            this.isSubmitting = false;
+            if (document.getElementById('confirmOrder')) document.getElementById('confirmOrder').disabled = false;
         });
         document.getElementById('confirmationModalConfirm')?.addEventListener('click', () => {
             console.log('[Checkout] Modal Confirm clicked');
@@ -78,6 +101,8 @@ window.CheckoutModule = {
                 const p = window.products.find(x => x.id === i.id);
                 if (!p) return false;
                 const name = p.name.toLowerCase();
+                // Vulcão Mini é liberado para entrega
+                if (name.includes('vulcão mini') || name.includes('vulcao mini')) return false;
                 return p.category === 'bolos' || name.includes('bolo p') || name.includes('bolo g') || name.match(/bolo\s*[pg]/i);
             });
 
@@ -85,7 +110,7 @@ window.CheckoutModule = {
                 e.target.checked = false;
                 document.querySelector('input[name="delivery"][value="retirada"]').checked = true;
                 f.classList.add('hidden');
-                alert('⚠️ Kits festa e bolos grandes não possuem entrega. Apenas retirada na loja.');
+                this.showWarning('⚠️ Kits festa e bolos grandes não possuem entrega. Apenas retirada na loja. (Vulcão Mini pode ser entregue!)');
                 return;
             }
             f.classList.remove('hidden');
@@ -105,12 +130,85 @@ window.CheckoutModule = {
         } catch (e2) { }
 
         if (window.updateCheckoutFeeAndTotalFast) window.updateCheckoutFeeAndTotalFast();
+
+        // Atualiza regras de pedido (valor mínimo por bairro, etc)
+        if (window.updateOrderRulesUI) window.updateOrderRulesUI();
+        if (window.updateNeighborhoodMinValueWarning) window.updateNeighborhoodMinValueWarning();
     },
 
     handlePaymentChange: function (e) {
         const b = document.getElementById('moneyChangeBox');
         if (e.target.value === 'dinheiro') b.classList.remove('hidden'); else b.classList.add('hidden');
         if (window.updateCheckoutFeeAndTotalFast) window.updateCheckoutFeeAndTotalFast();
+    },
+
+    // Atualiza horário mínimo quando data é hoje
+    updateMinTimeForDate: function (dateStr) {
+        const timeInput = document.getElementById('orderTimeSlot');
+        if (!timeInput) return;
+
+        const brasilia = window.getBrasiliaDate ? window.getBrasiliaDate() : new Date();
+        const todayStr = window.formatYYYYMMDD(brasilia);
+
+        if (dateStr === todayStr) {
+            // Data é hoje - definir horário mínimo como agora + 30min
+            const currentHour = brasilia.getHours();
+            const currentMin = brasilia.getMinutes();
+            let minHour = currentHour;
+            let minMin = currentMin + 30;
+
+            if (minMin >= 60) {
+                minHour += 1;
+                minMin -= 60;
+            }
+
+            const minTime = `${String(minHour).padStart(2, '0')}:${String(minMin).padStart(2, '0')}`;
+            timeInput.min = minTime;
+
+            // Se horário atual é menor que mínimo, limpar
+            if (timeInput.value && timeInput.value < minTime) {
+                timeInput.value = '';
+                if (window.showToast) window.showToast(`⏰ Horário mínimo para hoje: ${minTime}`, 'warning');
+            }
+
+            // Mostrar hint
+            const hint = document.getElementById('orderTimeHint');
+            if (hint) hint.textContent = `Para hoje, horário mínimo: ${minTime} (30min preparo)`;
+        } else {
+            // Data futura - REMOVER TODAS as restrições de horário
+            timeInput.removeAttribute('min');
+            timeInput.removeAttribute('max');
+            const hint = document.getElementById('orderTimeHint');
+            if (hint) hint.textContent = 'Horário de funcionamento: 07:00 às 18:00';
+        }
+    },
+
+    // Valida se horário não é passado
+    validateTimeSlotNotPast: function (timeStr) {
+        if (!timeStr) return;
+
+        const dateInput = document.getElementById('orderDate');
+        if (!dateInput || !dateInput.value) return;
+
+        const brasilia = window.getBrasiliaDate ? window.getBrasiliaDate() : new Date();
+        const todayStr = window.formatYYYYMMDD(brasilia);
+
+        if (dateInput.value !== todayStr) return; // Data futura - SEMPRE permitir qualquer horário
+
+        const currentHour = brasilia.getHours();
+        const currentMin = brasilia.getMinutes();
+        const currentTimeNum = currentHour * 100 + currentMin;
+
+        const [slotHour, slotMin] = timeStr.split(':').map(Number);
+        const slotTimeNum = slotHour * 100 + (slotMin || 0);
+
+        if (slotTimeNum < currentTimeNum) {
+            const timeInput = document.getElementById('orderTimeSlot');
+            if (timeInput) timeInput.value = '';
+            if (window.showToast) {
+                window.showToast(`⏰ O horário ${timeStr} já passou! Selecione um horário futuro.`, 'error');
+            }
+        }
     },
 
     handleClientSearch: function (e) {
@@ -222,8 +320,14 @@ window.CheckoutModule = {
     // MAIN ORDER FINALIZATION LOGIC
     // ===================================
     finalizeOrder: async function () {
+        if (this.isSubmitting) return;
         console.log('[Checkout] Iniciando finalizeOrder...');
+
         try {
+            this.isSubmitting = true;
+            const btn = document.getElementById('confirmOrder');
+            if (btn) btn.disabled = true;
+
             const warnings = document.getElementById('validationWarnings');
             warnings.innerHTML = '';
             warnings.classList.add('hidden');
@@ -236,13 +340,22 @@ window.CheckoutModule = {
             console.log('[Checkout] Step 1: Validating inputs...', { customerName, customerPhone, payment: payment?.value, delivery: delivery?.value });
 
             // 1. Validation
-            if (!customerName || !customerPhone) { this.showWarning('Preencha seu nome e telefone.'); return; }
+            if (!customerName || !customerPhone) {
+                this.showWarning('Preencha seu nome e telefone.');
+                this.isSubmitting = false;
+                if (btn) btn.disabled = false;
+                return;
+            }
 
             const normalizedPhone = customerPhone.replace(/\D/g, '');
             if (normalizedPhone.length !== 11) {
                 this.showWarning('Informe um telefone válido com DDD e 9 dígitos. Ex: 73999348552.');
+                this.isSubmitting = false;
+                if (btn) btn.disabled = false;
                 return;
             }
+
+            // ... (rest of validation) ...
 
             // Validate Full Name for new clients
             const isExistingClient = (window.clients || []).some(c => (c.phone || '').replace(/\D/g, '') === normalizedPhone);
@@ -250,6 +363,8 @@ window.CheckoutModule = {
                 const nameParts = customerName.split(/\s+/).filter(w => w.length > 0);
                 if (nameParts.length < 2) {
                     this.showWarning('Por favor, informe nome e sobrenome completo.');
+                    this.isSubmitting = false;
+                    if (btn) btn.disabled = false;
                     return;
                 }
             }
@@ -257,156 +372,107 @@ window.CheckoutModule = {
             const termsCheckbox = document.getElementById('acceptTermsCheckbox');
             if (termsCheckbox && !termsCheckbox.checked) {
                 this.showWarning('Você precisa aceitar os Termos de Uso para continuar.');
+                this.isSubmitting = false;
+                if (btn) btn.disabled = false;
                 return;
             }
 
-            if (!payment) { this.showWarning('Selecione uma forma de pagamento.'); return; }
-
-            const minOrder = (delivery && delivery.value === 'entrega') ? 15 : 8;
-            if (window.cartTotal < minOrder) { this.showWarning(`Pedido mínimo: R$ ${minOrder.toFixed(2).replace('.', ',')}`); return; }
-
-            console.log('[Checkout] Step 1.1: Product restrictions...');
-            // Product Restrictions
-            const containsKit = window.cart.some(i => window.products.find(p => p.id === i.id)?.category === 'kits');
-
-            // Apenas kits festa não têm entrega (bolos podem ter entrega com antecedência)
-            if (containsKit && delivery && delivery.value === 'entrega') {
-                this.showWarning('Kits festa não possuem entrega. Altere para retirada na loja.');
+            if (!payment) {
+                this.showWarning('Selecione uma forma de pagamento.');
+                this.isSubmitting = false;
+                if (btn) btn.disabled = false;
                 return;
             }
 
-            const onlyBeverages = window.cart.every(i => window.products.find(p => p.id === i.id)?.category === 'bebidas');
-            if (onlyBeverages && delivery && delivery.value === 'entrega') {
-                this.showWarning('Não entregamos apenas refrigerantes. Adicione salgados ao pedido ou escolha retirada na loja.');
-                return;
-            }
-
-            console.log('[Checkout] Step 1.2: Address validation...');
-            // Address Validation
-            if (delivery && delivery.value === 'entrega') {
+            // VALIDAÇÃO DE ENDEREÇO PARA ENTREGA
+            if (delivery?.value === 'entrega') {
                 const street = document.getElementById('street')?.value?.trim();
                 const number = document.getElementById('number')?.value?.trim();
-                const neighborhood = document.getElementById('neighborhood')?.value;
-
-                console.log('[Checkout] Address Data:', { street, number, neighborhood });
+                const neighborhood = document.getElementById('neighborhood')?.value?.trim();
 
                 if (!street || !number || !neighborhood) {
-                    this.showWarning('Por favor, preencha o endereço completo (Rua, Número e Bairro).');
+                    this.showWarning('Para entrega, preencha o endereço completo (rua, número e bairro).');
+                    this.isSubmitting = false;
+                    if (btn) btn.disabled = false;
                     return;
                 }
             }
 
-            console.log('[Checkout] Step 1.3: Time/Date validation...');
-            // Time & Date Validation
-            const orderDateStr = document.getElementById('orderDate').value;
-            const orderTimeSlot = document.getElementById('orderTimeSlot').value;
+            // DELIVERY TIME CHECK
+            const orderDateValue = document.getElementById('orderDate')?.value;
+            const orderTimeValue = document.getElementById('orderTimeSlot')?.value;
+
+            console.log('[Checkout] DEBUG - orderDate field:', document.getElementById('orderDate'));
+            console.log('[Checkout] DEBUG - orderTimeSlot field:', document.getElementById('orderTimeSlot'));
+            console.log('[Checkout] DEBUG - orderDateValue:', orderDateValue);
+            console.log('[Checkout] DEBUG - orderTimeValue:', orderTimeValue);
+            console.log('[Checkout] DEBUG - isFastOpen():', window.isFastOpen());
+
+            let orderDateStr = '';
+            let orderTimeSlot = '';
 
             if (!window.isFastOpen()) {
-                if (!orderDateStr) { this.showWarning('Informe a data da encomenda.'); return; }
-                if (!orderTimeSlot) { this.showWarning('Selecione um horário desejado.'); return; }
-
-                const todayDate = window.formatYYYYMMDD(window.getBrasiliaDate());
-                const isOrderForToday = orderDateStr === todayDate;
-                const isRetirada = delivery && delivery.value === 'retirada';
-
-                if (isOrderForToday) {
-                    if (window.canOrderTodayWithoutBolo) {
-                        const val = window.canOrderTodayWithoutBolo(isRetirada, window.cartTotal, orderTimeSlot);
-                        if (!val.allowed) { this.showWarning(val.reason); return; }
-                    }
-                } else {
-                    const minDate = window.getMinEncomendaDateYYYYMMDD();
-                    if (orderDateStr < minDate) { this.showWarning('Data da encomenda inválida.'); return; }
+                if (!orderDateValue || !orderTimeValue) {
+                    console.error('[Checkout] ERRO - Data ou horário vazio! Date:', orderDateValue, 'Time:', orderTimeValue);
+                    this.showWarning('A loja está fechada. Selecione data e horário para encomenda.');
+                    this.isSubmitting = false;
+                    if (btn) btn.disabled = false;
+                    return;
                 }
+                const [y, m, d] = orderDateValue.split('-');
+                orderDateStr = `${d}/${m}/${y}`;
+                orderTimeSlot = orderTimeValue;
+                console.log('[Checkout] Data/hora processadas:', orderDateStr, orderTimeSlot);
+            } else if (orderDateValue && orderTimeValue) {
+                // Scheduled while open
+                const [y, m, d] = orderDateValue.split('-');
+                orderDateStr = `${d}/${m}/${y}`;
+                orderTimeSlot = orderTimeValue;
+                console.log('[Checkout] Agendamento:', orderDateStr, orderTimeSlot);
+            }
 
-                // Time Window Logic
-                const timeNum = parseInt(orderTimeSlot.replace(/:/g, ''), 10);
-                const hasBolo = window.cartContainsBolo();
-                
-                if (isOrderForToday && !hasBolo) {
-                    // Pedido mesmo dia SEM bolo: usa janela same_day (11:00-18:00)
-                    const startStr = (window.storeConfig?.same_day_pickup_start || '11:00').replace(':', '');
-                    const endStr = (window.storeConfig?.same_day_pickup_end || '18:00').replace(':', '');
-                    const startNum = parseInt(startStr, 10) || 1100;
-                    const endNum = parseInt(endStr, 10) || 1800;
-                    
-                    if (timeNum < startNum || timeNum > endNum) {
-                        const startFormatted = window.storeConfig?.same_day_pickup_start || '11:00';
-                        const endFormatted = window.storeConfig?.same_day_pickup_end || '18:00';
-                        this.showWarning(`Para retirada no mesmo dia, o horário deve ser entre ${startFormatted} e ${endFormatted}.`);
-                        return;
-                    }
-                } else {
-                    // Encomenda (data futura) OU pedido com bolo
-                    let minTime = 700;
-                    let maxTime = 1800;
+            // ============================================================
+            // VALIDAR REGRAS DE PEDIDO (horário, valor mínimo, etc.)
+            // ============================================================
+            const isDelivery = delivery?.value === 'entrega';
+            const neighborhood = document.getElementById('neighborhood')?.value?.trim() || null;
 
-                    if (hasBolo) {
-                        // BOLO: usa Janela de Pedidos do admin (07:00-18:00)
-                        const orderWindowStart = (window.storeConfig?.order_window_start || '07:00').replace(':', '');
-                        const orderWindowEnd = (window.storeConfig?.order_window_end || '18:00').replace(':', '');
-                        minTime = parseInt(orderWindowStart, 10) || 700;
-                        maxTime = parseInt(orderWindowEnd, 10) || 1800;
-                    } else {
-                        // SEM BOLO: usa businessHours (horário comercial normal)
-                        try {
-                            const [y, m, d] = orderDateStr.split('-').map(Number);
-                            const dateObj = new Date(y, m - 1, d);
-                            const dayOfWeek = dateObj.getDay();
-                            const rules = (window.businessHours || []).find(b => b.day_of_week === dayOfWeek);
+            if (window.validateOrder) {
+                const validation = window.validateOrder({
+                    cartItems: window.cart,
+                    cartTotal: window.cartTotal,
+                    orderDate: orderDateValue,
+                    timeSlot: orderTimeValue,
+                    isDelivery: isDelivery,
+                    neighborhood: neighborhood
+                });
 
-                            if (rules && rules.is_open) {
-                                const openStr = (rules.open_time || '14:00').replace(':', '');
-                                const closeStr = (rules.close_time || '18:00').replace(':', '');
-                                minTime = parseInt(openStr, 10);
-                                maxTime = parseInt(closeStr, 10);
-                            } else {
-                                minTime = 1400;
-                                maxTime = 1800;
-                            }
-                        } catch (e) {
-                            console.warn('[Checkout] Erro ao calcular horário dinâmico:', e);
-                            minTime = 1400;
-                            maxTime = 1800;
-                        }
-                    }
-
-                    if (timeNum < minTime || timeNum > maxTime) {
-                        const tipo = delivery && delivery.value === 'entrega' ? 'entrega' : 'retirada';
-                        const minStr = String(minTime).padStart(4, '0').replace(/(\d{2})(\d{2})/, '$1:$2');
-                        const maxStr = String(maxTime).padStart(4, '0').replace(/(\d{2})(\d{2})/, '$1:$2');
-                        this.showWarning(`Para ${tipo} nesta data, o horário permitido é das ${minStr} às ${maxStr}.`);
-                        return;
-                    }
-                    
-                    // Regra da manhã: se NÃO tem bolo, valida valor mínimo antes das 14h
-                    if (!hasBolo && window.isOrderAllowedAtTime) {
-                        const tVal = window.isOrderAllowedAtTime(orderTimeSlot, window.cartTotal, window.cart);
-                        if (!tVal.allowed) { this.showWarning(tVal.reason); return; }
-                    }
+                if (!validation.valid) {
+                    console.warn('[Checkout] Validação falhou:', validation.errors);
+                    this.showWarning(validation.errors.join('<br>'));
+                    this.isSubmitting = false;
+                    if (btn) btn.disabled = false;
+                    return;
                 }
+                console.log('[Checkout] Validação de regras OK');
             }
 
             console.log('[Checkout] Step 2: Generating code...');
-            // 2. Generate Order Data
             const codes = await window.generateOrderCode();
-            const orderCode = codes.code;
+            const draftOrderCode = codes.code;
             const orderSequence = codes.sequence;
             const orderId = Date.now();
 
-            console.log('[Checkout] Step 3: Building message...');
-            // 3. Build WhatsApp Message & Calculate Discounts
+            console.log('[Checkout] Step 3: Building PRELIMINARY message...');
             const construction = await this.buildOrderMessageAndData({
-                customerName, customerPhone, payment, delivery, orderCode, orderSequence, orderId, orderDateStr, orderTimeSlot
+                customerName, customerPhone, payment, delivery, orderCode: draftOrderCode, orderSequence, orderId, orderDateStr, orderTimeSlot
             });
 
-            console.log('[Checkout] Step 3 Done. Data:', construction);
-            const { msg, orderData, hasBirthdayDiscount, birthdayDiscount } = construction;
+            const { msg: draftMsg, orderData: builtOrderData, hasBirthdayDiscount, birthdayDiscount } = construction;
 
-            console.log('[Checkout] Step 4: Payment checks...');
-            // 4. Check for "No Change" Confirmation (Cash Payment)
+            // MOVED PAYMENT CHECK (Step 5) TO HERE (Before Saving)
+            console.log('[Checkout] Checking Payment/Change...');
             const moneyChangeValue = document.getElementById('moneyChangeValue')?.value;
-            // Check if payment is Dinheiro and Change is EMPTY or ZERO
             if (payment.value === 'dinheiro' && (!moneyChangeValue || parseFloat(moneyChangeValue) <= 0)) {
                 console.log('[Checkout] Opening confirmation modal for no change...');
                 document.getElementById('confirmationModalTitle').textContent = 'Confirmar Troco';
@@ -415,47 +481,74 @@ window.CheckoutModule = {
                 const modal = document.getElementById('confirmationModal');
                 if (modal) {
                     modal.classList.remove('hidden');
-                    console.log('[Checkout] Modal class removed (hidden).');
-
                     this.onConfirmationConfirm = () => {
-                        console.log('[Checkout] Confirmation received. Proceeding...');
-                        this.handleBirthdayOrExecute(orderData, msg, customerPhone, hasBirthdayDiscount, birthdayDiscount);
+                        this.proceedToSaveAndExecute(builtOrderData, draftMsg, draftOrderCode, customerPhone, hasBirthdayDiscount, birthdayDiscount);
                     };
                     return;
-                } else {
-                    console.error('[Checkout] confirmationModal not found in DOM!');
-                    alert('Erro interno: Modal de confirmação não encontrado.');
                 }
             }
 
-            console.log('[Checkout] Proceeding to execution...');
-            // Proceed normally
-            this.handleBirthdayOrExecute(orderData, msg, customerPhone, hasBirthdayDiscount, birthdayDiscount);
+            // If no issue, proceed directly
+            await this.proceedToSaveAndExecute(builtOrderData, draftMsg, draftOrderCode, customerPhone, hasBirthdayDiscount, birthdayDiscount);
 
         } catch (err) {
             console.error('[Checkout] CRITICAL ERROR IN FINALIZE:', err);
             alert('Ocorreu um erro ao processar seu pedido. Veja o console para detalhes.');
+            this.isSubmitting = false;
+            if (document.getElementById('confirmOrder')) document.getElementById('confirmOrder').disabled = false;
         }
     },
 
     handleBirthdayOrExecute: function (orderData, msg, customerPhone, hasBirthdayDiscount, birthdayDiscount) {
-        // Check if client needs birthday registration
-        const clientForBirthday = window.clients.find(c => c.phone === customerPhone);
+        const normalizedPhone = (customerPhone || '').replace(/\D/g, '');
+        const clientForBirthday = window.clients.find(c => (c.phone || '').replace(/\D/g, '') === normalizedPhone);
         const needsBirthdayRegistration = !clientForBirthday || !clientForBirthday.birthdate || clientForBirthday.birthdate === '' ||
             (window.getBrasiliaDate && clientForBirthday.birthdate === window.formatYYYYMMDD(window.getBrasiliaDate()));
 
         if (needsBirthdayRegistration) {
-            // Store pending state for modal
             this.pendingOrderData = orderData;
             this.pendingWhatsAppMessage = msg;
             this.showBirthdayModal();
         } else {
-            // Proceed directly
             this.executeOrder(orderData, msg, customerPhone, hasBirthdayDiscount, birthdayDiscount);
         }
     },
 
-    // Helper: Build Message (Complex Logic Extracted)
+    proceedToSaveAndExecute: async function (builtOrderData, draftMsg, draftOrderCode, customerPhone, hasBirthdayDiscount, birthdayDiscount) {
+        console.log('[Checkout] Step 3.5: Saving to Supabase to confirm Order Code...');
+        let orderSavedSuccessfully = false;
+        if (window.saveOrderToSupabase) {
+            try {
+                const savedOrder = await window.saveOrderToSupabase(builtOrderData);
+
+                if (savedOrder && savedOrder.order_code) {
+                    console.log('[Checkout] Order Code from DB:', savedOrder.order_code);
+                    builtOrderData.order_code = savedOrder.order_code;
+                    builtOrderData.order_sequence = savedOrder.order_sequence;
+                    builtOrderData.id = savedOrder.id;
+                    orderSavedSuccessfully = true;
+                }
+            } catch (e) {
+                console.error('[Checkout] ERRO ao salvar pedido:', e.message || e);
+                if (window.showToast) {
+                    window.showToast('⚠️ Erro ao registrar pedido no sistema. Continue pelo WhatsApp.', 'warning');
+                }
+            }
+        }
+
+        console.log('[Checkout] Pedido salvo no banco:', orderSavedSuccessfully);
+
+        // NOW rebuild the message with the FINAL code if needed
+        console.log('[Checkout] Step 4: Re-Building FINAL message...');
+        let finalMsg = draftMsg;
+        if (builtOrderData.order_code !== draftOrderCode) {
+            finalMsg = finalMsg.replace(draftOrderCode, builtOrderData.order_code);
+        }
+
+        console.log('[Checkout] Proceeding to execution...');
+        this.handleBirthdayOrExecute(builtOrderData, finalMsg, customerPhone, hasBirthdayDiscount, birthdayDiscount);
+    },
+
     buildOrderMessageAndData: async function (ctx) {
         let msg = `🥟 *Pedido Fast Savory's*\n\n`;
         msg += `🧾 *Código:* ${ctx.orderCode}\n`;
@@ -470,7 +563,7 @@ window.CheckoutModule = {
         window.cart.forEach(i => {
             const promotion = window.promotions.find(p => p.productId === i.id);
             const original = window.products.find(p => p.id === i.id);
-            const price = i.price; // Cart price includes promo
+            const price = i.price;
             const originalPrice = original?.price || price;
 
             let discountText = '';
@@ -490,9 +583,7 @@ window.CheckoutModule = {
         let birthdayDiscount = 0;
         let hasBirthdayDiscount = false;
 
-        // Apply external discounts ONLY if no promo items
         if (!hasPromoItems) {
-            // Loyalty / Special
             if (window.SpecialDiscountService) {
                 const conf = await window.SpecialDiscountService.getConfig();
                 if (conf && conf.active) {
@@ -507,26 +598,23 @@ window.CheckoutModule = {
                 }
             }
 
-            // Birthday
             if (window.BirthdayDiscountService && window.isBirthdayDiscountValid && window.calculateBirthdayDiscount) {
                 const bConfig = await window.BirthdayDiscountService.getConfig();
                 const client = window.clients.find(c => c.phone === ctx.customerPhone);
-                if (bConfig && bConfig.active && client && window.isBirthdayDiscountValid(client.birthdate)) {
-                    // Check usage
+                if (bConfig && bConfig.active && client && window.isBirthdayDiscountValid(client.birthdate, bConfig)) {
                     const used = await window.checkBirthdayDiscountUsed(ctx.customerPhone);
                     if (!used) {
-                        birthdayDiscount = window.calculateBirthdayDiscount(Math.max(0, cartTotalWithPromo));
+                        birthdayDiscount = window.calculateBirthdayDiscount(Math.max(0, cartTotalWithPromo), bConfig);
                         birthdayDiscount = Math.min(birthdayDiscount, cartTotalWithPromo);
                         if (birthdayDiscount > 0) {
                             hasBirthdayDiscount = true;
-                            clientDiscount = 0; // Don't accumulate
+                            clientDiscount = 0;
                         }
                     }
                 }
             }
         }
 
-        // Fees
         let deliveryFee = 0;
         let cardFee = 0;
 
@@ -546,11 +634,9 @@ window.CheckoutModule = {
         if (clientDiscount > 0) msg += `Desconto fidelidade: -R$ ${clientDiscount.toFixed(2).replace('.', ',')}\n`;
         if (birthdayDiscount > 0) msg += `🎂 Desconto Aniversariante: -R$ ${birthdayDiscount.toFixed(2).replace('.', ',')}\n`;
 
-        // Coupon
         let couponDiscount = 0;
         let appliedCode = null;
         if (window.appliedCoupon && !hasPromoItems && birthdayDiscount <= 0) {
-            // Re-verify coupon logic
             const valid = window.findValidCouponByCode ? window.findValidCouponByCode(window.appliedCoupon.code) : null;
             if (valid && (!valid.minOrder || cartTotalWithPromo >= valid.minOrder)) {
                 const base = cartTotalWithPromo - clientDiscount;
@@ -589,7 +675,6 @@ window.CheckoutModule = {
             if (addr.ref) msg += `*Referência:* ${addr.ref}\n`;
         }
 
-        // Handle Schedule
         if (!window.isFastOpen()) {
             msg += `\n⚠️ *Encomenda:* Pedido selecionado para:\n*Data:* ${ctx.orderDateStr}\n*Horário:* ${ctx.orderTimeSlot}\n`;
         } else if (ctx.orderDateStr && ctx.orderTimeSlot) {
@@ -608,7 +693,7 @@ window.CheckoutModule = {
             client_name: ctx.customerName,
             client_phone: ctx.customerPhone,
             items: window.cart.map(i => ({ id: i.id, name: i.name, price: i.price, quantity: i.quantity, note: i.note })),
-            subtotal: window.cartTotal, // Base subtotal
+            subtotal: window.cartTotal,
             delivery_fee: deliveryFee,
             card_fee: cardFee,
             discount: productDiscount + clientDiscount + birthdayDiscount + couponDiscount,
@@ -633,15 +718,26 @@ window.CheckoutModule = {
     },
 
     executeOrder: function (orderData, msg, phone, hasBirthdayDiscount, birthdayDiscount) {
-        // 1. WhatsApp Redirect
+        // 1. WhatsApp Redirect (Improved to avoid duplicates)
         const number = '5573999366554';
         const url = `https://wa.me/${number}?text=${encodeURIComponent(msg)}`;
+
+        // Tentativa de abrir em nova aba
         const win = window.open(url, '_blank', 'noopener,noreferrer');
-        if (!win || win.closed || typeof win.closed === 'undefined') {
+
+        // Se bloqueado ou falhou, redireciona a mesma página
+        if (!win) {
             window.location.href = url;
         }
 
-        // 2. Save Client
+        // Reset submitting after delay (so user can't double click instantly, but can retry later if needed)
+        setTimeout(() => {
+            this.isSubmitting = false;
+            const btn = document.getElementById('confirmOrder');
+            if (btn) btn.disabled = false;
+        }, 5000);
+
+        // ...
         const existing = window.clients.find(c => c.phone === phone);
         if (!existing) {
             const newC = { id: Date.now(), name: orderData.client_name, phone: phone, birthdate: '', addresses: [] };
@@ -682,8 +778,7 @@ window.CheckoutModule = {
         document.getElementById('checkoutModal').classList.add('hidden');
         if (window.showToast) window.showToast('✅ Pedido enviado para o WhatsApp!', 'success');
 
-        // 6. Background Saves
-        if (window.saveOrderToSupabase) window.saveOrderToSupabase(orderData).catch(e => console.warn('Supabase Error:', e));
+        // 6. Notify ManyChat (Save to Supabase already happened)
         if (window.notifyManychatNewOrder) window.notifyManychatNewOrder(orderData).catch(e => console.warn('ManyChat Error:', e));
 
         if (hasBirthdayDiscount && birthdayDiscount > 0 && window.recordBirthdayDiscountUsage) {
@@ -745,20 +840,24 @@ window.CheckoutModule = {
         const customerPhone = this.pendingOrderData?.client_phone;
 
         if (birthdayDate && customerPhone) {
-            // Find and update client
-            const clientIndex = window.clients.findIndex(c => c.phone === customerPhone);
+            const phoneDigits = (customerPhone || '').replace(/\D/g, '');
+            // Find and update client in local cache
+            const clientIndex = window.clients.findIndex(c => (c.phone || '').replace(/\D/g, '') === phoneDigits);
             if (clientIndex !== -1) {
                 window.clients[clientIndex].birthdate = birthdayDate;
-                if (window.saveClients) window.saveClients(); // Persist to local/supabase
+                if (window.saveClients) window.saveClients();
             }
 
-            // Check if discount applies NOW (for next time? or valid for this one? 
-            // Original code didn't re-apply discount instantly, just saved date.)
-            // But if it IS valid, maybe we should offer it? 
-            // For now, mirroring original behavior: Just save and send.
-
-            // Update pending order data with birthdate for backend?
-            // The order payload doesn't carry client birthdate, only client_phone.
+            // Persistir birthdate no Supabase (fast_clients)
+            if (window.supabaseClient) {
+                window.supabaseClient
+                    .from('fast_clients')
+                    .upsert({ phone: phoneDigits, birthdate: birthdayDate, name: this.pendingOrderData?.client_name || '' }, { onConflict: 'phone' })
+                    .then(({ error }) => {
+                        if (error) console.warn('[Checkout] Erro ao salvar aniversário no Supabase:', error);
+                        else console.log('[Checkout] Aniversário salvo no Supabase:', phoneDigits);
+                    });
+            }
         }
 
         this.proceedWithOrderFromModal();

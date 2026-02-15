@@ -115,7 +115,7 @@ async function renderClients() {
         const sortedClients = Array.from(clientsMap.values())
             .filter(c => !searchTerm || normalizeName(c.name).includes(normalizeName(searchTerm)) || String(c.phone || '').includes(searchTerm))
             .filter(c => !initialFilter || normalizeName(c.name).startsWith(initialFilter))
-            .sort((a, b) => b.rawLastOrder - a.rawLastOrder); // Most recent first
+            .sort((a, b) => normalizeName(a.name).localeCompare(normalizeName(b.name))); // Alphabetical order
 
         if (sortedClients.length === 0) {
             list.innerHTML = '<tr><td colspan="7" class="p-4 text-center">Nenhum cliente encontrado.</td></tr>';

@@ -4,7 +4,7 @@
 // ========================================
 
 async function saveProduct(name, description, price, category, image) {
-    const emojiMap = { salgados: '🍽️', mini: '👨‍🍳', kits: '🎁', bolos: '🎂', adicionais: '➕', bebidas: '🥤' };
+    const emojiMap = { salgados: '🍽️', mini: '👨‍🍳', kits: '🎁', bolos: '🎂', combo: '🔥', adicionais: '➕', bebidas: '🥤' };
     const emoji = emojiMap[category] || '🍽️';
 
     // Campos de disponibilidade
@@ -84,15 +84,26 @@ async function saveProduct(name, description, price, category, image) {
         promo_value: promo.value
     };
 
-    if (window.editingProductId) {
-        productData.id = window.editingProductId;
-    }
-
     // Save to Supabase
     try {
-        const { error } = await window.supabaseClient
-            .from('fast_products')
-            .upsert(productData);
+        let error;
+        
+        if (window.editingProductId) {
+            // UPDATE existing product
+            productData.id = window.editingProductId;
+            const result = await window.supabaseClient
+                .from('fast_products')
+                .update(productData)
+                .eq('id', window.editingProductId);
+            error = result.error;
+        } else {
+            // INSERT new product with Date.now() as ID
+            productData.id = Date.now();
+            const result = await window.supabaseClient
+                .from('fast_products')
+                .insert(productData);
+            error = result.error;
+        }
 
         if (error) throw error;
 
@@ -206,6 +217,11 @@ function filterAndRenderProducts() {
             <td class="p-4 align-middle">
                 <input type="checkbox" class="product-select rounded text-rose-600 focus:ring-rose-500" value="${p.id}">
             </td>
+            <td class="p-4 align-middle text-center">
+                <span class="inline-flex items-center justify-center w-8 h-8 rounded-full ${p.catalog_order ? 'bg-rose-100 text-rose-700' : 'bg-gray-100 text-gray-400'} text-sm font-bold" title="Posição no catálogo">
+                    ${p.catalog_order || '-'}
+                </span>
+            </td>
             <td class="p-4 align-middle">
                 <div class="flex items-center gap-3">
                     <span class="text-2xl">${p.emoji || '📦'}</span>
@@ -247,6 +263,7 @@ function filterAndRenderProducts() {
         mobileGrid.innerHTML = filtered.map(p => `
             <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-100 flex items-center justify-between">
                 <div class="flex items-center gap-3">
+                     <span class="inline-flex items-center justify-center w-7 h-7 rounded-full ${p.catalog_order ? 'bg-rose-100 text-rose-700' : 'bg-gray-100 text-gray-400'} text-xs font-bold">${p.catalog_order || '-'}</span>
                      <span class="text-2xl">${p.emoji || '📦'}</span>
                      <div>
                         <h4 class="font-medium text-gray-900">${p.name}</h4>
@@ -355,14 +372,27 @@ async function renderOptionsList() {
             return;
         }
 
-        container.innerHTML = options.map(opt => `
-            <div class="flex items-center justify-between p-2 bg-gray-50 rounded border border-gray-100">
-                <span class="text-sm font-medium text-gray-700">${opt.name}</span>
-                <button onclick="handleDeleteOption(${opt.id})" class="text-red-500 hover:text-red-700 p-1">
-                    🗑️
-                </button>
-            </div>
-        `).join('');
+        container.innerHTML = options.map(opt => {
+            const isVisible = opt.visible !== false;
+            const visibilityIcon = isVisible ? '👁️' : '🚫';
+            const visibilityTitle = isVisible ? 'Ocultar' : 'Mostrar';
+            const bgClass = isVisible ? 'bg-gray-50' : 'bg-red-50 opacity-60';
+            return `
+            <div class="flex items-center justify-between p-2 ${bgClass} rounded border border-gray-100">
+                <span class="text-sm font-medium text-gray-700 ${!isVisible ? 'line-through' : ''}">${opt.name}</span>
+                <div class="flex gap-1">
+                    <button onclick="handleEditOption(${opt.id}, '${opt.name.replace(/'/g, "\\'")}')" class="text-blue-500 hover:text-blue-700 p-1" title="Editar">
+                        ✏️
+                    </button>
+                    <button onclick="handleToggleOptionVisibility(${opt.id}, ${isVisible})" class="text-yellow-600 hover:text-yellow-800 p-1" title="${visibilityTitle}">
+                        ${visibilityIcon}
+                    </button>
+                    <button onclick="handleDeleteOption(${opt.id})" class="text-red-500 hover:text-red-700 p-1" title="Excluir">
+                        🗑️
+                    </button>
+                </div>
+            </div>`;
+        }).join('');
 
     } catch (e) {
         console.error('Erro ao carregar opções:', e);
@@ -414,12 +444,108 @@ async function handleDeleteOption(id) {
     }
 }
 
+async function handleEditOption(id, currentName) {
+    const newName = prompt('Novo nome para a opção:', currentName);
+    if (!newName || newName.trim() === '' || newName.trim() === currentName) return;
+
+    try {
+        const { error } = await window.supabaseClient
+            .from('fast_product_options')
+            .update({ name: newName.trim() })
+            .eq('id', id);
+
+        if (error) throw error;
+        showToast('Opção atualizada!', 'success');
+        renderOptionsList();
+    } catch (e) {
+        console.error('Erro ao editar opção:', e);
+        showToast('Erro ao editar.', 'error');
+    }
+}
+
+async function handleToggleOptionVisibility(id, currentVisible) {
+    try {
+        const { error } = await window.supabaseClient
+            .from('fast_product_options')
+            .update({ visible: !currentVisible })
+            .eq('id', id);
+
+        if (error) throw error;
+        showToast(currentVisible ? 'Opção ocultada!' : 'Opção visível!', 'success');
+        renderOptionsList();
+    } catch (e) {
+        console.error('Erro ao alterar visibilidade:', e);
+        showToast('Erro ao alterar visibilidade.', 'error');
+    }
+}
+
 // Expose and Init
 window.handleDeleteOption = handleDeleteOption;
+window.handleEditOption = handleEditOption;
+window.handleToggleOptionVisibility = handleToggleOptionVisibility;
 // Init tabs if element exists
 if (document.querySelector('.options-tab')) {
     initOptionsTabs();
 }
+
+// ========================================
+// FORM SUBMIT HANDLER
+// ========================================
+document.addEventListener('DOMContentLoaded', function() {
+    const productForm = document.getElementById('productForm');
+    if (productForm) {
+        productForm.addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const name = document.getElementById('productName').value.trim();
+            const description = document.getElementById('productDescription').value.trim();
+            const price = parseFloat(document.getElementById('productPrice').value) || 0;
+            const category = document.getElementById('productCategory').value;
+            
+            if (!name || !price || !category) {
+                showToast('Preencha nome, preço e categoria!', 'error');
+                return;
+            }
+            
+            // Handle image upload if present
+            let imageUrl = null;
+            const imageInput = document.getElementById('productImage');
+            if (imageInput && imageInput.files && imageInput.files[0]) {
+                try {
+                    showToast('📤 Enviando imagem...', 'info');
+                    const file = imageInput.files[0];
+                    const fileExt = file.name.split('.').pop();
+                    const fileName = `product_${Date.now()}.${fileExt}`;
+                    const filePath = `products/${fileName}`;
+                    
+                    const { data, error } = await window.supabaseClient.storage
+                        .from('fast-images')
+                        .upload(filePath, file, { cacheControl: '3600', upsert: true });
+                    
+                    if (error) {
+                        console.error('Erro no upload:', error);
+                        showToast('⚠️ Erro no upload da imagem, salvando sem imagem...', 'warning');
+                    } else {
+                        const { data: urlData } = window.supabaseClient.storage
+                            .from('fast-images')
+                            .getPublicUrl(filePath);
+                        imageUrl = urlData?.publicUrl || null;
+                    }
+                } catch (uploadErr) {
+                    console.error('Erro ao enviar imagem:', uploadErr);
+                }
+            }
+            
+            await saveProduct(name, description, price, category, imageUrl);
+            
+            // Close modal after save
+            document.getElementById('productFormModal').classList.add('hidden');
+        });
+    }
+    
+    // Refresh button handler
+    document.getElementById('refreshProductsBtn')?.addEventListener('click', loadProductsAdmin);
+});
 
 // Expose globals
 window.saveProduct = saveProduct;
