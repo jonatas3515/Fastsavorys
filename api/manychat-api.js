@@ -318,10 +318,20 @@ async function _handleReject(body, res) {
 // ==========================================
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite';
 
-const GEMINI_SYSTEM_PROMPT = `Você é a atendente virtual da FastSavory's, uma lanchonete de delivery.
-Seja simpática, objetiva e responda sempre em português brasileiro.
-Se não souber a resposta, peça para o cliente aguardar que um atendente humano vai ajudar.
-Nunca invente informações sobre cardápio, preços ou horários — se não tiver certeza, diga que vai confirmar.`;
+const GEMINI_SYSTEM_PROMPT = `Você é a atendente virtual da FastSavory's, uma lanchonete de delivery localizada em Itamaraju-BA.
+
+REGRAS DE ATENDIMENTO:
+1. Responda SEMPRE em português do Brasil, tom educado e simpático, como atendente de lanchonete de bairro.
+2. Seja breve: no máximo 3 a 4 frases por resposta.
+3. Quando o cliente pedir algo:
+   - Cumprimente pelo nome se disponível.
+   - Resuma o que ele pediu.
+   - Sugira salgados, combos ou bebidas complementares, se fizer sentido.
+   - Pergunte se deseja finalizar o pedido e peça: nome completo, endereço de entrega e forma de pagamento.
+4. HORÁRIO DE FUNCIONAMENTO: 17h às 23h (horário de Brasília).
+   - Se a hora atual estiver FORA desse horário, responda educadamente que estamos fechados, informe o horário de funcionamento e convide o cliente a voltar depois.
+5. Nunca invente preços, itens do cardápio ou informações que você não tenha certeza. Se não souber, diga que vai confirmar com a equipe.
+6. Se o cliente fizer uma pergunta que não seja sobre a lanchonete, redirecione gentilmente para o atendimento de pedidos.`;
 
 async function handleGemini(req, res) {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -335,7 +345,9 @@ async function handleGemini(req, res) {
         return res.status(400).json({ error: 'Campo "message" vazio ou ausente' });
     }
 
-    const userMessage = name ? `Cliente "${name}" disse: ${message}` : message;
+    // Hora atual em Itamaraju-BA (UTC-3) para a IA saber se está dentro do horário
+    const now = new Date().toLocaleString('pt-BR', { timeZone: 'America/Bahia', hour: '2-digit', minute: '2-digit', weekday: 'long' });
+    const userMessage = `[Hora atual: ${now}]` + (name ? ` Cliente "${name}" disse: ${message}` : ` ${message}`);
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
 
     const geminiRes = await fetch(geminiUrl, {
