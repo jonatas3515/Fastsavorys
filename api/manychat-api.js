@@ -90,7 +90,6 @@ async function sendFlow(userId, flowId) {
 // ==========================================
 async function handleNotifyNewOrder(req, res) {
     if (!isConfigured()) {
-        console.log('[manychat-api:notify-new-order] ManyChat not configured');
         return res.status(200).json({ success: false, error: 'ManyChat not configured' });
     }
 
@@ -99,8 +98,37 @@ async function handleNotifyNewOrder(req, res) {
         return res.status(200).json({ success: false, error: 'No order data provided' });
     }
 
-    console.log(`[manychat-api:notify-new-order] Processing order ${order.order_code || order.id}`);
-    const result = await notifyNewOrder(order);
+    // Normaliza total: aceita "R$ 93,00" ou 93.00
+    let totalNormalized = order.total;
+    if (typeof totalNormalized === 'string') {
+        totalNormalized = parseFloat(
+            totalNormalized.replace('R$', '').replace('.', '').replace(',', '.').trim()
+        );
+    }
+
+    // Normaliza items: aceita string de texto ou array
+    let itemsNormalized = order.items;
+    if (typeof itemsNormalized === 'string' && itemsNormalized.trim()) {
+        itemsNormalized = [{ name: itemsNormalized, quantity: 1, price: null }];
+    }
+
+    // Normaliza phone
+    let phoneNormalized = order.client_phone || order.phone || '';
+    if (!phoneNormalized) {
+        phoneNormalized = 'Não informado';
+    }
+
+    const normalizedOrder = {
+        ...order,
+        total: totalNormalized,
+        items: itemsNormalized,
+        client_phone: phoneNormalized,
+        delivery_type: order.delivery_type || order.delivery_mode,
+        scheduled_date: order.scheduled_date,
+    };
+
+    console.log(`[manychat-api:notify-new-order] Processing order ${normalizedOrder.order_code || normalizedOrder.id}`);
+    const result = await notifyNewOrder(normalizedOrder);
     return res.status(200).json(result);
 }
 
