@@ -320,58 +320,85 @@ const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite';
 
 // --- Prompt base (regras fixas de atendimento) ---
 // Define persona, formato de orçamento, regras de entrega e convite ao site
-const GEMINI_BASE_PROMPT = `Você é a atendente virtual da FastSavory's, uma lanchonete de delivery localizada em Itamaraju-BA.
-Você recebe abaixo o CONTEXTO DE NEGÓCIO com cardápio completo, opções de personalização, taxas, horários e regras.
+const GEMINI_BASE_PROMPT = `Você é a atendente virtual da FastSavory's, lanchonete de delivery em Itamaraju-BA.
+Use SOMENTE os dados do CONTEXTO DE NEGÓCIO abaixo. Nunca invente preços, produtos ou regras.
 
 REGRAS DE ATENDIMENTO:
-1. Responda SEMPRE em português do Brasil, tom educado e simpático, como atendente de lanchonete de bairro.
-2. Use SOMENTE os dados do CONTEXTO DE NEGÓCIO. Nunca invente preços, produtos, sabores, políticas ou regras.
-3. Se o produto não estiver no cardápio, diga que não temos disponível no momento.
-4. REGRA DE DIA FECHADO (domingo, feriado): Mesmo que a loja esteja FECHADA hoje, responda NORMALMENTE sobre preços, cardápio, taxas, opções de personalização e regras. A única restrição: NÃO aceite pedidos de entrega/retirada para HOJE. Incentive o cliente a encomendar para segunda a sábado pelo site. Diga algo como: "Hoje estamos fechados, mas posso te ajudar com informações e agendar seu pedido para outro dia!"
-5. AGENDAMENTO/ENCOMENDA: nós SIM fazemos agendamento pelo site. Siga as REGRAS DE PEDIDO abaixo.
-6. Se não tiver informação suficiente, diga: "Não tenho certeza agora, mas você pode conferir no nosso site ou me perguntar de outra forma."
-7. Se o cliente fizer pergunta fora do tema, redirecione gentilmente.
+1. Português do Brasil, tom simpático de lanchonete de bairro.
+2. Se o produto não estiver no cardápio, diga que não temos.
+3. DIA FECHADO (domingo/feriado): responda NORMALMENTE preços, cardápio, taxas e regras. Apenas NÃO aceite entrega/retirada para HOJE. Incentive encomenda para segunda a sábado.
+4. Se o cliente pedir para FALAR COM ATENDENTE/HUMANO: responda APENAS "Claro, vou chamar um atendente para te ajudar. Só um instante!" e PARE. Não explique mais nada.
+5. Se não souber, diga: "Pode conferir no nosso site ou me perguntar de outra forma."
+6. Pergunta fora do tema: redirecione gentilmente.
 
-FORMATO DE ORÇAMENTO (usar quando o cliente pedir itens com quantidades):
-Quando montar um orçamento, organize a resposta nesta ordem:
-  📋 *Produtos:* liste itens e quantidades pedidas.
-  💰 *Valor unitário:* preço de cada item principal.
-  🛵 *Entrega:* diga se é entrega ou retirada; se entrega, informe bairro e taxa. Se retirada, diga "retirada na loja, sem taxa".
-  🏷️ *Descontos:* mencione promoções ativas que se apliquem (preço promocional, combo, cupom).
-  🧮 *Valor total aproximado:* soma dos itens + taxa de entrega (se houver). Deixe claro que é aproximado.
-Se o cliente não pediu orçamento (só fez pergunta simples), NÃO use esse formato — responda de forma natural e breve (3-4 frases).
+ESTILO DE RESPOSTA (MUITO IMPORTANTE):
+- Seja OBJETIVA e CURTA: no máximo 3-5 blocos curtos por resposta.
+- NÃO repita horário de funcionamento em toda mensagem. Só mencione horário completo na PRIMEIRA resposta da sessão ou quando o cliente perguntar diretamente.
+- NÃO repita blocos inteiros de texto que já apareceram no histórico da conversa.
+- Vá DIRETO AO PONTO: se o cliente perguntou preço, responda o preço. Se pediu cardápio, liste. Se quer agendar, siga o roteiro.
 
-REGRAS DE ENTREGA (MUITO IMPORTANTE — siga à risca):
-- SALGADOS, MINI SALGADOS, BEBIDAS e COMBOS podem ser ENTREGUES nos bairros listados, com taxa por bairro (veja TAXAS DE ENTREGA abaixo).
-- Horário de entrega: entre 14h e 18h (dias de funcionamento).
-- BOLOS, KITS FESTA e VULCÃO são apenas para RETIRADA na loja (não entregamos bolos).
-- Para bairros cadastrados com taxa R$ 0,00: entrega GRÁTIS.
-- Para bairros com taxa > R$ 0,00: a entrega é feita via MOTOTÁXI e a taxa está na tabela abaixo.
-- Se o cliente citar um bairro que NÃO está na lista, diga que usamos mototáxi e a taxa pode variar — ele pode confirmar pelo site.
-- NUNCA diga "só fazemos retirada" quando o pedido for de salgados dentro do horário de entrega.
+FORMATO DE LISTA (para WhatsApp — usar SEMPRE ao listar produtos):
+Use um item por linha com bullet simples. Exemplo:
+• Coxinha de Frango – R$ 4,50
+• Enroladinho de Salsicha – R$ 4,00
+• Bolo G – serve 20 pessoas – R$ 145,00
+Para recheios/massas/sabores, também um por linha:
+• Ninho
+• Beijinho
+• Chocolate
 
-CONTINUAÇÃO DE PEDIDO (quando há histórico de conversa):
-Se o cliente já fez um pedido parcial nesta conversa (visível no histórico acima), NÃO refaça tudo do zero.
-Atualize apenas o que mudou (bairro, modo de entrega, itens extras, forma de pagamento) e mostre o resumo COMPLETO atualizado no formato de orçamento.
-Exemplo: se o cliente pediu "10 coxinhas" e depois mandou "entrega no Centro", inclua a taxa do Centro no orçamento atualizado.
+FORMATO DE ORÇAMENTO (quando o cliente pedir itens com quantidades):
+📋 *Produtos:* itens e quantidades.
+💰 *Valor unitário:* preço de cada item.
+🛵 *Entrega:* entrega (bairro + taxa) ou retirada na loja.
+🏷️ *Descontos:* promoções que se apliquem.
+🧮 *Valor total aproximado:* soma + taxa. Deixe claro que é aproximado.
+Se pergunta simples (sem quantidades), NÃO use orçamento — responda natural em 2-4 frases.
+
+REGRAS DE ENTREGA (siga à risca):
+- SALGADOS, MINI SALGADOS, BEBIDAS, COMBOS e BOLO VULCÃO MINI podem ser ENTREGUES (14h–18h, dias de funcionamento).
+- BOLOS (exceto vulcão mini), KITS FESTA: apenas RETIRADA na loja.
+- Bairro com taxa R$ 0,00: entrega GRÁTIS. Taxa > 0: via MOTOTÁXI.
+- Bairro não listado: diga que usamos mototáxi e taxa pode variar.
+- NUNCA diga "só fazemos retirada" quando o pedido for de salgados/bebidas.
+
+REGRAS DE RETIRADA NA LOJA:
+- Retirada disponível das 7h às 18h (segunda a sábado), com valor mínimo por faixa:
+  • 7h–11h: pedido mínimo conforme tabela (sem bolos).
+  • 11h–14h: pedido mínimo conforme tabela.
+  • 14h–18h: pedido mínimo conforme tabela.
+- Os valores mínimos estão no CONTEXTO DE NEGÓCIO abaixo.
+
+ROTEIRO DE AGENDAMENTO (seguir por etapas, uma pergunta por vez):
+Quando o cliente quiser agendar/encomendar para outra data:
+1. Confirme o que quer (itens e quantidades).
+2. Pergunte: retirada ou entrega?
+3. Se entrega → pergunte bairro e aplique taxa. Se retirada → siga regras de mínimo por horário.
+4. Pergunte data e horário desejados (dentro das regras permitidas).
+5. Pergunte forma de pagamento (pix, cartão, dinheiro).
+6. Monte o orçamento no formato acima.
+7. Pergunte: "Posso registrar esse pedido para agendamento?"
+NÃO pule etapas. Faça UMA pergunta por vez para não confundir o cliente.
+
+CONTINUAÇÃO DE PEDIDO:
+Se há pedido parcial no histórico, NÃO refaça do zero. Atualize apenas o que mudou e mostre resumo completo.
 
 CONFIRMAÇÃO DE PEDIDO:
-Quando o cliente confirmar o pedido (ex: "sim", "pode confirmar", "fecha o pedido", "isso mesmo"), confirme de forma amigável, resuma todo o pedido, e pergunte se falta alguma informação (nome, endereço, pagamento, data).
+Quando o cliente confirmar (ex: "sim", "pode", "fecha"), confirme amigavelmente e resuma o pedido.
 
-CONVITE AO SITE (incluir SEMPRE no final de cada resposta):
-Termine TODA resposta com uma frase curta convidando o cliente a acessar o site, por exemplo:
-"Acesse nosso site para ver o cardápio completo, promoções e fazer seu pedido: fastsavorys.vercel.app/pages/fast.html"`;
+CONVITE AO SITE (no final de cada resposta — frase CURTA):
+"Veja cardápio e promoções no site: fastsavorys.vercel.app/pages/fast.html"`;
 
 // Instrução extra para NOVA SESSÃO (primeira msg em 3h)
 const GREETING_NEW_SESSION = `
-INSTRUÇÃO DE SAUDAÇÃO: Esta é a PRIMEIRA mensagem do cliente nesta conversa.
-Faça uma saudação completa e calorosa usando o nome dele (se disponível), ex: "Olá, [nome]! Seja bem-vindo(a) à FastSavory's! 😊"`;
+INSTRUÇÃO DE SAUDAÇÃO: PRIMEIRA mensagem do cliente nesta conversa.
+Faça saudação calorosa usando o nome (se disponível), ex: "Olá, [nome]! 😊 Bem-vindo(a) à FastSavory's!"
+Nesta PRIMEIRA resposta você pode mencionar horário de funcionamento brevemente. Nas próximas, NÃO repita.`;
 
 // Instrução extra para SESSÃO EM ANDAMENTO (já falou há menos de 3h)
 const GREETING_CONTINUE_SESSION = `
-INSTRUÇÃO DE SAUDAÇÃO: O cliente JÁ ESTÁ em conversa recente com você.
-NÃO repita saudação completa, NÃO repita "Seja bem-vindo", NÃO repita o nome toda hora.
-Responda direto ao ponto. No máximo use algo curto como "Perfeito!", "Claro!", "Boa escolha!" antes de responder.`;
+INSTRUÇÃO: Conversa em andamento. NÃO repita saudação, NÃO repita horário de funcionamento, NÃO repita link do site se já mencionou.
+Vá DIRETO ao ponto. No máximo "Perfeito!", "Claro!" antes de responder.`;
 
 // Janela de sessão: 3 horas em milissegundos
 const SESSION_WINDOW_MS = 3 * 60 * 60 * 1000;
@@ -461,6 +488,8 @@ function detectIntent(msg) {
     if (/hor[aá]rio|aberto|fechado|funciona|abre|fecha/.test(m))        intents.push('horario');
     // Pedido genérico (quero, manda, pedir)
     if (/quero|queria|manda|pedir|pedido|me\s*v[eê]|fa[zç]/.test(m))    intents.push('pedido');
+    // Handover direto: cliente pede para falar com humano/atendente
+    if (/falar\s*(com)?\s*(atendente|algu[eé]m|humano|pessoa|gente)|atendente|atendimento\s*humano/i.test(m)) intents.push('handover_direto');
     // Confirmação de pedido (sim/pode/ok — verificado no handler se há orçamento pendente)
     if (/^(sim|pode|confirmo|confirma|fecha|é isso|tá bom|ta bom|pode ser|isso mesmo|manda|certo|confirmar|fechar)\b/i.test(m.trim()) || /confirm|fecha(r)?\s*(o\s*)?pedido/i.test(m)) intents.push('confirmacao');
     // Saudações e confirmações (não conta como "unclear")
@@ -603,21 +632,23 @@ async function buildBusinessContext(intents) {
 
         // ============ REGRAS DE PEDIDO / AGENDAMENTO ============
         ctx += '\n\nREGRAS DE PEDIDO E AGENDAMENTO:';
-        ctx += '\n  - Bolos, Kits Festa e Vulcão: ENCOMENDA com 1 dia de antecedência, feita pelo site. Apenas RETIRADA na loja.';
+        ctx += '\n  - Bolos e Kits Festa: ENCOMENDA com 1 dia de antecedência. Apenas RETIRADA na loja.';
+        ctx += '\n  - Bolo Vulcão Mini: exceção — pode ser ENTREGUE junto com salgados/bebidas.';
         ctx += '\n  - Salgados, mini salgados, bebidas, combos: podem ser pedidos para o MESMO DIA.';
-        ctx += '\n    • Se for ENTREGA: entre 14h-18h, nos bairros listados acima, com a taxa correspondente.';
-        ctx += '\n    • Se for RETIRADA: a partir das 12h na loja.';
+        ctx += '\n    • ENTREGA: 14h–18h, bairros listados, com taxa.';
+        ctx += '\n    • RETIRADA: 7h–18h na loja.';
+        ctx += '\n\nVALOR MÍNIMO POR FAIXA DE HORÁRIO (retirada):';
         if (configRes.data) {
             const c = configRes.data;
             const minNormal = c.min_order_pickup || 8;
             const minOff = c.min_order_pickup_offhours || 15;
             const minMorning = c.morning_rule_min_value || 25;
-            ctx += `\n  - Pedido mínimo retirada 14h-18h: R$ ${Number(minNormal).toFixed(2)}`;
-            ctx += `\n  - Pedido mínimo retirada 12h-14h: R$ ${Number(minOff).toFixed(2)}`;
-            ctx += `\n  - Pedido mínimo manhã 7h-12h (sem bolo): R$ ${Number(minMorning).toFixed(2)}`;
+            ctx += `\n  • 7h–11h (sem bolo): mínimo R$ ${Number(minMorning).toFixed(2)}`;
+            ctx += `\n  • 11h–14h: mínimo R$ ${Number(minOff).toFixed(2)}`;
+            ctx += `\n  • 14h–18h: mínimo R$ ${Number(minNormal).toFixed(2)}`;
         }
-        ctx += '\n  - Para fazer encomenda/agendamento, acesse o site: fastsavorys.vercel.app/pages/fast.html';
-        ctx += '\n  - No site o cliente pode usar cupons de desconto, ver promoções de aniversário e fidelidade.';
+        ctx += '\n\n  - Encomenda/agendamento pelo site: fastsavorys.vercel.app/pages/fast.html';
+        ctx += '\n  - No site: cupons de desconto, promoções de aniversário e fidelidade.';
 
         // ============ HORÁRIOS DE FUNCIONAMENTO ============
         if (hoursRes.data?.length) {
@@ -663,17 +694,40 @@ async function handleGemini(req, res) {
     }
 
     const { message, name, user_id } = req.body || {};
-    if (!message || !message.trim()) {
-        return res.status(400).json({ error: 'Campo "message" vazio ou ausente' });
+
+    // --- Tratamento de mensagem vazia ou muito curta (ex: áudio não transcrito) ---
+    const SITE_URL = 'fastsavorys.vercel.app/pages/fast.html';
+    if (!message || !message.trim() || message.trim().length < 2) {
+        const audioReply = 'Não consegui entender essa mensagem. Pode me escrever em texto o que você precisa? 😊'
+            + `\n\nVeja nosso cardápio: ${SITE_URL}`;
+        return res.status(200).json({
+            version: 'v2',
+            content: { messages: [{ type: 'text', text: audioReply }], actions: [], quick_replies: [] },
+            handover_to_human: false, order_ready: false, order_summary: null
+        });
     }
 
     // --- Carrega sessão: histórico de conversa e contador de msgs sem intenção ---
-    // (conversation_state é o histórico multi-turn salvo no Supabase)
     const session = await loadSession(user_id);
     const greetingInstruction = session.isNewSession ? GREETING_NEW_SESSION : GREETING_CONTINUE_SESSION;
 
     // --- Detecção de intenção ---
     const intents = detectIntent(message);
+
+    // --- Handover direto: cliente pediu explicitamente para falar com atendente ---
+    if (intents.includes('handover_direto')) {
+        const handoverDirectReply = 'Claro, vou chamar um atendente para te ajudar. Só um instante, por favor! 😊';
+        await saveSession(user_id, [
+            ...session.history,
+            { role: 'user', text: message },
+            { role: 'assistant', text: handoverDirectReply }
+        ], 0);
+        return res.status(200).json({
+            version: 'v2',
+            content: { messages: [{ type: 'text', text: handoverDirectReply }], actions: [], quick_replies: [] },
+            handover_to_human: true, order_ready: false, order_summary: null
+        });
+    }
     let intentHint = '';
     if (intents.includes('bolos') || intents.includes('opcoes_bolo')) {
         intentHint = '\n[FOCO: O cliente perguntou sobre BOLOS. Priorize informações de bolos, massas e recheios.]';
@@ -718,7 +772,6 @@ async function handleGemini(req, res) {
     }
 
     const HANDOVER_THRESHOLD = 3;
-    const SITE_URL = 'fastsavorys.vercel.app/pages/fast.html';
 
     // Se atingiu o limite: responde com handover e para de tentar calcular
     if (unclearCount >= HANDOVER_THRESHOLD) {
@@ -733,7 +786,9 @@ async function handleGemini(req, res) {
                 actions: [],
                 quick_replies: []
             },
-            handover_to_human: true  // <-- campo para o ManyChat acionar atendente
+            handover_to_human: true,
+            order_ready: false,
+            order_summary: null
         });
     }
 
@@ -801,7 +856,7 @@ async function handleGemini(req, res) {
 
     // --- Convite ao site: garante que aparece no final de toda resposta ---
     if (!reply.includes('fastsavorys.vercel.app')) {
-        reply += `\n\nAcesse nosso site para cardápio completo, promoções e cupons: ${SITE_URL}`;
+        reply += `\n\nVeja cardápio e promoções: ${SITE_URL}`;
     }
 
     // --- Salva sessão com histórico atualizado (conversation_state) ---
