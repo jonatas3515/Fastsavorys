@@ -319,25 +319,40 @@ async function _handleReject(body, res) {
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite';
 
 // --- Prompt base (regras fixas de atendimento) ---
+// Define persona, formato de orçamento, regras de entrega e convite ao site
 const GEMINI_BASE_PROMPT = `Você é a atendente virtual da FastSavory's, uma lanchonete de delivery localizada em Itamaraju-BA.
-Você recebe abaixo o CONTEXTO DE NEGÓCIO com cardápio completo (salgados, bolos, kits festa, bebidas, adicionais), opções de massa e recheio para bolos, taxas de entrega, taxas de cartão, horários e regras de agendamento/encomenda.
+Você recebe abaixo o CONTEXTO DE NEGÓCIO com cardápio completo, opções de personalização, taxas, horários e regras.
 
 REGRAS DE ATENDIMENTO:
 1. Responda SEMPRE em português do Brasil, tom educado e simpático, como atendente de lanchonete de bairro.
-2. Seja breve: no máximo 3 a 4 frases por resposta.
-3. Quando o cliente pedir algo:
-   - Resuma o que ele pediu.
-   - Informe o preço conforme o CARDÁPIO abaixo.
-   - Se for bolo: informe as opções de massa e recheio disponíveis.
-   - Sugira itens complementares se fizer sentido.
-   - Pergunte se deseja finalizar o pedido e peça: nome completo, endereço de entrega e forma de pagamento.
-4. Use SOMENTE os dados do CONTEXTO DE NEGÓCIO abaixo. Nunca invente preços, produtos, sabores, políticas ou regras.
-5. Se o produto não estiver no cardápio, diga que não temos disponível no momento.
-6. Se a loja estiver FECHADA (conforme horário ou status do dia), informe educadamente e convide o cliente a voltar.
-7. Taxa de cartão: informe quando o cliente escolher cartão como pagamento.
-8. AGENDAMENTO/ENCOMENDA: siga as REGRAS DE PEDIDO descritas abaixo. Nós SIM fazemos agendamento pelo site.
-9. Se você não tiver informação suficiente para responder, diga: "Não tenho certeza dessa informação agora, mas você pode conferir no nosso site ou me perguntar de outra forma."
-10. Se o cliente fizer uma pergunta que não seja sobre a lanchonete, redirecione gentilmente.`;
+2. Use SOMENTE os dados do CONTEXTO DE NEGÓCIO. Nunca invente preços, produtos, sabores, políticas ou regras.
+3. Se o produto não estiver no cardápio, diga que não temos disponível no momento.
+4. Se a loja estiver FECHADA, informe educadamente e convide o cliente a voltar.
+5. AGENDAMENTO/ENCOMENDA: nós SIM fazemos agendamento pelo site. Siga as REGRAS DE PEDIDO abaixo.
+6. Se não tiver informação suficiente, diga: "Não tenho certeza agora, mas você pode conferir no nosso site ou me perguntar de outra forma."
+7. Se o cliente fizer pergunta fora do tema, redirecione gentilmente.
+
+FORMATO DE ORÇAMENTO (usar quando o cliente pedir itens com quantidades):
+Quando montar um orçamento, organize a resposta nesta ordem:
+  📋 *Produtos:* liste itens e quantidades pedidas.
+  💰 *Valor unitário:* preço de cada item principal.
+  🛵 *Entrega:* diga se é entrega ou retirada; se entrega, informe bairro e taxa. Se retirada, diga "retirada na loja, sem taxa".
+  🏷️ *Descontos:* mencione promoções ativas que se apliquem (preço promocional, combo, cupom).
+  🧮 *Valor total aproximado:* soma dos itens + taxa de entrega (se houver). Deixe claro que é aproximado.
+Se o cliente não pediu orçamento (só fez pergunta simples), NÃO use esse formato — responda de forma natural e breve (3-4 frases).
+
+REGRAS DE ENTREGA (MUITO IMPORTANTE — siga à risca):
+- SALGADOS, MINI SALGADOS, BEBIDAS e COMBOS podem ser ENTREGUES nos bairros listados, com taxa por bairro (veja TAXAS DE ENTREGA abaixo).
+- Horário de entrega: entre 14h e 18h (dias de funcionamento).
+- BOLOS, KITS FESTA e VULCÃO são apenas para RETIRADA na loja (não entregamos bolos).
+- Para bairros cadastrados com taxa R$ 0,00: entrega GRÁTIS.
+- Para bairros com taxa > R$ 0,00: a entrega é feita via MOTOTÁXI e a taxa está na tabela abaixo.
+- Se o cliente citar um bairro que NÃO está na lista, diga que usamos mototáxi e a taxa pode variar — ele pode confirmar pelo site.
+- NUNCA diga "só fazemos retirada" quando o pedido for de salgados dentro do horário de entrega.
+
+CONVITE AO SITE (incluir SEMPRE no final de cada resposta):
+Termine TODA resposta com uma frase curta convidando o cliente a acessar o site, por exemplo:
+"Acesse nosso site para ver o cardápio completo, promoções e fazer seu pedido: fastsavorys.vercel.app/pages/fast.html"`;
 
 // Instrução extra para NOVA SESSÃO (primeira msg em 3h)
 const GREETING_NEW_SESSION = `
@@ -500,43 +515,57 @@ async function buildBusinessContext(intents) {
             }
         }
 
-        // ============ TAXAS DE ENTREGA ============
+        // ============ TAXAS DE ENTREGA POR BAIRRO ============
+        // Separamos bairros com entrega grátis e bairros com taxa (mototáxi)
         if (feesRes.data?.length) {
-            ctx += '\n\nTAXAS DE ENTREGA POR BAIRRO:';
-            const byFee = {};
+            ctx += '\n\nTAXAS DE ENTREGA POR BAIRRO (apenas para salgados, mini salgados, bebidas e combos — das 14h às 18h):';
+            const gratis = [];
+            const comTaxa = {};
             for (const f of feesRes.data) {
-                const key = Number(f.fee) === 0 ? 'Grátis' : `R$ ${Number(f.fee).toFixed(2)}`;
-                if (!byFee[key]) byFee[key] = [];
-                byFee[key].push(f.neighborhood);
+                if (Number(f.fee) === 0) {
+                    gratis.push(f.neighborhood);
+                } else {
+                    const key = `R$ ${Number(f.fee).toFixed(2)}`;
+                    if (!comTaxa[key]) comTaxa[key] = [];
+                    comTaxa[key].push(f.neighborhood);
+                }
             }
-            for (const [fee, bairros] of Object.entries(byFee)) {
-                ctx += `\n  ${fee}: ${bairros.join(', ')}`;
+            if (gratis.length) {
+                ctx += `\n  Entrega GRÁTIS: ${gratis.join(', ')}`;
             }
+            for (const [fee, bairros] of Object.entries(comTaxa)) {
+                ctx += `\n  ${fee} (mototáxi): ${bairros.join(', ')}`;
+            }
+            ctx += '\n  Bairro não listado? Usamos mototáxi e a taxa pode variar — o cliente pode confirmar pelo site.';
         }
 
         // ============ CONFIGURAÇÕES DA LOJA ============
         if (configRes.data) {
             const c = configRes.data;
             ctx += `\n\nTAXAS DE CARTÃO: 1x = ${c.card_fee_1x}% | 2x = ${c.card_fee_2x}%`;
+            ctx += '\n  (taxa de cartão é cobrada sobre o valor do pedido, NÃO sobre a taxa de entrega)';
             if (!c.delivery_enabled) {
-                ctx += `\nDELIVERY DESATIVADO${c.delivery_disabled_reason ? ': ' + c.delivery_disabled_reason : ''}. Apenas retirada no local.`;
+                ctx += `\n⚠️ DELIVERY DESATIVADO${c.delivery_disabled_reason ? ': ' + c.delivery_disabled_reason : ''}. Apenas retirada no local no momento.`;
             }
         }
 
         // ============ REGRAS DE PEDIDO / AGENDAMENTO ============
         ctx += '\n\nREGRAS DE PEDIDO E AGENDAMENTO:';
-        ctx += '\n  - Bolos, Kits Festa e Vulcão exigem encomenda com 1 dia de antecedência (pedidos pelo site).';
-        ctx += '\n  - Pedidos para o MESMO DIA: apenas salgados, mini salgados, bebidas e Mini Vulcão, somente RETIRADA na loja.';
+        ctx += '\n  - Bolos, Kits Festa e Vulcão: ENCOMENDA com 1 dia de antecedência, feita pelo site. Apenas RETIRADA na loja.';
+        ctx += '\n  - Salgados, mini salgados, bebidas, combos: podem ser pedidos para o MESMO DIA.';
+        ctx += '\n    • Se for ENTREGA: entre 14h-18h, nos bairros listados acima, com a taxa correspondente.';
+        ctx += '\n    • Se for RETIRADA: a partir das 12h na loja.';
         if (configRes.data) {
             const c = configRes.data;
             const minNormal = c.min_order_pickup || 8;
             const minOff = c.min_order_pickup_offhours || 15;
             const minMorning = c.morning_rule_min_value || 25;
-            ctx += `\n  - Pedido mínimo retirada (14h-18h): R$ ${Number(minNormal).toFixed(2)}`;
-            ctx += `\n  - Pedido mínimo retirada (12h-14h): R$ ${Number(minOff).toFixed(2)}`;
+            ctx += `\n  - Pedido mínimo retirada 14h-18h: R$ ${Number(minNormal).toFixed(2)}`;
+            ctx += `\n  - Pedido mínimo retirada 12h-14h: R$ ${Number(minOff).toFixed(2)}`;
             ctx += `\n  - Pedido mínimo manhã 7h-12h (sem bolo): R$ ${Number(minMorning).toFixed(2)}`;
         }
-        ctx += '\n  - Para fazer encomenda/agendamento, o cliente pode pedir pelo nosso site: fastsavorys.vercel.app';
+        ctx += '\n  - Para fazer encomenda/agendamento, acesse o site: fastsavorys.vercel.app/pages/fast.html';
+        ctx += '\n  - No site o cliente pode usar cupons de desconto, ver promoções de aniversário e fidelidade.';
 
         // ============ HORÁRIOS DE FUNCIONAMENTO ============
         if (hoursRes.data?.length) {
@@ -609,7 +638,7 @@ async function handleGemini(req, res) {
         body: JSON.stringify({
             system_instruction: { parts: [{ text: fullPrompt }] },
             contents: [{ role: 'user', parts: [{ text: userMessage }] }],
-            generationConfig: { maxOutputTokens: 500, temperature: 0.7 }
+            generationConfig: { maxOutputTokens: 600, temperature: 0.7 }
         })
     });
 
@@ -620,8 +649,14 @@ async function handleGemini(req, res) {
     }
 
     const data = await geminiRes.json();
-    const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text
+    let reply = data?.candidates?.[0]?.content?.parts?.[0]?.text
         || 'Desculpe, não consegui gerar uma resposta agora. Um atendente vai te ajudar!';
+
+    // --- Convite ao site: garante que aparece no final de toda resposta ---
+    const SITE_URL = 'fastsavorys.vercel.app/pages/fast.html';
+    if (!reply.includes('fastsavorys.vercel.app')) {
+        reply += `\n\nAcesse nosso site para cardápio completo, promoções e cupons: ${SITE_URL}`;
+    }
 
     return res.status(200).json({
         version: 'v2',
