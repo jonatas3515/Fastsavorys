@@ -394,6 +394,13 @@ DIFERENCIAÇÃO COXINHA NORMAL vs MINI (IMPORTANTE):
   "Você prefere coxinha tradicional (unidade) ou mini coxinha?"
 - Só prossiga com preço/combo DEPOIS que o cliente confirmar qual tipo.
 
+MINI SALGADOS — REGRA DE PACOTES (CRÍTICO):
+- Mini salgados são vendidos em pacotes com preço fixo cadastrado no cardápio (categoria "mini").
+- Os pacotes estão no CONTEXTO DE NEGÓCIO como "Mini-Salgados 20", "Mini-Salgados 30", etc.
+- Se o cliente pedir uma quantidade que corresponda a um pacote, use SEMPRE o preço do pacote.
+- NUNCA multiplique preço unitário × quantidade quando existir pacote cadastrado para aquela quantidade.
+- Preço unitário (R$ 1,00 a R$ 1,25) é APENAS para quantidades que não têm pacote cadastrado.
+
 COMBOS (REGRA CRÍTICA — NÃO RECALCULAR):
 - Combos têm PREÇO FIXO. NUNCA recalcule o preço de um combo somando itens individuais.
 - Use EXATAMENTE o preço que aparece no CONTEXTO DE NEGÓCIO para cada combo.
@@ -408,14 +415,19 @@ REGRAS DE ENTREGA (siga à risca):
 - Bairro com taxa R$ 0,00: entrega GRÁTIS.
 - Entrega via MOTOTÁXI.
 - NUNCA diga "só fazemos retirada" quando o pedido for de salgados/bebidas.
+- Valor mínimo global para entrega: R$ 15,00 (sem contar a taxa de entrega).
+- Cada bairro pode ter valor mínimo próprio — consulte a tabela de taxas no CONTEXTO DE NEGÓCIO.
+- Se o valor do pedido (sem taxa) não atingir o mínimo do bairro, informe o cliente e peça para aumentar o pedido.
 
-REGRAS DE RETIRADA NA LOJA:
-- Retirada disponível das 7h às 18h (segunda a sábado), com valor mínimo por faixa:
-  • 7h–11h: pedido mínimo conforme tabela (sem bolos).
-  • 11h–14h: pedido mínimo conforme tabela.
-  • 14h–18h: pedido mínimo conforme tabela.
-- Os valores mínimos estão no CONTEXTO DE NEGÓCIO abaixo.
-- Se o valor do pedido NÃO atingir o mínimo, explique e sugira: aumentar o pedido OU escolher outro horário.
+REGRAS DE RETIRADA NA LOJA (pedidos futuros — data diferente de hoje):
+- Disponível das 7h às 18h, segunda a sábado.
+- Faixa 7h–11h: pedido mínimo R$ 35,00 (sem bolos).
+- Faixa 11h–14h: pedido mínimo R$ 25,00.
+- Faixa 14h–18h: sem mínimo extra além do mínimo global de R$ 8,00.
+
+REGRA DE DOMINGO:
+- Se a DATA DE ENTREGA ou RETIRADA cair num domingo: pedido mínimo R$ 39,00.
+- Se hoje é domingo mas o pedido é para outro dia da semana: sem restrição extra de valor mínimo.
 
 ROTEIRO DE AGENDAMENTO (seguir por etapas, uma pergunta por vez):
 Quando o cliente quiser agendar/encomendar para outra data:
@@ -607,7 +619,7 @@ async function buildBusinessContext(intents) {
             }
             // Ordem desejada das categorias
             const catOrder = ['salgados', 'mini', 'combos', 'bolos', 'kits', 'bebidas', 'adicionais'];
-            const catLabels = { salgados: 'SALGADOS', mini: 'MINI SALGADOS (CENTO/50 UN)', combos: 'COMBOS (PREÇO FIXO — NÃO RECALCULAR)', bolos: 'BOLOS', kits: 'KITS FESTA', bebidas: 'BEBIDAS', adicionais: 'ADICIONAIS' };
+            const catLabels = { salgados: 'SALGADOS', mini: 'MINI SALGADOS (CENTO/50 UN)', combos: '⚠️ COMBOS — PREÇO FIXO OBRIGATÓRIO — USE EXATAMENTE O PREÇO ABAIXO, NUNCA INVENTE', bolos: 'BOLOS', kits: 'KITS FESTA', bebidas: 'BEBIDAS', adicionais: 'ADICIONAIS' };
             for (const cat of catOrder) {
                 const items = grouped[cat];
                 if (!items?.length) continue;
@@ -628,6 +640,9 @@ async function buildBusinessContext(intents) {
                     }
                     ctx += line;
                 }
+            }
+            if (grouped['combos']?.length) {
+                ctx += '\n  ⛔ ATENÇÃO: Os preços dos combos acima são ABSOLUTOS. Não some itens, não estime, não use memória de treinamento — use APENAS os valores listados aqui.';
             }
             if (unavailable.length > 0) {
                 ctx += `\n\n[PRODUTOS INDISPONÍVEIS NO MOMENTO — não ofereça, diga que não temos]: ${unavailable.join(', ')}`;
