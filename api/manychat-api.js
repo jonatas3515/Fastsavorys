@@ -325,7 +325,6 @@ REGRAS DE ATENDIMENTO:
 1. Responda SEMPRE em português do Brasil, tom educado e simpático, como atendente de lanchonete de bairro.
 2. Seja breve: no máximo 3 a 4 frases por resposta.
 3. Quando o cliente pedir algo:
-   - Cumprimente pelo nome se disponível.
    - Resuma o que ele pediu.
    - Informe o preço de cada item conforme o CARDÁPIO abaixo.
    - Sugira salgados, combos ou bebidas complementares, se fizer sentido.
@@ -335,6 +334,57 @@ REGRAS DE ATENDIMENTO:
 6. Se a loja estiver FECHADA (conforme horário abaixo ou status do dia), informe educadamente o horário de funcionamento e convide o cliente a voltar.
 7. Taxa de cartão: informe ao cliente quando ele escolher cartão como pagamento.
 8. Se o cliente fizer uma pergunta que não seja sobre a lanchonete, redirecione gentilmente para o atendimento de pedidos.`;
+
+// Instrução extra para NOVA SESSÃO (primeira msg em 3h)
+const GREETING_NEW_SESSION = `
+INSTRUÇÃO DE SAUDAÇÃO: Esta é a PRIMEIRA mensagem do cliente nesta conversa.
+Faça uma saudação completa e calorosa usando o nome dele (se disponível), ex: "Olá, [nome]! Seja bem-vindo(a) à FastSavory's! 😊"`;
+
+// Instrução extra para SESSÃO EM ANDAMENTO (já falou há menos de 3h)
+const GREETING_CONTINUE_SESSION = `
+INSTRUÇÃO DE SAUDAÇÃO: O cliente JÁ ESTÁ em conversa recente com você.
+NÃO repita saudação completa, NÃO repita "Seja bem-vindo", NÃO repita o nome toda hora.
+Responda direto ao ponto. No máximo use algo curto como "Perfeito!", "Claro!", "Boa escolha!" antes de responder.`;
+
+// Janela de sessão: 3 horas em milissegundos
+const SESSION_WINDOW_MS = 3 * 60 * 60 * 1000;
+
+// --- Lógica de sessão: verifica se é nova conversa ou continuação ---
+async function checkSession(userId) {
+    // Se não tiver Supabase ou user_id, assume nova sessão
+    if (!supabaseAdmin || !userId) return true;
+
+    try {
+        // Busca última interação deste usuário
+        const { data: session } = await supabaseAdmin
+            .from('whatsapp_sessions')
+            .select('last_interaction_at')
+            .eq('manychat_user_id', userId)
+            .maybeSingle();
+
+        const now = new Date();
+        let isNewSession = true;
+
+        if (session?.last_interaction_at) {
+            const lastAt = new Date(session.last_interaction_at);
+            const diffMs = now.getTime() - lastAt.getTime();
+            isNewSession = diffMs > SESSION_WINDOW_MS;
+        }
+
+        // Atualiza (ou cria) o registro com o horário atual (UPSERT)
+        await supabaseAdmin
+            .from('whatsapp_sessions')
+            .upsert(
+                { manychat_user_id: userId, last_interaction_at: now.toISOString() },
+                { onConflict: 'manychat_user_id' }
+            );
+
+        return isNewSession;
+    } catch (err) {
+        console.error('[manychat-api:gemini] Erro ao verificar sessão:', err.message);
+        return true; // Em caso de erro, trata como nova sessão (mais seguro)
+    }
+}
 
 // --- Consultas ao Supabase: busca dados reais do negócio ---
 async function buildBusinessContext() {
@@ -437,10 +487,15 @@ async function handleGemini(req, res) {
         return res.status(500).json({ error: 'GEMINI_API_KEY not configured' });
     }
 
-    const { message, name } = req.body || {};
+    // Aceita user_id do ManyChat (para controle de sessão)
+    const { message, name, user_id } = req.body || {};
     if (!message || !message.trim()) {
         return res.status(400).json({ error: 'Campo "message" vazio ou ausente' });
     }
+
+    // --- Lógica de sessão: verifica se é nova conversa ou continuação ---
+    const isNewSession = await checkSession(user_id);
+    const greetingInstruction = isNewSession ? GREETING_NEW_SESSION : GREETING_CONTINUE_SESSION;
 
     // Hora atual em Itamaraju-BA (UTC-3) para a IA saber se está dentro do horário
     const now = new Date().toLocaleString('pt-BR', { timeZone: 'America/Bahia', hour: '2-digit', minute: '2-digit', weekday: 'long' });
@@ -448,7 +503,7 @@ async function handleGemini(req, res) {
 
     // --- Busca dados reais do Supabase e monta o prompt final ---
     const businessContext = await buildBusinessContext();
-    const fullPrompt = GEMINI_BASE_PROMPT + businessContext;
+    const fullPrompt = GEMINI_BASE_PROMPT + greetingInstruction + businessContext;
 
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
 
