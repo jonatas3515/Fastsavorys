@@ -333,6 +333,7 @@ REGRAS DE ATENDIMENTO:
 
 ESTILO DE RESPOSTA (MUITO IMPORTANTE):
 - Seja OBJETIVA e CURTA: no máximo 3-5 blocos curtos por resposta.
+- Envie apenas UMA resposta por mensagem do cliente. Nunca envie múltiplas respostas para a mesma pergunta.
 - NÃO repita horário de funcionamento em toda mensagem. Só mencione horário completo na PRIMEIRA resposta da sessão ou quando o cliente perguntar diretamente.
 - NÃO repita blocos inteiros de texto que já apareceram no histórico da conversa.
 - Vá DIRETO AO PONTO: se o cliente perguntou preço, responda o preço. Se pediu cardápio, liste. Se quer agendar, siga o roteiro.
@@ -365,9 +366,10 @@ DIFERENCIAÇÃO COXINHA NORMAL vs MINI (IMPORTANTE):
   "Você prefere coxinha tradicional (unidade) ou mini coxinha?"
 - Só prossiga com preço/combo DEPOIS que o cliente confirmar qual tipo.
 
-COMBOS DE MINI SALGADOS (PRIORIZAR):
-- Quando o cliente pedir mini salgados em quantidades compatíveis com combos do cardápio (20, 30, 50, 100 unidades), SEMPRE ofereça o combo correspondente em vez de calcular por unidade.
-- Diga algo como: "Para 30 mini coxinhas, temos o combo Bandeja 30un por R$ XX,XX — sai mais em conta!"
+COMBOS (REGRA CRÍTICA — NÃO RECALCULAR):
+- Combos têm PREÇO FIXO. NUNCA recalcule o preço de um combo somando itens individuais.
+- Use EXATAMENTE o preço que aparece no CONTEXTO DE NEGÓCIO para cada combo.
+- Quando o cliente pedir mini salgados em quantidades compatíveis com combos (10, 20, 30, 50, 100 un), SEMPRE ofereça o combo como opção principal, explicando que sai mais barato que por unidade.
 - Se a quantidade não bater com nenhum combo (ex: 3, 5 unidades), aí sim use o preço unitário.
 
 REGRAS DE ENTREGA (siga à risca):
@@ -414,8 +416,10 @@ Se há pedido parcial no histórico, NÃO refaça do zero. Atualize apenas o que
 CONFIRMAÇÃO DE PEDIDO:
 Quando o cliente confirmar (ex: "sim", "pode", "fecha"), confirme amigavelmente e resuma o pedido.
 
-CONVITE AO SITE (no final de cada resposta — frase CURTA):
-"Veja cardápio e promoções no site: fastsavorys.vercel.app/pages/fast.html"`;
+CONVITE AO SITE (no final de cada resposta — frase CURTA, link em LINHA SEPARADA):
+Veja cardápio e promoções:
+https://fastsavorys.vercel.app/pages/fast.html
+Sempre coloque o link COMPLETO com https:// e em uma linha separada para ficar clicável no WhatsApp/iOS.`;
 
 // Instrução extra para NOVA SESSÃO (primeira msg em 3h)
 const GREETING_NEW_SESSION = `
@@ -569,8 +573,8 @@ async function buildBusinessContext(intents) {
                 grouped[p.category].push(p);
             }
             // Ordem desejada das categorias
-            const catOrder = ['salgados', 'mini', 'bolos', 'kits', 'bebidas', 'adicionais'];
-            const catLabels = { salgados: 'SALGADOS', mini: 'MINI SALGADOS (CENTO/50 UN)', bolos: 'BOLOS', kits: 'KITS FESTA', bebidas: 'BEBIDAS', adicionais: 'ADICIONAIS' };
+            const catOrder = ['salgados', 'mini', 'combos', 'bolos', 'kits', 'bebidas', 'adicionais'];
+            const catLabels = { salgados: 'SALGADOS', mini: 'MINI SALGADOS (CENTO/50 UN)', combos: 'COMBOS (PREÇO FIXO — NÃO RECALCULAR)', bolos: 'BOLOS', kits: 'KITS FESTA', bebidas: 'BEBIDAS', adicionais: 'ADICIONAIS' };
             for (const cat of catOrder) {
                 const items = grouped[cat];
                 if (!items?.length) continue;
@@ -583,6 +587,7 @@ async function buildBusinessContext(intents) {
                         line += ` (${desc})`;
                     }
                     // Flags úteis
+                    if (cat === 'combos') line += ' [PREÇO FIXO - NÃO SOMAR ITENS]';
                     if (item.requires_preorder || item.is_encomenda) line += ' [ENCOMENDA - 1 dia antecedência]';
                     if (cat === 'bolos' || cat === 'kits') {
                         if (!item.block_massa) line += ' [escolhe massa]';
@@ -622,6 +627,7 @@ async function buildBusinessContext(intents) {
                 const desc = p.discount_type === 'percentage' ? `${p.value}% OFF` : `R$ ${Number(p.value).toFixed(2)} OFF`;
                 ctx += `\n  ${p.product_name}: ${desc}${p.description ? ' (' + p.description + ')' : ''}`;
             }
+            ctx += '\n  ⚠️ Promoções NÃO se aplicam a combos. Combos já têm preço fixo próprio — use o preço do combo direto, sem somar itens nem aplicar descontos.';
         }
 
         // ============ TAXAS DE ENTREGA POR BAIRRO ============
@@ -677,7 +683,7 @@ async function buildBusinessContext(intents) {
             ctx += `\n  • 11h–14h: mínimo R$ ${Number(minOff).toFixed(2)}`;
             ctx += `\n  • 14h–18h: mínimo R$ ${Number(minNormal).toFixed(2)}`;
         }
-        ctx += '\n\n  - Encomenda/agendamento pelo site: fastsavorys.vercel.app/pages/fast.html';
+        ctx += '\n\n  - Encomenda/agendamento pelo site:\n    https://fastsavorys.vercel.app/pages/fast.html';
         ctx += '\n  - No site: cupons de desconto, promoções de aniversário e fidelidade.';
 
         // ============ HORÁRIOS DE FUNCIONAMENTO ============
@@ -726,10 +732,10 @@ async function handleGemini(req, res) {
     const { message, name, user_id } = req.body || {};
 
     // --- Tratamento de mensagem vazia ou muito curta (ex: áudio não transcrito) ---
-    const SITE_URL = 'fastsavorys.vercel.app/pages/fast.html';
+    const SITE_URL = 'https://fastsavorys.vercel.app/pages/fast.html';
     if (!message || !message.trim() || message.trim().length < 2) {
         const audioReply = 'Não consigo ouvir seu áudio aqui, mas posso te ajudar se você escrever em texto o que precisa! 😊'
-            + `\n\nVeja nosso cardápio: ${SITE_URL}`;
+            + `\n\nVeja nosso cardápio:\n${SITE_URL}`;
         return res.status(200).json({
             version: 'v2',
             content: { messages: [{ type: 'text', text: audioReply }], actions: [], quick_replies: [] },
@@ -825,7 +831,7 @@ async function handleGemini(req, res) {
     // Se atingiu o limite: responde com handover e para de tentar calcular
     if (unclearCount >= HANDOVER_THRESHOLD) {
         const handoverReply = 'Acho que fiquei um pouco confuso aqui para entender certinho o que você quer 😅. Vou pedir para alguém do time te atender!\n\n'
-            + `Enquanto isso, acesse nosso site: ${SITE_URL}`;
+            + `Enquanto isso, acesse nosso site:\n${SITE_URL}`;
         // Reseta o contador ao acionar handover para não travar em loop
         await saveSession(user_id, session.history, 0);
         return res.status(200).json({
@@ -905,7 +911,7 @@ async function handleGemini(req, res) {
 
     // --- Convite ao site: garante que aparece no final de toda resposta ---
     if (!reply.includes('fastsavorys.vercel.app')) {
-        reply += `\n\nVeja cardápio e promoções: ${SITE_URL}`;
+        reply += `\n\nVeja cardápio e promoções:\n${SITE_URL}`;
     }
 
     // --- Salva sessão com histórico atualizado (conversation_state) ---
