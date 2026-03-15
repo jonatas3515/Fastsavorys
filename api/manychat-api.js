@@ -373,9 +373,10 @@ COMBOS DE MINI SALGADOS (PRIORIZAR):
 REGRAS DE ENTREGA (siga à risca):
 - SALGADOS, MINI SALGADOS, BEBIDAS, COMBOS e BOLO VULCÃO MINI podem ser ENTREGUES (14h–18h, dias de funcionamento).
 - BOLOS (exceto vulcão mini), KITS FESTA: apenas RETIRADA na loja.
-- TAXA PADRÃO: qualquer bairro NÃO LISTADO na tabela abaixo cobra R$ 8,00 (via mototáxi).
+- As taxas de entrega por bairro estão no CONTEXTO DE NEGÓCIO abaixo. Use SOMENTE esses valores.
+- Se o bairro do cliente NÃO estiver na lista, aplique a taxa padrão indicada no contexto.
 - Bairro com taxa R$ 0,00: entrega GRÁTIS.
-- Entrega via MOTOTÁXI — valores podem variar em domingos/feriados.
+- Entrega via MOTOTÁXI.
 - NUNCA diga "só fazemos retirada" quando o pedido for de salgados/bebidas.
 
 REGRAS DE RETIRADA NA LOJA:
@@ -644,7 +645,8 @@ async function buildBusinessContext(intents) {
             for (const [fee, bairros] of Object.entries(comTaxa)) {
                 ctx += `\n  ${fee} (mototáxi): ${bairros.join(', ')}`;
             }
-            ctx += '\n  ⚠️ Bairro NÃO listado acima (ex: Furlan, Corujão, etc.): taxa padrão R$ 8,00 (mototáxi).';
+            const defaultFee = configRes.data?.default_delivery_fee ?? 8;
+            ctx += `\n  ⚠️ Bairro NÃO listado acima: taxa padrão R$ ${Number(defaultFee).toFixed(2)} (via mototáxi).`;
             ctx += '\n  Entrega via mototáxi — valores podem variar em domingos/feriados.';
         }
 
@@ -773,7 +775,7 @@ async function handleGemini(req, res) {
     } else if (intents.includes('promocoes')) {
         intentHint = '\n[FOCO: O cliente perguntou sobre PROMOÇÕES.]';
     } else if (intents.includes('entrega')) {
-        intentHint = '\n[FOCO: ENTREGA/BAIRRO. Se bairro não estiver na tabela, taxa padrão R$ 8,00. Se há pedido em andamento, atualize com bairro e mostre orçamento.]';
+        intentHint = '\n[FOCO: ENTREGA/BAIRRO. Se bairro não estiver na tabela, use a taxa padrão indicada no contexto. Se há pedido em andamento, atualize com bairro e mostre orçamento.]';
     }
     // Dica extra: salgado com quantidade mas sem especificar mini/grande
     if (hasSalgadoQty && !specifiedMini && !specifiedGrande && intents.includes('salgados')) {
