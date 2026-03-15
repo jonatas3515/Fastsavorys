@@ -2,11 +2,27 @@
     "rewrites": [
         {
             "source": "/api/manychat-reject-order",
-            "destination": "/api/manychat-order-action"
+            "destination": "/api/manychat-api?type=order-action&action=reject"
         },
         {
             "source": "/api/manychat-accept-order",
-            "destination": "/api/manychat-order-action"
+            "destination": "/api/manychat-api?type=order-action&action=accept"
+        },
+        {
+            "source": "/api/manychat-order-action",
+            "destination": "/api/manychat-api?type=order-action"
+        },
+        {
+            "source": "/api/notify-manychat",
+            "destination": "/api/manychat-api?type=notify-new-order"
+        },
+        {
+            "source": "/api/manychat-notify-client",
+            "destination": "/api/manychat-api?type=notify-client"
+        },
+        {
+            "source": "/api/manychat-gemini",
+            "destination": "/api/manychat-api?type=gemini"
         }
     ],
     "headers": [
@@ -44,6 +60,12 @@
                     "value": "public, max-age=0, must-revalidate"
                 }
             ]
+        }
+    ],
+    "crons": [
+        {
+            "path": "/api/cron/notify-scheduled-orders",
+            "schedule": "0 15 * * *"
         }
     ]
 }
