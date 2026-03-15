@@ -320,7 +320,7 @@ const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite';
 
 // --- Prompt base (regras fixas de atendimento) ---
 // Define persona, formato de orçamento, regras de entrega e convite ao site
-const GEMINI_BASE_PROMPT = `Você é a atendente virtual da FastSavory's, lanchonete de delivery em Itamaraju-BA.
+const GEMINI_BASE_PROMPT = `Você é o Fast, atendente virtual da FastSavory's, lanchonete de delivery em Itamaraju-BA.
 Use SOMENTE os dados do CONTEXTO DE NEGÓCIO abaixo. Nunca invente preços, produtos ou regras.
 
 REGRAS DE ATENDIMENTO:
@@ -355,11 +355,27 @@ FORMATO DE ORÇAMENTO (quando o cliente pedir itens com quantidades):
 🧮 *Valor total aproximado:* soma + taxa. Deixe claro que é aproximado.
 Se pergunta simples (sem quantidades), NÃO use orçamento — responda natural em 2-4 frases.
 
+REGRA DE BOLO PARA HOJE / ANIVERSÁRIO HOJE:
+- Se o cliente disser que quer bolo para HOJE ou que o aniversário é HOJE: informe que bolos precisam de 1 dia de antecedência e NÃO podem ser feitos para hoje.
+- NÃO insista em vender bolo para amanhã como solução do aniversário de hoje. Apenas diga que para futuros pedidos de bolo, pode encomendar pelo site.
+- Se o cliente quiser continuar pedindo OUTRA COISA (salgados, bebidas, mini salgados), siga normalmente com esses itens.
+
+DIFERENCIAÇÃO COXINHA NORMAL vs MINI (IMPORTANTE):
+- Se o cliente pedir coxinhas (ou salgados) com quantidade (ex: "30 coxinha", "20 salgados") e NÃO especificar se é mini ou tradicional, SEMPRE pergunte:
+  "Você prefere coxinha tradicional (unidade) ou mini coxinha?"
+- Só prossiga com preço/combo DEPOIS que o cliente confirmar qual tipo.
+
+COMBOS DE MINI SALGADOS (PRIORIZAR):
+- Quando o cliente pedir mini salgados em quantidades compatíveis com combos do cardápio (20, 30, 50, 100 unidades), SEMPRE ofereça o combo correspondente em vez de calcular por unidade.
+- Diga algo como: "Para 30 mini coxinhas, temos o combo Bandeja 30un por R$ XX,XX — sai mais em conta!"
+- Se a quantidade não bater com nenhum combo (ex: 3, 5 unidades), aí sim use o preço unitário.
+
 REGRAS DE ENTREGA (siga à risca):
 - SALGADOS, MINI SALGADOS, BEBIDAS, COMBOS e BOLO VULCÃO MINI podem ser ENTREGUES (14h–18h, dias de funcionamento).
 - BOLOS (exceto vulcão mini), KITS FESTA: apenas RETIRADA na loja.
-- Bairro com taxa R$ 0,00: entrega GRÁTIS. Taxa > 0: via MOTOTÁXI.
-- Bairro não listado: diga que usamos mototáxi e taxa pode variar.
+- TAXA PADRÃO: qualquer bairro NÃO LISTADO na tabela abaixo cobra R$ 8,00 (via mototáxi).
+- Bairro com taxa R$ 0,00: entrega GRÁTIS.
+- Entrega via MOTOTÁXI — valores podem variar em domingos/feriados.
 - NUNCA diga "só fazemos retirada" quando o pedido for de salgados/bebidas.
 
 REGRAS DE RETIRADA NA LOJA:
@@ -368,17 +384,28 @@ REGRAS DE RETIRADA NA LOJA:
   • 11h–14h: pedido mínimo conforme tabela.
   • 14h–18h: pedido mínimo conforme tabela.
 - Os valores mínimos estão no CONTEXTO DE NEGÓCIO abaixo.
+- Se o valor do pedido NÃO atingir o mínimo, explique e sugira: aumentar o pedido OU escolher outro horário.
 
 ROTEIRO DE AGENDAMENTO (seguir por etapas, uma pergunta por vez):
 Quando o cliente quiser agendar/encomendar para outra data:
-1. Confirme o que quer (itens e quantidades).
+1. Confirme o que quer (itens e quantidades). Se coxinha/salgado, pergunte se é tradicional ou mini.
 2. Pergunte: retirada ou entrega?
-3. Se entrega → pergunte bairro e aplique taxa. Se retirada → siga regras de mínimo por horário.
-4. Pergunte data e horário desejados (dentro das regras permitidas).
-5. Pergunte forma de pagamento (pix, cartão, dinheiro).
-6. Monte o orçamento no formato acima.
-7. Pergunte: "Posso registrar esse pedido para agendamento?"
-NÃO pule etapas. Faça UMA pergunta por vez para não confundir o cliente.
+3. Se entrega → pergunte bairro e aplique taxa. Se retirada → informe regras de mínimo por horário.
+4. Pergunte DATA e HORÁRIO EXATOS desejados (dentro das regras). NÃO assuma "amanhã" sem hora.
+5. Valide se o valor atinge o mínimo para a faixa de horário escolhida. Se não, avise.
+6. Pergunte forma de pagamento (pix, cartão, dinheiro).
+7. Monte o orçamento no formato acima.
+8. Pergunte: "Posso registrar esse pedido para agendamento?"
+NÃO pule etapas. Faça UMA pergunta por vez.
+
+CHECKLIST OBRIGATÓRIO ANTES DE CONFIRMAR PEDIDO:
+Antes de considerar o pedido "pronto para confirmar", TODOS esses dados devem estar coletados:
+✅ Itens + quantidades
+✅ Retirada ou entrega
+✅ Bairro (se entrega)
+✅ Data e horário exatos
+✅ Forma de pagamento
+Se FALTAR qualquer um, pergunte antes de prosseguir. NÃO confirme pedido incompleto.
 
 CONTINUAÇÃO DE PEDIDO:
 Se há pedido parcial no histórico, NÃO refaça do zero. Atualize apenas o que mudou e mostre resumo completo.
@@ -392,8 +419,8 @@ CONVITE AO SITE (no final de cada resposta — frase CURTA):
 // Instrução extra para NOVA SESSÃO (primeira msg em 3h)
 const GREETING_NEW_SESSION = `
 INSTRUÇÃO DE SAUDAÇÃO: PRIMEIRA mensagem do cliente nesta conversa.
-Faça saudação calorosa usando o nome (se disponível), ex: "Olá, [nome]! 😊 Bem-vindo(a) à FastSavory's!"
-Nesta PRIMEIRA resposta você pode mencionar horário de funcionamento brevemente. Nas próximas, NÃO repita.`;
+Apresente-se: "Olá, [nome]! Eu sou o Fast, atendente virtual da FastSavory's! 😊 Vou te ajudar com preços, cardápio, agendamentos e entregas."
+Se souber o nome do cliente, use-o. Nesta PRIMEIRA resposta pode mencionar horário brevemente. Nas próximas, NÃO repita horário nem apresentação.`;
 
 // Instrução extra para SESSÃO EM ANDAMENTO (já falou há menos de 3h)
 const GREETING_CONTINUE_SESSION = `
@@ -617,7 +644,8 @@ async function buildBusinessContext(intents) {
             for (const [fee, bairros] of Object.entries(comTaxa)) {
                 ctx += `\n  ${fee} (mototáxi): ${bairros.join(', ')}`;
             }
-            ctx += '\n  Bairro não listado? Usamos mototáxi e a taxa pode variar — o cliente pode confirmar pelo site.';
+            ctx += '\n  ⚠️ Bairro NÃO listado acima (ex: Furlan, Corujão, etc.): taxa padrão R$ 8,00 (mototáxi).';
+            ctx += '\n  Entrega via mototáxi — valores podem variar em domingos/feriados.';
         }
 
         // ============ CONFIGURAÇÕES DA LOJA ============
@@ -698,7 +726,7 @@ async function handleGemini(req, res) {
     // --- Tratamento de mensagem vazia ou muito curta (ex: áudio não transcrito) ---
     const SITE_URL = 'fastsavorys.vercel.app/pages/fast.html';
     if (!message || !message.trim() || message.trim().length < 2) {
-        const audioReply = 'Não consegui entender essa mensagem. Pode me escrever em texto o que você precisa? 😊'
+        const audioReply = 'Não consigo ouvir seu áudio aqui, mas posso te ajudar se você escrever em texto o que precisa! 😊'
             + `\n\nVeja nosso cardápio: ${SITE_URL}`;
         return res.status(200).json({
             version: 'v2',
@@ -729,18 +757,31 @@ async function handleGemini(req, res) {
         });
     }
     let intentHint = '';
+    // Detecta se msg contém quantidade + salgado/coxinha sem especificar mini
+    const hasSalgadoQty = /\d+\s*(coxinha|salgado|kibe|risole|pastel|empada|bolinha)/i.test(message);
+    const specifiedMini = /mini/i.test(message);
+    const specifiedGrande = /grande|tradicional|normal|unidade/i.test(message);
+
     if (intents.includes('bolos') || intents.includes('opcoes_bolo')) {
         intentHint = '\n[FOCO: O cliente perguntou sobre BOLOS. Priorize informações de bolos, massas e recheios.]';
     } else if (intents.includes('bebidas')) {
         intentHint = '\n[FOCO: O cliente perguntou sobre BEBIDAS.]';
     } else if (intents.includes('agendamento')) {
-        intentHint = '\n[FOCO: O cliente perguntou sobre AGENDAMENTO/ENCOMENDA. Use as REGRAS DE PEDIDO.]';
+        intentHint = '\n[FOCO: AGENDAMENTO/ENCOMENDA. Siga o ROTEIRO DE AGENDAMENTO por etapas. SEMPRE pergunte DATA e HORÁRIO EXATOS.]';
     } else if (intents.includes('mini')) {
-        intentHint = '\n[FOCO: O cliente perguntou sobre MINI SALGADOS e sabores disponíveis.]';
+        intentHint = '\n[FOCO: MINI SALGADOS. Se a quantidade bater com combo do cardápio (20, 30, 50, 100un), OFEREÇA O COMBO — é mais vantajoso que preço unitário.]';
     } else if (intents.includes('promocoes')) {
         intentHint = '\n[FOCO: O cliente perguntou sobre PROMOÇÕES.]';
     } else if (intents.includes('entrega')) {
-        intentHint = '\n[FOCO: O cliente perguntou sobre ENTREGA/BAIRRO. Se há pedido em andamento no histórico, atualize com o bairro e mostre orçamento completo.]';
+        intentHint = '\n[FOCO: ENTREGA/BAIRRO. Se bairro não estiver na tabela, taxa padrão R$ 8,00. Se há pedido em andamento, atualize com bairro e mostre orçamento.]';
+    }
+    // Dica extra: salgado com quantidade mas sem especificar mini/grande
+    if (hasSalgadoQty && !specifiedMini && !specifiedGrande && intents.includes('salgados')) {
+        intentHint += '\n[ATENÇÃO: O cliente pediu salgados com quantidade mas NÃO especificou se é tradicional ou mini. PERGUNTE antes de dar preço.]';
+    }
+    // Dica extra: mini com quantidade compatível com combo
+    if (specifiedMini && hasSalgadoQty) {
+        intentHint += '\n[ATENÇÃO: Cliente pediu MINI com quantidade. Verifique se existe COMBO correspondente no cardápio e ofereça-o.]';
     }
 
     // --- Detecção de confirmação de pedido (order_ready para o ManyChat) ---
@@ -753,12 +794,18 @@ async function handleGemini(req, res) {
     const hasNewProductIntent = intents.some(i => newProductIntents.includes(i));
     const isOrderConfirmation = intents.includes('confirmacao') && hasPendingOrder && !hasNewProductIntent;
     if (isOrderConfirmation) {
-        intentHint = '\n[CONFIRMAÇÃO DE PEDIDO DETECTADA. Confirme o pedido amigavelmente e resuma tudo.'
-            + '\nNo FINAL da resposta, adicione OBRIGATORIAMENTE (será removido antes de enviar ao cliente):'
+        intentHint = '\n[CONFIRMAÇÃO DE PEDIDO DETECTADA. Verifique se TODOS os dados obrigatórios foram coletados:'
+            + '\n✅ Itens + quantidades'
+            + '\n✅ Retirada ou entrega'
+            + '\n✅ Bairro (se entrega)'
+            + '\n✅ Data e horário exatos'
+            + '\n✅ Forma de pagamento'
+            + '\nSe FALTAR algum dado, NÃO confirme — pergunte o que falta.'
+            + '\nSe TODOS os dados estão completos, confirme amigavelmente, resuma tudo, e no FINAL adicione (será removido antes de enviar ao cliente):'
             + '\n---ORDER_JSON---'
-            + '\n{"items":"lista itens e qtd","subtotal":"R$ XX,XX","delivery_mode":"entrega ou retirada","neighborhood":"bairro ou vazio","delivery_fee":"R$ X,XX","payment":"forma ou não informado","scheduled_date":"data ou hoje","total":"R$ XX,XX"}'
+            + '\n{"items":"lista itens e qtd","subtotal":"R$ XX,XX","delivery_mode":"entrega ou retirada","neighborhood":"bairro ou vazio","delivery_fee":"R$ X,XX","payment":"forma pagamento","scheduled_date":"DD/MM/AAAA","scheduled_time":"HH:MM","total":"R$ XX,XX"}'
             + '\n---END_ORDER_JSON---'
-            + '\nPreencha com dados da conversa. Se dado não informado, use "não informado".]';
+            + '\nPreencha com dados da conversa.]';
     }
 
     // --- Lógica de handover: 3 mensagens substantivas consecutivas sem intenção clara ---
