@@ -316,7 +316,7 @@ async function _handleReject(body, res) {
 // ==========================================
 // HANDLER: Gemini AI (ManyChat Webhook)
 // ==========================================
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.0-flash-lite';
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
 
 const GEMINI_SYSTEM_PROMPT = `Você é a atendente virtual da FastSavory's, uma lanchonete de delivery.
 Seja simpática, objetiva e responda sempre em português brasileiro.
