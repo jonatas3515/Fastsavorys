@@ -353,7 +353,7 @@ Use SOMENTE os dados do CONTEXTO DE NEGÓCIO abaixo. Nunca invente preços, prod
 
 REGRAS DE ATENDIMENTO:
 1. Português do Brasil, tom simpático de lanchonete de bairro.
-2. Se o produto não estiver no cardápio, diga que não temos.
+2. Se o produto não estiver no CARDÁPIO COMPLETO do contexto, ou estiver na lista PRODUTOS INDISPONÍVEIS, diga que não temos no momento.
 3. DIA FECHADO (domingo/feriado): responda NORMALMENTE preços, cardápio, taxas e regras. Apenas NÃO aceite entrega/retirada para HOJE. Incentive encomenda para segunda a sábado.
 4. Se o cliente pedir para FALAR COM ATENDENTE/HUMANO: responda APENAS "Claro, vou chamar um atendente para te ajudar. Só um instante!" e PARE. Não explique mais nada.
 5. Se não souber, diga: "Pode conferir no nosso site ou me perguntar de outra forma."
@@ -564,10 +564,10 @@ async function buildBusinessContext(intents) {
     try {
         // Busca em paralelo: produtos, promoções, taxas, config, horários, status, opções de produto
         const [productsRes, promotionsRes, feesRes, configRes, hoursRes, storeStatusRes, optionsRes] = await Promise.all([
-            // Produtos visíveis com descrição e flags de encomenda/personalização
+            // Produtos (todos, incluindo indisponíveis para informar ao modelo)
             supabaseAdmin.from('fast_products')
-                .select('name, description, price, category, emoji, requires_preorder, is_encomenda, block_massa, block_recheio')
-                .eq('visible', true).order('category').order('name'),
+                .select('name, description, price, category, emoji, requires_preorder, is_encomenda, block_massa, block_recheio, visible')
+                .order('category').order('name'),
             // Promoções ativas
             supabaseAdmin.from('fast_promotions')
                 .select('product_name, discount_type, value, description')
@@ -596,7 +596,12 @@ async function buildBusinessContext(intents) {
         if (productsRes.data?.length) {
             ctx += '\n\nCARDÁPIO COMPLETO:';
             const grouped = {};
+            const unavailable = [];
             for (const p of productsRes.data) {
+                if (p.visible === false || p.visible === null) {
+                    unavailable.push(p.name);
+                    continue;
+                }
                 if (!grouped[p.category]) grouped[p.category] = [];
                 grouped[p.category].push(p);
             }
@@ -623,6 +628,9 @@ async function buildBusinessContext(intents) {
                     }
                     ctx += line;
                 }
+            }
+            if (unavailable.length > 0) {
+                ctx += `\n\n[PRODUTOS INDISPONÍVEIS NO MOMENTO — não ofereça, diga que não temos]: ${unavailable.join(', ')}`;
             }
         }
 
