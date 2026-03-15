@@ -350,6 +350,11 @@ REGRAS DE ENTREGA (MUITO IMPORTANTE — siga à risca):
 - Se o cliente citar um bairro que NÃO está na lista, diga que usamos mototáxi e a taxa pode variar — ele pode confirmar pelo site.
 - NUNCA diga "só fazemos retirada" quando o pedido for de salgados dentro do horário de entrega.
 
+CONTINUAÇÃO DE PEDIDO (quando há histórico de conversa):
+Se o cliente já fez um pedido parcial nesta conversa (visível no histórico acima), NÃO refaça tudo do zero.
+Atualize apenas o que mudou (bairro, modo de entrega, itens extras, forma de pagamento) e mostre o resumo COMPLETO atualizado no formato de orçamento.
+Exemplo: se o cliente pediu "10 coxinhas" e depois mandou "entrega no Centro", inclua a taxa do Centro no orçamento atualizado.
+
 CONVITE AO SITE (incluir SEMPRE no final de cada resposta):
 Termine TODA resposta com uma frase curta convidando o cliente a acessar o site, por exemplo:
 "Acesse nosso site para ver o cardápio completo, promoções e fazer seu pedido: fastsavorys.vercel.app/pages/fast.html"`;
@@ -368,51 +373,93 @@ Responda direto ao ponto. No máximo use algo curto como "Perfeito!", "Claro!", 
 // Janela de sessão: 3 horas em milissegundos
 const SESSION_WINDOW_MS = 3 * 60 * 60 * 1000;
 
-// --- Lógica de sessão: verifica se é nova conversa ou continuação ---
-async function checkSession(userId) {
-    if (!supabaseAdmin || !userId) return true;
+// --- Lógica de sessão: carrega sessão completa (histórico + unclear_count) ---
+// Retorna { isNewSession, history (array de {role,text}), unclearCount }
+async function loadSession(userId) {
+    if (!supabaseAdmin || !userId) return { isNewSession: true, history: [], unclearCount: 0 };
 
     try {
+        // Usa select('*') para compatibilidade caso as colunas novas ainda não existam
         const { data: session } = await supabaseAdmin
             .from('whatsapp_sessions')
-            .select('last_interaction_at')
+            .select('*')
             .eq('manychat_user_id', userId)
             .maybeSingle();
 
         const now = new Date();
         let isNewSession = true;
+        let history = [];
+        let unclearCount = 0;
 
-        if (session?.last_interaction_at) {
-            const lastAt = new Date(session.last_interaction_at);
-            isNewSession = (now.getTime() - lastAt.getTime()) > SESSION_WINDOW_MS;
+        if (session) {
+            if (session.last_interaction_at) {
+                const lastAt = new Date(session.last_interaction_at);
+                isNewSession = (now.getTime() - lastAt.getTime()) > SESSION_WINDOW_MS;
+            }
+            // Se sessão em andamento, carrega histórico e contador; se nova, reseta tudo
+            if (!isNewSession) {
+                history = Array.isArray(session.conversation_history) ? session.conversation_history : [];
+                unclearCount = session.unclear_count || 0;
+            }
         }
 
+        return { isNewSession, history, unclearCount };
+    } catch (err) {
+        console.error('[manychat-api:gemini] Erro ao carregar sessão:', err.message);
+        return { isNewSession: true, history: [], unclearCount: 0 };
+    }
+}
+
+// --- Salva sessão: atualiza histórico de conversa e unclear_count ---
+// conversation_history é trimado para as últimas 10 mensagens (5 turnos)
+async function saveSession(userId, history, unclearCount) {
+    if (!supabaseAdmin || !userId) return;
+
+    try {
+        const trimmed = (history || []).slice(-10);
         await supabaseAdmin
             .from('whatsapp_sessions')
-            .upsert(
-                { manychat_user_id: userId, last_interaction_at: now.toISOString() },
-                { onConflict: 'manychat_user_id' }
-            );
-
-        return isNewSession;
+            .upsert({
+                manychat_user_id: userId,
+                last_interaction_at: new Date().toISOString(),
+                conversation_history: trimmed,
+                unclear_count: unclearCount || 0
+            }, { onConflict: 'manychat_user_id' });
     } catch (err) {
-        console.error('[manychat-api:gemini] Erro ao verificar sessão:', err.message);
-        return true;
+        console.error('[manychat-api:gemini] Erro ao salvar sessão:', err.message);
     }
 }
 
 // --- Detecção de intenção simples (prioriza seções relevantes no prompt) ---
+// Também serve para determinar se a mensagem é "clara" (handover se 3+ seguidas sem intenção)
 function detectIntent(msg) {
     const m = (msg || '').toLowerCase();
     const intents = [];
-    if (/bolo|naked|cake|kit\s*festa|vulc[aã]o/.test(m))            intents.push('bolos');
+    // Bolos e personalização
+    if (/bolo|naked|cake|kit\s*festa|vulc[aã]o/.test(m))                intents.push('bolos');
     if (/recheio|massa\s*(branca|chocolate)|sabor\s*do\s*bolo/.test(m)) intents.push('opcoes_bolo');
-    if (/bebida|refrigerante|refri|suco|agua|água/.test(m))          intents.push('bebidas');
+    // Bebidas
+    if (/bebida|refrigerante|refri|suco|agua|água|pepsi|coca|guaran[aá]/.test(m)) intents.push('bebidas');
+    // Agendamento / encomenda
     if (/agend|encomend|amanh[aã]|antecedência|antecedencia|marcar|reserv/.test(m)) intents.push('agendamento');
-    if (/taxa|entrega|frete|bairro|delivery/.test(m))                intents.push('entrega');
-    if (/cart[aã]o|pix|dinheiro|pagamento|pagar/.test(m))            intents.push('pagamento');
-    if (/mini\s*salgado|100\s*un|50\s*un|cento/.test(m))            intents.push('mini');
-    if (/promo[çc][aã]o|desconto|cupom|oferta/.test(m))             intents.push('promocoes');
+    // Entrega / bairro
+    if (/taxa|entrega|frete|bairro|delivery|entregar|retirada|retirar/.test(m)) intents.push('entrega');
+    // Pagamento
+    if (/cart[aã]o|pix|dinheiro|pagamento|pagar/.test(m))               intents.push('pagamento');
+    // Mini salgados
+    if (/mini\s*salgado|100\s*un|50\s*un|cento/.test(m))                intents.push('mini');
+    // Promoções
+    if (/promo[çc][aã]o|desconto|cupom|oferta/.test(m))                 intents.push('promocoes');
+    // Salgados específicos
+    if (/salgado|coxinha|kibe|risole|pastel|empada|bolinha|combo/.test(m)) intents.push('salgados');
+    // Cardápio / preços
+    if (/card[aá]pio|menu|pre[cç]o|quanto\s*custa|quanto\s*[eé]/.test(m)) intents.push('cardapio');
+    // Horário / funcionamento
+    if (/hor[aá]rio|aberto|fechado|funciona|abre|fecha/.test(m))        intents.push('horario');
+    // Pedido genérico (quero, manda, pedir)
+    if (/quero|queria|manda|pedir|pedido|me\s*v[eê]|fa[zç]/.test(m))    intents.push('pedido');
+    // Saudações e confirmações (não conta como "unclear")
+    if (/^(oi|ol[aá]|e\s*a[ií]|bom\s*dia|boa\s*(tarde|noite)|obrigad|valeu|ok|beleza|sim|n[aã]o|tchau|at[eé]|blz|show|perfeito|pode|isso|certo)\b/i.test(m)) intents.push('geral');
     return intents;
 }
 
@@ -596,29 +643,61 @@ async function handleGemini(req, res) {
         return res.status(500).json({ error: 'GEMINI_API_KEY not configured' });
     }
 
-    // Aceita user_id do ManyChat (para controle de sessão)
     const { message, name, user_id } = req.body || {};
     if (!message || !message.trim()) {
         return res.status(400).json({ error: 'Campo "message" vazio ou ausente' });
     }
 
-    // --- Lógica de sessão: verifica se é nova conversa ou continuação ---
-    const isNewSession = await checkSession(user_id);
-    const greetingInstruction = isNewSession ? GREETING_NEW_SESSION : GREETING_CONTINUE_SESSION;
+    // --- Carrega sessão: histórico de conversa e contador de msgs sem intenção ---
+    // (conversation_state é o histórico multi-turn salvo no Supabase)
+    const session = await loadSession(user_id);
+    const greetingInstruction = session.isNewSession ? GREETING_NEW_SESSION : GREETING_CONTINUE_SESSION;
 
-    // --- Detecção de intenção: prioriza seções relevantes no prompt ---
+    // --- Detecção de intenção ---
     const intents = detectIntent(message);
     let intentHint = '';
     if (intents.includes('bolos') || intents.includes('opcoes_bolo')) {
-        intentHint = '\n[FOCO: O cliente perguntou sobre BOLOS. Priorize informações de bolos, massas e recheios na resposta.]';
+        intentHint = '\n[FOCO: O cliente perguntou sobre BOLOS. Priorize informações de bolos, massas e recheios.]';
     } else if (intents.includes('bebidas')) {
-        intentHint = '\n[FOCO: O cliente perguntou sobre BEBIDAS. Priorize a seção de bebidas na resposta.]';
+        intentHint = '\n[FOCO: O cliente perguntou sobre BEBIDAS.]';
     } else if (intents.includes('agendamento')) {
-        intentHint = '\n[FOCO: O cliente perguntou sobre AGENDAMENTO/ENCOMENDA. Use as REGRAS DE PEDIDO para responder.]';
+        intentHint = '\n[FOCO: O cliente perguntou sobre AGENDAMENTO/ENCOMENDA. Use as REGRAS DE PEDIDO.]';
     } else if (intents.includes('mini')) {
-        intentHint = '\n[FOCO: O cliente perguntou sobre MINI SALGADOS. Priorize a seção de mini salgados e sabores disponíveis.]';
+        intentHint = '\n[FOCO: O cliente perguntou sobre MINI SALGADOS e sabores disponíveis.]';
     } else if (intents.includes('promocoes')) {
-        intentHint = '\n[FOCO: O cliente perguntou sobre PROMOÇÕES. Priorize a seção de promoções ativas.]';
+        intentHint = '\n[FOCO: O cliente perguntou sobre PROMOÇÕES.]';
+    } else if (intents.includes('entrega')) {
+        intentHint = '\n[FOCO: O cliente perguntou sobre ENTREGA/BAIRRO. Se há pedido em andamento no histórico, atualize com o bairro e mostre orçamento completo.]';
+    }
+
+    // --- Lógica de handover: 3 mensagens substantivas consecutivas sem intenção clara ---
+    // (handover_to_human = true aciona atribuição a atendente no ManyChat)
+    let unclearCount = session.unclearCount;
+    const isSubstantive = message.trim().length > 10; // msgs curtas tipo "oi" não contam
+    if (intents.length === 0 && isSubstantive) {
+        unclearCount++;
+    } else if (intents.length > 0) {
+        unclearCount = 0; // intenção clara reseta o contador
+    }
+
+    const HANDOVER_THRESHOLD = 3;
+    const SITE_URL = 'fastsavorys.vercel.app/pages/fast.html';
+
+    // Se atingiu o limite: responde com handover e para de tentar calcular
+    if (unclearCount >= HANDOVER_THRESHOLD) {
+        const handoverReply = 'Acho que fiquei um pouco confuso aqui para entender certinho o que você quer 😅. Vou pedir para alguém do time te atender!\n\n'
+            + `Enquanto isso, acesse nosso site: ${SITE_URL}`;
+        // Reseta o contador ao acionar handover para não travar em loop
+        await saveSession(user_id, session.history, 0);
+        return res.status(200).json({
+            version: 'v2',
+            content: {
+                messages: [{ type: 'text', text: handoverReply }],
+                actions: [],
+                quick_replies: []
+            },
+            handover_to_human: true  // <-- campo para o ManyChat acionar atendente
+        });
     }
 
     // Hora atual em Itamaraju-BA (UTC-3)
@@ -629,15 +708,27 @@ async function handleGemini(req, res) {
     const businessContext = await buildBusinessContext(intents);
     const fullPrompt = GEMINI_BASE_PROMPT + greetingInstruction + businessContext;
 
+    // --- Monta conversa multi-turn para o Gemini (histórico + msg atual) ---
+    // Histórico preserva contexto do pedido em andamento (itens, bairro, modo)
+    const contents = [];
+    for (const msg of session.history) {
+        contents.push({
+            role: msg.role === 'assistant' ? 'model' : 'user',
+            parts: [{ text: msg.text }]
+        });
+    }
+    // Mensagem atual: enriquecida com hora e dica de foco
+    contents.push({ role: 'user', parts: [{ text: userMessage }] });
+
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
 
-    // --- Chamada ao Gemini com o prompt completo ---
+    // --- Chamada ao Gemini com conversa multi-turn ---
     const geminiRes = await fetch(geminiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             system_instruction: { parts: [{ text: fullPrompt }] },
-            contents: [{ role: 'user', parts: [{ text: userMessage }] }],
+            contents: contents,
             generationConfig: { maxOutputTokens: 600, temperature: 0.7 }
         })
     });
@@ -653,10 +744,18 @@ async function handleGemini(req, res) {
         || 'Desculpe, não consegui gerar uma resposta agora. Um atendente vai te ajudar!';
 
     // --- Convite ao site: garante que aparece no final de toda resposta ---
-    const SITE_URL = 'fastsavorys.vercel.app/pages/fast.html';
     if (!reply.includes('fastsavorys.vercel.app')) {
         reply += `\n\nAcesse nosso site para cardápio completo, promoções e cupons: ${SITE_URL}`;
     }
+
+    // --- Salva sessão com histórico atualizado (conversation_state) ---
+    // Guarda msg original do usuário (sem enriquecimento) + resposta da IA
+    const updatedHistory = [
+        ...session.history,
+        { role: 'user', text: message },
+        { role: 'assistant', text: reply.length > 500 ? reply.substring(0, 500) : reply }
+    ];
+    await saveSession(user_id, updatedHistory, unclearCount);
 
     return res.status(200).json({
         version: 'v2',
@@ -664,7 +763,8 @@ async function handleGemini(req, res) {
             messages: [{ type: 'text', text: reply }],
             actions: [],
             quick_replies: []
-        }
+        },
+        handover_to_human: false  // <-- sem handover, conversa normal
     });
 }
 
