@@ -318,7 +318,8 @@ async function _handleReject(body, res) {
 // ==========================================
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite';
 
-const GEMINI_SYSTEM_PROMPT = `Você é a atendente virtual da FastSavory's, uma lanchonete de delivery localizada em Itamaraju-BA.
+// --- Prompt base (regras fixas de atendimento) ---
+const GEMINI_BASE_PROMPT = `Você é a atendente virtual da FastSavory's, uma lanchonete de delivery localizada em Itamaraju-BA.
 
 REGRAS DE ATENDIMENTO:
 1. Responda SEMPRE em português do Brasil, tom educado e simpático, como atendente de lanchonete de bairro.
@@ -326,12 +327,108 @@ REGRAS DE ATENDIMENTO:
 3. Quando o cliente pedir algo:
    - Cumprimente pelo nome se disponível.
    - Resuma o que ele pediu.
+   - Informe o preço de cada item conforme o CARDÁPIO abaixo.
    - Sugira salgados, combos ou bebidas complementares, se fizer sentido.
    - Pergunte se deseja finalizar o pedido e peça: nome completo, endereço de entrega e forma de pagamento.
-4. HORÁRIO DE FUNCIONAMENTO: 17h às 23h (horário de Brasília).
-   - Se a hora atual estiver FORA desse horário, responda educadamente que estamos fechados, informe o horário de funcionamento e convide o cliente a voltar depois.
-5. Nunca invente preços, itens do cardápio ou informações que você não tenha certeza. Se não souber, diga que vai confirmar com a equipe.
-6. Se o cliente fizer uma pergunta que não seja sobre a lanchonete, redirecione gentilmente para o atendimento de pedidos.`;
+4. Use SOMENTE os dados do CARDÁPIO, TAXAS e HORÁRIOS fornecidos abaixo. Nunca invente preços ou itens.
+5. Se o produto não estiver no cardápio, diga que não temos disponível no momento.
+6. Se a loja estiver FECHADA (conforme horário abaixo ou status do dia), informe educadamente o horário de funcionamento e convide o cliente a voltar.
+7. Taxa de cartão: informe ao cliente quando ele escolher cartão como pagamento.
+8. Se o cliente fizer uma pergunta que não seja sobre a lanchonete, redirecione gentilmente para o atendimento de pedidos.`;
+
+// --- Consultas ao Supabase: busca dados reais do negócio ---
+async function buildBusinessContext() {
+    if (!supabaseAdmin) return '(Dados do cardápio indisponíveis no momento)';
+
+    try {
+        // Busca em paralelo para ser mais rápido
+        const [productsRes, promotionsRes, feesRes, configRes, hoursRes, storeStatusRes] = await Promise.all([
+            // Produtos visíveis, ordenados por categoria e nome
+            supabaseAdmin.from('fast_products').select('name, price, category, emoji').eq('visible', true).order('category').order('name'),
+            // Promoções ativas
+            supabaseAdmin.from('fast_promotions').select('product_name, discount_type, value, description').eq('active', true),
+            // Taxas de entrega por bairro
+            supabaseAdmin.from('fast_delivery_fees').select('neighborhood, fee').order('fee').order('neighborhood'),
+            // Configurações da loja (taxa cartão, delivery habilitado)
+            supabaseAdmin.from('fast_store_config').select('*').eq('id', 1).single(),
+            // Horários de funcionamento por dia da semana
+            supabaseAdmin.from('fast_business_hours').select('day_name, is_open, open_time, close_time').order('day_of_week'),
+            // Status da loja hoje (fechada manualmente?)
+            supabaseAdmin.from('fast_store_status').select('is_closed').eq('date', new Date().toISOString().split('T')[0]).maybeSingle()
+        ]);
+
+        // --- Montagem do contexto de negócio em texto ---
+        let ctx = '';
+
+        // Cardápio agrupado por categoria
+        if (productsRes.data?.length) {
+            ctx += '\n\nCARDÁPIO ATUAL:';
+            const grouped = {};
+            for (const p of productsRes.data) {
+                if (!grouped[p.category]) grouped[p.category] = [];
+                grouped[p.category].push(p);
+            }
+            for (const [cat, items] of Object.entries(grouped)) {
+                ctx += `\n[${cat.toUpperCase()}]`;
+                for (const item of items) {
+                    ctx += `\n  ${item.emoji || ''} ${item.name} — R$ ${Number(item.price).toFixed(2)}`;
+                }
+            }
+        }
+
+        // Promoções ativas
+        if (promotionsRes.data?.length) {
+            ctx += '\n\nPROMOÇÕES ATIVAS:';
+            for (const p of promotionsRes.data) {
+                const desc = p.discount_type === 'percentage' ? `${p.value}% OFF` : `R$ ${Number(p.value).toFixed(2)} OFF`;
+                ctx += `\n  ${p.product_name}: ${desc}${p.description ? ' (' + p.description + ')' : ''}`;
+            }
+        }
+
+        // Taxas de entrega
+        if (feesRes.data?.length) {
+            ctx += '\n\nTAXAS DE ENTREGA POR BAIRRO:';
+            const byFee = {};
+            for (const f of feesRes.data) {
+                const key = Number(f.fee) === 0 ? 'Grátis' : `R$ ${Number(f.fee).toFixed(2)}`;
+                if (!byFee[key]) byFee[key] = [];
+                byFee[key].push(f.neighborhood);
+            }
+            for (const [fee, bairros] of Object.entries(byFee)) {
+                ctx += `\n  ${fee}: ${bairros.join(', ')}`;
+            }
+        }
+
+        // Configurações da loja (taxa de cartão)
+        if (configRes.data) {
+            const c = configRes.data;
+            ctx += `\n\nTAXAS DE CARTÃO: 1x = ${c.card_fee_1x}% | 2x = ${c.card_fee_2x}%`;
+            if (!c.delivery_enabled) {
+                ctx += `\nDELIVERY DESATIVADO${c.delivery_disabled_reason ? ': ' + c.delivery_disabled_reason : ''}. Apenas retirada no local.`;
+            }
+        }
+
+        // Horários de funcionamento
+        if (hoursRes.data?.length) {
+            ctx += '\n\nHORÁRIO DE FUNCIONAMENTO:';
+            for (const h of hoursRes.data) {
+                ctx += h.is_open
+                    ? `\n  ${h.day_name}: ${h.open_time} às ${h.close_time}`
+                    : `\n  ${h.day_name}: FECHADO`;
+            }
+        }
+
+        // Status de hoje (fechada manualmente pelo admin?)
+        if (storeStatusRes.data?.is_closed) {
+            ctx += '\n\n⚠️ ATENÇÃO: A loja está FECHADA hoje por decisão da administração.';
+        }
+
+        return ctx || '(Sem dados adicionais)';
+    } catch (err) {
+        console.error('[manychat-api:gemini] Erro ao buscar contexto do Supabase:', err.message);
+        return '(Erro ao carregar dados do cardápio)';
+    }
+}
 
 async function handleGemini(req, res) {
     const apiKey = process.env.GEMINI_API_KEY;
@@ -348,13 +445,19 @@ async function handleGemini(req, res) {
     // Hora atual em Itamaraju-BA (UTC-3) para a IA saber se está dentro do horário
     const now = new Date().toLocaleString('pt-BR', { timeZone: 'America/Bahia', hour: '2-digit', minute: '2-digit', weekday: 'long' });
     const userMessage = `[Hora atual: ${now}]` + (name ? ` Cliente "${name}" disse: ${message}` : ` ${message}`);
+
+    // --- Busca dados reais do Supabase e monta o prompt final ---
+    const businessContext = await buildBusinessContext();
+    const fullPrompt = GEMINI_BASE_PROMPT + businessContext;
+
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
 
+    // --- Chamada ao Gemini com o prompt completo ---
     const geminiRes = await fetch(geminiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-            system_instruction: { parts: [{ text: GEMINI_SYSTEM_PROMPT }] },
+            system_instruction: { parts: [{ text: fullPrompt }] },
             contents: [{ role: 'user', parts: [{ text: userMessage }] }],
             generationConfig: { maxOutputTokens: 300, temperature: 0.7 }
         })
