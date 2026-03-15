@@ -320,20 +320,24 @@ const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite';
 
 // --- Prompt base (regras fixas de atendimento) ---
 const GEMINI_BASE_PROMPT = `Você é a atendente virtual da FastSavory's, uma lanchonete de delivery localizada em Itamaraju-BA.
+Você recebe abaixo o CONTEXTO DE NEGÓCIO com cardápio completo (salgados, bolos, kits festa, bebidas, adicionais), opções de massa e recheio para bolos, taxas de entrega, taxas de cartão, horários e regras de agendamento/encomenda.
 
 REGRAS DE ATENDIMENTO:
 1. Responda SEMPRE em português do Brasil, tom educado e simpático, como atendente de lanchonete de bairro.
 2. Seja breve: no máximo 3 a 4 frases por resposta.
 3. Quando o cliente pedir algo:
    - Resuma o que ele pediu.
-   - Informe o preço de cada item conforme o CARDÁPIO abaixo.
-   - Sugira salgados, combos ou bebidas complementares, se fizer sentido.
+   - Informe o preço conforme o CARDÁPIO abaixo.
+   - Se for bolo: informe as opções de massa e recheio disponíveis.
+   - Sugira itens complementares se fizer sentido.
    - Pergunte se deseja finalizar o pedido e peça: nome completo, endereço de entrega e forma de pagamento.
-4. Use SOMENTE os dados do CARDÁPIO, TAXAS e HORÁRIOS fornecidos abaixo. Nunca invente preços ou itens.
+4. Use SOMENTE os dados do CONTEXTO DE NEGÓCIO abaixo. Nunca invente preços, produtos, sabores, políticas ou regras.
 5. Se o produto não estiver no cardápio, diga que não temos disponível no momento.
-6. Se a loja estiver FECHADA (conforme horário abaixo ou status do dia), informe educadamente o horário de funcionamento e convide o cliente a voltar.
-7. Taxa de cartão: informe ao cliente quando ele escolher cartão como pagamento.
-8. Se o cliente fizer uma pergunta que não seja sobre a lanchonete, redirecione gentilmente para o atendimento de pedidos.`;
+6. Se a loja estiver FECHADA (conforme horário ou status do dia), informe educadamente e convide o cliente a voltar.
+7. Taxa de cartão: informe quando o cliente escolher cartão como pagamento.
+8. AGENDAMENTO/ENCOMENDA: siga as REGRAS DE PEDIDO descritas abaixo. Nós SIM fazemos agendamento pelo site.
+9. Se você não tiver informação suficiente para responder, diga: "Não tenho certeza dessa informação agora, mas você pode conferir no nosso site ou me perguntar de outra forma."
+10. Se o cliente fizer uma pergunta que não seja sobre a lanchonete, redirecione gentilmente.`;
 
 // Instrução extra para NOVA SESSÃO (primeira msg em 3h)
 const GREETING_NEW_SESSION = `
@@ -351,11 +355,9 @@ const SESSION_WINDOW_MS = 3 * 60 * 60 * 1000;
 
 // --- Lógica de sessão: verifica se é nova conversa ou continuação ---
 async function checkSession(userId) {
-    // Se não tiver Supabase ou user_id, assume nova sessão
     if (!supabaseAdmin || !userId) return true;
 
     try {
-        // Busca última interação deste usuário
         const { data: session } = await supabaseAdmin
             .from('whatsapp_sessions')
             .select('last_interaction_at')
@@ -367,11 +369,9 @@ async function checkSession(userId) {
 
         if (session?.last_interaction_at) {
             const lastAt = new Date(session.last_interaction_at);
-            const diffMs = now.getTime() - lastAt.getTime();
-            isNewSession = diffMs > SESSION_WINDOW_MS;
+            isNewSession = (now.getTime() - lastAt.getTime()) > SESSION_WINDOW_MS;
         }
 
-        // Atualiza (ou cria) o registro com o horário atual (UPSERT)
         await supabaseAdmin
             .from('whatsapp_sessions')
             .upsert(
@@ -382,51 +382,116 @@ async function checkSession(userId) {
         return isNewSession;
     } catch (err) {
         console.error('[manychat-api:gemini] Erro ao verificar sessão:', err.message);
-        return true; // Em caso de erro, trata como nova sessão (mais seguro)
+        return true;
     }
 }
 
+// --- Detecção de intenção simples (prioriza seções relevantes no prompt) ---
+function detectIntent(msg) {
+    const m = (msg || '').toLowerCase();
+    const intents = [];
+    if (/bolo|naked|cake|kit\s*festa|vulc[aã]o/.test(m))            intents.push('bolos');
+    if (/recheio|massa\s*(branca|chocolate)|sabor\s*do\s*bolo/.test(m)) intents.push('opcoes_bolo');
+    if (/bebida|refrigerante|refri|suco|agua|água/.test(m))          intents.push('bebidas');
+    if (/agend|encomend|amanh[aã]|antecedência|antecedencia|marcar|reserv/.test(m)) intents.push('agendamento');
+    if (/taxa|entrega|frete|bairro|delivery/.test(m))                intents.push('entrega');
+    if (/cart[aã]o|pix|dinheiro|pagamento|pagar/.test(m))            intents.push('pagamento');
+    if (/mini\s*salgado|100\s*un|50\s*un|cento/.test(m))            intents.push('mini');
+    if (/promo[çc][aã]o|desconto|cupom|oferta/.test(m))             intents.push('promocoes');
+    return intents;
+}
+
 // --- Consultas ao Supabase: busca dados reais do negócio ---
-async function buildBusinessContext() {
+async function buildBusinessContext(intents) {
     if (!supabaseAdmin) return '(Dados do cardápio indisponíveis no momento)';
 
     try {
-        // Busca em paralelo para ser mais rápido
-        const [productsRes, promotionsRes, feesRes, configRes, hoursRes, storeStatusRes] = await Promise.all([
-            // Produtos visíveis, ordenados por categoria e nome
-            supabaseAdmin.from('fast_products').select('name, price, category, emoji').eq('visible', true).order('category').order('name'),
+        // Busca em paralelo: produtos, promoções, taxas, config, horários, status, opções de produto
+        const [productsRes, promotionsRes, feesRes, configRes, hoursRes, storeStatusRes, optionsRes] = await Promise.all([
+            // Produtos visíveis com descrição e flags de encomenda/personalização
+            supabaseAdmin.from('fast_products')
+                .select('name, description, price, category, emoji, requires_preorder, is_encomenda, block_massa, block_recheio')
+                .eq('visible', true).order('category').order('name'),
             // Promoções ativas
-            supabaseAdmin.from('fast_promotions').select('product_name, discount_type, value, description').eq('active', true),
+            supabaseAdmin.from('fast_promotions')
+                .select('product_name, discount_type, value, description')
+                .eq('active', true),
             // Taxas de entrega por bairro
-            supabaseAdmin.from('fast_delivery_fees').select('neighborhood, fee').order('fee').order('neighborhood'),
-            // Configurações da loja (taxa cartão, delivery habilitado)
-            supabaseAdmin.from('fast_store_config').select('*').eq('id', 1).single(),
-            // Horários de funcionamento por dia da semana
-            supabaseAdmin.from('fast_business_hours').select('day_name, is_open, open_time, close_time').order('day_of_week'),
-            // Status da loja hoje (fechada manualmente?)
-            supabaseAdmin.from('fast_store_status').select('is_closed').eq('date', new Date().toISOString().split('T')[0]).maybeSingle()
+            supabaseAdmin.from('fast_delivery_fees')
+                .select('neighborhood, fee').order('fee').order('neighborhood'),
+            // Configurações da loja (taxas, mínimos, regras)
+            supabaseAdmin.from('fast_store_config')
+                .select('*').eq('id', 1).single(),
+            // Horários de funcionamento
+            supabaseAdmin.from('fast_business_hours')
+                .select('day_name, is_open, open_time, close_time').order('day_of_week'),
+            // Status da loja hoje
+            supabaseAdmin.from('fast_store_status')
+                .select('is_closed').eq('date', new Date().toISOString().split('T')[0]).maybeSingle(),
+            // Opções de produto: massas de bolo, recheios, sabores de salgados
+            supabaseAdmin.from('fast_product_options')
+                .select('type, name, visible').eq('visible', true).order('sort_order')
         ]);
 
         // --- Montagem do contexto de negócio em texto ---
         let ctx = '';
 
-        // Cardápio agrupado por categoria
+        // ============ CARDÁPIO COMPLETO (todas as categorias) ============
         if (productsRes.data?.length) {
-            ctx += '\n\nCARDÁPIO ATUAL:';
+            ctx += '\n\nCARDÁPIO COMPLETO:';
             const grouped = {};
             for (const p of productsRes.data) {
                 if (!grouped[p.category]) grouped[p.category] = [];
                 grouped[p.category].push(p);
             }
-            for (const [cat, items] of Object.entries(grouped)) {
-                ctx += `\n[${cat.toUpperCase()}]`;
+            // Ordem desejada das categorias
+            const catOrder = ['salgados', 'mini', 'bolos', 'kits', 'bebidas', 'adicionais'];
+            const catLabels = { salgados: 'SALGADOS', mini: 'MINI SALGADOS (CENTO/50 UN)', bolos: 'BOLOS', kits: 'KITS FESTA', bebidas: 'BEBIDAS', adicionais: 'ADICIONAIS' };
+            for (const cat of catOrder) {
+                const items = grouped[cat];
+                if (!items?.length) continue;
+                ctx += `\n\n[${catLabels[cat] || cat.toUpperCase()}]`;
                 for (const item of items) {
-                    ctx += `\n  ${item.emoji || ''} ${item.name} — R$ ${Number(item.price).toFixed(2)}`;
+                    let line = `\n  ${item.emoji || ''} ${item.name} — R$ ${Number(item.price).toFixed(2)}`;
+                    // Inclui descrição resumida se existir (máx 80 chars)
+                    if (item.description) {
+                        const desc = item.description.length > 80 ? item.description.substring(0, 80) + '…' : item.description;
+                        line += ` (${desc})`;
+                    }
+                    // Flags úteis
+                    if (item.requires_preorder || item.is_encomenda) line += ' [ENCOMENDA - 1 dia antecedência]';
+                    if (cat === 'bolos' || cat === 'kits') {
+                        if (!item.block_massa) line += ' [escolhe massa]';
+                        if (!item.block_recheio) line += ' [escolhe recheio]';
+                    }
+                    ctx += line;
                 }
             }
         }
 
-        // Promoções ativas
+        // ============ OPÇÕES DE PERSONALIZAÇÃO (massas, recheios, sabores) ============
+        if (optionsRes.data?.length) {
+            const optGrouped = {};
+            for (const o of optionsRes.data) {
+                if (!optGrouped[o.type]) optGrouped[o.type] = [];
+                optGrouped[o.type].push(o.name);
+            }
+            ctx += '\n\nOPÇÕES DE PERSONALIZAÇÃO:';
+            if (optGrouped.cakeMass?.length) {
+                ctx += `\n  Massas de bolo: ${optGrouped.cakeMass.join(', ')}`;
+            }
+            if (optGrouped.filling?.length) {
+                ctx += `\n  Recheios de bolo: ${optGrouped.filling.join(', ')}`;
+            }
+            if (optGrouped.salgados?.length) {
+                ctx += `\n  Sabores de salgado (kits): ${optGrouped.salgados.join(', ')}`;
+            }
+            if (optGrouped.miniSalgadosFlavors?.length) {
+                ctx += `\n  Sabores mini salgado: ${optGrouped.miniSalgadosFlavors.join(', ')}`;
+            }
+        }
+
+        // ============ PROMOÇÕES ATIVAS ============
         if (promotionsRes.data?.length) {
             ctx += '\n\nPROMOÇÕES ATIVAS:';
             for (const p of promotionsRes.data) {
@@ -435,7 +500,7 @@ async function buildBusinessContext() {
             }
         }
 
-        // Taxas de entrega
+        // ============ TAXAS DE ENTREGA ============
         if (feesRes.data?.length) {
             ctx += '\n\nTAXAS DE ENTREGA POR BAIRRO:';
             const byFee = {};
@@ -449,7 +514,7 @@ async function buildBusinessContext() {
             }
         }
 
-        // Configurações da loja (taxa de cartão)
+        // ============ CONFIGURAÇÕES DA LOJA ============
         if (configRes.data) {
             const c = configRes.data;
             ctx += `\n\nTAXAS DE CARTÃO: 1x = ${c.card_fee_1x}% | 2x = ${c.card_fee_2x}%`;
@@ -458,7 +523,22 @@ async function buildBusinessContext() {
             }
         }
 
-        // Horários de funcionamento
+        // ============ REGRAS DE PEDIDO / AGENDAMENTO ============
+        ctx += '\n\nREGRAS DE PEDIDO E AGENDAMENTO:';
+        ctx += '\n  - Bolos, Kits Festa e Vulcão exigem encomenda com 1 dia de antecedência (pedidos pelo site).';
+        ctx += '\n  - Pedidos para o MESMO DIA: apenas salgados, mini salgados, bebidas e Mini Vulcão, somente RETIRADA na loja.';
+        if (configRes.data) {
+            const c = configRes.data;
+            const minNormal = c.min_order_pickup || 8;
+            const minOff = c.min_order_pickup_offhours || 15;
+            const minMorning = c.morning_rule_min_value || 25;
+            ctx += `\n  - Pedido mínimo retirada (14h-18h): R$ ${Number(minNormal).toFixed(2)}`;
+            ctx += `\n  - Pedido mínimo retirada (12h-14h): R$ ${Number(minOff).toFixed(2)}`;
+            ctx += `\n  - Pedido mínimo manhã 7h-12h (sem bolo): R$ ${Number(minMorning).toFixed(2)}`;
+        }
+        ctx += '\n  - Para fazer encomenda/agendamento, o cliente pode pedir pelo nosso site: fastsavorys.vercel.app';
+
+        // ============ HORÁRIOS DE FUNCIONAMENTO ============
         if (hoursRes.data?.length) {
             ctx += '\n\nHORÁRIO DE FUNCIONAMENTO:';
             for (const h of hoursRes.data) {
@@ -497,12 +577,27 @@ async function handleGemini(req, res) {
     const isNewSession = await checkSession(user_id);
     const greetingInstruction = isNewSession ? GREETING_NEW_SESSION : GREETING_CONTINUE_SESSION;
 
-    // Hora atual em Itamaraju-BA (UTC-3) para a IA saber se está dentro do horário
+    // --- Detecção de intenção: prioriza seções relevantes no prompt ---
+    const intents = detectIntent(message);
+    let intentHint = '';
+    if (intents.includes('bolos') || intents.includes('opcoes_bolo')) {
+        intentHint = '\n[FOCO: O cliente perguntou sobre BOLOS. Priorize informações de bolos, massas e recheios na resposta.]';
+    } else if (intents.includes('bebidas')) {
+        intentHint = '\n[FOCO: O cliente perguntou sobre BEBIDAS. Priorize a seção de bebidas na resposta.]';
+    } else if (intents.includes('agendamento')) {
+        intentHint = '\n[FOCO: O cliente perguntou sobre AGENDAMENTO/ENCOMENDA. Use as REGRAS DE PEDIDO para responder.]';
+    } else if (intents.includes('mini')) {
+        intentHint = '\n[FOCO: O cliente perguntou sobre MINI SALGADOS. Priorize a seção de mini salgados e sabores disponíveis.]';
+    } else if (intents.includes('promocoes')) {
+        intentHint = '\n[FOCO: O cliente perguntou sobre PROMOÇÕES. Priorize a seção de promoções ativas.]';
+    }
+
+    // Hora atual em Itamaraju-BA (UTC-3)
     const now = new Date().toLocaleString('pt-BR', { timeZone: 'America/Bahia', hour: '2-digit', minute: '2-digit', weekday: 'long' });
-    const userMessage = `[Hora atual: ${now}]` + (name ? ` Cliente "${name}" disse: ${message}` : ` ${message}`);
+    const userMessage = `[Hora atual: ${now}]${intentHint}` + (name ? ` Cliente "${name}" disse: ${message}` : ` ${message}`);
 
     // --- Busca dados reais do Supabase e monta o prompt final ---
-    const businessContext = await buildBusinessContext();
+    const businessContext = await buildBusinessContext(intents);
     const fullPrompt = GEMINI_BASE_PROMPT + greetingInstruction + businessContext;
 
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
@@ -514,7 +609,7 @@ async function handleGemini(req, res) {
         body: JSON.stringify({
             system_instruction: { parts: [{ text: fullPrompt }] },
             contents: [{ role: 'user', parts: [{ text: userMessage }] }],
-            generationConfig: { maxOutputTokens: 300, temperature: 0.7 }
+            generationConfig: { maxOutputTokens: 500, temperature: 0.7 }
         })
     });
 
