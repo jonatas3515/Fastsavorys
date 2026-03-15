@@ -327,7 +327,7 @@ REGRAS DE ATENDIMENTO:
 1. Responda SEMPRE em português do Brasil, tom educado e simpático, como atendente de lanchonete de bairro.
 2. Use SOMENTE os dados do CONTEXTO DE NEGÓCIO. Nunca invente preços, produtos, sabores, políticas ou regras.
 3. Se o produto não estiver no cardápio, diga que não temos disponível no momento.
-4. Se a loja estiver FECHADA, informe educadamente e convide o cliente a voltar.
+4. REGRA DE DIA FECHADO (domingo, feriado): Mesmo que a loja esteja FECHADA hoje, responda NORMALMENTE sobre preços, cardápio, taxas, opções de personalização e regras. A única restrição: NÃO aceite pedidos de entrega/retirada para HOJE. Incentive o cliente a encomendar para segunda a sábado pelo site. Diga algo como: "Hoje estamos fechados, mas posso te ajudar com informações e agendar seu pedido para outro dia!"
 5. AGENDAMENTO/ENCOMENDA: nós SIM fazemos agendamento pelo site. Siga as REGRAS DE PEDIDO abaixo.
 6. Se não tiver informação suficiente, diga: "Não tenho certeza agora, mas você pode conferir no nosso site ou me perguntar de outra forma."
 7. Se o cliente fizer pergunta fora do tema, redirecione gentilmente.
@@ -354,6 +354,9 @@ CONTINUAÇÃO DE PEDIDO (quando há histórico de conversa):
 Se o cliente já fez um pedido parcial nesta conversa (visível no histórico acima), NÃO refaça tudo do zero.
 Atualize apenas o que mudou (bairro, modo de entrega, itens extras, forma de pagamento) e mostre o resumo COMPLETO atualizado no formato de orçamento.
 Exemplo: se o cliente pediu "10 coxinhas" e depois mandou "entrega no Centro", inclua a taxa do Centro no orçamento atualizado.
+
+CONFIRMAÇÃO DE PEDIDO:
+Quando o cliente confirmar o pedido (ex: "sim", "pode confirmar", "fecha o pedido", "isso mesmo"), confirme de forma amigável, resuma todo o pedido, e pergunte se falta alguma informação (nome, endereço, pagamento, data).
 
 CONVITE AO SITE (incluir SEMPRE no final de cada resposta):
 Termine TODA resposta com uma frase curta convidando o cliente a acessar o site, por exemplo:
@@ -458,6 +461,8 @@ function detectIntent(msg) {
     if (/hor[aá]rio|aberto|fechado|funciona|abre|fecha/.test(m))        intents.push('horario');
     // Pedido genérico (quero, manda, pedir)
     if (/quero|queria|manda|pedir|pedido|me\s*v[eê]|fa[zç]/.test(m))    intents.push('pedido');
+    // Confirmação de pedido (sim/pode/ok — verificado no handler se há orçamento pendente)
+    if (/^(sim|pode|confirmo|confirma|fecha|é isso|tá bom|ta bom|pode ser|isso mesmo|manda|certo|confirmar|fechar)\b/i.test(m.trim()) || /confirm|fecha(r)?\s*(o\s*)?pedido/i.test(m)) intents.push('confirmacao');
     // Saudações e confirmações (não conta como "unclear")
     if (/^(oi|ol[aá]|e\s*a[ií]|bom\s*dia|boa\s*(tarde|noite)|obrigad|valeu|ok|beleza|sim|n[aã]o|tchau|at[eé]|blz|show|perfeito|pode|isso|certo)\b/i.test(m)) intents.push('geral');
     return intents;
@@ -624,9 +629,23 @@ async function buildBusinessContext(intents) {
             }
         }
 
-        // Status de hoje (fechada manualmente pelo admin?)
-        if (storeStatusRes.data?.is_closed) {
-            ctx += '\n\n⚠️ ATENÇÃO: A loja está FECHADA hoje por decisão da administração.';
+        // ============ SITUAÇÃO DE HOJE (domingo / feriado / fechamento admin) ============
+        // Identifica se hoje é dia de não-funcionamento e instrui a IA a NÃO bloquear info
+        const baFormatter = new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Bahia', weekday: 'long' });
+        const todayWeekday = baFormatter.format(new Date()).toLowerCase();
+        const todayHours = hoursRes.data?.find(h => h.day_name.toLowerCase() === todayWeekday);
+        const closedByAdmin = storeStatusRes.data?.is_closed;
+        const closedBySchedule = todayHours && !todayHours.is_open;
+        if (closedByAdmin || closedBySchedule) {
+            ctx += '\n\nSITUAÇÃO DE HOJE:';
+            if (closedByAdmin) {
+                ctx += '\n  A loja está FECHADA hoje por decisão da administração.';
+            } else {
+                ctx += `\n  Hoje é ${todayWeekday} e a loja NÃO funciona neste dia.`;
+            }
+            ctx += '\n  ⚠️ NÃO aceite pedidos de entrega/retirada para HOJE.';
+            ctx += '\n  ✅ MAS responda NORMALMENTE preços, cardápio, taxas, opções e regras.';
+            ctx += '\n  ✅ Incentive o cliente a encomendar para segunda a sábado pelo site.';
         }
 
         return ctx || '(Sem dados adicionais)';
@@ -668,6 +687,24 @@ async function handleGemini(req, res) {
         intentHint = '\n[FOCO: O cliente perguntou sobre PROMOÇÕES.]';
     } else if (intents.includes('entrega')) {
         intentHint = '\n[FOCO: O cliente perguntou sobre ENTREGA/BAIRRO. Se há pedido em andamento no histórico, atualize com o bairro e mostre orçamento completo.]';
+    }
+
+    // --- Detecção de confirmação de pedido (order_ready para o ManyChat) ---
+    // Só marca como confirmação se: (1) intent é 'confirmacao', (2) há orçamento no histórico,
+    // (3) o cliente não está pedindo novos produtos na mesma mensagem
+    const hasPendingOrder = session.history.some(m =>
+        m.role === 'assistant' && /valor total/i.test(m.text)
+    );
+    const newProductIntents = ['bolos', 'opcoes_bolo', 'bebidas', 'salgados', 'mini', 'pedido', 'cardapio', 'agendamento'];
+    const hasNewProductIntent = intents.some(i => newProductIntents.includes(i));
+    const isOrderConfirmation = intents.includes('confirmacao') && hasPendingOrder && !hasNewProductIntent;
+    if (isOrderConfirmation) {
+        intentHint = '\n[CONFIRMAÇÃO DE PEDIDO DETECTADA. Confirme o pedido amigavelmente e resuma tudo.'
+            + '\nNo FINAL da resposta, adicione OBRIGATORIAMENTE (será removido antes de enviar ao cliente):'
+            + '\n---ORDER_JSON---'
+            + '\n{"items":"lista itens e qtd","subtotal":"R$ XX,XX","delivery_mode":"entrega ou retirada","neighborhood":"bairro ou vazio","delivery_fee":"R$ X,XX","payment":"forma ou não informado","scheduled_date":"data ou hoje","total":"R$ XX,XX"}'
+            + '\n---END_ORDER_JSON---'
+            + '\nPreencha com dados da conversa. Se dado não informado, use "não informado".]';
     }
 
     // --- Lógica de handover: 3 mensagens substantivas consecutivas sem intenção clara ---
@@ -743,6 +780,25 @@ async function handleGemini(req, res) {
     let reply = data?.candidates?.[0]?.content?.parts?.[0]?.text
         || 'Desculpe, não consegui gerar uma resposta agora. Um atendente vai te ajudar!';
 
+    // --- Extrai order_summary do bloco ORDER_JSON (se o Gemini incluiu) ---
+    // O bloco é inserido pela IA apenas quando detectamos confirmação de pedido
+    const ORDER_JSON_REGEX = /---ORDER_JSON---\s*([\s\S]*?)\s*---END_ORDER_JSON---/;
+    const jsonMatch = reply.match(ORDER_JSON_REGEX);
+    let orderReady = false;
+    let orderSummary = null;
+    if (jsonMatch) {
+        try {
+            orderSummary = JSON.parse(jsonMatch[1].trim());
+        } catch (e) {
+            // Fallback: JSON inválido, usa texto bruto como resumo
+            orderSummary = { raw_summary: jsonMatch[1].trim() };
+        }
+        orderSummary.client_name = name || 'Não informado';
+        orderReady = true;
+        // Remove o bloco JSON da resposta visível ao cliente
+        reply = reply.replace(ORDER_JSON_REGEX, '').trim();
+    }
+
     // --- Convite ao site: garante que aparece no final de toda resposta ---
     if (!reply.includes('fastsavorys.vercel.app')) {
         reply += `\n\nAcesse nosso site para cardápio completo, promoções e cupons: ${SITE_URL}`;
@@ -764,7 +820,9 @@ async function handleGemini(req, res) {
             actions: [],
             quick_replies: []
         },
-        handover_to_human: false  // <-- sem handover, conversa normal
+        handover_to_human: false,
+        order_ready: orderReady,       // <-- true quando pedido confirmado pelo cliente
+        order_summary: orderSummary    // <-- dados do pedido para enviar à Jéssica via ManyChat
     });
 }
 
