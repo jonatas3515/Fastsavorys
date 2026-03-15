@@ -13,6 +13,10 @@
  * - MANYCHAT_FIELD_ID_ORDER_DESCRIPTION: Custom field ID for order description
  * - MANYCHAT_FIELD_ID_ORDER_DATE: Custom field ID for order date
  * - MANYCHAT_FIELD_ID_ORDER_DELIVERY_METHOD: Custom field ID for delivery method
+ * - MANYCHAT_FIELD_ID_PEDIDO_NUMERO: Custom field for pedido number (inbox display)
+ * - MANYCHAT_FIELD_ID_PEDIDO_TOTAL: Custom field for pedido total (inbox display)
+ * - MANYCHAT_FIELD_ID_PEDIDO_DESCRICAO: Custom field for pedido description (inbox display)
+ * - MANYCHAT_FIELD_ID_PEDIDO_TELEFONE: Custom field for pedido phone (inbox display)
  * 
  * ARCHITECTURE NOTES:
  * - This module is 100% additive - does not affect existing order/WhatsApp/payment flows
@@ -34,6 +38,7 @@ const MANYCHAT_CONFIG = {
     apiKey: process.env.MANYCHAT_API_KEY,
     userIdJessica: process.env.MANYCHAT_USER_ID_JESSICA,
     flowIdNovoPedido: process.env.MANYCHAT_FLOW_ID_NOVO_PEDIDO,
+    flowIdScheduledOrder: process.env.MANYCHAT_FLOW_ID_SCHEDULED_ORDER,
     fieldIds: {
         orderNumber: process.env.MANYCHAT_FIELD_ID_ORDER_NUMBER,
         orderTotal: process.env.MANYCHAT_FIELD_ID_ORDER_TOTAL,
@@ -43,6 +48,16 @@ const MANYCHAT_CONFIG = {
         clientFirstName: process.env.MANYCHAT_FIELD_ID_CLIENT_FIRST_NAME,
         paymentMethod: process.env.MANYCHAT_FIELD_ID_PAYMENT_METHOD,
         clientPhone: process.env.MANYCHAT_FIELD_ID_CLIENT_PHONE,
+        // Campos pedido_* para exibição na caixa de entrada da Jéssica
+        pedidoNumero: process.env.MANYCHAT_FIELD_ID_PEDIDO_NUMERO,
+        pedidoTotal: process.env.MANYCHAT_FIELD_ID_PEDIDO_TOTAL,
+        pedidoDescricao: process.env.MANYCHAT_FIELD_ID_PEDIDO_DESCRICAO,
+        pedidoTelefone: process.env.MANYCHAT_FIELD_ID_PEDIDO_TELEFONE,
+        // New fields for scheduled orders
+        scheduledClientName: process.env.MANYCHAT_FIELD_ID_SCHEDULED_CLIENT_NAME,
+        scheduledDate: process.env.MANYCHAT_FIELD_ID_SCHEDULED_DATE,
+        scheduledTime: process.env.MANYCHAT_FIELD_ID_SCHEDULED_TIME,
+        scheduledItems: process.env.MANYCHAT_FIELD_ID_SCHEDULED_ITEMS,
     }
 };
 
@@ -88,7 +103,7 @@ async function manychatRequest(endpoint, method, body) {
         const data = await response.json();
 
         if (!response.ok) {
-            console.error('[ManyChat] API Error:', response.status, data);
+            console.error('[ManyChat] API Error:', response.status, JSON.stringify(data, null, 2));
             return {
                 success: false,
                 error: data?.message || data?.error || `HTTP ${response.status}`
@@ -377,6 +392,32 @@ async function notifyNewOrder(order) {
             });
         }
 
+        // Campos pedido_* para exibição na caixa de entrada da Jéssica
+        if (fieldIds.pedidoNumero) {
+            fields.push({
+                field_id: parseInt(fieldIds.pedidoNumero, 10),
+                field_value: String(order.order_code || 'N/A')
+            });
+        }
+        if (fieldIds.pedidoTotal) {
+            fields.push({
+                field_id: parseInt(fieldIds.pedidoTotal, 10),
+                field_value: order.total ? `R$ ${Number(order.total).toFixed(2).replace('.', ',')}` : 'R$ 0,00'
+            });
+        }
+        if (fieldIds.pedidoDescricao) {
+            fields.push({
+                field_id: parseInt(fieldIds.pedidoDescricao, 10),
+                field_value: typeof order.items === 'string' ? order.items : formatOrderDescription(order.items)
+            });
+        }
+        if (fieldIds.pedidoTelefone) {
+            fields.push({
+                field_id: parseInt(fieldIds.pedidoTelefone, 10),
+                field_value: order.client_phone || 'Não informado'
+            });
+        }
+
         // Step 3: Update custom fields (if any are configured)
         if (fields.length > 0) {
             const fieldsResult = await updateCustomFields(userId, fields);
@@ -409,10 +450,93 @@ async function notifyNewOrder(order) {
     }
 }
 
+/**
+ * Notifies the owner about a scheduled order for the next day
+ * 
+ * @param {object} order - Order data
+ * @returns {Promise<{success: boolean, error?: string}>}
+ */
+async function notifyOwnerScheduledOrder(order) {
+    console.log('[ManyChat] 🗓️ Processing scheduled order notification...');
+
+    if (!isConfigured()) {
+        logConfigWarning('ManyChat not configured. Skipping notification.');
+        return { success: false, error: 'Not configured' };
+    }
+
+    const userId = MANYCHAT_CONFIG.userIdJessica;
+    const flowId = MANYCHAT_CONFIG.flowIdScheduledOrder;
+    const fieldIds = MANYCHAT_CONFIG.fieldIds;
+
+    if (!flowId) {
+        logConfigWarning('MANYCHAT_FLOW_ID_SCHEDULED_ORDER not configured. Skipping.');
+        return { success: false, error: 'Flow ID not configured' };
+    }
+
+    try {
+        const fields = [];
+
+        // 1. Client Name
+        if (fieldIds.scheduledClientName) {
+            fields.push({
+                field_id: parseInt(fieldIds.scheduledClientName, 10),
+                field_value: order.client_name || 'Cliente'
+            });
+        }
+
+        // 2. Delivery Date (YYYY-MM-DD)
+        if (fieldIds.scheduledDate) {
+            // ManyChat Date fields expect YYYY-MM-DD
+            fields.push({
+                field_id: parseInt(fieldIds.scheduledDate, 10),
+                field_value: order.scheduled_date || '2000-01-01'
+            });
+        }
+
+        // 3. Delivery Time
+        if (fieldIds.scheduledTime) {
+            fields.push({
+                field_id: parseInt(fieldIds.scheduledTime, 10),
+                field_value: order.scheduled_time || 'A combinar'
+            });
+        }
+
+        // 4. Items Summary
+        if (fieldIds.scheduledItems) {
+            fields.push({
+                field_id: parseInt(fieldIds.scheduledItems, 10),
+                field_value: formatOrderDescription(order.items)
+            });
+        }
+
+        // Update fields
+        if (fields.length > 0) {
+            await updateCustomFields(userId, fields);
+        } else {
+            logConfigWarning('No custom fields configured for scheduled order. Sending flow only.');
+        }
+
+        // Send Flow
+        const flowResult = await sendFlowToUser(userId, flowId);
+
+        if (flowResult.success) {
+            console.log(`[ManyChat] ✅ Scheduled notification sent for order ${order.id}`);
+        }
+
+        return flowResult;
+
+    } catch (err) {
+        console.error('[ManyChat] ❌ Error in notifyOwnerScheduledOrder:', err.message);
+        return { success: false, error: err.message };
+    }
+}
+
 module.exports = {
     MANYCHAT_CONFIG,
     isConfigured,
     updateCustomFields,
     sendFlowToUser,
-    notifyNewOrder
+    sendFlowToUser,
+    notifyNewOrder,
+    notifyOwnerScheduledOrder
 };
