@@ -344,7 +344,8 @@ async function _handleReject(body, res) {
 // ==========================================
 // HANDLER: Gemini AI (ManyChat Webhook)
 // ==========================================
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite';
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.1-flash-lite-preview';
+const GEMINI_MODEL_FALLBACK = 'gemini-2.5-flash';
 
 // --- Prompt base (regras fixas de atendimento) ---
 // Define persona, formato de orçamento, regras de entrega e convite ao site
@@ -921,7 +922,7 @@ async function handleGemini(req, res) {
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
 
     // --- Chamada ao Gemini com conversa multi-turn ---
-    const geminiRes = await fetch(geminiUrl, {
+    let geminiRes = await fetch(geminiUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -930,6 +931,21 @@ async function handleGemini(req, res) {
             generationConfig: { maxOutputTokens: 600, temperature: 0.7 }
         })
     });
+
+    // Fallback automático se o modelo preview falhar por limite de taxa
+    if (!geminiRes.ok && (geminiRes.status === 429 || geminiRes.status === 503)) {
+        console.warn('[gemini] Modelo preview com limite, usando fallback:', GEMINI_MODEL_FALLBACK);
+        const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL_FALLBACK}:generateContent?key=${apiKey}`;
+        geminiRes = await fetch(fallbackUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                system_instruction: { parts: [{ text: fullPrompt }] },
+                contents: contents,
+                generationConfig: { maxOutputTokens: 600, temperature: 0.7 }
+            })
+        });
+    }
 
     if (!geminiRes.ok) {
         const errBody = await geminiRes.text();
