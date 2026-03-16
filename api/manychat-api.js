@@ -795,50 +795,175 @@ async function handleGemini(req, res) {
         return res.status(500).json({ error: 'GEMINI_API_KEY not configured' });
     }
 
-    const { message, name, user_id } = req.body || {};
+    const { message, name, user_id, attachments, media_url, audio_url, image_url, file_url } = req.body || {};
 
     const SITE_URL = 'https://fastsavorys.vercel.app/pages/fast.html';
 
-    // --- Detecta áudio (ManyChat envia "[audio]" ou string vazia) ---
-    const isAudio = !message || !message.trim() || message.trim().length < 2
-        || /^\[áudio\]$|^\[audio\]$|^\[voice\]$/i.test(message.trim());
+    console.log('[gemini] req.body:', JSON.stringify(req.body || {}));
 
-    // --- Detecta imagem (ManyChat envia "[photo]", "[image]" ou similar) ---
-    const isImage = /^\[foto\]$|^\[photo\]$|^\[image\]$|^\[imagem\]$|^\[sticker\]$/i.test((message || '').trim());
+    const rawMessage = message || req.body?.text || req.body?.content || '';
+    const trimmed = rawMessage.trim();
 
-    if (isAudio) {
-        const audioReply = 'Oi! 😊 Não consigo ouvir áudios por aqui, mas adoraria te ajudar!\n\nMe escreve em texto o que você precisa e eu te atendo na hora! 🎉'
-            + `\n\nVeja cardápio e promoções:\n${SITE_URL}`;
+    // Detecta URLs de mídia enviadas pelo ManyChat
+    const mediaAttachment = attachments?.[0] || null;
+    const detectedAudioUrl = audio_url || (mediaAttachment?.type === 'audio' ? mediaAttachment?.url : null);
+    const detectedImageUrl = image_url || (mediaAttachment?.type === 'image' ? mediaAttachment?.url : null);
+    const detectedFileUrl = file_url || (mediaAttachment?.type === 'file' ? mediaAttachment?.url : null);
+
+    // Detecta por texto quando não há URL (fallback)
+    const looksLikeAudio = /\[áudio\]|\[audio\]|\[voice\]|\[ptt\]/i.test(trimmed);
+    const looksLikeImage = /\[foto\]|\[photo\]|\[image\]|\[imagem\]|\[sticker\]/i.test(trimmed);
+    const looksLikeFile = /\[arquivo\]|\[file\]|\[pdf\]|\[document\]/i.test(trimmed);
+
+    // --- Função para buscar e converter mídia em base64 para o Gemini ---
+    async function fetchMediaAsBase64(url) {
+        try {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const arrayBuffer = await response.arrayBuffer();
+            const base64 = Buffer.from(arrayBuffer).toString('base64');
+            const contentType = response.headers.get('content-type') || 'application/octet-stream';
+            return { base64, contentType };
+        } catch (err) {
+            console.error('[gemini] Erro ao buscar mídia:', err.message);
+            return null;
+        }
+    }
+
+    // --- Processa áudio ---
+    if (detectedAudioUrl || looksLikeAudio) {
+        if (detectedAudioUrl) {
+            // Tenta transcrever via Gemini
+            const media = await fetchMediaAsBase64(detectedAudioUrl);
+            if (media) {
+                const transcribeUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
+                const transcribeRes = await fetch(transcribeUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{
+                            role: 'user',
+                            parts: [
+                                { inline_data: { mime_type: media.contentType, data: media.base64 } },
+                                { text: 'Transcreva exatamente o que foi dito neste áudio em português. Retorne apenas a transcrição, sem comentários.' }
+                            ]
+                        }]
+                    })
+                });
+                const transcribeData = await transcribeRes.json();
+                const transcription = transcribeData?.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (transcription && transcription.trim().length > 2) {
+                    req.body.message = `[Transcrição de áudio]: ${transcription.trim()}`;
+                } else {
+                    return res.status(200).json({
+                        version: 'v2',
+                        content: { messages: [{ type: 'text', text: 'Não consegui entender o áudio 😕 Pode escrever em texto o que precisa?' }], actions: [], quick_replies: [] },
+                        handover_to_human: false, order_ready: false, order_summary: null
+                    });
+                }
+            }
+        } else {
+            return res.status(200).json({
+                version: 'v2',
+                content: { messages: [{ type: 'text', text: 'Oi! 😊 Não consigo ouvir áudios por aqui. Me escreve em texto o que precisa!' + `\n\nVeja cardápio e promoções:\n${SITE_URL}` }], actions: [], quick_replies: [] },
+                handover_to_human: false, order_ready: false, order_summary: null
+            });
+        }
+    }
+
+    // --- Processa imagem ---
+    if (detectedImageUrl || looksLikeImage) {
+        if (detectedImageUrl) {
+            const media = await fetchMediaAsBase64(detectedImageUrl);
+            if (media) {
+                const describeUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
+                const describeRes = await fetch(describeUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{
+                            role: 'user',
+                            parts: [
+                                { inline_data: { mime_type: media.contentType, data: media.base64 } },
+                                { text: 'Descreva o conteúdo desta imagem em português de forma objetiva. Se for um cardápio, lista de preços ou pedido, extraia as informações relevantes.' }
+                            ]
+                        }]
+                    })
+                });
+                const describeData = await describeRes.json();
+                const description = describeData?.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (description) {
+                    req.body.message = `[Conteúdo de imagem]: ${description.trim()}`;
+                }
+            }
+        } else {
+            return res.status(200).json({
+                version: 'v2',
+                content: { messages: [{ type: 'text', text: 'Oi! 😊 Não consigo ver imagens por aqui. Me escreve em texto o que precisa!' + `\n\nVeja cardápio e promoções:\n${SITE_URL}` }], actions: [], quick_replies: [] },
+                handover_to_human: false, order_ready: false, order_summary: null
+            });
+        }
+    }
+
+    // --- Processa PDF/arquivo ---
+    if (detectedFileUrl || looksLikeFile) {
+        if (detectedFileUrl) {
+            const media = await fetchMediaAsBase64(detectedFileUrl);
+            if (media) {
+                const extractUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
+                const extractRes = await fetch(extractUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{
+                            role: 'user',
+                            parts: [
+                                { inline_data: { mime_type: 'application/pdf', data: media.base64 } },
+                                { text: 'Extraia e resuma o conteúdo principal deste documento em português.' }
+                            ]
+                        }]
+                    })
+                });
+                const extractData = await extractRes.json();
+                const extracted = extractData?.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (extracted) {
+                    req.body.message = `[Conteúdo de arquivo]: ${extracted.trim()}`;
+                }
+            }
+        } else {
+            return res.status(200).json({
+                version: 'v2',
+                content: { messages: [{ type: 'text', text: 'Oi! 😊 Não consigo abrir arquivos por aqui. Me escreve em texto o que precisa!' + `\n\nVeja cardápio e promoções:\n${SITE_URL}` }], actions: [], quick_replies: [] },
+                handover_to_human: false, order_ready: false, order_summary: null
+            });
+        }
+    }
+
+    // Mensagem muito curta e sem mídia — ignora silenciosamente
+    if (!req.body.message?.trim() || req.body.message.trim().length < 2) {
         return res.status(200).json({
             version: 'v2',
-            content: { messages: [{ type: 'text', text: audioReply }], actions: [], quick_replies: [] },
+            content: { messages: [{ type: 'text', text: 'Oi! 😊 Me escreve o que precisa e eu te ajudo!' + `\n\nVeja cardápio e promoções:\n${SITE_URL}` }], actions: [], quick_replies: [] },
             handover_to_human: false, order_ready: false, order_summary: null
         });
     }
 
-    if (isImage) {
-        const imageReply = 'Oi! 😊 Não consigo visualizar imagens por aqui, mas posso te ajudar de outra forma!\n\nMe escreve em texto o que você precisa — preços, cardápio, agendamento — e eu te respondo! �'
-            + `\n\nVeja cardápio e promoções:\n${SITE_URL}`;
-        return res.status(200).json({
-            version: 'v2',
-            content: { messages: [{ type: 'text', text: imageReply }], actions: [], quick_replies: [] },
-            handover_to_human: false, order_ready: false, order_summary: null
-        });
-    }
+    // Usa mensagem atualizada (pode ter sido substituída por transcrição/descrição de mídia)
+    const effectiveMessage = req.body.message || message || '';
 
     // --- Carrega sessão: histórico de conversa e contador de msgs sem intenção ---
     const session = await loadSession(user_id);
     const greetingInstruction = session.isNewSession ? GREETING_NEW_SESSION : GREETING_CONTINUE_SESSION;
 
     // --- Detecção de intenção ---
-    const intents = detectIntent(message);
+    const intents = detectIntent(effectiveMessage);
 
     // --- Handover direto: cliente pediu explicitamente para falar com atendente ---
     if (intents.includes('handover_direto')) {
         const handoverDirectReply = 'Claro, vou chamar um atendente para te ajudar. Só um instante, por favor! 😊';
         await saveSession(user_id, [
             ...session.history,
-            { role: 'user', text: message },
+            { role: 'user', text: effectiveMessage },
             { role: 'assistant', text: handoverDirectReply }
         ], 0);
         return res.status(200).json({
@@ -849,9 +974,9 @@ async function handleGemini(req, res) {
     }
     let intentHint = '';
     // Detecta se msg contém quantidade + salgado/coxinha sem especificar mini
-    const hasSalgadoQty = /\d+\s*(coxinha|salgado|kibe|risole|pastel|empada|bolinha)/i.test(message);
-    const specifiedMini = /mini/i.test(message);
-    const specifiedGrande = /grande|tradicional|normal|unidade/i.test(message);
+    const hasSalgadoQty = /\d+\s*(coxinha|salgado|kibe|risole|pastel|empada|bolinha)/i.test(effectiveMessage);
+    const specifiedMini = /mini/i.test(effectiveMessage);
+    const specifiedGrande = /grande|tradicional|normal|unidade/i.test(effectiveMessage);
 
     if (intents.includes('bolos') || intents.includes('opcoes_bolo')) {
         intentHint = '\n[FOCO: O cliente perguntou sobre BOLOS. Priorize informações de bolos, massas e recheios.]';
@@ -902,7 +1027,7 @@ async function handleGemini(req, res) {
     // --- Lógica de handover: 3 mensagens substantivas consecutivas sem intenção clara ---
     // (handover_to_human = true aciona atribuição a atendente no ManyChat)
     let unclearCount = session.unclearCount;
-    const isSubstantive = message.trim().length > 10; // msgs curtas tipo "oi" não contam
+    const isSubstantive = effectiveMessage.trim().length > 10; // msgs curtas tipo "oi" não contam
     if (intents.length === 0 && isSubstantive) {
         unclearCount++;
     } else if (intents.length > 0) {
@@ -932,7 +1057,7 @@ async function handleGemini(req, res) {
 
     // Hora atual em Itamaraju-BA (UTC-3)
     const now = new Date().toLocaleString('pt-BR', { timeZone: 'America/Bahia', hour: '2-digit', minute: '2-digit', weekday: 'long' });
-    const userMessage = `[Hora atual: ${now}]${intentHint}` + (name ? ` Cliente "${name}" disse: ${message}` : ` ${message}`);
+    const userMessage = `[Hora atual: ${now}]${intentHint}` + (name ? ` Cliente "${name}" disse: ${effectiveMessage}` : ` ${effectiveMessage}`);
 
     // --- Busca dados reais do Supabase e monta o prompt final ---
     const businessContext = await buildBusinessContext(intents);
@@ -1016,7 +1141,7 @@ async function handleGemini(req, res) {
     // Guarda msg original do usuário (sem enriquecimento) + resposta da IA
     const updatedHistory = [
         ...session.history,
-        { role: 'user', text: message },
+        { role: 'user', text: effectiveMessage },
         { role: 'assistant', text: reply.length > 500 ? reply.substring(0, 500) : reply }
     ];
     await saveSession(user_id, updatedHistory, unclearCount);
