@@ -460,6 +460,11 @@ TAXA DE CARTÃO (aplicar SEMPRE que pagamento for cartão):
   💳 *Taxa cartão (X%):* R$ X,XX
 - Dinheiro e PIX: sem acréscimo.
 
+MENSAGENS FRAGMENTADAS:
+Se o cliente enviar uma resposta muito curta e isolada (ex: só "cartão", só "pix", só "sim", só um bairro),
+interprete sempre como continuação do contexto do pedido em andamento no histórico.
+Nunca trate uma resposta curta como uma nova conversa. Sempre relacione com o último pedido/pergunta do histórico.
+
 CONTINUAÇÃO DE PEDIDO:
 Se há pedido parcial no histórico, NÃO refaça do zero. Atualize apenas o que mudou e mostre resumo completo.
 
@@ -792,14 +797,31 @@ async function handleGemini(req, res) {
 
     const { message, name, user_id } = req.body || {};
 
-    // --- Tratamento de mensagem vazia ou muito curta (ex: áudio não transcrito) ---
     const SITE_URL = 'https://fastsavorys.vercel.app/pages/fast.html';
-    if (!message || !message.trim() || message.trim().length < 2) {
-        const audioReply = 'Não consigo ouvir seu áudio aqui, mas posso te ajudar se você escrever em texto o que precisa! 😊'
-            + `\n\nVeja nosso cardápio:\n${SITE_URL}`;
+
+    // --- Detecta áudio (ManyChat envia "[audio]" ou string vazia) ---
+    const isAudio = !message || !message.trim() || message.trim().length < 2
+        || /^\[áudio\]$|^\[audio\]$|^\[voice\]$/i.test(message.trim());
+
+    // --- Detecta imagem (ManyChat envia "[photo]", "[image]" ou similar) ---
+    const isImage = /^\[foto\]$|^\[photo\]$|^\[image\]$|^\[imagem\]$|^\[sticker\]$/i.test((message || '').trim());
+
+    if (isAudio) {
+        const audioReply = 'Oi! 😊 Não consigo ouvir áudios por aqui, mas adoraria te ajudar!\n\nMe escreve em texto o que você precisa e eu te atendo na hora! 🎉'
+            + `\n\nVeja cardápio e promoções:\n${SITE_URL}`;
         return res.status(200).json({
             version: 'v2',
             content: { messages: [{ type: 'text', text: audioReply }], actions: [], quick_replies: [] },
+            handover_to_human: false, order_ready: false, order_summary: null
+        });
+    }
+
+    if (isImage) {
+        const imageReply = 'Oi! 😊 Não consigo visualizar imagens por aqui, mas posso te ajudar de outra forma!\n\nMe escreve em texto o que você precisa — preços, cardápio, agendamento — e eu te respondo! �'
+            + `\n\nVeja cardápio e promoções:\n${SITE_URL}`;
+        return res.status(200).json({
+            version: 'v2',
+            content: { messages: [{ type: 'text', text: imageReply }], actions: [], quick_replies: [] },
             handover_to_human: false, order_ready: false, order_summary: null
         });
     }
