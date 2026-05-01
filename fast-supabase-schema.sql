@@ -326,7 +326,7 @@ INSERT INTO fast_business_hours (day_of_week, day_name, is_open, open_time, clos
     (2, 'Terça', true, '14:00', '18:00'),
     (3, 'Quarta', true, '14:00', '18:00'),
     (4, 'Quinta', true, '14:00', '18:00'),
-    (5, 'Sexta', true, '14:00', '19:30'),
+    (5, 'Sexta', true, '14:00', '18:00'),
     (6, 'Sábado', true, '14:00', '18:00')
 ON CONFLICT (day_of_week) DO NOTHING;
 
