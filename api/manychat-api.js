@@ -1186,45 +1186,27 @@ async function buildBusinessContext(intents) {
 
         // ============ TAXAS DE ENTREGA POR BAIRRO ============
         // Separamos bairros com entrega grátis e bairros com taxa (mototáxi)
-        // DEBUG: log raw delivery fee data from Supabase
         if (feesRes.data?.length) {
-            console.log('[DEBUG-FEES] Raw Supabase data:', JSON.stringify(feesRes.data.map(f => ({ n: f.neighborhood, fee: f.fee, min: f.min_order_value }))));
-        }
-        if (feesRes.data?.length) {
-            ctx += '\n\nTAXAS DE ENTREGA POR BAIRRO (apenas para salgados, mini salgados, bebidas e combos):';
-            const gratis = [];
-            const comTaxa = {};
-            const bairroInfo = {}; // Para armazenar informações detalhadas por bairro
+            ctx += '\n\nENTREGA POR BAIRRO (salgados, mini salgados, bebidas, combos e Vulcão Mini):';
+            ctx += '\n  ⚠️ Cada bairro tem TAXA DE ENTREGA (valor cobrado pela mototáxi) e pode ter PEDIDO MÍNIMO (valor mínimo em produtos para aceitar entrega — só informe ao cliente se o pedido for ABAIXO do mínimo).';
+            // Lista cada bairro com taxa E mínimo na mesma linha para evitar confusão
             for (const f of feesRes.data) {
-                // Armazena informações detalhadas por bairro
-                bairroInfo[f.neighborhood.toLowerCase()] = {
-                    fee: Number(f.fee),
-                    minimum_order: f.min_order_value ? Number(f.min_order_value) : null
-                };
-                if (Number(f.fee) === 0) {
-                    gratis.push(f.neighborhood);
+                const fee = Number(f.fee);
+                const min = f.min_order_value ? Number(f.min_order_value) : 0;
+                const name = f.neighborhood.charAt(0).toUpperCase() + f.neighborhood.slice(1);
+                let line = `\n  ${name}: TAXA `;
+                if (fee === 0) {
+                    line += 'GRÁTIS';
                 } else {
-                    const key = `R$ ${Number(f.fee).toFixed(2)}`;
-                    if (!comTaxa[key]) comTaxa[key] = [];
-                    comTaxa[key].push(f.neighborhood);
+                    line += `R$ ${fee.toFixed(2)}`;
                 }
-            }
-            if (gratis.length) {
-                ctx += `\n  Entrega GRÁTIS: ${gratis.join(', ')}`;
-            }
-            for (const [fee, bairros] of Object.entries(comTaxa)) {
-                ctx += `\n  ${fee} (mototáxi): ${bairros.join(', ')}`;
-            }
-            // Adiciona pedido mínimo por bairro (se houver)
-            const bairrosComMinimo = Object.entries(bairroInfo).filter(([_, info]) => info.minimum_order && info.minimum_order > 0);
-            if (bairrosComMinimo.length > 0) {
-                ctx += '\n\nPEDIDO MÍNIMO POR BAIRRO (VERIFICAÇÃO INTERNA — só informe ao cliente se o pedido for ABAIXO do mínimo):';
-                for (const [bairro, info] of bairrosComMinimo) {
-                    ctx += `\n  ${bairro.charAt(0).toUpperCase() + bairro.slice(1)}: mínimo R$ ${info.minimum_order.toFixed(2)}`;
+                if (min > 0) {
+                    line += ` (pedido mín. R$ ${min.toFixed(2)})`;
                 }
+                ctx += line;
             }
             const defaultFee = configRes.data?.default_delivery_fee ?? 8;
-            ctx += `\n  ⚠️ Bairro NÃO listado (SE FOR EM ITAMARAJU): taxa padrão R$ ${Number(defaultFee).toFixed(2)}.`;
+            ctx += `\n  ⚠️ Bairro NÃO listado (SE FOR EM ITAMARAJU): TAXA padrão R$ ${Number(defaultFee).toFixed(2)}.`;
             ctx += '\n  🚨 NUNCA aceite entrega para cidades vizinhas (como Prado, Guarani, etc). SÓ entregamos na zona urbana de ITAMARAJU.';
         }
 
