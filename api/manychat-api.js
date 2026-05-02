@@ -1186,6 +1186,10 @@ async function buildBusinessContext(intents) {
 
         // ============ TAXAS DE ENTREGA POR BAIRRO ============
         // Separamos bairros com entrega grátis e bairros com taxa (mototáxi)
+        // DEBUG: log raw delivery fee data from Supabase
+        if (feesRes.data?.length) {
+            console.log('[DEBUG-FEES] Raw Supabase data:', JSON.stringify(feesRes.data.map(f => ({ n: f.neighborhood, fee: f.fee, min: f.min_order_value }))));
+        }
         if (feesRes.data?.length) {
             ctx += '\n\nTAXAS DE ENTREGA POR BAIRRO (apenas para salgados, mini salgados, bebidas e combos):';
             const gratis = [];
