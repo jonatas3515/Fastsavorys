@@ -694,6 +694,7 @@ ENDEREÇO E TAXAS:
   - (Referência é opcional, mas bom pedir)
 - Se o cliente pedir entrega e só falar o bairro, pergunte:
   - "Me informa, por favor, rua, número e um ponto de referência para a entrega?"
+- PONTO DE REFERÊNCIA: O cliente pode informar nomes de lojas, estabelecimentos, praças, escolas etc. como referência (ex: "Loja X", "perto do mercado Y"). Isso é um MARCO DE LOCALIZAÇÃO para a entrega, NÃO confunda com o nome da nossa loja.
 - Valor mínimo global para entrega: R$ 15,00 em produtos (sem contar a taxa).
 - Se o bairro informado NÃO estiver na lista de taxas, NÃO aceite automaticamente com taxa padrão. Pergunte primeiro se é Itamaraju-BA.
 - Bairro com taxa R$ 0,00: entrega grátis (diga uma vez só).
@@ -829,7 +830,8 @@ Este roteiro se aplica a TODOS os pedidos (para hoje ou agendamento). NUNCA pule
     - NÃO aceite o pedido.
     - Informe: "Desculpe, para entrega no bairro [bairro] o pedido mínimo é R$ [mínimo]. Seu pedido atual está em R$ [atual]. Você gostaria de adicionar mais itens para atingir o mínimo ou prefere retirada na loja?"
     - NÃO confirme o pedido até atingir o mínimo ou mudar para retirada.
-  - Informe a taxa e o valor do produto + taxa juntos.
+  - ⛔ Se o valor dos produtos JÁ ULTRAPASSA o mínimo, NÃO mencione o pedido mínimo. O cliente não precisa saber disso.
+  - Informe APENAS a TAXA DE ENTREGA e o total (produtos + taxa). NÃO misture taxa de entrega com pedido mínimo na mesma frase.
 - Se for RETIRADA:
   - Informe o endereço: Rua Palmeiras, 105, Novo Prado.
 
@@ -1212,9 +1214,9 @@ async function buildBusinessContext(intents) {
             // Adiciona pedido mínimo por bairro (se houver)
             const bairrosComMinimo = Object.entries(bairroInfo).filter(([_, info]) => info.minimum_order && info.minimum_order > 0);
             if (bairrosComMinimo.length > 0) {
-                ctx += '\n\nPEDIDO MÍNIMO POR BAIRRO:';
+                ctx += '\n\nPEDIDO MÍNIMO POR BAIRRO (VERIFICAÇÃO INTERNA — só informe ao cliente se o pedido for ABAIXO do mínimo):';
                 for (const [bairro, info] of bairrosComMinimo) {
-                    ctx += `\n  ${bairro.charAt(0).toUpperCase() + bairro.slice(1)}: pedido mínimo R$ ${info.minimum_order.toFixed(2)}`;
+                    ctx += `\n  ${bairro.charAt(0).toUpperCase() + bairro.slice(1)}: mínimo R$ ${info.minimum_order.toFixed(2)}`;
                 }
             }
             const defaultFee = configRes.data?.default_delivery_fee ?? 8;
