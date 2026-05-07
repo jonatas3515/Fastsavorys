@@ -195,7 +195,7 @@ function updateKPIsDashboard(orders, dateFilter) {
 function createOrderCardHtml(order) {
     const status = STATUS_LABELS[order.status] || STATUS_LABELS.pending;
     const time = new Date(order.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-    
+
     // Data e horário de entrega/retirada
     let deliveryDateTimeHtml = '';
     if (order.order_date || order.scheduled_date) {
@@ -363,6 +363,10 @@ function renderDashboardOrders(orders) {
     const listBody = document.getElementById('ordersListTableBody');
     if (listBody) listBody.innerHTML = '';
 
+    // Mobile List Body
+    const mobileList = document.getElementById('ordersListMobile');
+    if (mobileList) mobileList.innerHTML = '';
+
     if (!orders || orders.length === 0) {
         if (listBody) listBody.innerHTML = '<tr><td colspan="7" class="p-8 text-center text-gray-500">Nenhum pedido encontrado.</td></tr>';
         return;
@@ -405,6 +409,12 @@ function renderDashboardOrders(orders) {
         // Render List Row
         if (listBody) {
             listBody.innerHTML += createOrderRowHtml(order);
+        }
+
+        // Render Mobile List Card
+        const mobileList = document.getElementById('ordersListMobile');
+        if (mobileList) {
+            mobileList.innerHTML += createOrderCardHtml(order);
         }
     });
 
@@ -731,10 +741,26 @@ function switchOrderView(view) {
     const btnKanban = document.getElementById('viewModeKanban');
     const btnList = document.getElementById('viewModeList');
 
-    if (view === 'kanban') {
-        if (kanbanView) kanbanView.classList.remove('hidden');
-        if (listView) listView.classList.add('hidden');
+    const mobileList = document.getElementById('ordersListMobile');
 
+    console.log('[Orders] Switching view to:', view);
+
+    if (view === 'kanban') {
+        // KANBAN ACTIVE
+        if (kanbanView) {
+            kanbanView.classList.remove('hidden');
+            kanbanView.style.display = '';
+        }
+
+        // HIDE LISTS
+        if (listView) {
+            listView.style.display = 'none';
+        }
+        if (mobileList) {
+            mobileList.style.display = 'none';
+        }
+
+        // UPDATE BUTTONS
         if (btnKanban) {
             btnKanban.classList.add('bg-white', 'text-gray-800', 'shadow-sm');
             btnKanban.classList.remove('text-gray-600', 'hover:text-gray-900');
@@ -743,10 +769,28 @@ function switchOrderView(view) {
             btnList.classList.remove('bg-white', 'text-gray-800', 'shadow-sm');
             btnList.classList.add('text-gray-600', 'hover:text-gray-900');
         }
-    } else {
-        if (kanbanView) kanbanView.classList.add('hidden');
-        if (listView) listView.classList.remove('hidden');
 
+    } else {
+        // LIST ACTIVE
+        if (kanbanView) {
+            kanbanView.classList.add('hidden');
+            kanbanView.style.display = 'none';
+        }
+
+        // SHOW LISTS (Responsive)
+        if (listView) {
+            // Desktop Table: MUST have 'hidden md:block' to be hidden on mobile/visible on desktop
+            listView.classList.add('hidden', 'md:block');
+            listView.style.display = '';
+        }
+        if (mobileList) {
+            // Mobile Cards: MUST have 'md:hidden' to be visible on mobile/hidden on desktop
+            mobileList.classList.remove('hidden');
+            mobileList.classList.add('md:hidden');
+            mobileList.style.display = '';
+        }
+
+        // UPDATE BUTTONS
         if (btnList) {
             btnList.classList.add('bg-white', 'text-gray-800', 'shadow-sm');
             btnList.classList.remove('text-gray-600', 'hover:text-gray-900');
@@ -763,6 +807,9 @@ document.addEventListener('DOMContentLoaded', () => {
     // View Switchers
     document.getElementById('viewModeKanban')?.addEventListener('click', () => switchOrderView('kanban'));
     document.getElementById('viewModeList')?.addEventListener('click', () => switchOrderView('list'));
+
+    // Initialize View (Fixes overlap on load)
+    switchOrderView('kanban');
 
     // Delete Button (shows confirmation modal first)
     document.getElementById('confirmDeleteOrdersBtn')?.addEventListener('click', deleteOrdersByCodes);

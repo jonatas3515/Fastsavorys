@@ -24,8 +24,6 @@
       const v = window.APP_VERSION || Date.now();
       document.write('<script src="../assets/js/utils.js?v=' + v + '"><\/script>');
       document.write('<script src="../assets/js/services.js?v=' + v + '"><\/script>');
-      document.write('<script src="../assets/js/fast/options.js?v=' + v + '"><\/script>');
-      document.write('<script src="../assets/js/fast/ad-banner.js?v=' + v + '"><\/script>');
     })();
   </script>
   <script>
@@ -284,6 +282,21 @@
     <button onclick="this.parentElement.classList.add('hidden'); loadProducts();"
       class="text-yellow-700 hover:text-yellow-900 underline font-medium">Tentar novamente</button>
   </div>
+  <!-- Safe catalog opener (loads before welcome buttons are clickable) -->
+  <script>
+    function openCatalogSafe() {
+      document.getElementById('welcomeScreen').classList.add('hidden');
+      function tryOpen() {
+        if (window.CatalogModule) {
+          if (!CatalogModule._initialized) CatalogModule.init();
+          CatalogModule.open();
+        } else {
+          setTimeout(tryOpen, 200);
+        }
+      }
+      setTimeout(tryOpen, 100);
+    }
+  </script>
   <!-- Welcome Screen with Gradient Background -->
   <div id="welcomeScreen" class="fixed inset-0 z-[100] overflow-hidden"
     style="background: linear-gradient(135deg, #9e0b5a 0%, #7a0945 25%, #5a0733 50%, #1f2937 75%, #000000 100%);">
@@ -309,7 +322,7 @@
         </button>
         <!-- CATALOG BUTTON (Mobile Welcome) - Abre página pública + catálogo -->
         <button id="openCatalogBtnMobile" type="button"
-          onclick="document.getElementById('welcomeScreen').classList.add('hidden'); setTimeout(() => CatalogModule.open(), 100);"
+          onclick="openCatalogSafe();"
           class="block mx-auto px-5 py-2 bg-gradient-to-r from-rose-500 to-purple-600 hover:from-rose-600 hover:to-purple-700 text-white font-bold text-sm rounded-full shadow-xl">
           📚 Ver Catálogo
         </button>
@@ -332,7 +345,7 @@
         </button>
         <!-- CATALOG BUTTON (Desktop Welcome) - Abre página pública + catálogo -->
         <button id="openCatalogBtnDesktop" type="button"
-          onclick="document.getElementById('welcomeScreen').classList.add('hidden'); setTimeout(() => CatalogModule.open(), 100);"
+          onclick="openCatalogSafe();"
           class="ml-3 px-6 py-3 bg-gradient-to-r from-rose-500 to-purple-600 hover:from-rose-600 hover:to-purple-700 text-white font-bold text-lg rounded-full shadow-2xl transform hover:scale-105 transition-all duration-300">
           📚 Catálogo
         </button>
@@ -1594,215 +1607,11 @@
 
 
 
-    document.addEventListener('DOMContentLoaded', async function () {
-      console.log('[INIT] DOMContentLoaded iniciado');
-      try {
-        // Show "Back to Admin" button if coming from admin panel
-        if (sessionStorage.getItem('fastAdmin') === '1') {
-          const backBtn = document.getElementById('backToAdminBtn');
-          const backBtnMobile = document.getElementById('backToAdminBtnMobile');
-          if (backBtn) backBtn.classList.remove('hidden');
-          if (backBtnMobile) backBtnMobile.classList.remove('hidden');
-        }
-
-        // Verificar se Supabase está disponível
-        if (!window.supabaseClient) {
-          console.error('[INIT] Supabase client não disponível - usando dados locais');
-        }
-
-        // Load all data in parallel for faster page load
-        // Timeout global de 12s para evitar travamento se Supabase estiver lento
-        await promiseWithTimeout(
-          Promise.all([
-            seedDefaultUsers().catch(function (e) { console.error('[INIT] seedDefaultUsers erro:', e); }),
-            loadProducts().catch(function (e) { console.error('[INIT] loadProducts erro:', e); }),
-            loadClients().catch(function (e) { console.error('[INIT] loadClients erro:', e); }),
-            Promise.resolve().then(function () { loadPromotions(); }).catch(function (e) { console.error('[INIT] loadPromotions erro:', e); }),
-            loadCoupons().catch(function (e) { console.error('[INIT] loadCoupons erro:', e); }),
-            loadStoreConfig().catch(function (e) { console.error('[INIT] loadStoreConfig erro:', e); }),
-            loadBusinessHours().catch(function (e) { console.error('[INIT] loadBusinessHours erro:', e); }),
-            (typeof loadDeliveryFees === 'function' ? loadDeliveryFees() : Promise.resolve()).catch(function (e) { console.error('[INIT] loadDeliveryFees erro:', e); }),
-            ProductOptionsModule.load().catch(function (e) { console.error('[INIT] ProductOptionsModule erro:', e); }),
-            StoreStatusService.isClosedToday().catch(function (e) { console.error('[INIT] StoreStatusService erro:', e); })
-          ]),
-          12000, // 12 segundos máximo
-          null
-        );
-
-        console.log('[INIT] Dados carregados, mostrando painel');
-
-        // Initialize Public Store
-        initializePublicStore();
-
-        try {
-          const params = new URLSearchParams(window.location.search);
-          const checkout = params.get('checkout');
-          const sessionId = params.get('session_id');
-          if (checkout === 'success' && sessionId) {
-            console.log('[Stripe] Retorno do Checkout detectado. Sincronizando pagamento...', sessionId);
-            const baseUrl = (typeof getStripeServerBaseUrl === 'function') ? getStripeServerBaseUrl() : '';
-            let syncedOrderId = null;
-            if (!baseUrl) {
-              console.warn('[Stripe] Stripe server URL não configurada para sync (ok em produção se webhook estiver ativo).');
-            } else {
-              const resp = await fetch(baseUrl + '/sync-checkout-session', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sessionId: sessionId })
-              });
-              const data = await resp.json().catch(function () { return {}; });
-              if (!resp.ok) {
-                console.warn('[Stripe] Falha ao sincronizar Checkout:', data);
-              } else {
-                console.log('[Stripe] Sincronização concluída:', data);
-                syncedOrderId = data.orderId;
-                try { loadDashboardOrders(); } catch (e) { }
-              }
-            }
-
-            // Redirecionar para WhatsApp após pagamento bem-sucedido
-            if (syncedOrderId) {
-              const waMessage = `Olá! Acabei de realizar o pagamento do pedido #${syncedOrderId} pelo cartão. Aguardo confirmação!`;
-              const waUrl = `https://wa.me/5573999366554?text=${encodeURIComponent(waMessage)}`;
-
-              // Limpar URL params e redirecionar para WhatsApp
-              window.history.replaceState({}, document.title, window.location.pathname);
-
-              // Mostrar confirmação e abrir WhatsApp
-              alert('✅ Pagamento confirmado!\n\nVocê será redirecionado para o WhatsApp para confirmar seu pedido.');
-              window.open(waUrl, '_blank');
-            }
-          }
-        } catch (e) {
-          console.warn('[Stripe] Erro ao sincronizar pagamento no retorno do Checkout:', e);
-        }
-        console.log('[INIT] Painel exibido com sucesso');
-
-        // Deep-link: auto-open tracking modal if ?track=FAST-xxxx&phone=...
-        try {
-          const params = new URLSearchParams(window.location.search);
-          const trackCode = params.get('track');
-          const trackPhone = params.get('phone');
-          if (trackCode && trackPhone) {
-            openTrackingModal();
-            const codeEl = document.getElementById('trackingOrderCode');
-            const phoneEl = document.getElementById('trackingPhone');
-            if (codeEl) codeEl.value = String(trackCode).toUpperCase();
-            if (phoneEl) phoneEl.value = normalizePhoneDigits(trackPhone);
-            setTimeout(() => handleTrackOrder(), 300);
-          }
-        } catch (e) { console.warn('[Tracking] Deep-link error:', e); }
-
-        // Deep-link: auto-open rating modal if ?rate=FAST-xxxx&phone=... or #rating hash
-        try {
-          const params = new URLSearchParams(window.location.search);
-          const rateCode = params.get('rate');
-          const ratePhone = params.get('phone');
-
-          // Check for hash #rating or rate params to force modal open immediately
-          if (window.location.hash === '#rating' || (rateCode && ratePhone)) {
-            // Hide landing page content immediately to show only rating modal
-            const landingContent = document.getElementById('landing');
-            if (landingContent) {
-              landingContent.style.display = 'none';
-            }
-
-            // Open rating modal with minimal delay
-            setTimeout(() => {
-              if (rateCode && ratePhone) {
-                initRatingModal(rateCode, ratePhone);
-              } else {
-                // If only hash is present, show a message or open empty modal
-                console.log('[Rating] Hash #rating detectado, mas sem parâmetros');
-                openRatingModal();
-              }
-            }, 100);
-          }
-        } catch (e) { console.warn('[Rating] Deep-link error:', e); }
-
-        // Load public testimonials for landing page
-        try { loadPublicRatings(); } catch (e) { console.warn('[Ratings] Failed to load:', e); }
-
-        // Initialize Options Admin UI (for products panel)
-        // try { OptionsAdminUI.init(); } catch (e) { console.warn('[OptionsAdmin] Failed to init:', e); }
-
-        // Initialize Flavor Selection UI (for product form)
-        // try { FlavorSelectionUI.init(); } catch (e) { console.warn('[FlavorSelection] Failed to init:', e); }
-
-        // Initialize Catalog Module (for magazine-style catalog)
-        try { CatalogModule.init(); } catch (e) { console.warn('[Catalog] Failed to init:', e); }
+    // [Bootstrapping moved to assets/js/fast/app.js]
 
 
-        // Admin auto-load removed. Use admin.html for administration.
+    // [User management moved to assets/js/fast/auth-legacy.js]
 
-
-        // Logout Handler (Backup para fast.html)
-        document.getElementById('logoutBtn')?.addEventListener('click', () => {
-          const modal = document.getElementById('logoutConfirmModal');
-          if (modal) {
-            modal.classList.remove('hidden');
-          } else if (confirm('Tem certeza que deseja sair do painel?')) {
-            // Fallback se modal não existir
-            sessionStorage.removeItem('fastAdmin');
-            window.location.reload();
-          }
-        });
-
-      } catch (e) {
-        console.error('[INIT] Erro crítico na inicialização:', e);
-        // Tentar mostrar a loja pública mesmo com erro
-        try { showPublicStore(); } catch (e2) { console.error('[INIT] Falha ao mostrar loja:', e2); }
-      }
-    });
-
-    async function seedDefaultUsers() {
-      try {
-        // Try to load from Supabase first
-        const { data, error } = await window.supabaseClient
-          .from('fast_users')
-          .select('*');
-
-        if (error) throw error;
-
-        if (data && data.length > 0) {
-          users = data;
-        } else {
-          // Seed default admin if table is empty
-          users = [{ username: 'fast', password: 'fast123', role: 'admin' }];
-          await window.supabaseClient.from('fast_users').upsert(users[0], { onConflict: 'username' });
-        }
-        // Keep localStorage as cache
-        localStorage.setItem('fastUsers', JSON.stringify(users));
-      } catch (error) {
-        console.error('Erro ao carregar usuários do Supabase:', error);
-        // Fallback to localStorage
-        const saved = localStorage.getItem('fastUsers');
-        if (saved) { users = JSON.parse(saved); }
-        else { users = [{ username: 'fast', password: 'fast123', role: 'admin' }]; localStorage.setItem('fastUsers', JSON.stringify(users)); }
-      }
-    }
-
-    async function saveUsers() {
-      // Always save to localStorage first (instant)
-      localStorage.setItem('fastUsers', JSON.stringify(users));
-
-      // Then sync with Supabase
-      try {
-        if (window.supabaseClient) {
-          // Clear and re-insert for simplicity
-          await window.supabaseClient.from('fast_users').delete().neq('id', 0);
-          for (const user of users) {
-            await window.supabaseClient.from('fast_users').upsert(
-              { username: user.username, password: user.password, role: user.role },
-              { onConflict: 'username' }
-            );
-          }
-          console.log('Usuários sincronizados com Supabase');
-        }
-      } catch (error) {
-        console.error('Erro ao salvar usuários no Supabase:', error);
-      }
-    }
 
     // User management functions removed (Admin only)
 
@@ -1810,21 +1619,8 @@
     // Client Management Functions
     // NOTA: loadClients agora usa apenas cache local.
     // A busca por telefone individual é feita via API /api/client-profile (seguro)
-    async function loadClients() {
-      try {
-        // Carrega do localStorage como cache inicial
-        const saved = localStorage.getItem('fastClients');
-        if (saved) {
-          clients = JSON.parse(saved);
-          console.log('[Clients] Carregados do cache local:', clients.length);
-        } else {
-          clients = [];
-        }
-      } catch (error) {
-        console.error('Erro ao carregar clientes:', error);
-        clients = [];
-      }
-    }
+    // [Client management moved to assets/js/fast/customer.js]
+
 
     // saveClients agora salva apenas no localStorage (cache)
     // O salvamento no Supabase é feito via endpoints seguros no checkout
@@ -1974,76 +1770,7 @@
 
     // ========== STORE CONFIG MANAGEMENT ==========
 
-    async function loadStoreConfig() {
-      try {
-        const { data, error } = await window.supabaseClient
-          .from('fast_store_config')
-          .select('*')
-          .eq('id', 1)
-          .single();
-
-        if (error) throw error;
-        if (data) {
-          storeConfig = {
-            card_fee_1x: parseFloat(data.card_fee_1x) || 5,
-            card_fee_2x: parseFloat(data.card_fee_2x) || 10,
-            delivery_enabled: data.delivery_enabled !== false,
-            delivery_disabled_reason: data.delivery_disabled_reason || '',
-            prep_time_min: parseInt(data.prep_time_min) || 0,
-            prep_time_max: parseInt(data.prep_time_max) || 0,
-            delivery_time_min: parseInt(data.delivery_time_min) || 0,
-            delivery_time_max: parseInt(data.delivery_time_max) || 0,
-            // Novas variáveis de regras
-            min_order_delivery: parseFloat(data.min_order_delivery) || 15.00,
-            min_order_pickup: parseFloat(data.min_order_pickup) || 8.00,
-            min_order_pickup_offhours: parseFloat(data.min_order_pickup_offhours) || 15.00,
-            same_day_orders_enabled: data.same_day_orders_enabled !== false,
-            same_day_min_value: parseFloat(data.same_day_min_value) || 15.00,
-            same_day_pickup_start: data.same_day_pickup_start || '11:00',
-            same_day_pickup_end: data.same_day_pickup_end || '18:00',
-            morning_rule_enabled: data.morning_rule_enabled !== false,
-            morning_rule_end_time: data.morning_rule_end_time || '14:00',
-            morning_rule_min_value: parseFloat(data.morning_rule_min_value) || 30.00,
-          };
-          storeConfig.card_fee_2x = storeConfig.card_fee_1x;
-          localStorage.setItem('fastStoreConfig', JSON.stringify(storeConfig));
-          console.log('Configurações carregadas do Supabase');
-        }
-      } catch (error) {
-        console.log('Carregando config do localStorage:', error.message);
-        try {
-          const saved = localStorage.getItem('fastStoreConfig');
-          if (saved) {
-            const parsed = JSON.parse(saved);
-            storeConfig = { ...storeConfig, ...parsed };
-            storeConfig.card_fee_2x = storeConfig.card_fee_1x;
-          }
-        } catch (e) {
-          console.log('Using default store config');
-        }
-      }
-
-      // Update UI if elements exist
-      const fee1x = document.getElementById('cardFee1x');
-      const deliveryEnabled = document.getElementById('deliveryEnabled');
-      const reasonBox = document.getElementById('deliveryDisabledReasonBox');
-      const reasonInput = document.getElementById('deliveryDisabledReason');
-
-      if (fee1x) fee1x.value = storeConfig.card_fee_1x;
-      if (deliveryEnabled) {
-        deliveryEnabled.checked = storeConfig.delivery_enabled;
-        if (reasonBox) reasonBox.classList.toggle('hidden', storeConfig.delivery_enabled);
-        if (reasonInput) reasonInput.value = storeConfig.delivery_disabled_reason || '';
-      }
-      // Time Inputs
-      if (document.getElementById('prepTimeMin')) document.getElementById('prepTimeMin').value = storeConfig.prep_time_min || '';
-      if (document.getElementById('prepTimeMax')) document.getElementById('prepTimeMax').value = storeConfig.prep_time_max || '';
-      if (document.getElementById('deliveryTimeMin')) document.getElementById('deliveryTimeMin').value = storeConfig.delivery_time_min || '';
-      if (document.getElementById('deliveryTimeMax')) document.getElementById('deliveryTimeMax').value = storeConfig.delivery_time_max || '';
-
-      // Update card fee labels in checkout
-      updateCardFeeLabels();
-    }
+    // [Store Config moved to assets/js/services.js]
 
     function updateCardFeeLabels() {
       const label1x = document.getElementById('cardFeeLabel1x');
@@ -2052,60 +1779,17 @@
 
     // saveStoreConfig removed (Admin only)
 
-    // ========== STORE STATUS SERVICE (Database-backed) ==========
-    let storeClosedToday = false; // Cached flag, loaded from DB
+    // [Store Status moved to assets/js/store-status.js]
 
-    const StoreStatusService = {
-      /**
-       * Check if store is closed today (from database)
-       */
-      isClosedToday: async function () {
-        try {
-          const brasilia = getBrasiliaDate();
-          const todayStr = formatYYYYMMDD(brasilia);
+    // [Store Status moved to assets/js/store-status.js]
 
-          const { data, error } = await window.supabaseClient
-            .from('fast_store_status')
-            .select('is_closed')
-            .eq('date', todayStr)
-            .maybeSingle();
 
-          if (error) {
-            console.warn('[StoreStatus] Error checking status:', error.message);
-            return false;
-          }
-
-          storeClosedToday = data?.is_closed === true;
-          return storeClosedToday;
-        } catch (e) {
-          console.error('[StoreStatus] Exception:', e);
-          return false;
-        }
-      }
-      // Admin methods (closeToday, reopenToday) removed for security
-    };
-
-    // ========== RULES PANEL MANAGEMENT ==========
-    let blockedDates = [];
+    // [Rules Panel moved to assets/js/fast/admin-rules.js]
 
     // loadRulesPanel removed (Admin only)
 
     // Load blocked dates for validation
-    async function loadBlockedDates() {
-      try {
-        const { data, error } = await window.supabaseClient
-          .from('fast_blocked_dates')
-          .select('*')
-          .order('blocked_date', { ascending: true });
-
-        if (error) throw error;
-        blockedDates = data || [];
-        // renderBlockedDates removed
-      } catch (e) {
-        console.log('[Rules] Erro ao carregar datas bloqueadas:', e.message);
-        blockedDates = [];
-      }
-    }
+    // [Rules Panel moved to assets/js/fast/admin-rules.js]
 
     function renderBlockedDates() {
       const container = document.getElementById('blockedDatesList');
@@ -2313,35 +1997,7 @@
     // updateOpenNotice — moved to: assets/js/store-status.js
 
 
-    function generateHoursDisplayString() {
-      if (!businessHours || businessHours.length === 0) {
-        return 'Seg–Qui e Sáb 14h–18h, Sexta 14h–19h30';
-      }
-
-      const openDays = businessHours.filter(d => d.is_open);
-      if (openDays.length === 0) return 'Fechado';
-
-      // Group by similar hours
-      const groups = [];
-      let currentGroup = null;
-
-      openDays.forEach(day => {
-        const hours = `${day.open_time.replace(':00', 'h').replace(':', 'h')}–${day.close_time.replace(':00', 'h').replace(':', 'h')}`;
-        if (currentGroup && currentGroup.hours === hours) {
-          currentGroup.days.push(day.day_name);
-        } else {
-          currentGroup = { hours, days: [day.day_name] };
-          groups.push(currentGroup);
-        }
-      });
-
-      return groups.map(g => {
-        const dayStr = g.days.length > 2
-          ? `${g.days[0].substr(0, 3)}–${g.days[g.days.length - 1].substr(0, 3)}`
-          : g.days.map(d => d.substr(0, 3)).join(', ');
-        return `${dayStr} ${g.hours}`;
-      }).join(', ');
-    }
+    // [Hours logic moved to assets/js/store-status.js]
 
 
 
@@ -2726,6 +2382,7 @@
     }
 
     window.openComboSalgadosModal = function (product) {
+      console.log('[Modal] openComboSalgadosModal called for:', product.name);
       pendingComboProduct = product;
 
       document.getElementById('comboProductName').textContent = product.name;
@@ -2734,7 +2391,19 @@
 
       // Usar salgados GRANDES da tabela fast_product_options (tipo 'salgados')
       const container = document.getElementById('comboSalgadosContainer');
+
+      // Debug: Check ProductOptionsModule availability
+      if (!window.ProductOptionsModule) {
+        console.error('[Modal] ProductOptionsModule is undefined!');
+        container.innerHTML = '<p class="text-red-500 text-sm text-center py-4">Erro interno: Módulo de opções não carregado.</p>';
+        document.getElementById('comboSalgadosError').classList.add('hidden');
+        document.getElementById('comboSalgadosModal').classList.remove('hidden');
+        return;
+      }
+
+      console.log('[Modal] Calling getVisible("salgados")...');
       const salgados = ProductOptionsModule.getVisible('salgados');
+      console.log('[Modal] getVisible returned:', salgados);
 
       if (salgados.length === 0) {
         container.innerHTML = '<p class="text-gray-500 text-sm text-center py-4">Nenhum salgado disponível.</p>';
@@ -4346,8 +4015,157 @@
 
   <!-- External modules (loaded after main script for dependency resolution) -->
 
+  <!-- ======================================== -->
+  <!-- MODAL: Custom Options (Bolos & Kits) -->
+  <!-- ======================================== -->
+  <div id="customOptionsModal"
+    class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center p-4 backdrop-blur-sm">
+    <div class="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl animate-fade-in">
+      <div class="p-6 border-b border-gray-100 bg-gray-50/50 sticky top-0 z-10 backdrop-blur-md">
+        <h3 id="customOptionsTitle" class="text-xl font-bold text-gray-800">Personalizar</h3>
+        <p id="customOptionsProductName" class="text-rose-600 font-medium"></p>
+        <p id="customOptionsProductPrice" class="text-sm text-gray-500"></p>
+      </div>
+
+      <div class="p-6 space-y-6">
+        <!-- Massas (Bolos) -->
+        <div id="cakeMassSection" class="hidden">
+          <h4 class="font-bold text-gray-800 mb-3 flex items-center gap-2">
+            <span
+              class="w-6 h-6 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center text-xs">1</span>
+            Escolha a Massa
+          </h4>
+          <div class="space-y-2">
+            <!-- Injetado via JS -->
+          </div>
+        </div>
+
+        <!-- Recheios (Bolos) -->
+        <div id="fillingSection" class="hidden">
+          <h4 class="font-bold text-gray-800 mb-3 flex items-center gap-2">
+            <span
+              class="w-6 h-6 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center text-xs">2</span>
+            Escolha o Recheio
+          </h4>
+          <div class="space-y-2">
+            <!-- Injetado via JS -->
+          </div>
+        </div>
+
+        <!-- Salgados (Kits) -->
+        <div id="salgadosSection" class="hidden">
+          <div class="flex justify-between items-center mb-3">
+            <h4 class="font-bold text-gray-800 flex items-center gap-2">
+              <span
+                class="w-6 h-6 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center text-xs">3</span>
+              Escolha os Salgados
+            </h4>
+            <span id="salgadosCounter"
+              class="text-xs font-bold bg-gray-100 px-2 py-1 rounded-full text-gray-600">0/4</span>
+          </div>
+          <p class="text-xs text-gray-500 mb-3">Selecione até 4 opções.</p>
+          <div class="space-y-2">
+            <!-- Injetado via JS -->
+          </div>
+        </div>
+
+        <div id="customOptionsError" class="hidden p-3 bg-red-50 text-red-600 rounded-lg text-sm border border-red-100">
+        </div>
+      </div>
+
+      <div class="p-4 border-t border-gray-100 bg-gray-50/50 flex gap-3 sticky bottom-0 z-10 backdrop-blur-md">
+        <button onclick="closeCustomOptionsModal()"
+          class="flex-1 py-3 text-gray-600 font-medium hover:bg-gray-100 rounded-xl transition-colors">Cancelar</button>
+        <button onclick="confirmCustomOptions()"
+          class="flex-1 py-3 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl shadow-lg shadow-rose-200 transition-all active:scale-95">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================== -->
+  <!-- MODAL: Combo Salgados -->
+  <!-- ======================================== -->
+  <div id="comboSalgadosModal"
+    class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center p-4 backdrop-blur-sm">
+    <div class="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl animate-fade-in">
+      <div class="p-6 border-b border-gray-100 bg-gray-50/50 sticky top-0 z-10 backdrop-blur-md">
+        <h3 class="text-xl font-bold text-gray-800">Escolha os Salgados</h3>
+        <p id="comboProductName" class="text-rose-600 font-medium mt-1"></p>
+        <p id="comboProductPrice" class="text-sm text-gray-500"></p>
+      </div>
+
+      <div class="p-6">
+        <div class="flex justify-between items-center mb-4 sticky top-0 bg-white z-10 py-2 border-b border-gray-50">
+          <span class="text-sm text-gray-600">Quantidade total:</span>
+          <span id="comboSalgadosCounter" class="font-bold text-rose-600 bg-rose-50 px-3 py-1 rounded-full">0/100</span>
+        </div>
+
+        <div id="comboSalgadosContainer" class="space-y-3 pb-2">
+          <!-- Injetado via JS -->
+          <div class="flex justify-center p-8">
+            <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-rose-600"></div>
+          </div>
+        </div>
+
+        <div id="comboSalgadosError"
+          class="hidden mt-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm border border-red-100 animate-pulse"></div>
+      </div>
+
+      <div class="p-4 border-t border-gray-100 bg-gray-50/50 flex gap-3 sticky bottom-0 z-10 backdrop-blur-md">
+        <button onclick="closeComboSalgadosModal()"
+          class="flex-1 py-3 text-gray-600 font-medium hover:bg-gray-100 rounded-xl transition-colors">Cancelar</button>
+        <button onclick="confirmComboSalgados()"
+          class="flex-1 py-3 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl shadow-lg shadow-rose-200 transition-all active:scale-95">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================== -->
+  <!-- MODAL: Mini Salgados (Flavor Selection) -->
+  <!-- ======================================== -->
+  <div id="miniSalgadosModal"
+    class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center p-4 backdrop-blur-sm">
+    <div class="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl animate-fade-in">
+      <div class="p-6 border-b border-gray-100 bg-gray-50/50 sticky top-0 z-10 backdrop-blur-md">
+        <h3 class="text-xl font-bold text-gray-800">Escolha os Sabores</h3>
+        <p id="miniSalgadosProductName" class="text-rose-600 font-medium mt-1"></p>
+        <div class="flex gap-2 text-xs mt-1">
+          <span class="bg-gray-100 text-gray-600 px-2 py-0.5 rounded">Mín: <span id="miniSalgadosMin">25</span></span>
+          <span class="bg-gray-100 text-gray-600 px-2 py-0.5 rounded">Máx: <span id="miniSalgadosMax">25</span></span>
+        </div>
+      </div>
+
+      <div class="p-6">
+        <div class="flex justify-between items-center mb-4 sticky top-0 bg-white z-10 py-2 border-b border-gray-50">
+          <span class="text-sm text-gray-600">Selecionados:</span>
+          <span id="miniSalgadosCounter" class="font-bold text-rose-600 bg-rose-50 px-3 py-1 rounded-full">0/25</span>
+        </div>
+
+        <div id="miniSalgadosContainer" class="space-y-3 pb-2">
+          <!-- Injected via JS -->
+        </div>
+
+        <div id="miniSalgadosError"
+          class="hidden mt-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm border border-red-100 animate-pulse"></div>
+      </div>
+
+      <div class="p-4 border-t border-gray-100 bg-gray-50/50 flex gap-3 sticky bottom-0 z-10 backdrop-blur-md">
+        <button onclick="document.getElementById('miniSalgadosModal').classList.add('hidden')"
+          class="flex-1 py-3 text-gray-600 font-medium hover:bg-gray-100 rounded-xl transition-colors">Cancelar</button>
+        <button onclick="confirmMiniSalgados()"
+          class="flex-1 py-3 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl shadow-lg shadow-rose-200 transition-all active:scale-95">Confirmar</button>
+      </div>
+    </div>
+  </div>
+
   <script src="../assets/js/pix.js"></script>
+  <script src="../assets/js/fast/auth-legacy.js"></script>
+  <script src="../assets/js/fast/admin-rules.js"></script>
+  <script src="../assets/js/fast/address.js"></script>
+  <script src="../assets/js/fast/options.js"></script>
+  <script src="../assets/js/fast/app.js"></script>
   <script src="../assets/js/store-status.js"></script>
+  <script src="../assets/js/fast/ad-banner.js"></script>
 
   <script>
     // Load Ratings/Testimonials (Public)

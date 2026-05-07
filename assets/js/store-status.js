@@ -4,6 +4,54 @@
 // Dependências: storeConfig, storeClosedToday, isFastOpen() (globais do fast.html)
 // ========================================
 
+window.storeClosedToday = false; // Cached flag
+
+window.StoreStatusService = {
+  /**
+   * Check if store is closed today (from database)
+   */
+  isClosedToday: async function () {
+    try {
+      // Function to format date YYYY-MM-DD
+      const formatYYYYMMDD = (d) => {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+      };
+
+      // Get Brasilia time if function exists, else local
+      const brasilia = typeof getBrasiliaDate === 'function' ? getBrasiliaDate() : new Date();
+      const todayStr = formatYYYYMMDD(brasilia);
+
+      if (!window.supabaseClient) return false;
+
+      const { data, error } = await window.supabaseClient
+        .from('fast_store_status')
+        .select('is_closed')
+        .eq('date', todayStr)
+        .maybeSingle();
+
+      if (error) {
+        console.warn('[StoreStatus] Error checking status:', error.message);
+        return false;
+      }
+
+      window.storeClosedToday = data?.is_closed === true;
+      return window.storeClosedToday;
+    } catch (e) {
+      console.error('[StoreStatus] Exception:', e);
+      return false;
+    }
+  }
+};
+
+if (!window.checkBusinessHours) {
+  // Basic fallback if not defined in util/data
+  window.checkBusinessHours = function () { return true; };
+}
+
+
 // REDEFINE updateOpenNotice to include Time Estimates
 function updateOpenNotice() {
   const notice = document.getElementById('openNotice');

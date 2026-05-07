@@ -115,6 +115,8 @@ function switchAdminTab(targetId, btnElement) {
         if (typeof renderFastFeesListPanel === 'function') renderFastFeesListPanel();
         // Load store config for PIX and delivery settings
         if (typeof loadStoreConfig === 'function') loadStoreConfig();
+        // Load store closure status for today
+        if (typeof loadStoreClosureStatus === 'function') loadStoreClosureStatus();
     }
     if (targetId === 'rulesPanelFast' && window.RulesModule) {
         RulesModule.init();
@@ -137,6 +139,15 @@ function setupGlobalListeners() {
             if (typeof renderDashboardOrders === 'function') renderDashboardOrders(filtered);
         });
     }
+
+    // Sidebar Toggles
+    const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+    const closeSidebarBtn = document.getElementById('closeSidebarBtn');
+    const sidebarBackdrop = document.getElementById('sidebarBackdrop');
+
+    if (mobileMenuBtn) mobileMenuBtn.addEventListener('click', openMobileSidebar);
+    if (closeSidebarBtn) closeSidebarBtn.addEventListener('click', closeMobileSidebar);
+    if (sidebarBackdrop) sidebarBackdrop.addEventListener('click', closeMobileSidebar);
 
     // Escape Config Modal
     document.addEventListener('keydown', (e) => {
@@ -242,3 +253,25 @@ window.safeDate = (d) => d ? new Date(d) : new Date(0);
 window.showPanel = function (panelId) {
     switchAdminTab(panelId);
 };
+
+// ========================================
+// MOBILE SIDEBAR FUNCTIONS
+// ========================================
+
+function openMobileSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const backdrop = document.getElementById('sidebarBackdrop');
+    if (sidebar) sidebar.classList.remove('-translate-x-full');
+    if (backdrop) backdrop.classList.remove('hidden');
+}
+
+function closeMobileSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const backdrop = document.getElementById('sidebarBackdrop');
+    if (sidebar) sidebar.classList.add('-translate-x-full');
+    if (backdrop) backdrop.classList.add('hidden');
+}
+
+// Make globally available
+window.openMobileSidebar = openMobileSidebar;
+window.closeMobileSidebar = closeMobileSidebar;

@@ -1,0 +1,515 @@
+# 📋 Fast Savory's — Todas as Regras do Sistema
+
+Documento completo com **todas as regras de negócio**, informando para cada uma: **tabela no Supabase**, **onde é alterada** (painel admin) e **onde fica salvo**.
+
+---
+
+## 1. 🕐 Horários de Funcionamento
+
+| Dia | Abre | Fecha | Status |
+|---|---|---|---|
+| Domingo | 14:00 | 18:00 | **Fechado** (padrão) |
+| Segunda | 14:00 | 18:00 | Aberto |
+| Terça | 14:00 | 18:00 | Aberto |
+| Quarta | 14:00 | 18:00 | Aberto |
+| Quinta | 14:00 | 18:00 | Aberto |
+| Sexta | 14:00 | 19:30 | Aberto |
+| Sábado | 14:00 | 18:00 | Aberto |
+
+- **Tabela Supabase:** `fast_business_hours`
+- **Campos:** `day_of_week` (0=Dom…6=Sáb), `day_name`, `is_open`, `open_time`, `close_time`
+- **Onde altera:** Admin → Configurações → Horários de Funcionamento ([handleSaveBusinessHours()](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/admin/config.js#490-494) em [config.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/admin/config.js))
+- **Onde é lida:** [data.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/fast/data.js) [loadBusinessHours()](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/fast/data.js#22-57) → [rules.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/fast/rules.js) `RulesModule.isOpen()`
+
+---
+
+## 2. 🔴 Fechamento Manual da Loja (Botão Pânico)
+
+- Permite fechar a loja para um dia específico manualmente
+- **Tabela Supabase:** `fast_store_status`
+- **Campos:** [date](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/cart.js#10-74) (UNIQUE), `is_closed`, `closed_by`
+- **Onde altera:** Admin → Configurações → Fechamento da Loja ([handleToggleStoreClosure()](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/admin/config.js#230-276) em [config.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/admin/config.js)) + Botão Pânico em [admin-rules.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/fast/admin-rules.js)
+- **Onde é lida:** [store-status.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/store-status.js) → `StoreStatusService.isClosedToday()`
+
+---
+
+## 3. 📅 Datas Bloqueadas (Feriados/Manutenção)
+
+- Permite bloquear datas futuras para pedidos
+- **Tabela Supabase:** `fast_blocked_dates`
+- **Campos:** [id](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/fast/order-rules.js#526-596), `blocked_date`, `reason`, `created_at`
+- **Onde altera:** Admin → Regras → Datas Bloqueadas em [admin-rules.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/fast/admin-rules.js) ([addBlockedDate()](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/pages/fast.html#1812-1839), [removeBlockedDate()](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/fast/admin-rules.js#86-101)) e [admin/rules.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/admin/rules.js) (`RulesModule.addBlockedDate()`)
+
+---
+
+## 4. 💳 Taxa de Cartão
+
+| Regra | Valor Padrão |
+|---|---|
+| Taxa cartão 1x | **5%** do subtotal |
+| Taxa cartão 2x | **= taxa 1x** (igualados) |
+
+- **Tabela Supabase:** `fast_store_config` (id=1)
+- **Campos:** `card_fee_1x`, `card_fee_2x`
+- **Onde altera:** Admin → Configurações → Taxa de Cartão ([handleSaveCardFees()](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/admin/config.js#482-489) em [config.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/admin/config.js))
+- **Onde é usada:** [checkout.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/fast/checkout.js) L629 + [fast.html](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/pages/fast.html) L3781
+
+---
+
+## 5. 🚚 Delivery (Entrega)
+
+### 5.1 Habilitação do Delivery
+
+| Regra | Valor |
+|---|---|
+| Delivery habilitado? | `true/false` |
+| Motivo quando desativado | Texto livre |
+
+- **Tabela Supabase:** `fast_store_config`
+- **Campos:** `delivery_enabled`, `delivery_disabled_reason`
+- **Onde altera:** Admin → Configurações → Entrega ([handleSaveDeliverySettings()](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/admin/config.js#495-514) em [config.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/admin/config.js)) e Admin → Regras em [admin-rules.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/fast/admin-rules.js)
+
+### 5.2 Tempo Estimado de Preparo/Entrega
+
+| Config | Padrão |
+|---|---|
+| Preparo mínimo | 30 min |
+| Preparo máximo | 60 min |
+| Entrega mínimo | 15 min |
+| Entrega máximo | 45 min |
+| Tempo extra alta demanda | +15 min |
+
+- **Tabela Supabase:** `fast_store_config`
+- **Campos:** `prep_time_min`, `prep_time_max`, `delivery_time_min`, `delivery_time_max`, `high_demand_extra_time`
+- **Onde altera:** Admin → Configurações → Entrega em [config.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/admin/config.js)
+- **Onde é usada:** [store-status.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/store-status.js) [updateDeliveryStatusBanner()](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/store-status.js#127-177)
+
+### 5.3 Alta Demanda
+
+| Config | Padrão |
+|---|---|
+| Máx pedidos simultâneos | 10 |
+
+- **Tabela:** `fast_store_config` → `max_concurrent_orders`
+- **Verifica em:** `fast_orders` (pedidos com status `pending/preparing/accepted/confirmed` nas últimas 24h)
+- **Onde altera:** Admin → Configurações → Regras ([handleSaveRules()](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/admin/config.js#534-544))
+
+---
+
+## 6. 🏘️ Taxas de Entrega por Bairro
+
+| Bairro | Taxa (R$) | Valor Mín. Entrega |
+|---|---|---|
+| Novo Prado | 0 | Configurável |
+| São Domingos | 0 | Configurável |
+| Cristo Redentor | 0 | Configurável |
+| Baixa Fria | 0 | Configurável |
+| Várzea Alegre | 2 | Configurável |
+| São Bernardo | 2 | Configurável |
+| Santo Antônio | 2 | Configurável |
+| Canaã | 2 | Configurável |
+| Centro | 2 | Configurável |
+| Fátima | 2 | Configurável |
+| 31 de Março | 2 | Configurável |
+| BNH | 2 | Configurável |
+| Vale do Jucuruçu | 2 | Configurável |
+| Jaqueira | 2 | Configurável |
+| Cidade Baixa | 2 | Configurável |
+| Marotinho | 3 | Configurável |
+| Corujão | 3 | Configurável |
+| Primavera | 3 | Configurável |
+| Bela Vista | 3 | Configurável |
+| Vista Bela | 3 | Configurável |
+| Liberdade | 3 | Configurável |
+| Urbis 2 | 3 | Configurável |
+| Urbis 3 | 3 | Configurável |
+| Italage | 3 | Configurável |
+| Portal do Monte | 4 | Configurável |
+| Alvorada | 4 | Configurável |
+| Monte Pescoço | 4 | Configurável |
+| Tarcizão | 4 | Configurável |
+| Vista da Pedra | 4 | Configurável |
+| Village das Pedras | 4 | Configurável |
+| Itatiaia | 4 | Configurável |
+| Furlan | 4 | Configurável |
+
+- **Tabela Supabase:** `fast_delivery_fees`
+- **Campos:** `neighborhood` (UNIQUE), `fee`, `min_order_value`
+- **Onde altera:** Admin → Taxas de Entrega ([handleAddFeePanel()](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/admin/config.js#303-315), [handleSaveAllFeesPanel()](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/admin/config.js#316-327) em [config.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/admin/config.js))
+- **Onde é usada:** [fast.html](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/pages/fast.html) [calcFastDeliveryFee()](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/pages/fast.html#3662-3674) L3662, [order-rules.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/fast/order-rules.js) [getMinDeliveryValue()](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/fast/order-rules.js#206-233)
+- **Cache:** `localStorage → fastDeliveryFees`
+
+---
+
+## 7. 💰 Valores Mínimos de Pedido
+
+### 7.1 Mínimos Globais
+
+| Regra | Valor Padrão | Tabela/Campo |
+|---|---|---|
+| Mínimo para **entrega** | R$ 15,00 | `fast_store_config.min_order_delivery` |
+| Mínimo para **retirada** | R$ 8,00 | `fast_store_config.min_order_pickup` |
+| Mínimo retirada **fora horário** | R$ 15,00 | `fast_store_config.min_order_pickup_offhours` |
+
+- **Onde altera:** Admin → Regras em [admin-rules.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/fast/admin-rules.js) e [admin/rules.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/admin/rules.js)
+- **Onde é validada:** [order-rules.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/fast/order-rules.js) [validateOrder()](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/fast/order-rules.js#526-596) L560
+
+### 7.2 Mínimos por Faixa de Horário (Salgados — data futura)
+
+| Horário | Valor Mínimo | Localização |
+|---|---|---|
+| 07:00 – 11:00 | R$ **35,00** | Hardcoded em [order-rules.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/fast/order-rules.js) L393 |
+| 11:00 – 14:00 | R$ **25,00** | Hardcoded em [order-rules.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/fast/order-rules.js) L404 |
+| 14:00 – 18:00 | Sem mínimo extra | — |
+
+### 7.3 Mínimos por Faixa de Horário (Salgados — mesmo dia)
+
+| Horário | Condição | Valor Mínimo |
+|---|---|---|
+| 11:30 – 14:00 | **Entrega** | R$ **20,00** |
+| 11:30 – 18:00 | Sem extra | — |
+
+Hardcoded em [order-rules.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/fast/order-rules.js) L374
+
+### 7.4 Mínimo por Bairro
+
+- Cada bairro pode ter valor mínimo individual
+- **Tabela:** `fast_delivery_fees.min_order_value`
+- **Validado em:** [order-rules.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/fast/order-rules.js) [canUseDelivery()](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/fast/order-rules.js#158-205) L192
+
+---
+
+## 8. 🌴 Regra de Domingo
+
+| Cenário | Regra |
+|---|---|
+| Hoje é domingo, pedido pra **hoje** | ❌ **Bloqueado** (loja fechada aos domingos) |
+| Data de entrega/retirada cai no **domingo** | Mín. R$ **39,00** (tanto entrega quanto retirada) |
+| Hoje é domingo, pedido para **outro dia** | ✅ Permitido sem restrição |
+
+- **Valor mínimo:** R$ 39,00 (hardcoded `SUNDAY_MIN_VALUE`)
+- **Localização:** [order-rules.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/fast/order-rules.js) [validateSundayRule()](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/fast/order-rules.js#433-492) L447
+
+---
+
+## 9. 🎂 Regras de Produtos por Categoria
+
+### 9.1 Classificação
+
+| Categoria | Exemplos |
+|---|---|
+| `bolo_grande` | Bolo G, Bolo P, Vulcão, Kit Festa |
+| `bolo_mini` | Vulcão Mini |
+| `combo_vulcao` | Combos com Vulcão |
+| [combo](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/pages/fast.html#2346-2368) | Outros combos |
+| `salgados` | Coxinha, Risole, Empada, etc. |
+| `bebidas` | Refri, Suco, Água |
+| `adicionais` | Molhos, Maionese |
+
+Definido em: [order-rules.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/fast/order-rules.js) [classifyProduct()](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/fast/order-rules.js#18-85) L23
+
+### 9.2 Regras por Tipo de Produto
+
+| Tipo | Entrega | Antecedência | Horário |
+|---|---|---|---|
+| **Bolo Grande / Kit Festa** | ❌ Apenas retirada | D+1 (sempre amanhã) | 07:00 – 18:00 |
+| **Vulcão Mini** | ✅ Permitida | Até 10h = hoje; Após 10h = D+1 | 07:00 – 18:00 |
+| **Salgados** | ✅ Permitida | Até 8h = hoje; Após 8h = restrições | 07:00 – 18:00 |
+| **Bebidas/Adicionais** só | ❌ Bloqueado (entrega) | — | — |
+
+Definido em: [order-rules.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/fast/order-rules.js) [canUseDelivery()](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/fast/order-rules.js#158-205), [getMinOrderDate()](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/fast/order-rules.js#238-300), [validateOrderTime()](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/fast/order-rules.js#305-428)
+
+---
+
+## 10. 📦 Pedidos no Mesmo Dia
+
+| Config | Valor Padrão | Tabela/Campo |
+|---|---|---|
+| Habilitado? | Sim | `fast_store_config.same_day_orders_enabled` |
+| Valor mínimo | R$ 15,00 | `fast_store_config.same_day_min_value` |
+| Horário início retirada | 11:00 ou 12:00 | `fast_store_config.same_day_pickup_start` |
+| Horário fim retirada | 18:00 | `fast_store_config.same_day_pickup_end` |
+
+- **Onde altera:** Admin → Regras
+- **Validação legado em [cart.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/cart.js):** [canOrderTodayWithoutBolo()](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/pages/fast.html#2047-2116) → mín R$ 15, apenas retirada, entre 11h-18h
+
+---
+
+## 11. 🌅 Regra da Manhã
+
+| Config | Valor Padrão | Tabela/Campo |
+|---|---|---|
+| Habilitada? | Sim | `fast_store_config.morning_rule_enabled` |
+| Horário limite | 12:00 / 14:00 | `fast_store_config.morning_rule_end_time` |
+| Valor mínimo | R$ 25,00 / R$ 30,00 | `fast_store_config.morning_rule_min_value` |
+
+- **Onde altera:** Admin → Regras em [admin-rules.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/fast/admin-rules.js) e [admin/rules.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/admin/rules.js)
+- **Legado em [cart.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/cart.js):** [isOrderAllowedAtTime()](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/pages/fast.html#2140-2215) → entre 7h–14h: mín R$ 30 ou ter bolo
+
+---
+
+## 12. 🎁 Promoções por Produto
+
+- Desconto pode ser **percentual** ou **fixo** por produto
+- Descontos de promoção **NÃO acumulam** com cupom, fidelidade ou aniversário
+
+| Campo | Descrição |
+|---|---|
+| `product_id` | FK para `fast_products` |
+| `discount_type` | `percentage` ou `fixed` |
+| `value` | Valor do desconto |
+| `active` | Se está ativa |
+
+- **Tabela Supabase:** `fast_promotions`
+- **Onde altera:** Admin → Promoções em [admin/promotions.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/admin/promotions.js)
+- **Onde é carregada:** [data.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/fast/data.js) [loadPromotions()](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/services.js#1691-1738)
+
+---
+
+## 13. 🎟️ Cupons de Desconto
+
+| Campo | Descrição |
+|---|---|
+| `code` | Código único (ex: FAST10) |
+| `discount_type` | `percentage` ou `fixed` |
+| `value` | Valor do desconto |
+| `min_order` | Valor mínimo do pedido |
+| `max_discount_value` | Teto máximo do desconto |
+| `max_usage_count` | Limite de usos totais |
+| `current_usage_count` | Usos atuais |
+| `expiry_date` | Data de expiração |
+| `active` | Se está ativo |
+
+**Regras de uso:**
+- ❌ Não acumula com promoções de produto
+- ❌ Não acumula com desconto aniversariante
+- ✅ Acumula com desconto fidelidade
+- 1 uso por telefone (verificado em `fast_coupon_usage`)
+
+- **Tabela Supabase:** `fast_coupons` (cupons) + `fast_coupon_usage` (histórico)
+- **Onde altera:** Admin → Promoções → Cupons em [admin/promotions.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/admin/promotions.js)
+- **Validação:** [data.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/fast/data.js) [findValidCouponByCode()](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/fast/data.js#391-426), [fast.html](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/pages/fast.html) [computeCouponDiscount()](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/pages/fast.html#3457-3471), [services.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/services.js) `CouponUsageService`
+
+---
+
+## 14. 🎂 Desconto de Aniversário
+
+| Config | Valor Padrão |
+|---|---|
+| Tipo de desconto | Percentual |
+| Valor | 10% |
+| Validade após aniversário | 6 dias |
+| Uso | 1x por ano por telefone |
+| Regra legado (fallback) | ≥ R$50 → 10%, < R$50 → 5% |
+
+**Regras:**
+- ❌ Não acumula com promoções
+- ❌ Não acumula com cupom
+- ✅ Substitui desconto fidelidade (se ambos aplicáveis)
+
+- **Tabela config:** `fast_birthday_discount` (config geral)
+- **Tabela uso:** `fast_birthday_discount_usage` (`client_phone` + `usage_year` = UNIQUE)
+- **Onde altera:** Admin → Promoções em [admin/promotions.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/admin/promotions.js)
+- **Onde é usada:** [services.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/services.js) `BirthdayDiscountService`, [rules.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/fast/rules.js) [isBirthdayDiscountValid()](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/pages/fast.html#1663-1696), [calculateBirthdayDiscount()](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/fast/rules.js#90-106)
+
+---
+
+## 15. 🌟 Desconto Fidelidade (Especial)
+
+| Config | Valor Padrão |
+|---|---|
+| A cada X pedidos | 10 |
+| Tipo | Percentual |
+| Valor | 10% |
+| Valor mínimo do pedido | R$ 0 |
+| Ativo? | Sim |
+
+- Conta pedidos com status `delivered` do mesmo telefone
+- Se `contagem % min_orders == 0` → desconto aplicado
+
+- **Tabela Supabase:** `fast_special_discounts`
+- **Campos:** `store_id` (=1), `min_orders`, `discount_type`, `discount_value`, `min_order_value`, `active`
+- **Onde altera:** Admin → Promoções em [admin/promotions.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/admin/promotions.js)
+- **Onde é usada:** [services.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/services.js) `SpecialDiscountService`
+
+---
+
+## 16. 📊 Desconto Individual por Cliente
+
+- Percentual de desconto fixo por telefone
+- **Tabela Supabase:** `fast_client_discounts`
+- **Campos:** `phone` (UNIQUE), `discount_percentage`
+- **Onde altera:** Admin → Clientes (editar cliente)
+- **Onde é usada:** [services.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/services.js) `ClientDiscountsService`
+
+---
+
+## 17. 🛒 Produtos
+
+| Campo | Descrição |
+|---|---|
+| [id](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/fast/order-rules.js#526-596) | BIGINT (Date.now()) |
+| `name` | Nome do produto |
+| `description` | Descrição |
+| `price` | Preço (R$) |
+| `category` | `salgados`, `mini`, `kits`, `bolos`, `adicionais`, `bebidas` |
+| `image` | URL da imagem |
+| `emoji` | Emoji padrão 🥟 |
+| `visible` | Se aparece na loja |
+
+- **Tabela Supabase:** `fast_products`
+- **Onde altera:** Admin → Produtos em [admin/products.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/admin/products.js)
+- **Onde é carregada:** [services.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/services.js) `ProductService.fetchAll()`
+
+---
+
+## 18. 👤 Clientes
+
+| Campo | Descrição |
+|---|---|
+| `name` | Nome completo |
+| `phone` | Telefone (UNIQUE) |
+| `birthdate` | Data de nascimento |
+| `email` | Email |
+| `addresses` | JSONB com lista de endereços |
+| `discount_percentage` | Desc. individual |
+
+- **Tabela Supabase:** `fast_clients`
+- **Onde altera:** Admin → Clientes em [admin/clients.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/admin/clients.js)
+
+---
+
+## 19. 📋 Pedidos
+
+| Campo | Descrição |
+|---|---|
+| `status` | `pending`, `confirmed`, `preparing`, `delivered`, `cancelled` |
+| `payment_method` | `dinheiro`, `cartao1x`, `pix` |
+| `delivery_type` | `entrega`, `retirada` |
+| `delivery_fee` | Taxa de entrega |
+| `card_fee` | Taxa de cartão |
+| `discount` | Desconto total aplicado |
+| `coupon_code` | Cupom usado |
+| `scheduled_date` / `scheduled_time` | Data/hora agendamento |
+
+- **Tabela Supabase:** `fast_orders`
+- **Onde gerencia:** Admin → Pedidos em [admin/orders.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/admin/orders.js)
+- **Onde cria:** [fast/data.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/fast/data.js) [saveOrderToSupabase()](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/fast/data.js#246-330)
+
+---
+
+## 20. 📱 WhatsApp / ManyChat
+
+| Config | Valor |
+|---|---|
+| Número WhatsApp | `5573999366554` |
+| Contato exibido | (73) 99936-6554 |
+
+- Hardcoded em [checkout.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/fast/checkout.js) L722
+- ManyChat em [api/manychat-api.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/api/manychat-api.js)
+
+---
+
+## 21. 💲 PIX
+
+| Config | Tabela/Campo |
+|---|---|
+| Chave PIX | `fast_store_config.pix_key` |
+| Nome comerciante | `fast_store_config.pix_merchant_name` |
+| Cidade comerciante | `fast_store_config.pix_merchant_city` |
+
+- **Onde altera:** Admin → Configurações → PIX ([handleSavePixConfig()](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/admin/config.js#515-533) em [config.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/admin/config.js))
+
+---
+
+## 22. 🖼️ Banner Publicitário
+
+| Campo | Descrição |
+|---|---|
+| `enabled` | Se o banner está ativo |
+| `image_url` | URL da imagem |
+| `link_url` | Link ao clicar |
+| `alt_text` | Texto alternativo |
+| `fallback_text` | Texto se sem imagem |
+
+- **Tabela Supabase:** `fast_banner_config`
+- **Onde altera:** Admin → Banner em [config.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/admin/config.js) `BannerModule`
+- **Onde exibe:** [ad-banner.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/fast/ad-banner.js)
+
+---
+
+## 23. ⭐ Avaliações
+
+| Campo | Descrição |
+|---|---|
+| `client_name` | Nome do cliente |
+| `rating` | 1 a 5 estrelas |
+| `comment` | Comentário (mín. 10 chars) |
+| `approved` | Se aprovada (moderação) |
+| `archived` | Se arquivada |
+
+- **Tabela Supabase:** `fast_ratings` + `fast_orders.rating` e `fast_orders.rating_comment`
+- **Onde gerencia:** Admin → Avaliações em [admin/ratings.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/admin/ratings.js)
+- **Onde publica:** [services.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/services.js) `RatingsService.getPublicRatings()`
+
+---
+
+## 24. 👤 Usuários Admin (Login)
+
+| Usuário Padrão | Senha | Role |
+|---|---|---|
+| `fast` | `fast123` | `admin` |
+
+- **Roles disponíveis:** `admin`, `gerente`, `garcom`, `caixa`
+- **Tabela Supabase:** `fast_users`
+- **Onde gerencia:** Admin → Login em [admin/auth.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/admin/auth.js)
+
+---
+
+## 25. 🔄 Validações do Checkout
+
+| Validação | Localização |
+|---|---|
+| Nome + sobrenome obrigatório (novos clientes) | [checkout.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/fast/checkout.js) L363 |
+| Telefone 11 dígitos | [checkout.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/fast/checkout.js) L351 |
+| Aceitar Termos de Uso | [checkout.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/fast/checkout.js) L373 |
+| Endereço completo para entrega | [checkout.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/fast/checkout.js) L388 |
+| Data/hora obrigatórios se loja fechada | [checkout.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/fast/checkout.js) L414 |
+| Modal de confirmação se sem troco (dinheiro) | [checkout.js](file:///c:/Users/jhona/CascadeProjects/Fastsavorys/assets/js/fast/checkout.js) L476 |
+
+---
+
+## 26. ⏱️ Janela de Pedidos
+
+| Config | Valor Padrão | Tabela/Campo |
+|---|---|---|
+| Início | 07:00 | `fast_store_config.order_window_start` |
+| Fim | 18:00 | `fast_store_config.order_window_end` |
+
+- **Onde altera:** Admin → Regras
+
+---
+
+## Resumo: Todas as Tabelas Supabase Envolvidas
+
+| # | Tabela | Finalidade |
+|---|---|---|
+| 1 | `fast_products` | Cadastro de produtos |
+| 2 | `fast_clients` | Cadastro de clientes |
+| 3 | `fast_promotions` | Promoções por produto |
+| 4 | `fast_delivery_fees` | Taxas e mínimos por bairro |
+| 5 | `fast_users` | Usuários admin |
+| 6 | `fast_orders` | Pedidos |
+| 7 | `fast_coupons` | Cupons de desconto |
+| 8 | `fast_coupon_usage` | Histórico de uso de cupons |
+| 9 | `fast_store_status` | Fechamento manual (por data) |
+| 10 | `fast_birthday_discount_usage` | Uso do desconto aniversário |
+| 11 | `fast_store_config` | Configurações gerais (1 registro) |
+| 12 | `fast_business_hours` | Horários por dia da semana |
+| 13 | `fast_blocked_dates` | Datas bloqueadas |
+| 14 | `fast_birthday_discount` | Config do desconto aniversário |
+| 15 | `fast_special_discounts` | Config desconto fidelidade |
+| 16 | `fast_client_discounts` | Desconto individual por cliente |
+| 17 | `fast_banner_config` | Banner publicitário |
+| 18 | `fast_ratings` | Avaliações dos clientes |
+| 19 | `fast_data_versions` | Versionamento de dados (cache) |

@@ -21,40 +21,14 @@ const adminConfigDefaults = {
 
 // Load store config from Supabase and populate admin form
 async function loadStoreConfig() {
-    try {
-        if (!window.supabaseClient) {
-            loadStoreConfigFromLocalStorage();
-            return;
-        }
-
-        const { data, error } = await window.supabaseClient
-            .from('fast_store_config')
-            .select('*')
-            .eq('id', 1)
-            .maybeSingle();
-
-        if (error) throw error;
-
-        if (data) {
-            window.storeConfig = {
-                ...window.storeConfig,
-                card_fee_1x: parseFloat(data.card_fee_1x) || 5,
-                card_fee_2x: parseFloat(data.card_fee_2x) || 5,
-                delivery_enabled: data.delivery_enabled !== false,
-                delivery_disabled_reason: data.delivery_disabled_reason || '',
-                prep_time_min: parseInt(data.prep_time_min) || 30,
-                prep_time_max: parseInt(data.prep_time_max) || 60,
-                delivery_time_min: parseInt(data.delivery_time_min) || 15,
-                delivery_time_max: parseInt(data.delivery_time_max) || 45,
-                pix_key: data.pix_key || '',
-                pix_merchant_name: data.pix_merchant_name || '',
-                pix_merchant_city: data.pix_merchant_city || ''
-            };
-            localStorage.setItem('fastStoreConfig', JSON.stringify(window.storeConfig));
-        }
+    if (window.StoreConfigService) {
+        // Use centralized service (Consolidation)
+        await window.StoreConfigService.load();
+        // UI population is triggered by event 'fastStoreConfigLoaded' dispatch inside Service
+        // OR we can explicit call populate here just to be sure
         populateConfigForm();
-    } catch (e) {
-        console.warn('[Admin Config] Error loading config:', e);
+    } else {
+        console.error('StoreConfigService not found, falling back to local');
         loadStoreConfigFromLocalStorage();
     }
 }
@@ -101,6 +75,24 @@ function populateConfigForm() {
     if (pixKey) pixKey.value = cfg.pix_key || '';
     if (pixName) pixName.value = cfg.pix_merchant_name || '';
     if (pixCity) pixCity.value = cfg.pix_merchant_city || '';
+
+    // Message Buffer Settings
+    const bufferEnabled = document.getElementById('messageBufferEnabled');
+    const bufferDelay = document.getElementById('messageBufferDelay');
+    if (bufferEnabled) bufferEnabled.checked = cfg.message_buffer_enabled === true;
+    if (bufferDelay) bufferDelay.value = cfg.message_buffer_delay_seconds || 5;
+
+    // AI Config Settings
+    const aiModel = document.getElementById('aiModelPrimary');
+    const aiMultimodal = document.getElementById('aiModelMultimodal');
+    const aiTemp = document.getElementById('aiTemperature');
+    const aiTokens = document.getElementById('aiMaxOutputTokens');
+    const mediaEnabled = document.getElementById('mediaProcessingEnabled');
+    if (aiModel) aiModel.value = cfg.ai_model_primary || 'gemini-2.5-flash-lite';
+    if (aiMultimodal) aiMultimodal.value = cfg.ai_model_multimodal || 'gemini-2.5-flash';
+    if (aiTemp) aiTemp.value = cfg.ai_temperature != null ? cfg.ai_temperature : 0.7;
+    if (aiTokens) aiTokens.value = cfg.ai_max_output_tokens || 2048;
+    if (mediaEnabled) mediaEnabled.checked = cfg.media_processing_enabled !== false;
 }
 
 async function saveStoreConfig() {
@@ -154,9 +146,197 @@ async function saveStoreConfig() {
     }
 }
 
+// --- Save AI Settings ---
+async function handleSaveAiSettings() {
+    const aiModel = document.getElementById('aiModelPrimary')?.value || 'gemini-2.5-flash-lite';
+    const aiMultimodal = document.getElementById('aiModelMultimodal')?.value || 'gemini-2.5-flash';
+    const aiTemp = parseFloat(document.getElementById('aiTemperature')?.value) || 0.7;
+    const aiTokens = parseInt(document.getElementById('aiMaxOutputTokens')?.value) || 2048;
+    const mediaEnabled = document.getElementById('mediaProcessingEnabled')?.checked !== false;
+
+    window.storeConfig = {
+        ...window.storeConfig,
+        ai_model_primary: aiModel,
+        ai_model_multimodal: aiMultimodal,
+        ai_temperature: Math.max(0, Math.min(1, aiTemp)),
+        ai_max_output_tokens: Math.max(256, Math.min(8192, aiTokens)),
+        media_processing_enabled: mediaEnabled
+    };
+
+    if (window.StoreConfigService) {
+        const ok = await window.StoreConfigService.save(window.storeConfig);
+        if (ok) {
+            showToast('Configuracoes da IA salvas!', 'success');
+        } else {
+            showToast('Erro ao salvar configuracoes da IA', 'error');
+        }
+    } else {
+        localStorage.setItem('fastStoreConfig', JSON.stringify(window.storeConfig));
+        showToast('IA salva localmente (Supabase indisponivel)', 'warning');
+    }
+}
+
 // Export functions
 window.loadStoreConfig = loadStoreConfig;
 window.saveStoreConfig = saveStoreConfig;
+window.handleSaveAiSettings = handleSaveAiSettings;
+
+// ========================================
+// STORE CLOSURE (fast_store_status table)
+// ========================================
+
+function getStoreClosureDateFormatted() {
+    const input = document.getElementById('storeClosureDate');
+    if (!input || !input.value) return null;
+    return input.value; // Already YYYY-MM-DD from date input
+}
+
+function formatDateBR(dateStr) {
+    if (!dateStr) return '';
+    const parts = dateStr.split('-');
+    return parts[2] + '/' + parts[1] + '/' + parts[0];
+}
+
+function getTodayBrasilia() {
+    const now = typeof getBrasiliaDate === 'function' ? getBrasiliaDate() : new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+}
+
+async function loadStoreClosureStatus() {
+    const dateInput = document.getElementById('storeClosureDate');
+    const toggle = document.getElementById('storeClosureToggle');
+    const label = document.getElementById('storeClosureLabel');
+    const statusDiv = document.getElementById('storeClosureStatus');
+    if (!dateInput || !toggle || !statusDiv) return;
+
+    // Default to today if empty
+    if (!dateInput.value) {
+        dateInput.value = getTodayBrasilia();
+    }
+
+    // Set minimum date to today
+    dateInput.min = getTodayBrasilia();
+
+    const dateStr = dateInput.value;
+
+    if (!window.supabaseClient) {
+        statusDiv.textContent = 'Supabase indisponível';
+        statusDiv.className = 'mt-4 p-3 rounded-lg text-sm font-medium bg-yellow-50 text-yellow-700 text-center';
+        return;
+    }
+
+    try {
+        const { data, error } = await window.supabaseClient
+            .from('fast_store_status')
+            .select('is_closed')
+            .eq('date', dateStr)
+            .maybeSingle();
+
+        if (error) throw error;
+
+        const isClosed = data?.is_closed === true;
+        toggle.checked = isClosed;
+        updateClosureLabel(isClosed);
+        updateClosureStatusIndicator(dateStr, isClosed);
+    } catch (e) {
+        console.error('[StoreClosure] Error loading status:', e);
+        statusDiv.textContent = 'Erro ao carregar status: ' + e.message;
+        statusDiv.className = 'mt-4 p-3 rounded-lg text-sm font-medium bg-red-50 text-red-700 text-center';
+    }
+}
+
+function updateClosureLabel(isClosed) {
+    const label = document.getElementById('storeClosureLabel');
+    if (!label) return;
+    if (isClosed) {
+        label.textContent = 'Loja Fechada';
+        label.className = 'text-sm font-semibold text-red-700';
+    } else {
+        label.textContent = 'Loja Aberta';
+        label.className = 'text-sm font-semibold text-green-700';
+    }
+}
+
+function updateClosureStatusIndicator(dateStr, isClosed) {
+    const statusDiv = document.getElementById('storeClosureStatus');
+    if (!statusDiv) return;
+
+    const isToday = dateStr === getTodayBrasilia();
+    const dateBR = formatDateBR(dateStr);
+
+    if (isClosed) {
+        statusDiv.innerHTML = `🔴 Loja <strong>FECHADA</strong> em ${dateBR}${isToday ? ' (HOJE)' : ''}`;
+        statusDiv.className = 'mt-4 p-3 rounded-lg text-sm font-medium bg-red-50 text-red-700 border border-red-200 text-center';
+    } else {
+        statusDiv.innerHTML = `🟢 Loja <strong>ABERTA</strong> em ${dateBR}${isToday ? ' (HOJE)' : ''}`;
+        statusDiv.className = 'mt-4 p-3 rounded-lg text-sm font-medium bg-green-50 text-green-700 border border-green-200 text-center';
+    }
+}
+
+async function handleToggleStoreClosure() {
+    const dateStr = getStoreClosureDateFormatted();
+    const toggle = document.getElementById('storeClosureToggle');
+    const statusDiv = document.getElementById('storeClosureStatus');
+
+    if (!dateStr) {
+        showToast('Selecione uma data primeiro.', 'error');
+        return;
+    }
+
+    if (!window.supabaseClient) {
+        showToast('Supabase indisponível.', 'error');
+        return;
+    }
+
+    const isClosed = toggle.checked;
+
+    try {
+        statusDiv.textContent = 'Salvando...';
+        statusDiv.className = 'mt-4 p-3 rounded-lg text-sm font-medium bg-blue-50 text-blue-700 text-center';
+
+        const { error } = await window.supabaseClient
+            .from('fast_store_status')
+            .upsert({
+                date: dateStr,
+                is_closed: isClosed
+            }, { onConflict: 'date' });
+
+        if (error) throw error;
+
+        updateClosureLabel(isClosed);
+        updateClosureStatusIndicator(dateStr, isClosed);
+
+        // Update the global cached flag if the date is today
+        if (dateStr === getTodayBrasilia()) {
+            window.storeClosedToday = isClosed;
+        }
+
+        showToast(isClosed ? 'Loja FECHADA para ' + formatDateBR(dateStr) : 'Loja ABERTA para ' + formatDateBR(dateStr), 'success');
+    } catch (e) {
+        console.error('[StoreClosure] Error saving:', e);
+        showToast('Erro ao salvar: ' + e.message, 'error');
+        statusDiv.textContent = 'Erro ao salvar.';
+        statusDiv.className = 'mt-4 p-3 rounded-lg text-sm font-medium bg-red-50 text-red-700 text-center';
+    }
+}
+
+// Update toggle label in real-time when user clicks the toggle
+document.addEventListener('change', function (e) {
+    if (e.target && e.target.id === 'storeClosureToggle') {
+        updateClosureLabel(e.target.checked);
+    }
+    // Auto-load status when date changes
+    if (e.target && e.target.id === 'storeClosureDate') {
+        loadStoreClosureStatus();
+    }
+});
+
+// Global exports for store closure
+window.handleToggleStoreClosure = handleToggleStoreClosure;
+window.loadStoreClosureStatus = loadStoreClosureStatus;
 
 function readFastFees() {
     try {
@@ -169,17 +349,39 @@ function writeFastFees(data) {
     localStorage.setItem('fastDeliveryFees', JSON.stringify(data));
 }
 
-function handleAddFeePanel() {
+async function handleAddFeePanel() {
     const b = document.getElementById('feeNeighborhoodFastPanel').value.trim();
     const v = parseFloat(document.getElementById('feeValueFastPanel').value.replace(',', '.'));
     const min = parseFloat(document.getElementById('feeMinValueFastPanel').value.replace(',', '.')) || 0;
     if (!b || isNaN(v)) { showToast('Preencha bairro e valor.', 'error'); return; }
-    const m = readFastFees(); // Global or local
-    m[window.norm(b)] = { fee: v, min: min };
+    const normalizedName = window.norm(b);
+    const m = readFastFees();
+    m[normalizedName] = { fee: v, min: min };
     writeFastFees(m);
     renderFastFeesListPanel();
     document.getElementById('feeNeighborhoodFastPanel').value = '';
     document.getElementById('feeValueFastPanel').value = '';
+    if (document.getElementById('feeMinValueFastPanel')) document.getElementById('feeMinValueFastPanel').value = '';
+
+    // Salvar diretamente no Supabase
+    if (window.supabaseClient) {
+        try {
+            const { error } = await window.supabaseClient
+                .from('fast_delivery_fees')
+                .upsert({
+                    neighborhood: normalizedName,
+                    fee: v,
+                    min_order_value: min
+                }, { onConflict: 'neighborhood' });
+
+            if (error) throw error;
+            showToast(`Bairro "${normalizedName}" salvo!`, 'success');
+            console.log('[Admin] Bairro adicionado no Supabase:', normalizedName);
+        } catch (e) {
+            console.error('[Admin] Erro ao salvar bairro no Supabase:', e);
+            showToast('Salvo localmente, mas erro ao sincronizar: ' + e.message, 'warning');
+        }
+    }
 }
 
 async function handleSaveAllFeesPanel() {
@@ -199,13 +401,13 @@ async function saveFeesToSupabase() {
     try {
         const fees = readFastFees();
         console.log('[Admin] Salvando taxas no Supabase:', fees);
-        
+
         if (Object.keys(fees).length === 0) {
             console.warn('[Admin] Nenhuma taxa para salvar');
             showInlineMessage('feesListFastPanel', '⚠️ Nenhuma taxa para salvar', 'warning');
             return;
         }
-        
+
         const rows = Object.entries(fees).map(([neighborhood, entry]) => {
             let feeValue = entry;
             let minValue = 0;
@@ -247,7 +449,7 @@ async function loadFeesFromSupabase() {
             console.warn('[Admin] Supabase não disponível para carregar taxas');
             return;
         }
-        
+
         console.log('[Admin] Carregando taxas do Supabase...');
         const { data, error } = await window.supabaseClient
             .from('fast_delivery_fees')
@@ -259,7 +461,7 @@ async function loadFeesFromSupabase() {
         }
 
         console.log('[Admin] Taxas carregadas do Supabase:', data?.length || 0, 'registros');
-        
+
         if (data && data.length > 0) {
             const feesObj = {};
             data.forEach(row => {
@@ -291,26 +493,51 @@ function renderFastFeesListPanel() {
     list.innerHTML = entries.map(([k, v]) => {
         const fee = typeof v === 'object' ? v.fee : v;
         const min = typeof v === 'object' ? (v.min || 0) : 0;
-        return `<div class='py-3 border-b flex justify-between items-center'>
-       <div><span class='font-bold'>${k}</span></div>
-       <div class="flex gap-2">
-         <input data-k='${k}' data-type="fee" class='w-20 border rounded text-right' value='${fee}'>
-         <input data-k='${k}' data-type="min" class='w-20 border rounded text-right' value='${min}'>
-         <button data-del='${k}' class='bg-red-500 text-white px-2 rounded'>X</button>
+        return `<div class='py-3 border-b flex flex-col sm:flex-row justify-between items-center gap-2'>
+       <div class="w-full sm:w-auto"><span class='font-bold text-gray-800'>${k}</span></div>
+       <div class="flex gap-2 w-full sm:w-auto justify-end">
+         <div class="relative">
+            <span class="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 text-xs">R$</span>
+            <input data-k='${k}' data-type="fee" class='w-20 pl-6 border rounded text-right py-1' value='${fee}' placeholder="Taxa">
+         </div>
+         <div class="relative">
+            <span class="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 text-xs">Min</span>
+            <input data-k='${k}' data-type="min" class='w-20 pl-6 border rounded text-right py-1' value='${min}' placeholder="Mín">
+         </div>
+         <button data-del='${k}' class='bg-red-100 text-red-600 hover:bg-red-200 px-3 py-1 rounded transition-colors'>✕</button>
        </div>
      </div>`;
     }).join('');
 }
 
-function handleFeeListClick(e) {
+async function handleFeeListClick(e) {
     if (e.target.dataset.del) {
+        const neighborhoodKey = e.target.dataset.del;
         const m = readFastFees();
-        delete m[e.target.dataset.del];
+        delete m[neighborhoodKey];
         writeFastFees(m);
         renderFastFeesListPanel();
+
+        // Deletar do Supabase
+        if (window.supabaseClient) {
+            try {
+                const { error } = await window.supabaseClient
+                    .from('fast_delivery_fees')
+                    .delete()
+                    .eq('neighborhood', neighborhoodKey);
+
+                if (error) throw error;
+                showToast(`Bairro "${neighborhoodKey}" removido!`, 'success');
+                console.log('[Admin] Bairro removido do Supabase:', neighborhoodKey);
+            } catch (e) {
+                console.error('[Admin] Erro ao remover bairro do Supabase:', e);
+                showToast('Removido localmente, mas erro ao sincronizar: ' + e.message, 'warning');
+            }
+        }
     }
 }
 
+let _feeChangeTimer = null;
 function handleFeeListChange(e) {
     if (e.target.dataset.k) {
         const m = readFastFees();
@@ -322,6 +549,30 @@ function handleFeeListChange(e) {
             if (type === 'fee') m[key].fee = val;
             if (type === 'min') m[key].min = val;
             writeFastFees(m);
+
+            // Debounce: salvar no Supabase após 800ms sem digitar
+            clearTimeout(_feeChangeTimer);
+            _feeChangeTimer = setTimeout(async () => {
+                if (window.supabaseClient) {
+                    try {
+                        const current = readFastFees()[key];
+                        if (!current) return;
+                        const feeVal = typeof current === 'object' ? current.fee : current;
+                        const minVal = typeof current === 'object' ? (current.min || 0) : 0;
+                        const { error } = await window.supabaseClient
+                            .from('fast_delivery_fees')
+                            .upsert({
+                                neighborhood: key,
+                                fee: feeVal,
+                                min_order_value: minVal
+                            }, { onConflict: 'neighborhood' });
+                        if (error) throw error;
+                        console.log('[Admin] Taxa atualizada no Supabase:', key);
+                    } catch (err) {
+                        console.error('[Admin] Erro ao atualizar taxa no Supabase:', err);
+                    }
+                }
+            }, 800);
         }
     }
 }
@@ -392,6 +643,34 @@ async function handleSavePixConfig() {
 
     await saveStoreConfig();
     showInlineMessage('configPanelFast', '✅ PIX Salvo!', 'success');
+}
+
+async function handleSaveBufferSettings() {
+    const enabled = document.getElementById('messageBufferEnabled')?.checked || false;
+    const delay = Math.max(2, Math.min(15, parseInt(document.getElementById('messageBufferDelay')?.value) || 5));
+
+    storeConfig.message_buffer_enabled = enabled;
+    storeConfig.message_buffer_delay_seconds = delay;
+    localStorage.setItem('fastStoreConfig', JSON.stringify(storeConfig));
+
+    try {
+        const { error } = await window.supabaseClient
+            .from('fast_store_config')
+            .update({
+                message_buffer_enabled: enabled,
+                message_buffer_delay_seconds: delay,
+                updated_at: new Date().toISOString()
+            })
+            .eq('id', 1);
+
+        if (error) throw error;
+        showInlineMessage('configPanelFast', enabled
+            ? `✅ Buffer ativado! Delay: ${delay}s`
+            : '✅ Buffer desativado!', 'success');
+    } catch (e) {
+        console.error('[Buffer] Erro ao salvar:', e);
+        showInlineMessage('configPanelFast', '❌ Erro ao salvar: ' + e.message, 'error');
+    }
 }
 
 async function handleSaveRules() {

@@ -100,7 +100,7 @@ window.CustomerModule = {
 
             if (result.success && result.found && result.client) {
                 const client = result.client;
-                
+
                 // Adiciona ao cache local
                 const existingIndex = window.clients.findIndex(c => c.phone === normalizedPhone);
                 if (existingIndex >= 0) {
@@ -108,7 +108,7 @@ window.CustomerModule = {
                 } else {
                     window.clients.push(client);
                 }
-                
+
                 // Atualiza localStorage como backup
                 try {
                     localStorage.setItem('fastClients', JSON.stringify(window.clients));
@@ -342,3 +342,32 @@ if (document.readyState === 'loading') {
 } else {
     window.CustomerModule.init();
 }
+
+// ===================================
+// LEGACY CLIENT MANAGEMENT (Back-compat)
+// ===================================
+window.clients = [];
+
+window.loadClients = async function () {
+    try {
+        const saved = localStorage.getItem('fastClients');
+        if (saved) {
+            window.clients = JSON.parse(saved);
+            console.log('[Clients] Carregados do cache local:', window.clients.length);
+        } else {
+            window.clients = [];
+        }
+        // If we want to sync with Supabase here, we could, but original fast.html didn't for public view (only admin).
+    } catch (error) {
+        console.error('Erro ao carregar clientes:', error);
+        window.clients = [];
+    }
+};
+
+window.saveClients = async function () {
+    try {
+        localStorage.setItem('fastClients', JSON.stringify(window.clients));
+    } catch (error) {
+        console.error('Erro ao salvar clientes no cache:', error);
+    }
+};

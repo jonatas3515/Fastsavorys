@@ -37,12 +37,12 @@ async function renderPromotions() {
 
             return `
             <div class="flex items-center justify-between p-3 border rounded bg-white shadow-sm mb-2">
-                <div>
-                    <h5 class="font-bold text-gray-800">${productName}</h5>
+                <div class="flex-1 min-w-0 pr-2">
+                    <h5 class="font-bold text-gray-800 truncate">${productName}</h5>
                     <p class="text-sm text-green-600 font-medium">Desconto: ${valueDisplay}</p>
                     <p class="text-xs text-gray-400">${p.active ? 'Ativo' : 'Inativo'}</p>
                 </div>
-                <button onclick="handleDeletePromotion(${p.id})" class="text-red-500 hover:text-red-700 p-2">🔄 🗑️</button>
+                <button onclick="handleDeletePromotion(${p.id})" class="text-red-500 hover:text-red-700 p-2 flex-shrink-0">🔄 🗑️</button>
             </div>`;
         }).join('');
 
@@ -97,6 +97,16 @@ async function handleSavePromotion(event) {
 
         if (error) throw error;
 
+        // Sync fast_products columns to keep both tables consistent
+        await window.supabaseClient
+            .from('fast_products')
+            .update({
+                promo_value: val,
+                promo_type: normalizedType,
+                promo_active: true
+            })
+            .eq('id', probId);
+
         showToast('Promoção salva!', 'success');
 
         // Force public cache update
@@ -117,12 +127,28 @@ async function handleSavePromotion(event) {
 async function handleDeletePromotion(id) {
     if (!confirm('Excluir esta promoção?')) return;
     try {
+        // Get product_id before deleting so we can sync fast_products
+        const { data: promoRow } = await window.supabaseClient
+            .from('fast_promotions')
+            .select('product_id')
+            .eq('id', id)
+            .maybeSingle();
+
         const { error } = await window.supabaseClient
             .from('fast_promotions')
             .delete()
             .eq('id', id);
 
         if (error) throw error;
+
+        // Sync fast_products columns
+        if (promoRow?.product_id) {
+            await window.supabaseClient
+                .from('fast_products')
+                .update({ promo_value: 0, promo_active: false })
+                .eq('id', promoRow.product_id);
+        }
+
         showToast('Promoção excluída!', 'success');
 
         // Force public cache update
@@ -184,7 +210,7 @@ async function renderCoupons() {
                 .not('coupon_code', 'is', null)
                 .neq('coupon_code', '')
                 .eq('status', 'delivered');
-            
+
             if (ordersWithCoupon) {
                 ordersWithCoupon.forEach(o => {
                     const code = String(o.coupon_code || '').toUpperCase().trim();
@@ -270,6 +296,58 @@ async function renderCoupons() {
         const html = coupons.map(renderRow).join('');
         if (tableBody) tableBody.innerHTML = html;
         else cardsContainer.innerHTML = html;
+
+        // Render Mobile List
+        const mobileList = document.getElementById('couponsListMobile');
+        if (mobileList) {
+            if (coupons.length === 0) {
+                mobileList.innerHTML = '<div class="text-gray-500 text-center py-4">Nenhum cupom criado.</div>';
+            } else {
+                mobileList.innerHTML = coupons.map(c => {
+                    const type = c.discount_type ?? c.type;
+                    const valueNum = Number(c.value || 0);
+                    const valueDisplay = type === 'percentage' ? `${valueNum}%` : `R$ ${valueNum.toFixed(2).replace('.', ',')}`;
+                    const minOrderNum = Number(c.min_order || 0);
+                    const code = String(c.code || '').toUpperCase().trim();
+                    const realUsageCount = usageCountMap[code] || 0;
+                    const uses = `${realUsageCount}/${c.max_usage_count ?? '∞'}`;
+                    const expiry = c.expiry_date ? new Date(c.expiry_date).toLocaleDateString('pt-BR') : 'Sem validade';
+                    const activeClass = c.active !== false ? 'text-green-600 bg-green-50 border-green-200' : 'text-gray-400 bg-gray-50 border-gray-200';
+                    const isActive = c.active !== false;
+
+                    return `
+                    <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col gap-3 ${!isActive ? 'opacity-75' : ''}">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-2">
+                                <span class="font-bold text-lg tracking-wider text-gray-800">${code}</span>
+                                <span class="text-[10px] px-2 py-0.5 rounded-full ${isActive ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}">
+                                    ${isActive ? 'Ativo' : 'Inativo'}
+                                </span>
+                            </div>
+                            <div class="text-xl font-bold text-rose-600">${valueDisplay} OFF</div>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-2 text-sm text-gray-600 bg-gray-50 p-2 rounded-lg">
+                            <div>Min: <span class="font-medium text-gray-800">R$ ${minOrderNum.toFixed(2).replace('.', ',')}</span></div>
+                            <div>Usos: <span class="font-medium text-gray-800">${uses}</span></div>
+                            <div class="col-span-2">Validade: <span class="font-medium text-gray-800">${expiry}</span></div>
+                        </div>
+
+                        <div class="flex items-center justify-end gap-2 pt-2 border-t border-gray-50">
+                            <button onclick="handleEditCoupon(${c.id})" class="flex items-center gap-1 text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors">
+                                ✏️ Editar
+                            </button>
+                             <button onclick="handleToggleCoupon(${c.id}, ${isActive})" class="flex items-center gap-1 ${isActive ? 'text-orange-600 bg-orange-50 hover:bg-orange-100' : 'text-green-600 bg-green-50 hover:bg-green-100'} px-3 py-1.5 rounded-lg text-sm font-medium transition-colors">
+                                ${isActive ? '⏸️ Pausar' : '▶️ Ativar'}
+                            </button>
+                            <button onclick="handleDeleteCoupon(${c.id})" class="flex items-center gap-1 text-red-600 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors">
+                                🗑️ Excluir
+                            </button>
+                        </div>
+                    </div>`;
+                }).join('');
+            }
+        }
 
     } catch (e) {
         console.error('Erro ao carregar cupons:', e);
@@ -361,7 +439,7 @@ async function handleSaveCoupon() {
         if (expiryEl) expiryEl.value = '';
 
         if (btn) btn.innerText = 'Criar Cupom';
-        
+
         // Reset code field to be editable
         if (codeEl) codeEl.disabled = false;
 
@@ -546,14 +624,47 @@ async function loadProductsForPromotions() {
     tableBody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-500">Carregando produtos...</td></tr>';
 
     try {
-        const { data: products, error } = await window.supabaseClient
-            .from('fast_products')
-            .select('id, name, price, promo_value, promo_type, promo_active, category')
-            .order('name', { ascending: true });
+        // Load products and active promotions in parallel
+        const [productsRes, promosRes] = await Promise.all([
+            window.supabaseClient
+                .from('fast_products')
+                .select('id, name, price, promo_value, promo_type, promo_active, category')
+                .order('name', { ascending: true }),
+            window.supabaseClient
+                .from('fast_promotions')
+                .select('product_id, discount_type, value, active')
+        ]);
 
-        if (error) throw error;
+        if (productsRes.error) throw productsRes.error;
 
-        _productsCacheForPromo = products || [];
+        const products = productsRes.data || [];
+        const promos = promosRes.data || [];
+
+        // Build a map of fast_promotions by product_id (source of truth for public store)
+        const promoMap = {};
+        promos.forEach(p => {
+            if (p.active) {
+                promoMap[p.product_id] = p;
+            }
+        });
+
+        // Merge: override fast_products promo fields with fast_promotions data
+        products.forEach(prod => {
+            const fp = promoMap[prod.id];
+            if (fp) {
+                prod.promo_type = fp.discount_type || 'fixed';
+                prod.promo_value = Number(fp.value) || 0;
+                prod.promo_active = true;
+            } else if (!prod.promo_active) {
+                // No active promo in either table - keep as-is (inactive)
+            } else {
+                // Product says active but fast_promotions has no record - mark inactive
+                prod.promo_active = false;
+                prod.promo_value = 0;
+            }
+        });
+
+        _productsCacheForPromo = products;
         // Expose globally for inline events
         window._productsCacheForPromo = _productsCacheForPromo;
 
@@ -623,6 +734,87 @@ window.renderProductPromotions = function (products) {
                 </td>
             </tr>
         `).join('');
+
+    // Render Mobile List
+    const mobileList = document.getElementById('productPromotionsListMobile');
+    if (mobileList) {
+        mobileList.innerHTML = filtered.map(p => `
+            <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col gap-3">
+                <div class="flex items-start justify-between">
+                    <div>
+                        <h4 class="font-medium text-gray-900 leading-tight">${p.name}</h4>
+                        <span class="inline-block mt-1 px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-[10px] font-medium uppercase">
+                            ${p.category || 'Geral'}
+                        </span>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-gray-500 text-xs decoration-line-through">R$ ${p.price.toFixed(2).replace('.', ',')}</div>
+                        <div class="font-bold text-rose-600 text-lg">
+                            ${p.promo_active && p.promo_value ?
+                (p.promo_type === 'percentage' ?
+                    `R$ ${(p.price * (1 - p.promo_value / 100)).toFixed(2).replace('.', ',')}` :
+                    `R$ ${(Math.max(0, p.price - p.promo_value)).toFixed(2).replace('.', ',')}`
+                ) : '---'}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 items-center bg-gray-50 p-3 rounded-lg border border-gray-100">
+                    <div>
+                        <label class="block text-[10px] text-gray-500 uppercase font-bold mb-1">Tipo de Desconto</label>
+                        <select id="promo_type_mobile_${p.id}" 
+                            class="w-full px-2 py-1.5 border rounded text-sm bg-white outline-none focus:ring-2 focus:ring-rose-500 ${p.promo_active ? 'border-rose-300 text-rose-700' : 'border-gray-200'}"
+                            onchange="syncMobilePromoInput(${p.id}, 'type')">
+                            <option value="fixed" ${(!p.promo_type || p.promo_type === 'fixed') ? 'selected' : ''}>R$ Fixo</option>
+                            <option value="percentage" ${p.promo_type === 'percentage' ? 'selected' : ''}>% Porcentagem</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-[10px] text-gray-500 uppercase font-bold mb-1">Valor do Desconto</label>
+                         <input type="number" 
+                            id="promo_value_mobile_${p.id}" 
+                            value="${p.promo_value ? p.promo_value : ''}" 
+                            placeholder="0.00" 
+                            step="0.01" 
+                            class="w-full px-2 py-1.5 border rounded text-sm bg-white outline-none focus:ring-2 focus:ring-rose-500 ${p.promo_active ? 'border-rose-300 text-rose-700 font-bold' : 'border-gray-200'}"
+                            onchange="syncMobilePromoInput(${p.id}, 'value')">
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between pt-2">
+                     <span class="text-xs text-gray-500">Status da Promoção</span>
+                     <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="promo_active_mobile_${p.id}" class="sr-only peer" ${p.promo_active ? 'checked' : ''} onchange="syncMobilePromoInput(${p.id}, 'active')">
+                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-rose-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-rose-600"></div>
+                        <span class="ml-2 text-sm font-medium text-gray-700 peer-checked:text-rose-600">${p.promo_active ? 'Ativa' : 'Inativa'}</span>
+                    </label>
+                </div>
+            </div>
+         `).join('');
+    }
+
+    // Helper to sync mobile inputs with desktop inputs (which are the source of truth for saving)
+    window.syncMobilePromoInput = function (id, field) {
+        // Sync to Desktop Elements
+        const desktopType = document.getElementById(`promo_type_${id}`);
+        const desktopValue = document.getElementById(`promo_value_${id}`);
+        const desktopActive = document.getElementById(`promo_active_${id}`);
+
+        const mobileType = document.getElementById(`promo_type_mobile_${id}`);
+        const mobileValue = document.getElementById(`promo_value_mobile_${id}`);
+        const mobileActive = document.getElementById(`promo_active_mobile_${id}`);
+
+        if (field === 'type' && desktopType && mobileType) desktopType.value = mobileType.value;
+        if (field === 'value' && desktopValue && mobileValue) desktopValue.value = mobileValue.value;
+        if (field === 'active' && desktopActive && mobileActive) {
+            desktopActive.checked = mobileActive.checked;
+            // Trigger visual toggle logic
+            togglePromoInput(id);
+        } else {
+            // For value/type changes, just mark dirty
+            markProductDirty(id);
+        }
+    };
 };
 
 function togglePromoInput(id) {
@@ -738,6 +930,16 @@ window.saveProductPromotions = async function () {
                     // Don't count as error - might not exist
                 }
             }
+
+            // Sync fast_products columns to keep both tables consistent
+            await window.supabaseClient
+                .from('fast_products')
+                .update({
+                    promo_value: up.promo_value,
+                    promo_type: up.promo_type,
+                    promo_active: up.promo_active
+                })
+                .eq('id', up.id);
         }
 
         if (errorCount === 0) {
@@ -951,7 +1153,7 @@ window.saveBirthdayDiscountConfig = async function () {
 document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('saveSpecialDiscountConfig')?.addEventListener('click', window.saveSpecialDiscountConfig);
     document.getElementById('saveBirthdayDiscountConfig')?.addEventListener('click', window.saveBirthdayDiscountConfig);
-    
+
     // Conectar botão de criar/salvar cupom
     document.getElementById('addCouponBtn')?.addEventListener('click', window.handleSaveCoupon);
 });

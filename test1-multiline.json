@@ -1,0 +1,16 @@
+{
+  "version": "v2",
+  "content": {
+    "messages": [
+      {
+        "type": "text",
+        "text": "Olá, [nome]! Eu sou o Fast, atendente virtual da FastSavory's! 😊 Vou te ajudar com preços, cardápio, agendamentos e entregas.\n\nVocê prefere coxinha tradicional (unidade) ou mini coxinha?"
+      }
+    ],
+    "actions": [],
+    "quick_replies": []
+  },
+  "handover_to_human": false,
+  "order_ready": false,
+  "order_summary": null
+}

@@ -767,7 +767,14 @@ window.ClientDiscountsService = {
 // ========================================
 // STORE CONFIG SERVICE
 // ========================================
+// ========================================
+// STORE CONFIG SERVICE
+// ========================================
 window.StoreConfigService = {
+  load: async function () {
+    return this.loadHelper();
+  },
+
   loadHelper: async function () {
     try {
       const { data, error } = await window.supabaseClient
@@ -781,24 +788,64 @@ window.StoreConfigService = {
         // Merge with defaults
         window.storeConfig = {
           ...window.storeConfig,
+          // Fees & Basic
           card_fee_1x: parseFloat(data.card_fee_1x) || 5,
           card_fee_2x: parseFloat(data.card_fee_2x) || 10,
           delivery_enabled: data.delivery_enabled !== false,
           delivery_disabled_reason: data.delivery_disabled_reason || '',
+
+          // Times
           prep_time_min: parseInt(data.prep_time_min) || 0,
           prep_time_max: parseInt(data.prep_time_max) || 0,
           delivery_time_min: parseInt(data.delivery_time_min) || 0,
           delivery_time_max: parseInt(data.delivery_time_max) || 0,
           max_concurrent_orders: parseInt(data.max_concurrent_orders) || 10,
-          high_demand_extra_time: parseInt(data.high_demand_extra_time) || 15
+          high_demand_extra_time: parseInt(data.high_demand_extra_time) || 15,
+
+          // Rules & Limits (Migrated from data.js)
+          min_order_delivery: parseFloat(data.min_order_delivery) || 15.00,
+          min_order_pickup: parseFloat(data.min_order_pickup) || 8.00,
+          min_order_pickup_offhours: parseFloat(data.min_order_pickup_offhours) || 15.00,
+
+          // Same Day
+          same_day_orders_enabled: data.same_day_orders_enabled !== false,
+          same_day_min_value: parseFloat(data.same_day_min_value) || 15.00,
+          same_day_pickup_start: data.same_day_pickup_start || '11:00',
+          same_day_pickup_end: data.same_day_pickup_end || '18:00',
+
+          // Morning Rule
+          morning_rule_enabled: data.morning_rule_enabled !== false,
+          morning_rule_end_time: data.morning_rule_end_time || '14:00',
+          morning_rule_min_value: parseFloat(data.morning_rule_min_value) || 30.00,
+
+          // Window
+          order_window_start: data.order_window_start || '07:00',
+          order_window_end: data.order_window_end || '18:00',
+
+          // PIX (Admin)
+          pix_key: data.pix_key || '',
+          pix_merchant_name: data.pix_merchant_name || '',
+          pix_merchant_city: data.pix_merchant_city || '',
+
+          // Message Buffer (Bot)
+          message_buffer_enabled: data.message_buffer_enabled === true,
+          message_buffer_delay_seconds: parseInt(data.message_buffer_delay_seconds) || 5,
+
+          // AI Config (Bot)
+          ai_model_primary: data.ai_model_primary || 'gemini-2.5-flash-lite',
+          ai_model_multimodal: data.ai_model_multimodal || 'gemini-2.5-flash',
+          ai_temperature: parseFloat(data.ai_temperature) || 0.7,
+          ai_max_output_tokens: parseInt(data.ai_max_output_tokens) || 2048,
+          media_processing_enabled: data.media_processing_enabled !== false
         };
         // Ensure consistency
         window.storeConfig.card_fee_2x = window.storeConfig.card_fee_1x;
         localStorage.setItem('fastStoreConfig', JSON.stringify(window.storeConfig));
-        console.log('[StoreConfig] Carregado do Supabase');
+        console.log('[StoreConfig] Carregado do Supabase (Consolidado)');
 
         // Dispatch event for UI updates
         window.dispatchEvent(new CustomEvent('fastStoreConfigLoaded'));
+        return window.storeConfig;
       }
     } catch (e) {
       console.warn('[StoreConfig] Usando fallback/cache:', e.message);
@@ -806,6 +853,7 @@ window.StoreConfigService = {
       if (saved) {
         try { window.storeConfig = { ...window.storeConfig, ...JSON.parse(saved) }; } catch (err) { }
       }
+      return window.storeConfig;
     }
   },
 
@@ -814,22 +862,39 @@ window.StoreConfigService = {
       window.storeConfig = { ...window.storeConfig, ...newConfig };
       localStorage.setItem('fastStoreConfig', JSON.stringify(window.storeConfig));
 
+      // Filter only DB columns for update (prevent error with local-only fields)
+      // This is a simplified approach, ideally we filter precisely.
+      // For now, we rely on the object passed being correct or upsert ignoring extras if configured (Supabase doesn't ignore by default).
+      // We will construct the update object safely.
+
+      const updatePayload = {
+        id: 1,
+        updated_at: new Date().toISOString()
+      };
+
+      // Merge safe known fields
+      const safeFields = [
+        'card_fee_1x', 'card_fee_2x', 'delivery_enabled', 'delivery_disabled_reason',
+        'prep_time_min', 'prep_time_max', 'delivery_time_min', 'delivery_time_max',
+        'max_concurrent_orders', 'high_demand_extra_time',
+        'min_order_delivery', 'min_order_pickup', 'min_order_pickup_offhours',
+        'same_day_orders_enabled', 'same_day_min_value', 'same_day_pickup_start', 'same_day_pickup_end',
+        'morning_rule_enabled', 'morning_rule_end_time', 'morning_rule_min_value',
+        'order_window_start', 'order_window_end', 'pix_key', 'pix_merchant_name', 'pix_merchant_city',
+        'message_buffer_enabled', 'message_buffer_delay_seconds',
+        'ai_model_primary', 'ai_model_multimodal', 'ai_temperature', 'ai_max_output_tokens',
+        'media_processing_enabled'
+      ];
+
+      safeFields.forEach(field => {
+        if (window.storeConfig[field] !== undefined) {
+          updatePayload[field] = window.storeConfig[field];
+        }
+      });
+
       const { error } = await window.supabaseClient
         .from('fast_store_config')
-        .upsert({
-          id: 1,
-          card_fee_1x: window.storeConfig.card_fee_1x,
-          card_fee_2x: window.storeConfig.card_fee_2x,
-          delivery_enabled: window.storeConfig.delivery_enabled,
-          delivery_disabled_reason: window.storeConfig.delivery_disabled_reason,
-          prep_time_min: window.storeConfig.prep_time_min,
-          prep_time_max: window.storeConfig.prep_time_max,
-          delivery_time_min: window.storeConfig.delivery_time_min,
-          delivery_time_max: window.storeConfig.delivery_time_max,
-          max_concurrent_orders: window.storeConfig.max_concurrent_orders,
-          high_demand_extra_time: window.storeConfig.high_demand_extra_time,
-          updated_at: new Date().toISOString()
-        });
+        .upsert(updatePayload);
 
       if (error) throw error;
       return true;
@@ -837,6 +902,73 @@ window.StoreConfigService = {
       console.error('[StoreConfig] Erro ao salvar:', e);
       return false;
     }
+  }
+};
+
+// ========================================
+// PRODUCT SERVICE (Consolidated Fetching)
+// ========================================
+window.ProductService = {
+  fetchAll: async function () {
+    try {
+      const result = await window.promiseWithTimeout(
+        window.supabaseClient
+          .from('fast_products')
+          .select('*')
+          .order('id', { ascending: true }),
+        8000,
+        { data: null, error: { message: 'Timeout' } }
+      );
+
+      const { data, error } = result || { data: null, error: null };
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        // Use global mapper (now in utils.js)
+        let serverProducts = data.map(window.mapProductData || (p => p));
+
+        // Smart Cache Merge (preserve cached images/info if offline-ish or to save bandwidth)
+        // But specifically, data.js usage was to keep cached images while updating prices.
+        const cached = window.DataCache.get('products');
+        if (cached && cached.items && cached.items.length > 0) {
+          serverProducts = window.DataCache.mergeWithCriticalData(serverProducts, cached.items);
+        }
+
+        console.log('[ProductService] ✅ Carregados:', serverProducts.length);
+
+        const serverVersion = await window.VersionService.getServerVersion('products');
+        window.DataCache.set('products', serverProducts, serverVersion || 1);
+        localStorage.setItem('fastProducts', JSON.stringify(serverProducts));
+
+        // Hide cache notice if visible
+        const cacheNotice = document.getElementById('cacheNotice');
+        if (cacheNotice) cacheNotice.classList.add('hidden');
+
+        return serverProducts;
+      } else {
+        console.error('[ProductService] ⚠️ Supabase retornou vazio - mantendo dados existentes');
+        // Fallback to cache/local
+        return this.loadFromCache();
+      }
+    } catch (error) {
+      console.error('[ProductService] Erro ao carregar:', error);
+      return this.loadFromCache();
+    }
+  },
+
+  loadFromCache: function () {
+    const cached = window.DataCache.get('products');
+    if (cached && cached.items && cached.items.length > 0) {
+      console.log('[ProductService] Usando cache DataCache');
+      return cached.items;
+    }
+    const saved = localStorage.getItem('fastProducts');
+    if (saved) {
+      console.log('[ProductService] Usando localStorage legado');
+      return JSON.parse(saved);
+    }
+    return [];
   }
 };
 

@@ -98,6 +98,35 @@ window.formatOrderCode = function (orderIdOrSeq) {
 // ========================================
 // SERVICE WORKER CLEANUP (Local Dev)
 // ========================================
+// ... (existing code)
+
+// ========================================
+// DATA MAPPING HELPERS
+// ========================================
+
+/**
+ * Helper to map snake_case from Supabase to camelCase
+ * Consolidated from products.js and data.js
+ */
+window.mapProductData = function (p) {
+    return {
+        ...p,
+        startDate: p.start_date,
+        endDate: p.end_date,
+        unavailableToday: p.unavailable_today,
+        isEncomenda: p.is_encomenda,
+        flavor_selection: p.flavor_selection,
+        catalog_enabled: p.catalog_enabled !== undefined ? p.catalog_enabled : true,
+        catalog_size_options: p.catalog_size_options || null,
+        catalog_vegan: p.catalog_vegan || false,
+        catalog_phrase: p.catalog_phrase || null,
+        catalog_order: p.catalog_order || 0,
+        blockMassa: p.block_massa || false,
+        blockRecheio: p.block_recheio || false,
+        requires_preorder: p.requires_preorder || false
+    };
+};
+
 (function () {
     try {
         var hostname = location.hostname;

@@ -66,7 +66,7 @@ window.updateCart = function () {
     if (typeof window.renderUpsellSuggestions === 'function') {
         window.renderUpsellSuggestions();
     }
-    
+
     // Atualiza regras de pedido (desabilita entrega para bolos, etc.)
     if (typeof window.updateOrderRulesUI === 'function') {
         window.updateOrderRulesUI();
@@ -368,10 +368,13 @@ document.addEventListener('click', function (e) {
             return;
         }
 
-        // Verifica Combo Explosão (permite escolher 2 salgados)
-        if (product && product.name && product.name.toLowerCase().includes('combo explos')) {
+        // Verifica Combo (permite escolher salgados)
+        // Regra atualizada: Se categoria 'combos' OU nome contém 'combo', deve abrir modal
+        if (product && (product.category === 'combos' || (product.name && product.name.toLowerCase().includes('combo')))) {
             if (window.openComboSalgadosModal) {
                 window.openComboSalgadosModal(product);
+            } else {
+                console.error('Modal de combos não encontrado (openComboSalgadosModal)');
             }
             return;
         }

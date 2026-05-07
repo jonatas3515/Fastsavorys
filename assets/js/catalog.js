@@ -4,7 +4,7 @@
 // Displays products in a magazine-style overlay
 // ========================================
 
-const CatalogModule = {
+window.CatalogModule = {
     products: [],
     currentPage: 0,
     isMobile: false,

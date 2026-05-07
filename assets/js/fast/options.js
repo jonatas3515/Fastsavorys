@@ -66,7 +66,18 @@ window.ProductOptionsModule = {
                 this.options = { cakeMass: [], filling: [], salgados: [], miniSalgadosFlavors: [], comboSalgados: [] };
                 data.forEach(opt => {
                     if (this.options[opt.type]) {
+                        // Defensive: ensure visible is true if missing/null
+                        if (opt.visible === undefined || opt.visible === null) {
+                            opt.visible = true;
+                        }
                         this.options[opt.type].push(opt);
+                    }
+                });
+
+                // Debug: Log first item of each type to verify structure
+                Object.keys(this.options).forEach(k => {
+                    if (this.options[k].length > 0) {
+                        console.log(`[ProductOptions] First ${k}:`, this.options[k][0]);
                     }
                 });
                 // Always load comboSalgados from defaults (not stored in DB)
@@ -105,7 +116,10 @@ window.ProductOptionsModule = {
     },
 
     getVisible: function (type) {
-        return (this.options[type] || []).filter(o => o.visible);
+        const items = (this.options[type] || []).filter(o => o.visible);
+        console.log(`[ProductOptions] getVisible('${type}') returned ${items.length} items.`);
+        if (items.length === 0) console.warn(`[ProductOptions] Warning: No visible options for '${type}'. Raw:`, this.options[type]);
+        return items;
     },
 
     getAll: function (type) {

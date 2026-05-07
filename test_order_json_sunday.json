@@ -1,0 +1,16 @@
+{
+  "version": "v2",
+  "content": {
+    "messages": [
+      {
+        "type": "text",
+        "text": "Olá, Tester! Eu sou o Fast, atendente virtual da FastSavory's! 😊 Vou te ajudar com preços, cardápio, agendamentos e entregas.\n\nPara 100 mini salgados, temos o pacote de 100 unidades por R$ 85,00. Para essa quantidade, você pode escolher até 5 sabores. Quais você gostaria? Você mencionou frango e queijo, mas temos também Coxinha, Enroladinho de Salsicha, Quibe, Bolinha de Carne, Bolinha de Queijo e Cazulo de Queijo com Presunto.\n\nSobre a entrega para domingo, nosso expediente é fechado nesse dia. Esse pedido dependeria da aprovação da proprietária, a Jéssica. Ela vai te confirmar se consegue atender esse horário, tudo bem?\n\nA taxa de entrega para o Bairro Corujão é R$ 8,00. Como você vai pagar no dinheiro, o valor total aproximado do seu pedido será R$ 93,00."
+      }
+    ],
+    "actions": [],
+    "quick_replies": []
+  },
+  "handover_to_human": false,
+  "order_ready": false,
+  "order_summary": null
+}

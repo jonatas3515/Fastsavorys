@@ -66,6 +66,10 @@
         {
             "path": "/api/cron/notify-scheduled-orders",
             "schedule": "0 15 * * *"
+        },
+        {
+            "path": "/api/birthday-broadcast",
+            "schedule": "0 12 * * *"
         }
     ]
 }

@@ -129,7 +129,35 @@ module.exports = async function handler(req, res) {
         } else if (event.type === 'checkout.session.completed' || event.type === 'checkout.session.async_payment_succeeded') {
             const session = event.data.object;
             const orderId = session?.metadata?.order_id || session?.client_reference_id;
+            const source = session?.metadata?.source;
 
+            // Se for pagamento do robô do ManyChat, registra em fast_bot_payments
+            if (source === 'manychat_bot') {
+                const amountPaid = (session.amount_total || 0) / 100;
+                const customerName = session?.metadata?.customer_name || 'Cliente';
+
+                const { error: botPaymentErr } = await supabaseAdmin
+                    .from('fast_bot_payments')
+                    .upsert({
+                        stripe_session_id: session.id,
+                        stripe_payment_intent_id: session.payment_intent,
+                        amount: amountPaid,
+                        customer_name: customerName,
+                        source: 'manychat_bot',
+                        payment_status: 'succeeded'
+                    }, {
+                        onConflict: 'stripe_session_id',
+                        ignoreDuplicates: false
+                    });
+
+                if (botPaymentErr) {
+                    console.error(`❌ Failed to register bot payment: ${botPaymentErr.message}`);
+                } else {
+                    console.log(`✅ Bot payment registered: ${session.id} (R$ ${amountPaid})`);
+                }
+            }
+
+            // Se tiver order_id, atualiza o pedido em fast_orders (fluxo normal do site)
             if (orderId) {
                 const amountPaid = (session.amount_total || 0) / 100;
 

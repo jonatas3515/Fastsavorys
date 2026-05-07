@@ -1,0 +1,24 @@
+{
+  "version": "v2",
+  "content": {
+    "messages": [
+      {
+        "type": "text",
+        "text": "A chave Pix é o nosso CNPJ:"
+      },
+      {
+        "type": "text",
+        "text": "O nome favorecido é JESSICA RODRIGUES DOS SANTOS - NU PAGAMENTOS - IP.\n\nE aqui está o código Copia e Cola automático:"
+      },
+      {
+        "type": "text",
+        "text": "00020126360014br.gov.bcb.pix011463160686000106520400005303986540550.005802BR5925JESSICA RODRIGUES DOS SAN6009Itamaraju62070503***6304F7CB"
+      }
+    ],
+    "actions": [],
+    "quick_replies": []
+  },
+  "handover_to_human": false,
+  "order_ready": false,
+  "order_summary": null
+}

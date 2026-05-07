@@ -4,78 +4,18 @@
  */
 
 // Helper to map snake_case do Supabase para camelCase local
-function mapProductData(p) {
-    return {
-        ...p,
-        startDate: p.start_date,
-        endDate: p.end_date,
-        unavailableToday: p.unavailable_today,
-        isEncomenda: p.is_encomenda,
-        flavor_selection: p.flavor_selection,
-        catalog_enabled: p.catalog_enabled !== undefined ? p.catalog_enabled : true,
-        catalog_size_options: p.catalog_size_options || null,
-        catalog_vegan: p.catalog_vegan || false,
-        catalog_phrase: p.catalog_phrase || null,
-        catalog_order: p.catalog_order || 0,
-        blockMassa: p.block_massa || false,
-        blockRecheio: p.block_recheio || false,
-        requires_preorder: p.requires_preorder || false
-    };
-}
+// REMOVIDO: Agora usa window.mapProductData de utils.js
 
 // ========================================
 // DATA LOADING
 // ========================================
 
 async function loadStoreConfig() {
-    try {
-        const { data, error } = await window.supabaseClient
-            .from('fast_store_config')
-            .select('*')
-            .eq('id', 1)
-            .single();
-
-        if (error) throw error;
-        if (data) {
-            window.storeConfig = {
-                card_fee_1x: parseFloat(data.card_fee_1x) || 5,
-                card_fee_2x: parseFloat(data.card_fee_2x) || 10,
-                delivery_enabled: data.delivery_enabled !== false,
-                delivery_disabled_reason: data.delivery_disabled_reason || '',
-                prep_time_min: parseInt(data.prep_time_min) || 0,
-                prep_time_max: parseInt(data.prep_time_max) || 0,
-                delivery_time_min: parseInt(data.delivery_time_min) || 0,
-                delivery_time_max: parseInt(data.delivery_time_max) || 0,
-                // Novas variáveis de regras
-                min_order_delivery: parseFloat(data.min_order_delivery) || 15.00,
-                min_order_pickup: parseFloat(data.min_order_pickup) || 8.00,
-                min_order_pickup_offhours: parseFloat(data.min_order_pickup_offhours) || 15.00,
-                same_day_orders_enabled: data.same_day_orders_enabled !== false,
-                same_day_min_value: parseFloat(data.same_day_min_value) || 15.00,
-                same_day_pickup_start: data.same_day_pickup_start || '11:00',
-                same_day_pickup_end: data.same_day_pickup_end || '18:00',
-                morning_rule_enabled: data.morning_rule_enabled !== false,
-                morning_rule_end_time: data.morning_rule_end_time || '14:00',
-                morning_rule_min_value: parseFloat(data.morning_rule_min_value) || 30.00,
-                order_window_start: data.order_window_start || '07:00',
-                order_window_end: data.order_window_end || '18:00',
-            };
-            window.storeConfig.card_fee_2x = window.storeConfig.card_fee_1x;
-            localStorage.setItem('fastStoreConfig', JSON.stringify(window.storeConfig));
-            console.log('Configurações carregadas do Supabase');
-        }
-    } catch (error) {
-        console.log('Carregando config do localStorage:', error.message);
-        try {
-            const saved = localStorage.getItem('fastStoreConfig');
-            if (saved) {
-                const parsed = JSON.parse(saved);
-                window.storeConfig = { ...window.storeConfig, ...parsed };
-                window.storeConfig.card_fee_2x = window.storeConfig.card_fee_1x;
-            }
-        } catch (e) {
-            console.log('Using default store config');
-        }
+    // Delegado para o Service centralizado
+    if (window.StoreConfigService) {
+        await window.StoreConfigService.load();
+    } else {
+        console.error('StoreConfigService não encontrado!');
     }
 }
 
@@ -88,10 +28,10 @@ async function loadBusinessHours() {
 
         if (error) throw error;
         if (data && data.length > 0) {
-            businessHours = data;
+            window.businessHours = data;
         } else {
             // Defaults
-            businessHours = [
+            window.businessHours = [
                 { day_of_week: 0, day_name: 'Domingo', is_open: false, open_time: '14:00', close_time: '18:00' },
                 { day_of_week: 1, day_name: 'Segunda', is_open: true, open_time: '14:00', close_time: '18:00' },
                 { day_of_week: 2, day_name: 'Terça', is_open: true, open_time: '14:00', close_time: '18:00' },
@@ -103,7 +43,7 @@ async function loadBusinessHours() {
         }
     } catch (error) {
         console.log('Using default business hours:', error.message);
-        businessHours = [
+        window.businessHours = [
             { day_of_week: 0, day_name: 'Domingo', is_open: false, open_time: '14:00', close_time: '18:00' },
             { day_of_week: 1, day_name: 'Segunda', is_open: true, open_time: '14:00', close_time: '18:00' },
             { day_of_week: 2, day_name: 'Terça', is_open: true, open_time: '14:00', close_time: '18:00' },
@@ -124,7 +64,7 @@ async function loadPromotions() {
 
         if (error) throw error;
 
-        promotions = (data || []).map(p => ({
+        window.promotions = (data || []).map(p => ({
             id: p.id,
             productId: p.product_id,
             productName: p.product_name,
@@ -132,31 +72,26 @@ async function loadPromotions() {
             value: parseFloat(p.value),
             description: p.description
         }));
-        console.log('Promoções carregadas do Supabase:', promotions.length);
+        console.log('Promoções carregadas do Supabase:', window.promotions.length);
     } catch (e) {
         console.warn('Erro ao carregar promoções do Supabase, usando localStorage:', e);
         const saved = localStorage.getItem('fastPromotions');
-        if (saved) { promotions = JSON.parse(saved); }
-        else { promotions = []; }
+        if (saved) { window.promotions = JSON.parse(saved); }
+        else { window.promotions = []; }
     }
 
     // Load client discounts from Supabase (sync across devices)
     try {
-        const loadedDiscounts = await ClientDiscountsService.load();
+        const loadedDiscounts = await window.ClientDiscountsService.load();
         if (loadedDiscounts && Object.keys(loadedDiscounts).length > 0) {
-            clientDiscounts = loadedDiscounts;
-            saveClientDiscounts(); // Update localStorage as fallback
+            window.clientDiscounts = loadedDiscounts;
+            // saveClientDiscounts(); // No longer needed as service handles persistence
         } else {
-            // Fallback to localStorage
-            const discountsSaved = localStorage.getItem('fastClientDiscounts');
-            if (discountsSaved) { clientDiscounts = JSON.parse(discountsSaved); }
-            else { clientDiscounts = {}; }
+            // Fallback to localStorage handled by service
+            window.clientDiscounts = window.ClientDiscountsService.get();
         }
     } catch (e) {
-        console.warn('[ClientDiscounts] Erro ao carregar do Supabase:', e);
-        const discountsSaved = localStorage.getItem('fastClientDiscounts');
-        if (discountsSaved) { clientDiscounts = JSON.parse(discountsSaved); }
-        else { clientDiscounts = {}; saveClientDiscounts(); }
+        console.warn('[ClientDiscounts] Erro ao carregar:', e);
     }
 }
 
@@ -169,7 +104,7 @@ async function loadCoupons() {
 
         if (error) throw error;
 
-        coupons = (data || []).map(c => ({
+        window.coupons = (data || []).map(c => ({
             id: c.id,
             code: c.code,
             type: c.discount_type,
@@ -184,132 +119,35 @@ async function loadCoupons() {
         }));
 
         // Sync to localStorage
-        localStorage.setItem('fastCoupons', JSON.stringify(coupons));
+        localStorage.setItem('fastCoupons', JSON.stringify(window.coupons));
     } catch (error) {
         console.error('Erro ao carregar cupons do Supabase:', error);
         // Fallback to localStorage
         const saved = localStorage.getItem('fastCoupons');
-        if (saved) { coupons = JSON.parse(saved); }
-        else { coupons = []; }
+        if (saved) { window.coupons = JSON.parse(saved); }
+        else { window.coupons = []; }
     }
 }
 
-// Busca produtos do Supabase e atualiza cache (sem cache-first)
+// Busca produtos do Supabase e atualiza cache (Delegado ao ProductService)
 async function fetchProductsFromSupabase() {
-    try {
-        const result = await window.promiseWithTimeout(
-            window.supabaseClient
-                .from('fast_products')
-                .select('*')
-                .order('id', { ascending: true }),
-            8000,
-            { data: null, error: { message: 'Timeout' } }
-        );
-
-        const { data, error } = result || { data: null, error: null };
-
-        if (error) throw error;
-
-        if (data && data.length > 0) {
-            window.products = data.map(mapProductData);
-            console.log('[Products] ✅ Carregados do Supabase:', window.products.length);
-
-            const serverVersion = await window.VersionService.getServerVersion('products');
-            window.DataCache.set('products', window.products, serverVersion || 1);
-            localStorage.setItem('fastProducts', JSON.stringify(window.products));
-
-            const cacheNotice = document.getElementById('cacheNotice');
-            if (cacheNotice) cacheNotice.classList.add('hidden');
-        } else {
-            console.error('[Products] ⚠️ Supabase retornou vazio - mantendo dados existentes');
-            const cached = window.DataCache.get('products');
-            if (cached && cached.items && cached.items.length > 0) {
-                window.products = cached.items;
-            } else {
-                const saved = localStorage.getItem('fastProducts');
-                if (saved) { window.products = JSON.parse(saved); }
-            }
-        }
-    } catch (error) {
-        console.error('[Products] Erro ao carregar do Supabase:', error);
-        const saved = localStorage.getItem('fastProducts');
-        if (saved) { window.products = JSON.parse(saved); }
-        else {
-            const cached = window.DataCache.get('products');
-            if (cached && cached.items && cached.items.length > 0) {
-                window.products = cached.items;
-            } else {
-                window.products = [];
-            }
-        }
+    if (window.ProductService) {
+        window.products = await window.ProductService.fetchAll();
+    } else {
+        console.error('ProductService não disponível');
     }
 }
+
 
 async function loadProducts() {
     const isAdmin = sessionStorage.getItem('fastAdmin') === '1';
 
-    if (isAdmin) {
-        await fetchProductsFromSupabase();
-        return;
-    }
-
-    try {
-        const cached = window.DataCache.get('products');
-        const cachedItems = cached?.items || [];
-
-        console.log('[Products] 💰 Buscando PREÇOS ATUALIZADOS do servidor...');
-
-        const result = await window.promiseWithTimeout(
-            window.supabaseClient
-                .from('fast_products')
-                .select('*')
-                .order('id', { ascending: true }),
-            6000,
-            null
-        );
-
-        if (result && result.data && result.data.length > 0) {
-            let serverProducts = result.data.map(mapProductData);
-
-            if (cachedItems.length > 0) {
-                serverProducts = window.DataCache.mergeWithCriticalData(serverProducts, cachedItems);
-            }
-
-            window.products = serverProducts;
-            console.log('[Products] ✅ Carregados do servidor com preços atuais:', window.products.length);
-
-            const serverVersion = await window.VersionService.getServerVersion('products');
-            window.DataCache.set('products', window.products, serverVersion || Date.now());
-            localStorage.setItem('fastProducts', JSON.stringify(window.products));
-
-            // Start background sync? assuming global function exists or handled else where
-            // window.startBackgroundVersionSync(); 
-            // In modules, we might need to handle this differently. 
-            // For now, removing startBackgroundVersionSync call as it's likely a loop we need to define in core or just define here if trivial. 
-
-            return;
-        }
-
-        if (cachedItems.length > 0) {
-            window.products = cachedItems;
-            console.warn('[Products] ⚠️ Servidor indisponível, usando cache');
-            setTimeout(() => {
-                const notice = document.getElementById('cacheNotice');
-                if (notice) notice.classList.remove('hidden');
-            }, 1000);
-            return;
-        }
-
-        await fetchProductsFromSupabase();
-
-    } catch (error) {
-        console.error('[Products] Erro no carregamento híbrido:', error);
-        const cached = window.DataCache.get('products');
-        if (cached?.items?.length > 0) {
-            window.products = cached.items;
-        } else {
-            await fetchProductsFromSupabase();
-        }
+    // Se isAdmin, ProductService já lida corretamente (sempre fetch)
+    // Para público, ProductService implementa a lógica robusta
+    if (window.ProductService) {
+        window.products = await window.ProductService.fetchAll();
+    } else {
+        console.error('ProductService indisponível');
     }
 }
 

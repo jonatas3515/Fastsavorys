@@ -5,8 +5,8 @@
  * Garante que o cliente SEMPRE recebe a versão mais recente
  * Cache é usado APENAS como fallback quando offline
  */
-const CACHE_NAME = 'fastsavorys-v34';
-const CACHE_VERSION = 'v34';
+const CACHE_NAME = 'fastsavorys-v35';
+const CACHE_VERSION = 'v35';
 
 // URLs para cache offline - apenas essenciais
 const urlsToCache = [

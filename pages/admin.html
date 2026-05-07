@@ -297,8 +297,16 @@
         <header class="bg-white shadow sticky top-0 z-40">
             <div class="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
                 <div class="flex items-center gap-3">
+                    <!-- Mobile Menu Button -->
+                    <button id="mobileMenuBtn" class="md:hidden text-gray-600 hover:text-gray-900 focus:outline-none">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M4 6h16M4 12h16M4 18h16"></path>
+                        </svg>
+                    </button>
                     <h1 class="text-xl font-bold text-gray-800 hidden md:block">Fast Savory's Admin</h1>
-                    <span class="text-xs bg-rose-100 text-rose-800 px-2 py-1 rounded-full font-medium">v2.0</span>
+                    <h1 class="text-lg font-bold text-gray-800 md:hidden">Admin</h1>
+                    <span class="text-xs bg-rose-100 text-rose-800 px-2 py-1 rounded-full font-medium">v2.2</span>
                 </div>
                 <div class="flex items-center gap-4">
                     <button onclick="window.location.href='fast.html'"
@@ -314,71 +322,85 @@
         </header>
 
         <!-- Main Content -->
-        <div class="flex-1 flex overflow-hidden">
+        <div class="flex-1 flex overflow-hidden relative">
+            <!-- Mobile Sidebar Backdrop -->
+            <div id="sidebarBackdrop"
+                class="fixed inset-0 bg-black bg-opacity-50 z-20 hidden md:hidden transition-opacity opacity-0"></div>
+
             <!-- Sidebar (Mobile & Desktop) -->
-            <aside class="w-16 md:w-64 bg-gray-900 text-white flex flex-col flex-shrink-0 transition-all">
+            <aside id="sidebar"
+                class="fixed inset-y-0 left-0 transform -translate-x-full md:relative md:translate-x-0 w-64 bg-gray-900 text-white flex flex-col flex-shrink-0 transition-transform duration-300 ease-in-out z-30 h-full pt-16 md:pt-0 shadow-xl md:shadow-none">
                 <nav class="flex-1 overflow-y-auto py-4 space-y-1">
-                    <button onclick="showPanel('ordersPanelFast')"
+                    <!-- Close Button (Mobile Only) -->
+                    <button id="closeSidebarBtn"
+                        class="md:hidden absolute top-4 right-4 text-gray-400 hover:text-white">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+
+                    <button onclick="showPanel('ordersPanelFast'); closeMobileSidebar()"
                         class="w-full text-left px-4 py-3 hover:bg-gray-800 flex items-center gap-3 transition-colors border-l-4 border-transparent hover:border-rose-500 focus:bg-gray-800 focus:border-rose-500 group"
                         id="nav-orders">
                         <span class="text-2xl">📦</span>
-                        <span class="hidden md:inline font-medium group-hover:text-white">Pedidos</span>
+                        <span class="font-medium group-hover:text-white">Pedidos</span>
                     </button>
-                    <button onclick="showPanel('productsPanelFast')"
+                    <button onclick="showPanel('productsPanelFast'); closeMobileSidebar()"
                         class="w-full text-left px-4 py-3 hover:bg-gray-800 flex items-center gap-3 transition-colors border-l-4 border-transparent hover:border-rose-500 focus:bg-gray-800 focus:border-rose-500 group"
                         id="nav-products">
                         <span class="text-2xl">🍔</span>
-                        <span class="hidden md:inline font-medium group-hover:text-white">Produtos</span>
+                        <span class="font-medium group-hover:text-white">Produtos</span>
                     </button>
-                    <button onclick="showPanel('clientsPanelFast')"
+                    <button onclick="showPanel('clientsPanelFast'); closeMobileSidebar()"
                         class="w-full text-left px-4 py-3 hover:bg-gray-800 flex items-center gap-3 transition-colors border-l-4 border-transparent hover:border-rose-500 focus:bg-gray-800 focus:border-rose-500 group"
                         id="nav-clients">
                         <span class="text-2xl">👥</span>
-                        <span class="hidden md:inline font-medium group-hover:text-white">Clientes</span>
+                        <span class="font-medium group-hover:text-white">Clientes</span>
                     </button>
-                    <button onclick="showPanel('reportsPanelFast')"
+                    <button onclick="showPanel('reportsPanelFast'); closeMobileSidebar()"
                         class="w-full text-left px-4 py-3 hover:bg-gray-800 flex items-center gap-3 transition-colors border-l-4 border-transparent hover:border-rose-500 focus:bg-gray-800 focus:border-rose-500 group"
                         id="nav-reports">
                         <span class="text-2xl">📊</span>
-                        <span class="hidden md:inline font-medium group-hover:text-white">Relatórios</span>
+                        <span class="font-medium group-hover:text-white">Relatórios</span>
                     </button>
                     <div class="border-t border-gray-700 my-2"></div>
-                    <button onclick="showPanel('promotionsPanelFast')"
+                    <button onclick="showPanel('promotionsPanelFast'); closeMobileSidebar()"
                         class="w-full text-left px-4 py-3 hover:bg-gray-800 flex items-center gap-3 transition-colors border-l-4 border-transparent hover:border-rose-500 focus:bg-gray-800 focus:border-rose-500 group"
                         id="nav-promos">
                         <span class="text-2xl">🏷️</span>
-                        <span class="hidden md:inline font-medium group-hover:text-white">Promoções</span>
+                        <span class="font-medium group-hover:text-white">Promoções</span>
                     </button>
-                    <button onclick="showPanel('bannerPanelFast')"
+                    <button onclick="showPanel('bannerPanelFast'); closeMobileSidebar()"
                         class="w-full text-left px-4 py-3 hover:bg-gray-800 flex items-center gap-3 transition-colors border-l-4 border-transparent hover:border-rose-500 focus:bg-gray-800 focus:border-rose-500 group"
                         id="nav-banner">
                         <span class="text-2xl">🖼️</span>
-                        <span class="hidden md:inline font-medium group-hover:text-white">Banner</span>
+                        <span class="font-medium group-hover:text-white">Banner</span>
                     </button>
-                    <button onclick="showPanel('ratingsPanelFast')"
+                    <button onclick="showPanel('ratingsPanelFast'); closeMobileSidebar()"
                         class="w-full text-left px-4 py-3 hover:bg-gray-800 flex items-center gap-3 transition-colors border-l-4 border-transparent hover:border-rose-500 focus:bg-gray-800 focus:border-rose-500 group"
                         id="nav-ratings">
                         <span class="text-2xl">⭐</span>
-                        <span class="hidden md:inline font-medium group-hover:text-white">Avaliações</span>
+                        <span class="font-medium group-hover:text-white">Avaliações</span>
                     </button>
                     <div class="border-t border-gray-700 my-2"></div>
-                    <button onclick="showPanel('configPanelFast')"
+                    <button onclick="showPanel('configPanelFast'); closeMobileSidebar()"
                         class="w-full text-left px-4 py-3 hover:bg-gray-800 flex items-center gap-3 transition-colors border-l-4 border-transparent hover:border-rose-500 focus:bg-gray-800 focus:border-rose-500 group"
                         id="nav-config">
                         <span class="text-2xl">⚙️</span>
-                        <span class="hidden md:inline font-medium group-hover:text-white">Config</span>
+                        <span class="font-medium group-hover:text-white">Config</span>
                     </button>
-                    <button onclick="showPanel('rulesPanelFast')"
+                    <button onclick="showPanel('rulesPanelFast'); closeMobileSidebar()"
                         class="w-full text-left px-4 py-3 hover:bg-gray-800 flex items-center gap-3 transition-colors border-l-4 border-transparent hover:border-rose-500 focus:bg-gray-800 focus:border-rose-500 group"
                         id="nav-rules">
                         <span class="text-2xl">🛡️</span>
-                        <span class="hidden md:inline font-medium group-hover:text-white">Regras/Segurança</span>
+                        <span class="font-medium group-hover:text-white">Regras/Segurança</span>
                     </button>
                 </nav>
             </aside>
 
             <!-- Main Content Area -->
-            <main class="flex-1 overflow-y-auto bg-gray-50 p-4 relative" id="mainContainer">
+            <main class="flex-1 overflow-y-auto bg-gray-50 p-4 relative w-full" id="mainContainer">
                 <!-- Products Panel -->
                 <main id="productsPanelFast"
                     class="admin-panel admin-card p-6 hidden animate-fade-in mx-auto w-full max-w-7xl">
@@ -513,45 +535,7 @@
                     </div>
                 </main>
 
-                <!-- Ratings Panel -->
-                <main id="ratingsPanelFast"
-                    class="admin-panel admin-card p-6 hidden animate-fade-in mx-auto w-full max-w-7xl">
-                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                        <h2 class="text-2xl font-bold text-gray-800 flex items-center gap-2">
-                            <span>⭐</span> Avaliações de Clientes
-                        </h2>
-                        <div class="flex gap-2">
-                            <span
-                                class="text-sm text-gray-500 bg-gray-100 px-3 py-1.5 rounded-lg flex items-center gap-2">
-                                <span>Note:</span> Aprovação necessária para aparecer no site
-                            </span>
-                        </div>
-                    </div>
 
-                    <!-- Toolbar / Filters -->
-                    <div class="flex flex-wrap items-center gap-2 mb-4" id="ratingsFilterToolbar">
-                        <button onclick="RatingsModule.setFilter('all')" id="ratingsFilterAll"
-                            class="px-3 py-1.5 rounded-lg text-sm font-medium border border-rose-600 bg-rose-600 text-white transition-colors flex items-center gap-1">
-                            Todas
-                        </button>
-                        <button onclick="RatingsModule.setFilter('pending')" id="ratingsFilterPending"
-                            class="px-3 py-1.5 rounded-lg text-sm font-medium border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 transition-colors flex items-center gap-1">
-                            ⏳ Pendentes
-                        </button>
-                        <button onclick="RatingsModule.setFilter('published')" id="ratingsFilterPublished"
-                            class="px-3 py-1.5 rounded-lg text-sm font-medium border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 transition-colors flex items-center gap-1">
-                            ✅ Publicadas
-                        </button>
-                        <button onclick="RatingsModule.setFilter('archived')" id="ratingsFilterArchived"
-                            class="px-3 py-1.5 rounded-lg text-sm font-medium border border-gray-200 bg-white text-gray-600 hover:bg-gray-50 transition-colors flex items-center gap-1">
-                            📦 Arquivadas
-                        </button>
-                    </div>
-
-                    <!-- Stats Cards -->
-                </main>
-
-                <!-- Orders Panel (Dashboard) -->
                 <main id="ordersPanelFast"
                     class="admin-panel admin-card p-6 hidden animate-fade-in mx-auto w-full max-w-7xl">
                     <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
@@ -619,10 +603,10 @@
 
                     <!-- Kanban Board View -->
                     <div id="ordersKanbanView" class="overflow-x-auto pb-4">
-                        <div class="flex gap-4 min-w-[1200px]">
+                        <div class="flex flex-col md:flex-row gap-4 min-w-full md:min-w-[1200px]">
                             <!-- Column: Payment Pending -->
                             <div
-                                class="flex-1 min-w-[300px] bg-gray-100 rounded-xl p-3 flex flex-col max-h-[calc(100vh-250px)]">
+                                class="flex-1 min-w-[300px] bg-gray-100 rounded-xl p-3 flex flex-col h-auto md:max-h-[calc(100vh-250px)]">
                                 <div class="flex items-center justify-between mb-3 px-1">
                                     <h3 class="font-bold text-gray-700">Aguardando Pagamento</h3>
                                     <span class="bg-gray-200 text-gray-700 text-xs px-2 py-0.5 rounded-full"
@@ -635,7 +619,7 @@
 
                             <!-- Column: Received (Paid/Confirmed) -->
                             <div
-                                class="flex-1 min-w-[300px] bg-blue-50 rounded-xl p-3 flex flex-col max-h-[calc(100vh-250px)]">
+                                class="flex-1 min-w-[300px] bg-blue-50 rounded-xl p-3 flex flex-col h-auto md:max-h-[calc(100vh-250px)]">
                                 <div class="flex items-center justify-between mb-3 px-1">
                                     <h3 class="font-bold text-blue-800">Recebidos / A Confirmar</h3>
                                     <span class="bg-blue-200 text-blue-800 text-xs px-2 py-0.5 rounded-full"
@@ -647,7 +631,7 @@
 
                             <!-- Column: Preparing -->
                             <div
-                                class="flex-1 min-w-[300px] bg-orange-50 rounded-xl p-3 flex flex-col max-h-[calc(100vh-250px)]">
+                                class="flex-1 min-w-[300px] bg-orange-50 rounded-xl p-3 flex flex-col h-auto md:max-h-[calc(100vh-250px)]">
                                 <div class="flex items-center justify-between mb-3 px-1">
                                     <h3 class="font-bold text-orange-800">Em Preparo</h3>
                                     <span class="bg-orange-200 text-orange-800 text-xs px-2 py-0.5 rounded-full"
@@ -659,7 +643,7 @@
 
                             <!-- Column: Ready/Delivery -->
                             <div
-                                class="flex-1 min-w-[300px] bg-purple-50 rounded-xl p-3 flex flex-col max-h-[calc(100vh-250px)]">
+                                class="flex-1 min-w-[300px] bg-purple-50 rounded-xl p-3 flex flex-col h-auto md:max-h-[calc(100vh-250px)]">
                                 <div class="flex items-center justify-between mb-3 px-1">
                                     <h3 class="font-bold text-purple-800">Pronto / Entrega</h3>
                                     <span class="bg-purple-200 text-purple-800 text-xs px-2 py-0.5 rounded-full"
@@ -671,7 +655,7 @@
 
                             <!-- Column: Completed -->
                             <div
-                                class="flex-1 min-w-[300px] bg-green-50 rounded-xl p-3 flex flex-col max-h-[calc(100vh-250px)]">
+                                class="flex-1 min-w-[300px] bg-green-50 rounded-xl p-3 flex flex-col h-auto md:max-h-[calc(100vh-250px)]">
                                 <div class="flex items-center justify-between mb-3 px-1">
                                     <h3 class="font-bold text-green-800">Concluídos</h3>
                                     <span class="bg-green-200 text-green-800 text-xs px-2 py-0.5 rounded-full"
@@ -684,7 +668,8 @@
                     </div>
 
                     <!-- List View (Hidden by default) -->
-                    <div id="ordersListView" class="hidden overflow-x-auto bg-white rounded-lg border border-gray-200">
+                    <div id="ordersListView"
+                        class="hidden overflow-x-auto bg-white rounded-lg border border-gray-200 hidden md:block">
                         <table class="w-full text-left border-collapse">
                             <thead class="bg-gray-50 text-gray-600 text-xs uppercase">
                                 <tr>
@@ -700,6 +685,11 @@
                             <tbody id="ordersListTableBody" class="divide-y divide-gray-100 text-sm">
                             </tbody>
                         </table>
+                    </div>
+
+                    <!-- Mobile List View -->
+                    <div id="ordersListMobile" class="md:hidden space-y-4 hidden">
+                        <!-- Cards injected here -->
                     </div>
                 </main>
 
@@ -753,7 +743,7 @@
                         </div>
                     </div>
 
-                    <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                    <div class="bg-white rounded-lg border border-gray-200 overflow-hidden hidden md:block">
                         <div class="overflow-x-auto">
                             <table class="w-full text-left border-collapse">
                                 <thead class="bg-gray-50 text-gray-600 text-xs uppercase tracking-wider">
@@ -775,6 +765,13 @@
                                     </tr>
                                 </tbody>
                             </table>
+                        </div>
+                    </div>
+
+                    <!-- Mobile View for Clients -->
+                    <div id="clientsGridMobile" class="md:hidden grid grid-cols-1 gap-4 mt-4">
+                        <div class="text-center py-8 text-gray-500">
+                            Carregando clientes...
                         </div>
                     </div>
                 </main>
@@ -810,15 +807,18 @@
                     </h2>
 
                     <!-- Tabs -->
-                    <div class="flex border-b border-gray-200 mb-6">
+                    <div class="flex border-b border-gray-200 mb-6 overflow-x-auto hide-scrollbar">
                         <button id="promoTabBtnCoupons"
-                            class="px-4 py-2 text-rose-600 border-b-2 border-rose-600 font-medium"
+                            class="px-4 py-2 text-rose-600 border-b-2 border-rose-600 font-medium whitespace-nowrap flex-shrink-0"
                             onclick="switchPromoTab('coupons')">Cupons</button>
-                        <button id="promoTabBtnAutomatic" class="px-4 py-2 text-gray-500 hover:text-gray-700"
+                        <button id="promoTabBtnAutomatic"
+                            class="px-4 py-2 text-gray-500 hover:text-gray-700 whitespace-nowrap flex-shrink-0"
                             onclick="switchPromoTab('automatic')">Automáticas</button>
-                        <button id="promoTabBtnLoyalty" class="px-4 py-2 text-gray-500 hover:text-gray-700"
+                        <button id="promoTabBtnLoyalty"
+                            class="px-4 py-2 text-gray-500 hover:text-gray-700 whitespace-nowrap flex-shrink-0"
                             onclick="switchPromoTab('loyalty')">Fidelidade</button>
-                        <button id="promoTabBtnProducts" class="px-4 py-2 text-gray-500 hover:text-gray-700"
+                        <button id="promoTabBtnProducts"
+                            class="px-4 py-2 text-gray-500 hover:text-gray-700 whitespace-nowrap flex-shrink-0"
                             onclick="switchPromoTab('products')">Por Produto</button>
                     </div>
 
@@ -870,7 +870,7 @@
                                 </button>
                             </div>
                         </div>
-                        <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                        <div class="bg-white rounded-lg border border-gray-200 overflow-hidden hidden md:block">
                             <table class="w-full text-left">
                                 <thead class="bg-gray-50 text-gray-600 text-xs uppercase">
                                     <tr>
@@ -884,6 +884,8 @@
                                 <tbody id="couponsList" class="divide-y divide-gray-100 text-sm"></tbody>
                             </table>
                         </div>
+                        <!-- Mobile Coupons List -->
+                        <div id="couponsListMobile" class="md:hidden space-y-4"></div>
                     </div>
 
                     <!-- Automatic Discounts Tab -->
@@ -1015,7 +1017,7 @@
                                 </select>
                             </div>
 
-                            <div class="overflow-x-auto rounded-lg border border-gray-200">
+                            <div class="overflow-x-auto rounded-lg border border-gray-200 hidden md:block">
                                 <table class="w-full text-left text-sm">
                                     <thead class="bg-gray-50 text-gray-600 uppercase text-xs">
                                         <tr>
@@ -1033,6 +1035,8 @@
                                     </tbody>
                                 </table>
                             </div>
+                            <!-- Mobile Product Promotions List -->
+                            <div id="productPromotionsListMobile" class="md:hidden space-y-4 mt-4"></div>
                         </div>
                     </div>
                 </main>
@@ -1089,7 +1093,7 @@
                     <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
                         <span>⭐</span> Avaliações de Clientes
                     </h2>
-                    <div class="bg-white rounded-lg border border-gray-200 overflow-hidden">
+                    <div class="bg-white rounded-lg border border-gray-200 overflow-hidden hidden md:block">
                         <table class="w-full text-left">
                             <thead class="bg-gray-50 text-gray-600 text-xs uppercase">
                                 <tr>
@@ -1104,6 +1108,8 @@
                             <tbody id="ratingsList" class="divide-y divide-gray-100 text-sm"></tbody>
                         </table>
                     </div>
+                    <!-- Mobile Ratings List -->
+                    <div id="ratingsListMobile" class="md:hidden space-y-4"></div>
                 </main>
 
                 <!-- Reports Panel -->
@@ -1149,12 +1155,14 @@
                             <div class="flex flex-wrap items-center justify-between mb-4 gap-2">
                                 <h3 class="text-lg font-semibold text-gray-800">🏆 Ranking de Clientes</h3>
                                 <div class="flex gap-2">
-                                    <select id="rankingFilterYear" class="text-xs border rounded p-1 bg-white" onchange="updateClientRanking()">
+                                    <select id="rankingFilterYear" class="text-xs border rounded p-1 bg-white"
+                                        onchange="updateClientRanking()">
                                         <option value="2024">2024</option>
                                         <option value="2025">2025</option>
                                         <option value="2026" selected>2026</option>
                                     </select>
-                                    <select id="rankingFilterPeriod" class="text-xs border rounded p-1 bg-white" onchange="updateClientRanking()">
+                                    <select id="rankingFilterPeriod" class="text-xs border rounded p-1 bg-white"
+                                        onchange="updateClientRanking()">
                                         <option value="all">Todo o ano</option>
                                         <option value="1">1º Semestre</option>
                                         <option value="2">2º Semestre</option>
@@ -1205,7 +1213,7 @@
                         <!-- Top Products -->
                         <div class="bg-gray-50 rounded-lg p-4">
                             <h3 class="text-lg font-semibold text-gray-800 mb-4">🔥 Produtos Mais Pedidos</h3>
-                            <div id="topProductsList" class="grid grid-cols-2 gap-3">
+                            <div id="topProductsList" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                 <div class="text-center py-6 text-gray-500 col-span-full">
                                     <p class="text-4xl mb-2">🍽️</p>
                                     <p>Aguardando dados de pedidos...</p>
@@ -1256,17 +1264,54 @@
                 <main id="configPanelFast"
                     class="admin-panel admin-card p-6 hidden animate-fade-in mx-auto w-full max-w-7xl">
                     <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
-                        <span>⚙️</span> Configurações da Loja
+                        Configurações da Loja
                     </h2>
+
+                    <!-- Store Closure Section (Full Width) -->
+                    <div id="storeClosureSection" class="bg-white p-6 rounded-xl border-2 border-red-200 mb-6">
+                        <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2 text-lg">
+                            Fechar Loja
+                        </h3>
+                        <p class="text-sm text-gray-500 mb-4">Feche a loja para um dia específico. Quando fechada, os clientes verão "Loja Fechada Temporariamente" e não poderão fazer pedidos para o dia selecionado.</p>
+
+                        <div class="flex flex-col sm:flex-row items-start sm:items-end gap-4">
+                            <!-- Date Selector -->
+                            <div class="flex-1 w-full sm:w-auto">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Data</label>
+                                <input type="date" id="storeClosureDate"
+                                    class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-red-300 focus:outline-none" />
+                            </div>
+
+                            <!-- Toggle -->
+                            <div class="flex items-center gap-3">
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="storeClosureToggle" class="sr-only peer" />
+                                    <div class="w-14 h-7 bg-green-500 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-red-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all peer-checked:bg-red-600"></div>
+                                </label>
+                                <span id="storeClosureLabel" class="text-sm font-semibold text-green-700">Loja Aberta</span>
+                            </div>
+
+                            <!-- Save Button -->
+                            <button onclick="handleToggleStoreClosure()"
+                                class="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg text-sm font-medium transition-colors shadow-sm">
+                                Salvar Status
+                            </button>
+                        </div>
+
+                        <!-- Current Status Indicator -->
+                        <div id="storeClosureStatus" class="mt-4 p-3 rounded-lg text-sm font-medium bg-gray-50 text-gray-500 text-center">
+                            Carregando status...
+                        </div>
+                    </div>
 
                     <div class="grid lg:grid-cols-2 gap-6">
                         <!-- Delivery Fees Section -->
                         <div class="bg-white p-6 rounded-xl border border-gray-200">
                             <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2">
-                                🚚 Taxas de Entrega
+                                Taxas de Entrega
                             </h3>
                             <p class="text-sm text-gray-500 mb-4">Gerencie as taxas por bairro.</p>
-                            <div class="grid grid-cols-3 gap-2 mb-3">
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">
                                 <input type="text" id="feeNeighborhoodFastPanel" placeholder="Bairro"
                                     class="col-span-1 px-3 py-2 border rounded-lg text-sm" />
                                 <input type="number" step="0.01" id="feeValueFastPanel" placeholder="Taxa (R$)"
@@ -1389,6 +1434,87 @@
                                 <button onclick="handleSaveCardFees()"
                                     class="w-full bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
                                     💾 Salvar Taxa
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Message Buffer (WhatsApp Bot) -->
+                        <div class="bg-white p-6 rounded-xl border border-gray-200">
+                            <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                                💬 Buffer de Mensagens (Bot)
+                            </h3>
+                            <p class="text-xs text-gray-500 mb-4">Quando ativo, o bot aguarda o cliente terminar de digitar antes de responder. Mensagens enviadas em sequência são agrupadas e processadas de uma vez.</p>
+                            <div class="space-y-4">
+                                <div class="flex items-center justify-between">
+                                    <label class="text-sm font-medium text-gray-700">Buffer Ativo</label>
+                                    <label class="relative inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" id="messageBufferEnabled" class="sr-only peer" />
+                                        <div
+                                            class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-rose-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-rose-600">
+                                        </div>
+                                    </label>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Tempo de espera (segundos)</label>
+                                    <input type="number" min="2" max="15" step="1" id="messageBufferDelay" placeholder="5"
+                                        class="w-full px-3 py-2 border rounded-lg text-sm" />
+                                    <p class="text-xs text-gray-500 mt-1">O bot espera esse tempo antes de responder. Se o cliente enviar outra mensagem nesse intervalo, o contador reinicia. Recomendado: 4-6 segundos.</p>
+                                </div>
+                                <button onclick="handleSaveBufferSettings()"
+                                    class="w-full bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
+                                    💾 Salvar Buffer
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- AI & Media Config -->
+                        <div class="bg-white p-6 rounded-xl border border-gray-200">
+                            <h3 class="font-bold text-gray-800 mb-4 flex items-center gap-2">
+                                🤖 Configurações da IA
+                            </h3>
+                            <p class="text-xs text-gray-500 mb-4">Modelo, temperatura e processamento de mídia do assistente. Alterações em até 60s (cache).</p>
+                            <div class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Modelo Principal (texto)</label>
+                                    <select id="aiModelPrimary" class="w-full px-3 py-2 border rounded-lg text-sm">
+                                        <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite (econômico)</option>
+                                        <option value="gemini-3.1-flash-lite-preview">gemini-3.1-flash-lite-preview</option>
+                                        <option value="gemini-2.5-flash">gemini-2.5-flash (thinking)</option>
+                                        <option value="gemini-3-flash-preview">gemini-3-flash-preview</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Modelo Multimodal (áudio/imagem/PDF)</label>
+                                    <select id="aiModelMultimodal" class="w-full px-3 py-2 border rounded-lg text-sm">
+                                        <option value="gemini-2.5-flash">gemini-2.5-flash (recomendado)</option>
+                                        <option value="gemini-3-flash-preview">gemini-3-flash-preview</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Temperatura (criatividade)</label>
+                                    <input type="number" min="0" max="1" step="0.1" id="aiTemperature" placeholder="0.7"
+                                        class="w-full px-3 py-2 border rounded-lg text-sm" />
+                                    <p class="text-xs text-gray-500 mt-1">0.0 = determ., 1.0 = criativas. Recomendado: 0.5-0.7</p>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 mb-1">Max Output Tokens</label>
+                                    <input type="number" min="256" max="8192" step="256" id="aiMaxOutputTokens" placeholder="2048"
+                                        class="w-full px-3 py-2 border rounded-lg text-sm" />
+                                    <p class="text-xs text-gray-500 mt-1">Limite de tokens. Modelos com thinking precisam ~4096.</p>
+                                </div>
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <label class="text-sm font-medium text-gray-700">Processar Mídia</label>
+                                        <p class="text-xs text-gray-500">Imagens, PDFs e arquivos analisados pela IA</p>
+                                    </div>
+                                    <label class="relative inline-flex items-center cursor-pointer">
+                                        <input type="checkbox" id="mediaProcessingEnabled" class="sr-only peer" checked />
+                                        <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-rose-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-rose-600"></div>
+                                    </label>
+                                </div>
+                                <button onclick="handleSaveAiSettings()"
+                                    class="w-full bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-lg text-sm font-medium">
+                                    💾 Salvar IA
                                 </button>
                             </div>
                         </div>

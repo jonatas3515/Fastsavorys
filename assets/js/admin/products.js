@@ -87,7 +87,7 @@ async function saveProduct(name, description, price, category, image) {
     // Save to Supabase
     try {
         let error;
-        
+
         if (window.editingProductId) {
             // UPDATE existing product
             productData.id = window.editingProductId;
@@ -258,21 +258,44 @@ function filterAndRenderProducts() {
     `;
     }).join('');
 
-    // Render Grid (Mobile) - Simplified
+    // Render Grid (Mobile) - Enhanced
     if (mobileGrid) {
-        mobileGrid.innerHTML = filtered.map(p => `
-            <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-100 flex items-center justify-between">
-                <div class="flex items-center gap-3">
-                     <span class="inline-flex items-center justify-center w-7 h-7 rounded-full ${p.catalog_order ? 'bg-rose-100 text-rose-700' : 'bg-gray-100 text-gray-400'} text-xs font-bold">${p.catalog_order || '-'}</span>
-                     <span class="text-2xl">${p.emoji || '📦'}</span>
-                     <div>
-                        <h4 class="font-medium text-gray-900">${p.name}</h4>
-                        <p class="text-sm text-gray-500">R$ ${parseFloat(p.price || 0).toFixed(2).replace('.', ',')}</p>
-                     </div>
+        mobileGrid.innerHTML = filtered.map(p => {
+            const price = parseFloat(p.price || 0).toFixed(2).replace('.', ',');
+            return `
+            <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-100 flex flex-col gap-3">
+                <div class="flex items-start justify-between">
+                    <div class="flex items-center gap-3">
+                         <span class="inline-flex items-center justify-center w-8 h-8 rounded-full ${p.catalog_order ? 'bg-rose-100 text-rose-700' : 'bg-gray-100 text-gray-400'} text-xs font-bold" title="Pos.">${p.catalog_order || '-'}</span>
+                         <span class="text-3xl">${p.emoji || '📦'}</span>
+                         <div>
+                            <h4 class="font-medium text-gray-900 leading-tight">${p.name}</h4>
+                            <span class="inline-block mt-1 px-2 py-0.5 bg-gray-100 text-gray-600 rounded text-[10px] font-medium uppercase">
+                                ${p.category}
+                            </span>
+                         </div>
+                    </div>
+                     <div class="text-right">
+                        <div class="font-bold text-gray-900">R$ ${price}</div>
+                        <div class="text-[10px] ${p.visible ? 'text-green-600' : 'text-gray-400'} mt-1">
+                            ${p.visible ? 'Visível' : 'Oculto'}
+                        </div>
+                    </div>
                 </div>
-                <button onclick="editProduct(${p.id})" class="text-blue-600 hover:bg-blue-50 p-2 rounded">✏️</button>
+                
+                <div class="flex items-center justify-between pt-3 border-t border-gray-50 mt-1">
+                    <button onclick="toggleVisibility(${p.id})" 
+                        class="flex items-center gap-2 text-xs font-medium ${p.visible ? 'text-green-700' : 'text-gray-500'} px-2 py-1.5 rounded hover:bg-gray-50 transition-colors">
+                        <span class="w-2 h-2 rounded-full ${p.visible ? 'bg-green-500' : 'bg-gray-300'}"></span>
+                        ${p.visible ? 'Ativo' : 'Inativo'}
+                    </button>
+                    
+                    <button onclick="editProduct(${p.id})" class="flex items-center gap-1 text-blue-600 hover:bg-blue-50 px-3 py-1.5 rounded transition-colors text-sm font-medium">
+                        ✏️ Editar
+                    </button>
+                </div>
             </div>
-        `).join('');
+        `}).join('');
     }
 }
 
@@ -491,22 +514,22 @@ if (document.querySelector('.options-tab')) {
 // ========================================
 // FORM SUBMIT HANDLER
 // ========================================
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     const productForm = document.getElementById('productForm');
     if (productForm) {
-        productForm.addEventListener('submit', async function(e) {
+        productForm.addEventListener('submit', async function (e) {
             e.preventDefault();
-            
+
             const name = document.getElementById('productName').value.trim();
             const description = document.getElementById('productDescription').value.trim();
             const price = parseFloat(document.getElementById('productPrice').value) || 0;
             const category = document.getElementById('productCategory').value;
-            
+
             if (!name || !price || !category) {
                 showToast('Preencha nome, preço e categoria!', 'error');
                 return;
             }
-            
+
             // Handle image upload if present
             let imageUrl = null;
             const imageInput = document.getElementById('productImage');
@@ -517,11 +540,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     const fileExt = file.name.split('.').pop();
                     const fileName = `product_${Date.now()}.${fileExt}`;
                     const filePath = `products/${fileName}`;
-                    
+
                     const { data, error } = await window.supabaseClient.storage
                         .from('fast-images')
                         .upload(filePath, file, { cacheControl: '3600', upsert: true });
-                    
+
                     if (error) {
                         console.error('Erro no upload:', error);
                         showToast('⚠️ Erro no upload da imagem, salvando sem imagem...', 'warning');
@@ -535,14 +558,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     console.error('Erro ao enviar imagem:', uploadErr);
                 }
             }
-            
+
             await saveProduct(name, description, price, category, imageUrl);
-            
+
             // Close modal after save
             document.getElementById('productFormModal').classList.add('hidden');
         });
     }
-    
+
     // Refresh button handler
     document.getElementById('refreshProductsBtn')?.addEventListener('click', loadProductsAdmin);
 });

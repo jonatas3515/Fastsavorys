@@ -31,3 +31,4 @@ stripe-server/.env
 
 
 .vercel
+.env*.local

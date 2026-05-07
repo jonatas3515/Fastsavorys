@@ -1,0 +1,24 @@
+{
+  "version": "v2",
+  "content": {
+    "messages": [
+      {
+        "type": "text",
+        "text": "A chave Pix é o CNPJ:"
+      },
+      {
+        "type": "text",
+        "text": "63.160.686/0001-06"
+      },
+      {
+        "type": "text",
+        "text": ". O nome favorecido é JESSICA RODRIGUES DOS SANTOS - NU PAGAMENTOS - IP."
+      }
+    ],
+    "actions": [],
+    "quick_replies": []
+  },
+  "handover_to_human": false,
+  "order_ready": false,
+  "order_summary": null
+}

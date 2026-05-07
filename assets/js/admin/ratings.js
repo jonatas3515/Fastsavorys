@@ -35,7 +35,7 @@ const RatingsModule = {
             if (header) {
                 toolbar = document.createElement('div');
                 toolbar.id = 'ratingsToolbar';
-                toolbar.className = 'flex gap-2 mb-4';
+                toolbar.className = 'flex flex-wrap gap-2 mb-4';
                 // Insert after the header, within the ratings panel
                 header.insertAdjacentElement('afterend', toolbar);
             }
@@ -146,8 +146,62 @@ const RatingsModule = {
             </tr>
             `;
         }).join('');
-    },
 
+        // Mobile Render
+        const mobileList = document.getElementById('ratingsListMobile');
+        if (mobileList) {
+            if (filtered.length === 0) {
+                mobileList.innerHTML = '<div class="text-gray-500 text-center py-6 bg-gray-50 rounded-lg">Nenhuma avaliação encontrada.</div>';
+            } else {
+                mobileList.innerHTML = filtered.map(r => {
+                    const date = new Date(r.created_at).toLocaleDateString('pt-BR');
+                    const time = new Date(r.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+                    const stars = '⭐'.repeat(r.rating) + '☆'.repeat(5 - r.rating);
+
+                    return `
+                <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col gap-3">
+                        <div class="flex items-start justify-between">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-lg">
+                                    👤
+                                </div>
+                                <div>
+                                    <h4 class="font-bold text-gray-900">${r.client_name || 'Cliente'}</h4>
+                                    <p class="text-xs text-gray-500">${date} às ${time}</p>
+                                </div>
+                            </div>
+                            <div class="text-yellow-500 text-sm tracking-widest">${stars}</div>
+                        </div>
+
+                        <div class="bg-gray-50 p-3 rounded-lg border border-gray-100 text-sm text-gray-700 italic relative">
+                            <span class="absolute top-2 left-2 text-gray-300 text-2xl leading-none">"</span>
+                            <p class="px-3 z-10 relative">${r.comment || 'Sem comentário'}</p>
+                        </div>
+                        
+                        <div class="flex items-center justify-between pt-2 border-t border-gray-50 mt-1">
+                            <div class="flex flex-col">
+                                <span class="text-[10px] uppercase text-gray-400 font-bold mb-0.5">Status</span>
+                                ${r.approved
+                            ? '<span class="text-green-600 font-medium text-xs flex items-center gap-1">✅ Publicado</span>'
+                            : '<span class="text-yellow-600 font-medium text-xs flex items-center gap-1">⏳ Pendente</span>'}
+                            </div>
+                            
+                            <div class="flex gap-2">
+                                <button onclick="RatingsModule.toggleApproval(${r.id}, ${!r.approved})" 
+                                    class="px-3 py-1.5 rounded-lg text-sm font-medium transition-colors border ${r.approved ? 'border-gray-200 text-gray-600 hover:bg-gray-50' : 'bg-green-600 text-white hover:bg-green-700 shadow-sm'}">
+                                    ${r.approved ? 'Ocultar' : 'Aprovar'}
+                                </button>
+                                <button onclick="RatingsModule.deleteRating(${r.id})" 
+                                    class="p-2 rounded-lg text-red-500 hover:bg-red-50 border border-transparent hover:border-red-100 transition-colors">
+                                    🗑️
+                                </button>
+                            </div>
+                        </div>
+                    </div > `;
+                }).join('');
+            }
+        }
+    },
 
     // Actions
     toggleApproval: async function (id, newStatus) {

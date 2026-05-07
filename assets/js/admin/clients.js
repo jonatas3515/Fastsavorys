@@ -182,6 +182,58 @@ async function renderClients() {
       `;
         }).join('');
 
+        // Render Grid (Mobile)
+        const mobileGrid = document.getElementById('clientsGridMobile');
+        if (mobileGrid) {
+            mobileGrid.innerHTML = sortedClients.map(c => {
+                const classes = getDiscountClasses(c.discount);
+                const badge = c.discount > 0 ? `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium ${classes.badge}">-${c.discount}%</span>` : '';
+
+                return `
+                <div class="bg-white p-4 rounded-lg shadow-sm border border-gray-100 flex flex-col gap-3">
+                    <div class="flex justify-between items-start">
+                         <div>
+                            <h4 class="font-medium text-gray-900 flex items-center gap-2">
+                                ${c.name}
+                                ${badge}
+                            </h4>
+                            <div class="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                                <span>📱 ${c.phone}</span>
+                                <span class="text-gray-300">|</span>
+                                ${c.birthday ? `<span>🎂 ${c.birthday}</span>` : ''}
+                            </div>
+                         </div>
+                         <button onclick="openWhatsAppForOrder('${c.phone}')" class="text-green-600 hover:bg-green-50 p-2 rounded-full">
+                            <span class="text-xl">💬</span>
+                         </button>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-2 text-xs text-gray-600 bg-gray-50 p-2 rounded border border-gray-100">
+                        <div>
+                            <span class="block text-gray-400 text-[10px] uppercase tracking-wide">Pedidos</span>
+                            <span class="font-semibold text-gray-800">${c.orderCount}</span>
+                        </div>
+                         <div>
+                            <span class="block text-gray-400 text-[10px] uppercase tracking-wide">Último</span>
+                            <span class="font-semibold text-gray-800">${new Date(c.lastOrder).toLocaleDateString('pt-BR')}</span>
+                        </div>
+                    </div>
+
+                     <div class="flex items-center gap-2 mt-1">
+                        <label class="text-xs text-gray-500 font-medium">Desc. Fixo:</label>
+                         <select onchange="updateClientFixedDiscount('${c.phone}', this.value)" class="flex-1 border-gray-200 border rounded px-2 py-1.5 text-xs focus:ring-1 focus:ring-rose-500 outline-none ${classes.text} ${classes.bg}">
+                           <option value="0" ${c.discount == 0 ? 'selected' : ''}>Sem Desconto</option>
+                           <option value="5" ${c.discount == 5 ? 'selected' : ''}>5%</option>
+                           <option value="10" ${c.discount == 10 ? 'selected' : ''}>10%</option>
+                           <option value="15" ${c.discount == 15 ? 'selected' : ''}>15%</option>
+                           <option value="20" ${c.discount == 20 ? 'selected' : ''}>20%</option>
+                         </select>
+                     </div>
+                </div>
+                `;
+            }).join('');
+        }
+
     } catch (e) {
         console.error('[Clients] Erro ao carregar:', e);
         list.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-red-500">Erro ao carregar clientes.</td></tr>';
