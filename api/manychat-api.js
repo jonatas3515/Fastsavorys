@@ -404,7 +404,7 @@ async function _handleReject(body, res) {
 // Modelos validados (21/abr/2026): cascata econômica sem modelos descontinuados (1.5/2.0 removidos)
 // Ordem: mais barato → mais capaz. Fallbacks 3/4 em infra 3.x (separada da 2.5, protege contra overload)
 const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash-lite';
-const GEMINI_MODEL_FALLBACK = 'gemini-3.1-flash-lite-preview';
+const GEMINI_MODEL_FALLBACK = 'gemini-3.1-flash-lite';
 const GEMINI_MODEL_FALLBACK_2 = 'gemini-2.5-flash';
 const GEMINI_MODEL_FALLBACK_3 = 'gemini-3-flash-preview';
 // Modelo multimodal para processar áudio/imagem/PDF (modelos lite não suportam inline_data)
