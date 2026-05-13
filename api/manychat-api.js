@@ -422,8 +422,9 @@ Use SOMENTE os dados do CONTEXTO DE NEGÓCIO abaixo. Nunca invente preços, prod
 - ✅ INFORMAÇÕES DE NEGÓCIO (status da loja, horários, preços, taxas, se está aberto ou fechado) DEVEM ser comunicadas ao cliente com linguagem natural e amigável.
 
 REGRAS DE FORMATAÇÃO WHATSAPP:
-- Para negrito use UM asterisco só: *texto* (CORRETO)
-- NUNCA use dois asteriscos: **texto** (ERRADO, não funciona no WhatsApp)
+- ⛔ NEGRITO: use APENAS UM asterisco de cada lado: *texto* (CORRETO no WhatsApp)
+- ⛔ NUNCA use dois asteriscos: **texto** (ERRADO — isso é Markdown, NÃO funciona no WhatsApp)
+- Exemplos: *Bolo G* ✅ | **Bolo G** ❌ | *Massa:* ✅ | **Massa:** ❌
 - Para itálico use underline: _texto_
 - Listas: use • ou - no início da linha
 
@@ -669,6 +670,14 @@ RESPOSTAS PARCIAIS NA PERSONALIZAÇÃO:
 - Ex: "Ótimo, recheio de Ninho anotado! 😊 Só falta escolher a *massa* (Branca ou Chocolate?) e os *sabores dos mini salgados* (até 5 tipos)."
 - Só avance para data/horário/pagamento quando a personalização estiver 100% completa.
 
+FITA/LAÇO DO BOLO:
+- Todos os bolos (exceto Vulcão Mini) levam fita decorativa.
+- APÓS o cliente escolher massa e recheio (personalização completa), pergunte a cor da fita:
+  "Gostaria de escolher a cor da fita/laço do bolo? 🎀
+  🟢 Verde  🔵 Azul  🩷 Rosa  🔴 Vermelha"
+- Se o cliente não quiser escolher ou disser "tanto faz", use a padrão (rosa).
+- ⛔ Bolo Vulcão Mini NÃO leva fita (é individual). Não pergunte.
+
 Exceções:
 - ⛔ Bolo Vulcão Mini NÃO precisa de personalização (já vem pronto). NUNCA pergunte massa nem recheio para ele.
 
@@ -687,9 +696,14 @@ O QUE É APENAS RETIRADA:
 - Bolos GRANDES (Bolo P, Bolo G, Bolo PP, Vulcão P) e TODOS os Kits Festa:
   - Apenas retirada na loja.
   - ⛔ O *Bolo Vulcão Mini* NÃO entra nesta regra! Ele PODE ser entregue (está na lista acima).
-- Se o pedido incluir bolo GRANDE ou kit festa e o cliente quiser entrega:
-  - Explique que por conter bolo grande/kit, o pedido só pode ser retirado na loja.
-  - Mas se for APENAS Vulcão Mini (com ou sem salgados/bebidas), a entrega é PERMITIDA normalmente.
+
+⛔ REGRA CRÍTICA — PEDIDO MISTO COM BOLO:
+- Se o pedido contiver QUALQUER bolo grande (PP, P, G, Vulcão P) ou Kit Festa, o PEDIDO INTEIRO é APENAS RETIRADA.
+- NÃO ofereça entrega para nenhum item do pedido (nem para os salgados, bebidas etc. que estão no mesmo pedido).
+- NÃO pergunte "quer entrega para os salgados?". O pedido é UM SÓ.
+- Informe de forma simples: "Por conter bolo, o pedido é apenas para retirada na loja (Rua Palmeiras, 105, Novo Prado)."
+- NÃO detalhe qual produto impede a entrega. Apenas diga "por conter bolo" ou "por conter kit festa".
+- Mas se o pedido tiver APENAS Vulcão Mini (com ou sem salgados/bebidas, SEM bolo grande), a entrega é PERMITIDA normalmente.
 
 ENDEREÇO E TAXAS:
 - Endereço da loja para retirada: Rua Palmeiras, número 105, bairro Novo Prado, Itamaraju - BA.
@@ -803,6 +817,12 @@ CHAVE PIX SEM VALOR:
   - Responda APENAS com a tag [GERAR_PIX:] (sem valor).
   - Não escreva texto junto.
 
+COMPROVANTE DE PAGAMENTO (IMAGEM):
+- Se o cliente enviar uma imagem e a descrição indicar que é um COMPROVANTE DE PAGAMENTO (Pix, transferência, depósito):
+  - Confirme o recebimento: "Recebido o comprovante! 😊 Vou encaminhar para a Jéssica confirmar o pagamento e já te atualizo!"
+  - NÃO confunda comprovante com foto de produto. Se a descrição diz "COMPROVANTE DE PAGAMENTO", trate como pagamento.
+  - NÃO pergunte "o que deseja pedir?" nem recomece o roteiro.
+
 ----------------------------------------------------------------
 7) MENSAGENS GERADAS PELO SITE
 ----------------------------------------------------------------
@@ -826,8 +846,8 @@ Este roteiro se aplica a TODOS os pedidos (para hoje ou agendamento). NUNCA pule
 - Informe o preço do produto escolhido (usando pacotes ou combos quando existir).
 
 2️⃣ ENTREGA OU RETIRADA:
-- Pergunte se será retirada na loja ou entrega.
-- Se houver bolo/kit festa: explique que é APENAS retirada.
+- Se o pedido contiver bolo grande (PP/P/G/Vulcão P) ou Kit Festa: NÃO pergunte — INFORME direto que por conter bolo o pedido é apenas retirada na loja (Rua Palmeiras, 105, Novo Prado). O pedido é UM SÓ, NÃO separe itens.
+- Se NÃO tiver bolo grande nem kit: pergunte se será retirada na loja ou entrega.
 - Se for ENTREGA:
   - ⛔ CRÍTICO: PRIMEIRO peça endereço completo (bairro, rua, número e referência opcional). SÓ DEPOIS de ter o bairro, verifique a taxa.
   - ⛔ NUNCA informe o valor da taxa ou total antes de coletar o endereço completo.
@@ -849,6 +869,7 @@ Este roteiro se aplica a TODOS os pedidos (para hoje ou agendamento). NUNCA pule
 - Se for MINI SALGADOS (sem kit): pergunte os sabores (respeitando limites por pacote) ou se prefere sortido.
 - Se o produto NÃO tem personalização, pule esta etapa.
 - Se o cliente responder parcialmente, confirme o que ele escolheu e só então peça o que faltou.
+- FITA DO BOLO: Quando massa e recheio estiverem completos, pergunte a cor da fita/laço (🟢 Verde, 🔵 Azul, 🩷 Rosa, 🔴 Vermelha). Se disser "tanto faz", use rosa.
 
 4️⃣ DATA E HORÁRIO:
 - Se o pedido é para HOJE e o produto está liberado para hoje (respeitando:
@@ -1229,6 +1250,7 @@ async function buildBusinessContext(intents) {
         // ============ REGRAS DE PEDIDO / AGENDAMENTO ============
         ctx += '\n\nREGRAS DE PEDIDO E AGENDAMENTO:';
         ctx += '\n  - Bolos (exceto Vulcão Mini) e Kits Festa: NÃO podem ser feitos para o mesmo dia. Se o cliente pedir para HOJE, recuse. Se já pediu para data futura, confirme normalmente SEM repetir regra de antecedência. Apenas RETIRADA na loja (Rua Palmeiras, 105, Novo Prado). NUNCA sugira entrega para eles.';
+        ctx += '\n  - PEDIDO MISTO COM BOLO: Se o pedido incluir bolo grande OU kit festa junto com salgados/bebidas, o PEDIDO INTEIRO é apenas retirada. NÃO ofereça entrega separada para os salgados.';
         ctx += '\n  - Bolo Vulcão Mini (R$ 15,00): exceção — NÃO precisa de antecedência, pode ser pedido para HOJE (verificar disponibilidade). Pode ser ENTREGUE junto com salgados/bebidas.';
         ctx += '\n  - Salgados, mini salgados, bebidas, combos: podem ser pedidos para o MESMO DIA.';
         ctx += '\n    • ENTREGA (Mototáxi): das 7h às 18h, segunda a sábado, bairros listados, com taxa. (Aceite o horário que o cliente pedir dentro deste intervalo, não force para a tarde).';
@@ -1471,7 +1493,7 @@ async function describeImage(imageUrl, apiKey, multimodalModel) {
     const text = await callGeminiMultimodal(
         apiKey, multimodalModel,
         { base64: media.base64, mimeType: mime },
-        'Analise esta imagem. Se contém texto (print, comprovante, lista, cardápio), extraia o texto. Se é uma foto de produto, comida ou cenário, descreva brevemente o que mostra. Responda em português, de forma concisa.',
+        'Analise esta imagem com atenção. PRIORIDADE: Se for um COMPROVANTE DE PAGAMENTO (Pix, transferência, depósito, recibo bancário), diga claramente "COMPROVANTE DE PAGAMENTO" e extraia: valor, data, favorecido. Se contém outro texto (print, lista, cardápio), extraia o texto. Se é uma foto de produto, comida, bolo ou cenário, descreva brevemente. Responda em português, de forma concisa.',
         1024, 12000
     );
     if (text) console.log(`[media] 🖼️ ✅ Image description OK: "${text.substring(0, 100)}"`);
@@ -1965,7 +1987,7 @@ async function handleGeminiCore(req, res) {
     if (intents.includes('social') && !hasNewProductIntent) {
         intentHint = '\n[FOCO: MENSAGEM SOCIAL/PESSOAL. O cliente NÃO está pedindo comida — é uma mensagem de carinho, aniversário, elogio ou afeto. Responda com CALOR HUMANO e BREVIDADE. Agradeça de coração. Diga que vai repassar o carinho para a Jéssica (proprietária). NÃO mencione horário de funcionamento, cardápio, preços nem tente vender. NÃO pergunte "o que deseja pedir?". Se for elogio sobre um produto (bolo, salgado), agradeça e diga que fica feliz, e que está à disposição para futuros pedidos. Se for mensagem de aniversário para a Jéssica, agradeça muito e diga que vai passar para ela.]';
     } else if (intents.includes('bolos') || intents.includes('opcoes_bolo')) {
-        intentHint = '\n[FOCO: BOLO/KIT FESTA. Siga o ROTEIRO DE PEDIDO: 1) produto+preço, 2) entrega/retirada (bolo/kit = APENAS retirada), 3) recheio do bolo, 4) sabores dos mini salgados (se kit festa). Uma pergunta por vez. NÃO pule direto para pagamento.]';
+        intentHint = '\n[FOCO: BOLO/KIT FESTA. Siga o ROTEIRO DE PEDIDO: 1) produto+preço, 2) entrega/retirada (se o pedido contiver bolo grande ou kit, o PEDIDO INTEIRO é apenas retirada — NÃO ofereça entrega para nenhum item separado), 3) personalização (massa+recheio+fita), 4) sabores dos mini salgados (se kit festa). Uma pergunta por vez. NÃO pule direto para pagamento.]';
     } else if (intents.includes('bebidas')) {
         intentHint = '\n[FOCO: O cliente perguntou sobre BEBIDAS.]';
     } else if (intents.includes('agendamento')) {
@@ -2043,7 +2065,14 @@ async function handleGeminiCore(req, res) {
             if (missing.length > 0) {
                 intentHint = `\n[⛔ PERSONALIZAÇÃO INCOMPLETA: O cliente já respondeu parte, mas ainda falta: ${missing.join(', ')}. Confirme o que ele já escolheu e pergunte APENAS o que falta. NÃO avance para data/horário/pagamento até ter TUDO.]`;
             } else {
-                intentHint += '\n[Personalização completa (massa + recheio' + (isKitFesta ? ' + sabores' : '') + '). Siga o ROTEIRO DE PEDIDO: se encomenda pergunte data/horário, depois monte orçamento e pergunte forma de pagamento.]';
+                // Check if ribbon color was already asked/answered
+                const fitaAsked = session.history.some(m => m.role === 'assistant' && /fita|laço|🎀/i.test(m.text));
+                const fitaAnswered = session.history.some(m => m.role === 'user' && /verde|azul|rosa|vermelha|tanto faz|qualquer/i.test(m.text)) && fitaAsked;
+                if (!fitaAsked && !isKitFesta) {
+                    intentHint += '\n[Personalização de massa e recheio completa! Agora pergunte a COR DA FITA/LAÇO do bolo: 🟢 Verde, 🔵 Azul, 🩷 Rosa, 🔴 Vermelha. Só depois siga para data/horário/pagamento.]';
+                } else {
+                    intentHint += '\n[Personalização completa (massa + recheio' + (isKitFesta ? ' + sabores' : '') + (fitaAnswered ? ' + fita' : '') + '). Siga o ROTEIRO DE PEDIDO: se encomenda pergunte data/horário, depois monte orçamento e pergunte forma de pagamento.]';
+                }
             }
         }
     }
@@ -2388,6 +2417,9 @@ function generatePixBrCode(amount = null) {
     reply = reply.replace(/\[SYSTEM\][\s\S]*?\[(?:USER|ASSISTANT)\]/gi, '').trim();
     reply = reply.replace(/\[USER\].*?\[ASSISTANT\]/gi, '').trim();
     reply = reply.replace(/\[ASSISTANT\]\s*/gi, '').trim();
+
+    // --- Corrige formatação WhatsApp: **texto** → *texto* (modelo usa markdown, WhatsApp usa 1 asterisco) ---
+    reply = reply.replace(/\*\*([^*]+)\*\*/g, '*$1*');
 
     // --- Sanitiza vazamento de instruções internas (BUG CRÍTICO) ---
     // Detecta se o modelo ecoou histórico, contexto ou regras internas na resposta
