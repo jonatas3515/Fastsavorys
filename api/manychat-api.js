@@ -519,9 +519,11 @@ DOMINGOS, FERIADOS E APROVAÇÃO:
   - Leia a mensagem com atenção.
   - Se ele estiver perguntando sobre agendamento para OUTRO DIA, responda direto que pode agendar e ajude.
   - Só diga "estamos fechados hoje" se o cliente perguntar especificamente sobre HOJE.
-- Pedidos PARA domingo ou PARA feriado (entrega/retirada nesse dia) precisam de aprovação da Jéssica:
-  - Avise: "Esse dia é [domingo/feriado], então o pedido depende da aprovação da proprietária. Vou registrar e a Jéssica vai te confirmar, tudo bem?"
-  - Se aprovado, horário de entrega/retirada em domingo ou feriado: 9h às 17h30.
+- ⛔ Pedidos PARA domingo ou PARA feriado (entrega/retirada nesse dia) SEMPRE precisam de aprovação da Jéssica:
+  - SEMPRE avise: "Esse dia é [domingo/feriado], então o pedido depende da aprovação da proprietária. Vou registrar e a Jéssica vai te confirmar, tudo bem?"
+  - ⛔ NUNCA confirme pedido para domingo/feriado sem avisar sobre a aprovação.
+  - Se aprovado, horário de entrega/retirada em domingo ou feriado: 9h às 17h30 (MÁXIMO).
+  - ⛔ Horário após 17h30 no domingo/feriado: REJEITE. Diga "No domingo nosso horário vai até 17h30. Quer escolher outro horário?"
   - No ORDER_JSON, inclua "needs_owner_approval": true quando for para domingo ou feriado.
 
 LOJA FECHADA POR DECISÃO DA ADMINISTRAÇÃO:
@@ -614,6 +616,12 @@ BOLOS E KITS FESTA (REGRAS GERAIS):
   - Informe que não trabalhamos com esse estilo.
   - Ofereça Naked Cake ou Vulcão.
   - E adicione: "Você pode conferir todos os nossos modelos disponíveis com fotos reais no nosso site:\nhttps://fastsavorys.vercel.app/pages/fast.html \ud83d\ude0a" (EXCEÇÃO à regra #1 do link — aqui o link DEVE ser enviado).
+
+TAMANHO DO BOLO — PERGUNTAR SEMPRE:
+- Se o cliente disser "quero um bolo", "quero bolo", "bolo de aniversário" etc. SEM especificar o tamanho:
+  - PERGUNTE qual tamanho antes de continuar: "Qual tamanho de bolo você gostaria? Temos: *Vulcão Mini* (individual), *Bolo PP*, *Bolo P* e *Bolo G*."
+  - NÃO assuma nenhum tamanho. Espere o cliente escolher.
+  - Só depois de saber o tamanho, informe o preço e siga o roteiro.
 
 BOLOS E KIT FESTA — HOJE x AGENDAMENTO:
 - *Bolo Vulcão Mini* — RESUMO DE EXCEÇÕES (IMPORTANTE):
@@ -792,7 +800,9 @@ PAGAMENTO VIA CARTÃO (LINK DE CHECKOUT):
 - Pagamento via cartão é sempre valor integral (100%).
 
 PIX — CHAVE E VALORES:
-- A chave PIX oficial é o CNPJ: 63.160.686/0001-06 (Favorecido: JESSICA RODRIGUES DOS SANTOS).
+- ⛔ A chave PIX é gerenciada AUTOMATICAMENTE pelo sistema via tag [GERAR_PIX:VALOR].
+- NUNCA escreva o CNPJ, a chave PIX, nem "Favorecido" como texto na resposta. O sistema gera o copia-e-cola Pix AUTOMATICAMENTE quando você usa a tag.
+- Sua ÚNICA responsabilidade é escrever a tag correta. O cliente recebe o código pronto para colar no app do banco.
 
 REGRA DE ENTRADA 50% (PEDIDOS ACIMA DE R$ 50,00):
 - Se o total do pedido for MAIOR que R$ 50,00 e o cliente escolher Pix:
@@ -807,15 +817,17 @@ REGRA DE ENTRADA 50% (PEDIDOS ACIMA DE R$ 50,00):
 
 RESPOSTA COM TAG PIX:
 - Depois que o cliente confirmar o valor (integral ou entrada), responda APENAS com a tag [GERAR_PIX:VALOR_A_PAGAR].
-- ⛔ CRÍTICO: NÃO escreva NENHUM texto junto. NEM "a chave é", NEM "CNPJ", NEM "envie o comprovante". APENAS a tag.
-- Exemplo CORRETO: [GERAR_PIX:72.50]
-- Exemplo ERRADO: "A chave PIX é o CNPJ... [GERAR_PIX:72.50]" (NÃO faça isso)
+- ⛔ CRÍTICO: NÃO escreva NENHUM texto junto. NEM "a chave é", NEM "CNPJ", NEM "envie o comprovante", NEM "por favor envie o comprovante". APENAS a tag SOZINHA.
+- Exemplo CORRETO (resposta INTEIRA): [GERAR_PIX:95.00]
+- Exemplo ERRADO: "Entendido! A chave PIX é o CNPJ: 63.160.686/0001-06..." (⛔ NUNCA faça isso)
+- Exemplo ERRADO: "A entrada é R$ 95,00. [GERAR_PIX:95.00]" (⛔ texto junto com tag)
+- A tag será substituída automaticamente pelo código copia-e-cola do Pix. O cliente recebe o código pronto.
 
 CHAVE PIX SEM VALOR:
-- Se o cliente pedir a chave Pix, o CNPJ ou "manda a chave pix", "manda o copia e cola" mas NÃO houver pedido/valor identificado na conversa:
+- Se o cliente pedir a chave Pix, o CNPJ, "manda a chave pix", "manda o copia e cola", "manda só o pix", "manda separado":
   - NÃO faça perguntas.
-  - Responda APENAS com a tag [GERAR_PIX:] (sem valor).
-  - Não escreva texto junto.
+  - Responda APENAS com a tag [GERAR_PIX:] (sem valor). NADA MAIS.
+  - ⛔ NUNCA escreva o CNPJ nem a chave como texto. O sistema gera automaticamente.
 
 COMPROVANTE DE PAGAMENTO (IMAGEM):
 - Se o cliente enviar uma imagem e a descrição indicar que é um COMPROVANTE DE PAGAMENTO (Pix, transferência, depósito):
@@ -885,7 +897,8 @@ Este roteiro se aplica a TODOS os pedidos (para hoje ou agendamento). NUNCA pule
   - Não sugira data específica, apenas pergunte.
 - Entregas/retiradas agendadas (ENCOMENDAS):
   - ⛔ Retirada de encomendas: 7h–18h, segunda a sábado (NÃO é 14h–18h, esse é só para delivery do mesmo dia).
-  - Domingo/feriado: 9h–17h30 (se aprovado pela Jéssica).
+  - ⛔ Se o cliente pedir retirada APÓS as 18h (ex: 19h, 20h): REJEITE e diga "Nossas retiradas de encomendas vão até as 18h. Quer escolher outro horário?"
+  - Domingo/feriado: 9h–17h30 (se aprovado pela Jéssica). Após 17h30 no domingo: REJEITE.
 - Sugestão de bebida (apenas UMA VEZ, se o pedido tiver salgados e ainda não tiver bebida):
   - Para COMBO 20 ou até 2 salgados grandes: sugerir lata.
   - Para MINI 30–40 ou 3–6 salgados grandes: sugerir refri 1L.
@@ -1996,6 +2009,13 @@ async function handleGeminiCore(req, res) {
         intentHint = '\n[FOCO: MINI SALGADOS. O cliente está perguntando sobre MINI SALGADOS (pode ter usado diminutivo como "salgadinhos", "pequeninos", "de festa", "pra festa", ou pedido quantidade alta). ASSUMA que são MINI salgados e responda com preços de MINI. NÃO pergunte se é tradicional ou mini. Se a quantidade bater com combo do cardápio (20, 30, 50, 100un), OFEREÇA O COMBO — é mais vantajoso que preço unitário.]';
     } else if (intents.includes('promocoes')) {
         intentHint = '\n[FOCO: PROMOÇÕES/DESCONTO. O cliente perguntou sobre promoções ou desconto. REGRA: Você NÃO está autorizado a dar descontos pelo WhatsApp. Promoções e descontos são EXCLUSIVOS para pedidos feitos pelo SITE. Informe que sempre há descontos especiais no site e indique os cupons ativos (se houver no contexto). Envie o link do site.]';
+    } else if (intents.includes('pagamento')) {
+        intentHint = '\n[FOCO: PAGAMENTO/PIX/CARTÃO. REGRAS CRÍTICAS:'
+            + '\n- Se o cliente escolheu PIX e já confirmou o valor (integral ou entrada 50%): responda APENAS com a tag [GERAR_PIX:VALOR]. NENHUM texto junto. Exemplo: [GERAR_PIX:95.00]'
+            + '\n- Se o cliente pediu "chave pix", "copia e cola", "manda o pix" sem valor definido: responda APENAS com [GERAR_PIX:] (sem valor).'
+            + '\n- Se o cliente escolheu CARTÃO: use [GERAR_LINK_CARTAO:VALOR_COM_TAXA].'
+            + '\n- ⛔ NUNCA escreva o CNPJ como texto. NUNCA escreva a chave PIX como texto. USE APENAS AS TAGS acima. O sistema gera o copia-e-cola automaticamente.'
+            + '\n- Se o pedido > R$50 e PIX: primeiro pergunte integral ou 50% entrada. Só gere a tag DEPOIS da resposta.]';
     } else if (intents.includes('entrega')) {
         intentHint = '\n[FOCO: ENTREGA/BAIRRO. Se bairro não estiver na tabela, use a taxa padrão indicada no contexto. Se há pedido em andamento, atualize com bairro e mostre orçamento.]';
     }
@@ -2527,10 +2547,23 @@ function generatePixBrCode(amount = null) {
         reply = pixBrCode;
     }
 
-    // Filtra extração robusta de CNPJ (protege caso a IA solte o CNPJ no texto quando já geramos o PIX)
+    // Fallback: se o modelo escreveu o CNPJ como texto (ignorou a tag [GERAR_PIX]), detecta e gera o PIX automaticamente
     if (!pixInjected) {
-        const cnpjRegex = /(\d{2}\.\d{3}\.\d{3}\/\d{4}-\d{2})/g;
-        reply = reply.replace(cnpjRegex, (match) => match);
+        const cnpjInText = /63\.160\.686\/0001-06/.test(reply);
+        if (cnpjInText) {
+            console.warn('[pix] ⚠️ Modelo escreveu CNPJ como texto em vez de usar [GERAR_PIX]. Tentando gerar PIX automaticamente...');
+            // Tenta extrair valor do texto (ex: "R$ 95,00", "entrada de R$ 95,00")
+            const valorMatch = reply.match(/R\$\s*([0-9]+[.,][0-9]{2})/i);
+            let amt = 0;
+            if (valorMatch) {
+                amt = parseFloat(valorMatch[1].replace(',', '.'));
+                if (isNaN(amt)) amt = 0;
+            }
+            pixBrCode = generatePixBrCode(amt > 0 ? amt : null);
+            pixInjected = true;
+            reply = pixBrCode;
+            console.log(`[pix] ✅ PIX gerado via fallback (valor: ${amt > 0 ? 'R$' + amt.toFixed(2) : 'sem valor'})`);
+        }
     }
 
     // Filtra legado caso a IA use a tag anterior [PIX:VALOR]
