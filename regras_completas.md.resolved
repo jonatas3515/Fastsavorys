@@ -13,7 +13,7 @@ Documento completo com **todas as regras de negócio**, informando para cada uma
 | Terça | 14:00 | 18:00 | Aberto |
 | Quarta | 14:00 | 18:00 | Aberto |
 | Quinta | 14:00 | 18:00 | Aberto |
-| Sexta | 14:00 | 19:30 | Aberto |
+| Sexta | 14:00 | 18:00 | Aberto |
 | Sábado | 14:00 | 18:00 | Aberto |
 
 - **Tabela Supabase:** `fast_business_hours`

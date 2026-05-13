@@ -37,7 +37,7 @@ async function loadBusinessHours() {
                 { day_of_week: 2, day_name: 'Terça', is_open: true, open_time: '14:00', close_time: '18:00' },
                 { day_of_week: 3, day_name: 'Quarta', is_open: true, open_time: '14:00', close_time: '18:00' },
                 { day_of_week: 4, day_name: 'Quinta', is_open: true, open_time: '14:00', close_time: '18:00' },
-                { day_of_week: 5, day_name: 'Sexta', is_open: true, open_time: '14:00', close_time: '19:30' },
+                { day_of_week: 5, day_name: 'Sexta', is_open: true, open_time: '14:00', close_time: '18:00' },
                 { day_of_week: 6, day_name: 'Sábado', is_open: true, open_time: '14:00', close_time: '18:00' }
             ];
         }
@@ -49,7 +49,7 @@ async function loadBusinessHours() {
             { day_of_week: 2, day_name: 'Terça', is_open: true, open_time: '14:00', close_time: '18:00' },
             { day_of_week: 3, day_name: 'Quarta', is_open: true, open_time: '14:00', close_time: '18:00' },
             { day_of_week: 4, day_name: 'Quinta', is_open: true, open_time: '14:00', close_time: '18:00' },
-            { day_of_week: 5, day_name: 'Sexta', is_open: true, open_time: '14:00', close_time: '19:30' },
+            { day_of_week: 5, day_name: 'Sexta', is_open: true, open_time: '14:00', close_time: '18:00' },
             { day_of_week: 6, day_name: 'Sábado', is_open: true, open_time: '14:00', close_time: '18:00' }
         ];
     }
