@@ -321,6 +321,12 @@ window.editProduct = function (id) {
     document.getElementById('productIsEncomenda').checked = p.is_encomenda;
     document.getElementById('productRequiresPreorder').checked = p.requires_preorder;
 
+    // Show/hide conditional sections based on category
+    const blockSection = document.getElementById('blockOptionsSection');
+    const flavorSection = document.getElementById('flavorSelectionSection');
+    if (blockSection) blockSection.classList.toggle('hidden', p.category !== 'bolos' && p.category !== 'kits');
+    if (flavorSection) flavorSection.classList.toggle('hidden', p.category !== 'mini');
+
     if (document.getElementById('productBlockMassa')) document.getElementById('productBlockMassa').checked = p.block_massa;
     if (document.getElementById('productBlockRecheio')) document.getElementById('productBlockRecheio').checked = p.block_recheio;
 
