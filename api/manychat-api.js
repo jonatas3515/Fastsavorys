@@ -952,8 +952,10 @@ INSTRUÇÃO DE SAUDAÇÃO: PRIMEIRA mensagem do cliente nesta conversa.
 PRIORIDADE MÁXIMA: Leia com atenção o que o cliente escreveu e RESPONDA à pergunta ou pedido dele. A saudação é secundária.
 Comece com uma apresentação BREVE (máx 1 linha): "Olá, [nome]! Sou o Fast, atendente virtual da FastSavory's! 😊"
 Logo em seguida, RESPONDA DIRETAMENTE ao que o cliente perguntou ou pediu — não pare na saudação.
-Se souber o nome do cliente, use-o. Nas próximas mensagens, NÃO repita saudação nem apresentação.
-TOM: Seja BREVE, amigável e alegre. Respostas curtas (2-3 linhas máx). NÃO seja prolixo nem repetitivo.`;
+Se souber o nome do cliente, use-o. Se o nome estiver ausente, vazio ou for apenas um ponto/símbolo, NÃO use nome — diga apenas "Olá!".
+Nas próximas mensagens, NÃO repita saudação nem apresentação.
+TOM: Seja BREVE, amigável e alegre. Respostas curtas (2-3 linhas máx). NÃO seja prolixo nem repetitivo.
+MENSAGEM VAGA/INCOMPLETA: Se a primeira mensagem for muito curta ou vaga (ex: "quero", "oi", "quero 2", "me manda", "tem?"), o cliente pode estar respondendo a um status/stories do WhatsApp. NÃO assuma qual produto ele quer. Pergunte gentilmente: "Vi que se interessou! Me diz o que você gostaria que te ajudo no atendimento 😊". NÃO pergunte data nem mencione regras de antecedência nesse momento.`;
 
 // Instrução extra para SESSÃO EM ANDAMENTO (já falou há menos de 3h)
 const GREETING_CONTINUE_SESSION = `
@@ -2051,7 +2053,11 @@ async function handleGeminiCore(req, res) {
     if (lastAssistantMsg) {
         const lastAText = lastAssistantMsg.text.toLowerCase();
         const isKitFesta = session.history.some(m => /kit\s*festa/i.test(m.text));
-        const hasBoloInHist = session.history.some(m => /\bbolo\b/i.test(m.text) && !/vulc[aã]o\s*mini/i.test(m.text));
+        const hasBoloInHist = session.history.some(m => {
+            if (/vulc[aã]o\s*mini|bolo\s*(no|de)\s*pote|pote\s*(de\s*)?bolo/i.test(m.text)) return false;
+            if (m.role === 'user') return /\bbolo\b/i.test(m.text);
+            return /bolo\s*(pp|p\b|g\b)/i.test(m.text) && /R\$\s*\d/i.test(m.text);
+        });
         const needsCustom = isKitFesta || hasBoloInHist;
 
         // Verifica se ENTREGA/RETIRADA já foi discutida
@@ -2221,7 +2227,8 @@ function generatePixBrCode(amount = null) {
 
     // Hora atual em Itamaraju-BA (UTC-3)
     const now = new Date().toLocaleString('pt-BR', { timeZone: 'America/Bahia', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', weekday: 'long' });
-    const userMessage = `[Hoje é ${now}]${intentHint}` + (name ? ` Cliente "${name}" disse: ${effectiveMessage}` : ` ${effectiveMessage}`);
+    const cleanName = name && /[a-zA-ZÀ-ÿ]{2,}/.test(name) ? name.trim() : '';
+    const userMessage = `[Hoje é ${now}]${intentHint}` + (cleanName ? ` Cliente "${cleanName}" disse: ${effectiveMessage}` : ` ${effectiveMessage}`);
 
     // --- Busca dados reais do Supabase e monta o prompt final ---
     const businessContext = await buildBusinessContext(intents);
@@ -2235,7 +2242,7 @@ function generatePixBrCode(amount = null) {
             return /kit\s*festa\s*(pp|p\b|g\b)/i.test(m.text) && /R\$\s*\d/i.test(m.text);
         });
         const hasBoloInHistory = session.history.some(m => {
-            if (/vulc[aã]o\s*mini|bolo\s*no\s*pote/i.test(m.text)) return false;
+            if (/vulc[aã]o\s*mini|bolo\s*(no|de)\s*pote|pote\s*(de\s*)?bolo/i.test(m.text)) return false;
             if (m.role === 'user') return /\bbolo\b/i.test(m.text);
             // Bot: só conta se menciona tamanho específico (Bolo PP/P/G) com preço
             return /bolo\s*(pp|p\b|g\b)/i.test(m.text) && /R\$\s*\d/i.test(m.text);
