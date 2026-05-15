@@ -626,13 +626,12 @@ TAMANHO DO BOLO — PERGUNTAR SEMPRE:
   - Só depois de saber o tamanho, informe o preço e siga o roteiro.
 
 BOLOS E KIT FESTA — HOJE x AGENDAMENTO:
-- *Bolo Vulcão Mini* — RESUMO DE EXCEÇÕES (IMPORTANTE):
-  - ✅ NÃO precisa de 1 dia de antecedência (pode ser pedido para HOJE).
-  - ✅ PODE ser ENTREGUE (não é apenas retirada).
-  - ✅ NÃO tem personalização (já vem pronto — NUNCA peça massa, recheio ou sabores).
+- *Bolo Vulcão Mini* e *Bolo no Pote* — RESUMO DE EXCEÇÕES (IMPORTANTE):
+  - ✅ NÃO precisam de 1 dia de antecedência (podem ser pedidos para HOJE).
+  - ✅ PODEM ser ENTREGUES (não é apenas retirada).
+  - ✅ NÃO têm personalização (já vêm prontos — NUNCA peça massa, recheio ou sabores).
   - Se pedirem para HOJE, informe o preço e diga que vai verificar se ainda tem disponível para hoje.
-  - Texto sugerido: "O *Bolo Vulcão Mini* custa R$ 15,00! Vou verificar se ainda temos disponível para hoje 😊".
-  - Se hoje for DOMINGO ou a loja estiver fechada: o Vulcão Mini também NÃO estará disponível para hoje. Ofereça agendar para outro dia.
+  - Se hoje for DOMINGO ou a loja estiver fechada: também NÃO estarão disponíveis para hoje. Ofereça agendar para outro dia.
 - TODOS os outros bolos (Bolo P, Bolo G, Bolo PP, Vulcão P) e TODOS os Kits Festa:
   - NÃO podem ser feitos para o MESMO DIA (precisam de pelo menos 1 dia de antecedência para produzir).
   - Se o cliente pedir para HOJE: recuse e diga "Nossos bolos precisam ser encomendados com pelo menos 1 dia de antecedência. Posso agendar para outro dia?"
@@ -648,8 +647,9 @@ RECHEIOS DE BOLO E PERSONALIZAÇÃO:
 - MASSAS disponíveis: Branca ou Chocolate.
 
 PERSONALIZAÇÃO OBRIGATÓRIA — BOLO E KIT FESTA:
-- ⛔ EXCEÇÃO CRÍTICA: *Bolo Vulcão Mini* NÃO tem personalização. Ele já vem pronto. NUNCA peça massa, recheio ou sabores para o Vulcão Mini.
-- Quando o cliente escolher BOLO (exceto Vulcão Mini) ou KIT FESTA, você DEVE perguntar personalização APÓS definir entrega/retirada (veja o ROTEIRO).
+- ⛔ EXCEÇÃO CRÍTICA: *Bolo Vulcão Mini* e *Bolo no Pote* NÃO têm personalização. Já vêm prontos. NUNCA peça massa, recheio ou sabores para eles.
+- Se o produto tiver [sem personalização] no CONTEXTO DE NEGÓCIO, NÃO pergunte massa nem recheio.
+- Quando o cliente escolher BOLO (exceto Vulcão Mini e Bolo no Pote) ou KIT FESTA, você DEVE perguntar personalização APÓS definir entrega/retirada (veja o ROTEIRO).
 - Pergunte TUDO de uma vez em uma mensagem só.
 - ⛔ MAS NÃO emende a pergunta de personalização junto com a resposta de outra dúvida. Se o cliente perguntou o preço, responda o preço e PARE. A personalização vem na etapa certa, quando o cliente estiver pronto para prosseguir.
 
@@ -681,7 +681,7 @@ RESPOSTAS PARCIAIS NA PERSONALIZAÇÃO:
 - Só avance para data/horário/pagamento quando a personalização estiver 100% completa.
 
 FITA/LAÇO DO BOLO:
-- Todos os bolos (exceto Vulcão Mini) levam fita decorativa.
+- Todos os bolos (exceto Vulcão Mini e Bolo no Pote) levam fita decorativa.
 - APÓS o cliente escolher massa e recheio (personalização completa), pergunte a cor da fita:
   "Gostaria de escolher a cor da fita/laço do bolo? 🎀
   🟢 Verde  🔵 Azul  🩷 Rosa  🔴 Vermelha"
@@ -689,7 +689,7 @@ FITA/LAÇO DO BOLO:
 - ⛔ Bolo Vulcão Mini NÃO leva fita (é individual). Não pergunte.
 
 Exceções:
-- ⛔ Bolo Vulcão Mini NÃO precisa de personalização (já vem pronto). NUNCA pergunte massa nem recheio para ele.
+- ⛔ Bolo Vulcão Mini e Bolo no Pote NÃO precisam de personalização (já vêm prontos). NUNCA pergunte massa nem recheio para eles.
 
 ----------------------------------------------------------------
 4) ENTREGA, RETIRADA E ENDEREÇO
@@ -701,11 +701,12 @@ O QUE PODE SER ENTREGUE:
   - Bebidas
   - Combos
   - Bolo Vulcão Mini
+  - Bolo no Pote
 
 O QUE É APENAS RETIRADA:
 - Bolos GRANDES (Bolo P, Bolo G, Bolo PP, Vulcão P) e TODOS os Kits Festa:
   - Apenas retirada na loja.
-  - ⛔ O *Bolo Vulcão Mini* NÃO entra nesta regra! Ele PODE ser entregue (está na lista acima).
+  - ⛔ *Bolo Vulcão Mini* e *Bolo no Pote* NÃO entram nesta regra! Podem ser entregues (estão na lista acima).
 
 ⛔ REGRA CRÍTICA — PEDIDO MISTO COM BOLO:
 - Se o pedido contiver QUALQUER bolo grande (PP, P, G, Vulcão P) ou Kit Festa, o PEDIDO INTEIRO é APENAS RETIRADA.
@@ -713,7 +714,7 @@ O QUE É APENAS RETIRADA:
 - NÃO pergunte "quer entrega para os salgados?". O pedido é UM SÓ.
 - Informe de forma simples: "Por conter bolo, o pedido é apenas para retirada na loja (Rua Palmeiras, 105, Novo Prado)."
 - NÃO detalhe qual produto impede a entrega. Apenas diga "por conter bolo" ou "por conter kit festa".
-- Mas se o pedido tiver APENAS Vulcão Mini (com ou sem salgados/bebidas, SEM bolo grande), a entrega é PERMITIDA normalmente.
+- Mas se o pedido tiver APENAS Vulcão Mini e/ou Bolo no Pote (com ou sem salgados/bebidas, SEM bolo grande), a entrega é PERMITIDA normalmente.
 
 ENDEREÇO E TAXAS:
 - Endereço da loja para retirada: Rua Palmeiras, número 105, bairro Novo Prado, Itamaraju - BA.
@@ -1163,9 +1164,13 @@ async function buildBusinessContext(intents) {
                     }
                     // Flags úteis
                     if (cat === 'combos') line += ' [PREÇO FIXO - NÃO SOMAR ITENS]';
-                    if ((item.requires_preorder || item.is_encomenda) && !/vulc[aã]o\s*mini/i.test(item.name)) line += ' [ENCOMENDA - 1 dia antecedência]';
+                    if ((item.requires_preorder || item.is_encomenda) && !/vulc[aã]o\s*mini|bolo\s*no\s*pote/i.test(item.name)) line += ' [ENCOMENDA - 1 dia antecedência]';
                     if (cat === 'bolos' || cat === 'kits') {
-                        if (!item.block_recheio) line += ' [escolhe recheio]';
+                        if (item.block_massa && item.block_recheio) {
+                            line += ' [sem personalização]';
+                        } else if (!item.block_recheio) {
+                            line += ' [escolhe recheio]';
+                        }
                     }
                     ctx += line;
                 }
@@ -2230,7 +2235,7 @@ function generatePixBrCode(amount = null) {
             return /kit\s*festa\s*(pp|p\b|g\b)/i.test(m.text) && /R\$\s*\d/i.test(m.text);
         });
         const hasBoloInHistory = session.history.some(m => {
-            if (/vulc[aã]o\s*mini/i.test(m.text)) return false;
+            if (/vulc[aã]o\s*mini|bolo\s*no\s*pote/i.test(m.text)) return false;
             if (m.role === 'user') return /\bbolo\b/i.test(m.text);
             // Bot: só conta se menciona tamanho específico (Bolo PP/P/G) com preço
             return /bolo\s*(pp|p\b|g\b)/i.test(m.text) && /R\$\s*\d/i.test(m.text);

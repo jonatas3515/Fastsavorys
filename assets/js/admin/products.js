@@ -568,6 +568,18 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Refresh button handler
     document.getElementById('refreshProductsBtn')?.addEventListener('click', loadProductsAdmin);
+
+    // Category change → show/hide conditional sections
+    const categorySelect = document.getElementById('productCategory');
+    if (categorySelect) {
+        categorySelect.addEventListener('change', function () {
+            const cat = this.value;
+            const blockSection = document.getElementById('blockOptionsSection');
+            const flavorSection = document.getElementById('flavorSelectionSection');
+            if (blockSection) blockSection.classList.toggle('hidden', cat !== 'bolos' && cat !== 'kits');
+            if (flavorSection) flavorSection.classList.toggle('hidden', cat !== 'mini');
+        });
+    }
 });
 
 // Expose globals
