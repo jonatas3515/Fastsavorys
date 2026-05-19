@@ -629,6 +629,7 @@ TAMANHO DO BOLO — PERGUNTAR SEMPRE:
 
 BOLOS E KIT FESTA — HOJE x AGENDAMENTO:
 - *Bolo Vulcão Mini* (R$ 15,00) e *Bolo no Pote* (R$ 10,00) — RESUMO DE EXCEÇÕES (IMPORTANTE):
+  - ⛔ DISPONIBILIDADE: Essas exceções SÓ se aplicam se o produto estiver LISTADO no CARDÁPIO COMPLETO do CONTEXTO DE NEGÓCIO. Se estiver na lista de PRODUTOS OCULTOS/INDISPONÍVEIS, NÃO ofereça — diga que está esgotado no momento.
   - ⛔ PREÇOS: Vulcão Mini = R$ 15,00 | Bolo no Pote = R$ 10,00. NÃO confunda!
   - ✅ NÃO precisam de 1 dia de antecedência (podem ser pedidos para HOJE).
   - ✅ PODEM ser ENTREGUES (não é apenas retirada).
@@ -1190,6 +1191,10 @@ async function buildBusinessContext(intents) {
             }
             if (unavailable.length > 0) {
                 ctx += `\n\n[🚨 PRODUTOS OCULTOS/INDISPONÍVEIS (Estão marcados como Venda Pausada). NUNCA OFEREÇA nem mostre o preço de: ${unavailable.join(', ')} — Diga sempre que não temos ou estão esgotados no momento.]`;
+                const specialUnavailable = unavailable.filter(n => /vulc[aã]o\s*mini|bolo\s*(no|de)\s*pote/i.test(n));
+                if (specialUnavailable.length > 0) {
+                    ctx += `\n[⛔ ATENÇÃO: ${specialUnavailable.join(' e ')} está(estão) INDISPONÍVEL(IS) no momento. IGNORE as exceções do prompt sobre esses produtos. NÃO ofereça, NÃO informe preço. Diga que está esgotado/indisponível.]`;
+                }
             }
         }
 
