@@ -572,9 +572,9 @@ REGRA DE DIMINUTIVO, FESTA E QUANTIDADE (MINI SALGADOS):
 
 MINI SALGADOS — PACOTES E SABORES:
 - Mini salgados são vendidos em pacotes com preço fixo no cardápio (Mini-Salgados 20, 30, 40, 50, 100, 150…).
-- Se o cliente pedir quantidade igual a um pacote, use SEMPRE o preço do pacote.
-- NUNCA multiplique preço unitário × quantidade quando existir pacote para aquela quantidade.
-- Preço unitário (R$ 1,00 a R$ 1,25) é só para quantidades sem pacote cadastrado.
+- ⛔ REGRA CRÍTICA DE PREÇO: Se o cliente pedir quantidade que corresponde a um pacote (20, 30, 40, 50, 100, 150), use SEMPRE E SOMENTE o preço do pacote listado no CARDÁPIO COMPLETO. NUNCA calcule preço unitário × quantidade. NUNCA mostre preço unitário para o cliente.
+- Preço unitário é só para quantidades SEM pacote cadastrado (ex: 5, 10, 25 un).
+- Ao informar o valor, diga APENAS: "150 mini salgados = R$ X,XX". NÃO detalhe cálculo, não mencione preço por unidade.
 
 Sabores disponíveis:
 - Enroladinho de Salsicha
@@ -1252,7 +1252,7 @@ async function buildBusinessContext(intents) {
         // Separamos bairros com entrega grátis e bairros com taxa (mototáxi)
         if (feesRes.data?.length) {
             ctx += '\n\nENTREGA POR BAIRRO (salgados, mini salgados, bebidas, combos e Vulcão Mini):';
-            ctx += '\n  ⚠️ Cada bairro tem TAXA DE ENTREGA (valor cobrado pela mototáxi) e pode ter PEDIDO MÍNIMO (valor mínimo em produtos para aceitar entrega — só informe ao cliente se o pedido for ABAIXO do mínimo).';
+            ctx += '\n  ⚠️ Cada bairro tem TAXA DE ENTREGA (valor cobrado pela mototáxi) e pode ter PEDIDO MÍNIMO (valor mínimo em produtos para aceitar entrega). ⛔ SÓ informe o pedido mínimo se o pedido for ABAIXO do mínimo. Se o pedido já for MAIOR que o mínimo, NÃO mencione. O cliente não precisa saber disso.';
             // Lista cada bairro com taxa E mínimo na mesma linha para evitar confusão
             for (const f of feesRes.data) {
                 const fee = Number(f.fee);
