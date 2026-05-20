@@ -493,8 +493,11 @@ CORREÇÕES E MUDANÇAS DE IDEIA:
 ----------------------------------------------------------------
 HORÁRIO GERAL DA LOJA / ENTREGAS:
 - Segunda a sábado: entregas e retiradas de pedidos para HOJE (mesmo dia) entre 14h e 18h.
-- ⛔ ATENÇÃO: O horário de 14h–18h se aplica APENAS a pedidos para o MESMO DIA (delivery).
-- ENCOMENDAS/AGENDAMENTOS (retirada na loja em outro dia): podem ser retiradas das 7h às 18h.
+- ⛔ ATENÇÃO: O horário de 14h–18h se aplica APENAS a pedidos para o MESMO DIA.
+- ENCOMENDAS/AGENDAMENTOS (entrega OU retirada em outro dia):
+  - Segunda a sábado: 7h às 18h.
+  - Domingos e feriados: 7h às 17h30.
+  - ⛔ Se o cliente agendar entrega para outro dia (ex: sábado às 7:30), ACEITE normalmente. A restrição de 14h–18h NÃO se aplica a agendamentos.
 
 DEFINIÇÃO IMPORTANTE:
 - "Pedido para hoje" = pedido feito no mesmo dia para entrega ou retirada no mesmo dia.
@@ -686,7 +689,7 @@ RESPOSTAS PARCIAIS NA PERSONALIZAÇÃO:
 
 FITA/LAÇO DO BOLO:
 - Todos os bolos (exceto Vulcão Mini e Bolo no Pote) levam fita decorativa.
-- APÓS o cliente escolher massa e recheio (personalização completa), pergunte a cor da fita:
+- APÓS o cliente escolher massa e recheio (personalização completa), pergunte a cor da fita/laço:
   "Gostaria de escolher a cor da fita/laço do bolo? 🎀
   🟢 Verde  🔵 Azul  🩷 Rosa  🔴 Vermelha"
 - Se o cliente não quiser escolher ou disser "tanto faz", use a padrão (rosa).
@@ -743,17 +746,20 @@ EXCEÇÃO SÃO DOMINGOS / CRISTO REDENTOR:
 
 REGRAS DE RETIRADA NA LOJA (AGENDAMENTOS/ENCOMENDAS):
 - Retirada agendada: Rua Palmeiras, 105, Novo Prado, Itamaraju - BA.
-- ⛔ Horário de retirada de ENCOMENDAS: 7h às 18h, segunda a sábado.
+- ⛔ Horário de retirada de ENCOMENDAS: 7h às 18h, segunda a sábado, e 7h às 17h30, domingo e feriado.
 - DIFERENTE do horário de delivery (14h–18h). Encomendas têm horário mais amplo para retirada.
 - Verifique o valor mínimo da faixa de horário (se houver) sem ficar listando regras para o cliente o tempo todo.
 - Se não atingir valor mínimo, informe suavemente quanto falta e sugira algo do cardápio.
 
 ENTREGAS E HORÁRIO DE ENTREGA:
 - Entregas de mototáxi: das 14h às 18h, segunda a sábado (sexta-feira também até 18h).
-- ⛔ Se o cliente pedir entrega APÓS as 18h:
-  - REJEITE. Diga: "Nossas entregas vão até as 18h. Quer escolher outro horário?"
+- Entregas AGENDADAS (outro dia): das 7h às 18h, segunda a sábado, e 7h às 17h30, domingo e feriado.
+- ⛔ Se o cliente pedir entrega HOJE após as 18h:
+  - REJEITE. Diga: "Nossas entregas para hoje vão até as 18h. Quer escolher outro horário?"
+- ⛔ Se o cliente pedir entrega AGENDADA (outro dia) após as 18h: REJEITE (máximo 18h seg-sáb, 17h30 dom).
+- ⛔ Se o cliente pedir entrega AGENDADA dentro do horário (7h–18h): ACEITE normalmente. NÃO diga que entregas são só das 14h.
 - Pedidos até 17:59 devem ser aceitos normalmente.
-- NÃO diga que "está muito em cima do horário" se estiver dentro do expediente e dentro da faixa 14h–18h.
+- NÃO diga que "está muito em cima do horário" se estiver dentro do expediente.
 
 ----------------------------------------------------------------
 5) SITE, FOTOS, CUPONS E REDES
@@ -907,9 +913,11 @@ Este roteiro se aplica a TODOS os pedidos (para hoje ou agendamento). NUNCA pule
   - Se o cliente ainda não informou a data, pergunte: "Para qual data e horário você gostaria de agendar?".
   - Não sugira data específica, apenas pergunte.
 - Entregas/retiradas agendadas (ENCOMENDAS):
-  - ⛔ Retirada de encomendas: 7h–18h, segunda a sábado (NÃO é 14h–18h, esse é só para delivery do mesmo dia).
-  - ⛔ Se o cliente pedir retirada APÓS as 18h (ex: 19h, 20h): REJEITE e diga "Nossas retiradas de encomendas vão até as 18h. Quer escolher outro horário?"
-  - Domingo/feriado: 9h–17h30 (se aprovado pela Jéssica). Após 17h30 no domingo: REJEITE.
+  - ⛔ Entrega de encomendas: 7h–18h, seg-sáb | 7h–17h30, dom/feriado. NÃO é 14h–18h (esse é só para MESMO DIA).
+  - ⛔ Retirada de encomendas: 7h–18h, seg-sáb | 7h–17h30, dom/feriado.
+  - ⛔ Se o cliente agendar entrega/retirada dentro de 7h–18h (ex: sábado 7:30): ACEITE normalmente.
+  - ⛔ Se pedir após 18h (seg-sáb) ou após 17h30 (dom/feriado): REJEITE e sugira outro horário.
+  - Domingo/feriado: dependem de aprovação da Jéssica.
 - Sugestão de bebida (apenas UMA VEZ, se o pedido tiver salgados e ainda não tiver bebida):
   - Para COMBO 20 ou até 2 salgados grandes: sugerir lata.
   - Para MINI 30–40 ou 3–6 salgados grandes: sugerir refri 1L.
@@ -1252,7 +1260,7 @@ async function buildBusinessContext(intents) {
         // Separamos bairros com entrega grátis e bairros com taxa (mototáxi)
         if (feesRes.data?.length) {
             ctx += '\n\nENTREGA POR BAIRRO (salgados, mini salgados, bebidas, combos e Vulcão Mini):';
-            ctx += '\n  ⚠️ Cada bairro tem TAXA DE ENTREGA (valor cobrado pela mototáxi) e pode ter PEDIDO MÍNIMO (valor mínimo em produtos para aceitar entrega). ⛔ SÓ informe o pedido mínimo se o pedido for ABAIXO do mínimo. Se o pedido já for MAIOR que o mínimo, NÃO mencione. O cliente não precisa saber disso.';
+            ctx += '\n  ⚠️ Cada bairro tem TAXA DE ENTREGA (valor cobrado pela mototáxi) e PEDIDO MÍNIMO (uso interno). ⛔ REGRA: SÓ mencione o pedido mínimo se o pedido do cliente for MENOR que o mínimo do bairro. Se o pedido já for MAIOR ou IGUAL, NÃO mencione o mínimo — é informação interna que o cliente NÃO precisa saber.';
             // Lista cada bairro com taxa E mínimo na mesma linha para evitar confusão
             for (const f of feesRes.data) {
                 const fee = Number(f.fee);
