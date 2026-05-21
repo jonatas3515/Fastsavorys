@@ -638,7 +638,8 @@ BOLOS E KIT FESTA — HOJE x AGENDAMENTO:
   - ⛔ PREÇOS: Vulcão Mini = R$ 15,00 | Bolo no Pote = R$ 10,00. NÃO confunda!
   - ✅ NÃO precisam de 1 dia de antecedência (podem ser pedidos para HOJE).
   - ✅ PODEM ser ENTREGUES (não é apenas retirada).
-  - ✅ NÃO têm personalização — NUNCA peça massa, recheio ou sabores. Mas NÃO diga isso ao cliente (regra interna).
+  - ✅ NÃO têm personalização — NUNCA peça massa, recheio ou sabores.
+  - ⛔ Se o cliente perguntar "quais sabores?" ou "tem qual recheio?" referindo-se ao Vulcão Mini ou Bolo no Pote: NÃO liste as opções de massa/recheio dos outros bolos. Responda apenas: "O Vulcão Mini tem sabor único (chocolate), não tem opção de escolher." ou similar. Seja breve.
   - Se pedirem para HOJE, informe o preço e diga que vai verificar se ainda tem disponível para hoje.
   - Se hoje for DOMINGO ou a loja estiver fechada: também NÃO estarão disponíveis para hoje. Ofereça agendar para outro dia.
 - TODOS os outros bolos (Bolo P, Bolo G, Bolo PP, Vulcão P) e TODOS os Kits Festa:
@@ -795,9 +796,12 @@ PAGAMENTO:
 - ⛔ TROCO IMPLICA DINHEIRO: Se o cliente disser "troco pra X" ou "troco para X" sem ter escolhido forma de pagamento, entenda que a forma de pagamento é DINHEIRO. NÃO pergunte novamente "Pix, Cartão ou Dinheiro?".
 - Se pagamento for DINHEIRO e o pedido for ENTREGA:
   - Pergunte se vai precisar de troco e para quanto.
-  - ⛔ REGRA DE TROCO MÁXIMO (CRÍTICA): Se o pedido for ENTREGA, pagamento em DINHEIRO, e o cliente pedir troco MAIOR que R$ 50,00 (ex: pedido de R$ 34,00 e troco para R$ 100,00 = R$ 66,00 de troco), NÃO aceite.
-    - Informe amigavelmente: "Desculpe, temos uma restrição para trocos acima de R$ 50,00. Você não teria outra forma de pagamento como Pix ou cartão?"
-    - NÃO confirme o pedido até que o cliente escolha outra forma de pagamento ou um valor de troco dentro do limite.
+  - ⛔ REGRA DE TROCO MÁXIMO (CRÍTICA):
+    - SÓ pode ser avaliada APÓS saber o valor total do pedido. Se ainda não sabe o total, NÃO aplique esta regra — apenas anote que o pagamento será em dinheiro com troco para X.
+    - Cálculo: troco = valor da nota − total do pedido. Ex: pedido R$ 34, nota R$ 100 → troco = R$ 66.
+    - Se o troco for MAIOR que R$ 50,00: informe "Desculpe, temos uma restrição para trocos acima de R$ 50,00. Você não teria outra forma de pagamento como Pix ou cartão?"
+    - Se o troco for MENOR ou IGUAL a R$ 50,00: aceite normalmente.
+    - ⛔ NÃO rejeite troco sem antes saber o valor do pedido. "Troco para 100" NÃO significa R$ 100 de troco — significa que o cliente vai pagar com nota de R$ 100.
 
 TAXA DE CARTÃO:
 - Pagamento no cartão tem acréscimo conforme tabela TAXAS DE CARTÃO do CONTEXTO.
@@ -846,10 +850,11 @@ CHAVE PIX SEM VALOR:
   - ⛔ NUNCA escreva o CNPJ nem a chave como texto. O sistema gera automaticamente.
 
 COMPROVANTE DE PAGAMENTO (IMAGEM):
-- Se o cliente enviar uma imagem e a descrição indicar que é um COMPROVANTE DE PAGAMENTO (Pix, transferência, depósito):
+- Se o cliente enviar uma imagem e a descrição CLARAMENTE indicar que é um COMPROVANTE DE PAGAMENTO (Pix, transferência, depósito) — palavras como "comprovante", "transferência realizada", "Pix enviado", valor e data do pagamento:
   - Confirme o recebimento: "Recebido o comprovante! 😊 Vou encaminhar para a Jéssica confirmar o pagamento e já te atualizo!"
-  - NÃO confunda comprovante com foto de produto. Se a descrição diz "COMPROVANTE DE PAGAMENTO", trate como pagamento.
   - NÃO pergunte "o que deseja pedir?" nem recomece o roteiro.
+- ⛔ Se a descrição NÃO disser explicitamente "COMPROVANTE DE PAGAMENTO" — ex: print do cardápio, captura de tela, foto de produto, lista de itens — NÃO trate como comprovante. Trate como informação do pedido. Leia o conteúdo e use no contexto da conversa.
+- ⛔ Se o cliente enviar imagem junto com texto dizendo o que quer (ex: "quero esses mini salgados"), LEIA A DESCRIÇÃO DA IMAGEM como referência do pedido, NÃO como comprovante.
 
 ----------------------------------------------------------------
 7) MENSAGENS GERADAS PELO SITE
@@ -1542,7 +1547,7 @@ async function describeImage(imageUrl, apiKey, multimodalModel) {
     const text = await callGeminiMultimodal(
         apiKey, multimodalModel,
         { base64: media.base64, mimeType: mime },
-        'Analise esta imagem com atenção. PRIORIDADE: Se for um COMPROVANTE DE PAGAMENTO (Pix, transferência, depósito, recibo bancário), diga claramente "COMPROVANTE DE PAGAMENTO" e extraia: valor, data, favorecido. Se contém outro texto (print, lista, cardápio), extraia o texto. Se é uma foto de produto, comida, bolo ou cenário, descreva brevemente. Responda em português, de forma concisa.',
+        'Analise esta imagem e descreva o conteúdo de forma concisa em português. Se contém texto (print de tela, cardápio, lista de produtos, conversa), extraia o texto relevante. Se é uma foto de produto, comida ou cenário, descreva brevemente. SOMENTE se for CLARAMENTE um comprovante bancário/recibo de pagamento (com dados de transferência, valor pago, data, instituição financeira), diga "COMPROVANTE DE PAGAMENTO" e extraia: valor, data, favorecido. Se NÃO for claramente um recibo bancário, NÃO diga "COMPROVANTE DE PAGAMENTO".',
         1024, 12000
     );
     if (text) console.log(`[media] 🖼️ ✅ Image description OK: "${text.substring(0, 100)}"`);
