@@ -101,8 +101,9 @@ window.CheckoutModule = {
                 const p = window.products.find(x => x.id === i.id);
                 if (!p) return false;
                 const name = p.name.toLowerCase();
-                // Vulcão Mini é liberado para entrega
+                // Vulcão Mini e Bolo no Pote são liberados para entrega
                 if (name.includes('vulcão mini') || name.includes('vulcao mini')) return false;
+                if (name.includes('pote')) return false;
                 return p.category === 'bolos' || name.includes('bolo p') || name.includes('bolo g') || name.match(/bolo\s*[pg]/i);
             });
 
@@ -110,7 +111,7 @@ window.CheckoutModule = {
                 e.target.checked = false;
                 document.querySelector('input[name="delivery"][value="retirada"]').checked = true;
                 f.classList.add('hidden');
-                this.showWarning('⚠️ Kits festa e bolos grandes não possuem entrega. Apenas retirada na loja. (Vulcão Mini pode ser entregue!)');
+                this.showWarning('⚠️ Kits festa e bolos grandes não possuem entrega. Apenas retirada na loja. (Vulcão Mini e Bolo no Pote podem ser entregues!)');
                 return;
             }
             f.classList.remove('hidden');

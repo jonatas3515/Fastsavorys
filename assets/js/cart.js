@@ -382,6 +382,8 @@ window.cartContainsBolo = function () {
         const product = window.products.find(p => p.id === item.id);
         const name = (item.name || '').toLowerCase();
         const cat = (product?.category || '').toLowerCase();
+        // Vulcão Mini e Bolo no Pote são exceções (podem ser entregues, não exigem antecedência)
+        if (name.includes('vulcão mini') || name.includes('vulcao mini') || name.includes('pote')) return false;
         return cat === 'bolos' || name.includes('bolo');
     });
 };

@@ -4,7 +4,7 @@
  * 
  * CATEGORIAS DE PRODUTOS:
  * - BOLO_GRANDE: Bolo G, Bolo P, Bolo Vulcão (não mini), Kit Festa
- * - BOLO_MINI: Bolo Vulcão Mini
+ * - BOLO_MINI: Bolo Vulcão Mini, Bolo no Pote
  * - COMBO: Combos (se contém Vulcão Mini → permite entrega)
  * - SALGADOS: Salgados, Mini-Salgados
  * - BEBIDAS: Refrigerantes, Sucos
@@ -46,6 +46,10 @@ window.classifyProduct = function (product) {
         // Vulcão Mini → pode entrega
         if (name.includes('vulcão mini') || name.includes('vulcao mini') ||
             name.includes('mini vulcão') || name.includes('mini vulcao')) {
+            return 'bolo_mini';
+        }
+        // Bolo no Pote → pode entrega (mesmo tratamento do Vulcão Mini)
+        if (name.includes('pote') || name.includes('no pote') || name.includes('de pote')) {
             return 'bolo_mini';
         }
         // Qualquer outro bolo (G, P, Vulcão normal) → apenas retirada
@@ -165,7 +169,7 @@ window.analyzeCart = function (cartItems = window.cart) {
 window.canUseDelivery = function (cartItems = window.cart, cartTotal = window.cartTotal, neighborhood = null) {
     const analysis = window.analyzeCart(cartItems);
 
-    // Regra 1: Kit Festa, Bolo G/P, Vulcão → APENAS RETIRADA
+    // Regra 1: Kit Festa, Bolo G/P, Vulcão → APENAS RETIRADA (exceto Vulcão Mini e Bolo no Pote)
     if (analysis.hasBoloGrande) {
         const boloGrandeItems = analysis.products
             .filter(p => p.ruleCategory === 'bolo_grande')
@@ -173,7 +177,7 @@ window.canUseDelivery = function (cartItems = window.cart, cartTotal = window.ca
             .join(', ');
         return {
             allowed: false,
-            reason: `🚫 Os produtos "${boloGrandeItems}" estão disponíveis apenas para RETIRADA NA LOJA. Não oferecemos entrega para bolos, kits festa ou vulcão.`,
+            reason: `🚫 Os produtos "${boloGrandeItems}" estão disponíveis apenas para RETIRADA NA LOJA. Não oferecemos entrega para bolos grandes, kits festa ou vulcão. (Vulcão Mini e Bolo no Pote podem ser entregues!)`,
             minValue: 0
         };
     }
@@ -630,7 +634,7 @@ window.updateOrderRulesUI = function () {
                 .map(p => p.name)
                 .join(', ');
 
-            deliveryWarning.innerHTML = `🚫 <strong>Atenção:</strong> Os produtos "${boloGrandeItems}" estão disponíveis apenas para <strong>RETIRADA NA LOJA</strong>. Não oferecemos entrega para bolos, kits festa ou vulcão.`;
+            deliveryWarning.innerHTML = `🚫 <strong>Atenção:</strong> Os produtos "${boloGrandeItems}" estão disponíveis apenas para <strong>RETIRADA NA LOJA</strong>. Não oferecemos entrega para bolos grandes, kits festa ou vulcão. (Vulcão Mini e Bolo no Pote podem ser entregues!)`;
             deliveryWarning.classList.remove('hidden');
         }
     } else {

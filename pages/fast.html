@@ -2019,6 +2019,8 @@
         if (!product) return false;
         const name = (product.name || '').toLowerCase();
         const category = (product.category || '').toLowerCase();
+        // Vulcão Mini e Bolo no Pote são exceções (podem ser entregues)
+        if (name.includes('vulcão mini') || name.includes('vulcao mini') || name.includes('pote')) return false;
         return category === 'bolos' || name.includes('bolo p') || name.includes('bolo g') || name.match(/bolo\s*[pg]/i);
       });
     }
