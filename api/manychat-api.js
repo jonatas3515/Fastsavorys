@@ -1084,6 +1084,177 @@ async function saveSession(userId, history, unclearCount, ownerApprovalNoticeCou
     }
 }
 
+// ==========================================
+// BAIRRO FEE MAP — HARDCODED SOURCE OF TRUTH
+// ==========================================
+// Used for PROGRAMMATIC validation so the model can't hallucinate wrong values.
+// Sorted longest-key-first for matching priority.
+const BAIRRO_FEE_MAP = {
+    'centro cidade baixa': { fee: 5, min: 15 },
+    'tarcizio carleto': { fee: 8, min: 30 },
+    'tarcisio carleto': { fee: 8, min: 30 },
+    'village das pedras': { fee: 8, min: 30 },
+    'vale do jucurucu': { fee: 8, min: 30 },
+    'vale do jucuruçu': { fee: 8, min: 30 },
+    'portal do monte': { fee: 8, min: 30 },
+    'monte pescoco': { fee: 8, min: 30 },
+    'monte pescoço': { fee: 8, min: 30 },
+    'cristo redentor': { fee: 5, min: 15 },
+    'santo antonio': { fee: 5, min: 15 },
+    'santo antônio': { fee: 5, min: 15 },
+    'sao domingos': { fee: 3, min: 15 },
+    'são domingos': { fee: 3, min: 15 },
+    'vista da pedra': { fee: 8, min: 30 },
+    'varzea alegre': { fee: 5, min: 20 },
+    'várzea alegre': { fee: 5, min: 20 },
+    '31 de marco': { fee: 6, min: 20 },
+    '31 de março': { fee: 6, min: 20 },
+    'sao bernardo': { fee: 8, min: 30 },
+    'são bernardo': { fee: 8, min: 30 },
+    'cidade baixa': { fee: 5, min: 15 },
+    'vista bela': { fee: 8, min: 30 },
+    'novo prado': { fee: 0, min: 15 },
+    'bela vista': { fee: 8, min: 30 },
+    'baixa fria': { fee: 5, min: 20 },
+    'beira rio': { fee: 5, min: 20 },
+    'liberdade': { fee: 8, min: 30 },
+    'primavera': { fee: 8, min: 30 },
+    'marotinho': { fee: 8, min: 30 },
+    'tarcisao': { fee: 8, min: 30 },
+    'tarcisão': { fee: 8, min: 30 },
+    'tarcizio': { fee: 8, min: 30 },
+    'itatiaia': { fee: 8, min: 30 },
+    'jaqueira': { fee: 8, min: 25 },
+    'alvorada': { fee: 8, min: 30 },
+    'corujao': { fee: 8, min: 25 },
+    'corujão': { fee: 8, min: 25 },
+    'italage': { fee: 8, min: 30 },
+    'urbis 2': { fee: 8, min: 30 },
+    'urbis 3': { fee: 8, min: 30 },
+    'urbis ii': { fee: 8, min: 30 },
+    'urbis iii': { fee: 8, min: 30 },
+    'fatima': { fee: 8, min: 25 },
+    'fátima': { fee: 8, min: 25 },
+    'furlan': { fee: 8, min: 30 },
+    'centro': { fee: 6, min: 20 },
+    'canaa': { fee: 8, min: 25 },
+    'canaã': { fee: 8, min: 25 },
+    'bnh': { fee: 6, min: 20 },
+};
+
+// Mini salgados pack prices (from menu — used for programmatic total estimation)
+const MINI_PACK_PRICES = { 20: 20, 30: 29, 40: 39, 50: 45, 100: 85, 150: 130 };
+
+// Individual product prices for estimation
+const PRODUCT_PRICES = {
+    'coxinha': 4.50, 'enroladinho': 4.00, 'risole': 4.50,
+    'vulcão mini': 15, 'vulcao mini': 15, 'bolo no pote': 10,
+    'coca-cola 350': 6, 'pepsi 1l': 8, 'pepsi 2l': 12, 'pepsi lata': 5.50,
+};
+
+function detectBairroInText(text) {
+    const t = (text || '').toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, ''); // remove accents for matching
+    const sorted = Object.entries(BAIRRO_FEE_MAP).sort((a, b) => b[0].length - a[0].length);
+    for (const [bairro, data] of sorted) {
+        const bairroNorm = bairro.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        if (t.includes(bairroNorm)) {
+            return { name: bairro, fee: data.fee, min: data.min };
+        }
+    }
+    return null;
+}
+
+function estimateCartTotal(history) {
+    const allText = history.map(m => m.text).join(' ');
+    let total = 0;
+    let items = [];
+
+    // 1) Mini salgados packs (check largest first)
+    const packQtys = Object.keys(MINI_PACK_PRICES).map(Number).sort((a, b) => b - a);
+    for (const qty of packQtys) {
+        const price = MINI_PACK_PRICES[qty];
+        const patterns = [
+            new RegExp(`\\b${qty}\\s*(mini|salgadinho|unidade)`, 'i'),
+            new RegExp(`mini.*salgad.*\\b${qty}\\b`, 'i'),
+            new RegExp(`\\b${qty}\\b.*mini.*salgad`, 'i'),
+        ];
+        if (patterns.some(p => p.test(allText))) {
+            total += price;
+            items.push(`${qty} mini salgados = R$ ${price.toFixed(2)}`);
+            break; // only one pack per order usually
+        }
+    }
+    // Also: "vou querer 100" / "quero 100" after mini salgados context
+    if (total === 0) {
+        const qtyMatch = allText.match(/(?:querer|quero|vou\s*querer|pode\s*ser)\s*(\d+)/i);
+        if (qtyMatch && /mini|salgadinho|festa|salgadinhos/i.test(allText)) {
+            const qty = parseInt(qtyMatch[1]);
+            if (MINI_PACK_PRICES[qty]) {
+                total += MINI_PACK_PRICES[qty];
+                items.push(`${qty} mini salgados = R$ ${MINI_PACK_PRICES[qty].toFixed(2)}`);
+            }
+        }
+    }
+
+    // 2) Individual salgados (coxinha × N)
+    for (const [prod, price] of Object.entries(PRODUCT_PRICES)) {
+        const re = new RegExp(`(\\d+)\\s*${prod}`, 'i');
+        const match = allText.match(re);
+        if (match) {
+            const qty = parseInt(match[1]);
+            const sub = qty * price;
+            total += sub;
+            items.push(`${qty}× ${prod} = R$ ${sub.toFixed(2)}`);
+        }
+    }
+
+    return { total, description: items.join(' + ') || '' };
+}
+
+function buildDeliveryFactHint(history, currentMessage) {
+    // Only look at USER messages for bairro detection (bot messages list ALL bairros)
+    const userMsgs = history.filter(m => m.role === 'user').map(m => m.text);
+    userMsgs.push(currentMessage);
+
+    // Check if conversation is in delivery context
+    const allTexts = history.map(m => m.text).join(' ') + ' ' + currentMessage;
+    const isDeliveryCtx = /entrega|entregar|delivery|bairro|endereço|para qual bairro/i.test(allTexts);
+    if (!isDeliveryCtx) return '';
+
+    // Detect bairro from user messages (prefer most recent)
+    let bairroInfo = null;
+    for (let i = userMsgs.length - 1; i >= 0; i--) {
+        bairroInfo = detectBairroInText(userMsgs[i]);
+        if (bairroInfo) break;
+    }
+    if (!bairroInfo) return '';
+
+    // Estimate order total from full conversation
+    const { total, description } = estimateCartTotal([...history, { role: 'user', text: currentMessage }]);
+
+    const feeStr = bairroInfo.fee === 0 ? 'GRÁTIS' : `R$ ${bairroInfo.fee.toFixed(2)}`;
+    let hint = `\n[⛔ DADOS VERIFICADOS PELO SISTEMA (USE ESTES VALORES — NÃO INVENTE):`;
+    hint += `\n  BAIRRO: ${bairroInfo.name.toUpperCase()} → TAXA DE ENTREGA = ${feeStr} | PEDIDO MÍNIMO = R$ ${bairroInfo.min.toFixed(2)}`;
+
+    if (total > 0) {
+        const effectiveMin = Math.max(15, bairroInfo.min);
+        hint += `\n  PEDIDO: ${description} | TOTAL = R$ ${total.toFixed(2)}`;
+        if (total >= effectiveMin) {
+            const totalComTaxa = total + bairroInfo.fee;
+            hint += `\n  ✅ R$ ${total.toFixed(2)} ≥ R$ ${effectiveMin.toFixed(2)} → ENTREGA PERMITIDA.`;
+            hint += ` Total com taxa: R$ ${total.toFixed(2)} + ${feeStr} = R$ ${totalComTaxa.toFixed(2)}`;
+        } else {
+            const falta = (effectiveMin - total).toFixed(2).replace('.', ',');
+            hint += `\n  ❌ R$ ${total.toFixed(2)} < R$ ${effectiveMin.toFixed(2)} → ABAIXO DO MÍNIMO. Faltam R$ ${falta}. NÃO aceite entrega.`;
+        }
+    }
+
+    hint += `]`;
+    console.log(`[delivery-hint] ${hint.replace(/\n/g, ' | ')}`);
+    return hint;
+}
+
 // --- Detecção de intenção simples (prioriza seções relevantes no prompt) ---
 // Também serve para determinar se a mensagem é "clara" (handover se 3+ seguidas sem intenção)
 function detectIntent(msg) {
@@ -1509,11 +1680,18 @@ async function callGeminiMultimodal(apiKey, modelName, inlineData, promptText, m
         });
         clearTimeout(timer);
         if (!res.ok) {
-            console.warn(`[media] Gemini multimodal failed (HTTP ${res.status})`);
+            const errBody = await res.text().catch(() => '');
+            console.warn(`[media] Gemini multimodal failed (HTTP ${res.status}): ${errBody.substring(0, 300)}`);
             return null;
         }
         const data = await res.json();
-        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        // Debug: log blockReason/finishReason for failed responses
+        const candidate = data?.candidates?.[0];
+        if (candidate && !candidate?.content?.parts?.[0]?.text) {
+            const blockReason = data?.promptFeedback?.blockReason || candidate?.finishReason || 'unknown';
+            console.warn(`[media] Gemini multimodal empty content. blockReason=${blockReason}, model=${modelName}`);
+        }
+        const text = candidate?.content?.parts?.[0]?.text;
         return text && text.trim().length > 0 ? text.trim() : null;
     } catch (e) {
         clearTimeout(timer);
@@ -1525,20 +1703,52 @@ async function callGeminiMultimodal(apiKey, modelName, inlineData, promptText, m
 
 async function transcribeAudio(audioUrl, apiKey, multimodalModel) {
     console.log(`[media] 🎤 Transcribing audio: ${audioUrl.substring(0, 80)}...`);
-    const media = await fetchMediaAsBase64(audioUrl, 6000);
-    if (!media) return null;
+    const media = await fetchMediaAsBase64(audioUrl, 8000);
+    if (!media) {
+        console.warn('[media] 🎤 Audio download failed');
+        return null;
+    }
     // Normalize mime type for audio
     let mime = media.mimeType;
     if (!mime.startsWith('audio/')) mime = 'audio/ogg';
     console.log(`[media] 🎤 Audio downloaded: ${media.byteLength} bytes, mime: ${mime}`);
-    const text = await callGeminiMultimodal(
+
+    // Attempt 1: primary model
+    let text = await callGeminiMultimodal(
         apiKey, multimodalModel,
         { base64: media.base64, mimeType: mime },
         'Transcreva o áudio acima em texto, em português. Retorne APENAS a transcrição, sem explicações.',
-        512, 10000
+        512, 12000
     );
-    if (text) console.log(`[media] 🎤 ✅ Transcription OK: "${text.substring(0, 100)}"`);
-    else console.warn('[media] 🎤 Transcription failed or empty');
+
+    // Attempt 2: retry with different prompt if first attempt returned empty
+    if (!text) {
+        console.log('[media] 🎤 Retry with alternative prompt...');
+        text = await callGeminiMultimodal(
+            apiKey, multimodalModel,
+            { base64: media.base64, mimeType: mime },
+            'O áudio acima é de um cliente de uma lanchonete. Transcreva o que a pessoa disse em português. Se não entender, escreva "[áudio inaudível]".',
+            512, 12000
+        );
+    }
+
+    // Attempt 3: try fallback model (gemini-2.5-flash) if multimodal model different
+    if (!text && multimodalModel !== 'gemini-2.5-flash') {
+        console.log('[media] 🎤 Retry with fallback model gemini-2.5-flash...');
+        text = await callGeminiMultimodal(
+            apiKey, 'gemini-2.5-flash',
+            { base64: media.base64, mimeType: mime },
+            'Transcreva o áudio acima em texto, em português. Retorne APENAS a transcrição.',
+            512, 12000
+        );
+    }
+
+    if (text && text !== '[áudio inaudível]') {
+        console.log(`[media] 🎤 ✅ Transcription OK: "${text.substring(0, 100)}"`);
+    } else {
+        console.warn(`[media] 🎤 Transcription failed after retries (text=${text || 'null'})`);
+        text = null;
+    }
     return text;
 }
 
@@ -2259,6 +2469,13 @@ function generatePixBrCode(amount = null) {
     // Hora atual em Itamaraju-BA (UTC-3)
     const now = new Date().toLocaleString('pt-BR', { timeZone: 'America/Bahia', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', weekday: 'long' });
     const cleanName = name && /[a-zA-ZÀ-ÿ]{2,}/.test(name) ? name.trim() : '';
+
+    // --- Validação programática de entrega: injeta FATOS verificados para o modelo não inventar ---
+    const deliveryFactHint = buildDeliveryFactHint(session.history, effectiveMessage);
+    if (deliveryFactHint) {
+        intentHint += deliveryFactHint;
+    }
+
     const userMessage = `[Hoje é ${now}]${intentHint}` + (cleanName ? ` Cliente "${cleanName}" disse: ${effectiveMessage}` : ` ${effectiveMessage}`);
 
     // --- Busca dados reais do Supabase e monta o prompt final ---
