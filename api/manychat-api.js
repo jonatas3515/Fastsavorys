@@ -483,6 +483,18 @@ FILTRO DE MENSAGENS DO SISTEMA:
 - IGNORE COMPLETAMENTE essas partes.
 - Foque APENAS no que o cliente realmente digitou (ex: "boa tarde", "já tá escrito", "coloca em isopor separado").
 
+IMAGENS ENVIADAS PELO CLIENTE:
+- Se o cliente enviar uma imagem (foto de produto, print, referência), descreva brevemente o que vê e PERGUNTE o que ele deseja.
+- NÃO assuma que o cliente está fazendo um pedido com base na imagem. Pergunte: "Vi a imagem! O que você gostaria de pedir?" ou "Vi a foto! Como posso te ajudar?"
+- NÃO pule direto para personalização ou Kit Festa só porque viu uma imagem de bolo/festa.
+
+CLIENTE CONFUSO OU "NÃO ENTENDI":
+- Se o cliente disser "calma", "não entendi", "como assim?", "explica melhor":
+  - PARE o roteiro. NÃO repita a mesma mensagem.
+  - Reformule de forma mais simples e curta.
+  - Pergunte o que exatamente ele quer saber.
+  - NÃO repita a personalização inteira. Vá por partes.
+
 MENSAGENS FRAGMENTADAS E SEQUENCIAIS:
 - Se o cliente enviar respostas curtas isoladas (ex: só "cartão", ou "pix", ou "100 salgados" logo depois de pedir outra coisa), interprete como CONTINUAÇÃO do pedido ativo no histórico.
 - Não trate como nova conversa. Junte com os produtos anteriores.
@@ -616,11 +628,20 @@ KIT FESTA — SUGESTÃO INTELIGENTE:
   - Se o cliente recusar ou preferir montar separado, siga normalmente.
 - Esta sugestão deve ser feita APENAS UMA VEZ. Se o cliente já recusou, não insista.
 
+⛔ DOCES — NÃO VENDEMOS:
+- A FastSavory's NÃO trabalha com doces tradicionais (brigadeiro, cajuzinho, bem-casado, beijinho de coco avulso, trufa, brownie, cupcake, torta doce etc.).
+- Se o cliente perguntar "faz doces?", "tem doces?", "quero doces":
+  - Responda com honestidade: "Não trabalhamos com doces tradicionais como brigadeiro ou cajuzinho. Mas temos *bolos* deliciosos (Naked Cake e Vulcão) e *mini salgados* para festas! Posso te ajudar com algum deles?"
+  - NÃO diga "sim, fazemos doces" e liste salgados — isso é enganoso.
+  - NÃO trate mini salgados como doces.
+- Se o cliente pedir "50 doces" ou "100 doces": NÃO interprete como mini salgados. Esclareça que não trabalhamos com doces e ofereça o que temos (bolos e salgados).
+
 BOLOS E KITS FESTA (REGRAS GERAIS):
 - A FastSavory's trabalha APENAS com bolos estilo *Naked Cake* e *Vulcão*.
-- ⛔ NÃO vendemos FATIAS de bolo. Se o cliente pedir "fatia", "pedaço de bolo" ou similar:
-  - Responda: "Não trabalhamos com venda de fatias. Vendemos bolos inteiros: Vulcão Mini (individual, R$ 15,00), Bolo PP, Bolo P e Bolo G. Posso te ajudar com algum deles?"
+- ⛔ NÃO vendemos FATIAS nem PEDAÇOS de bolo. Se o cliente pedir "fatia", "pedaço de bolo", "bolo de X pedaços", "bolo pra X pessoas" ou similar:
+  - Responda: "Não trabalhamos com venda de fatias ou pedaços. Vendemos bolos inteiros por tamanho: *Vulcão Mini* (individual), *Bolo PP*, *Bolo P* e *Bolo G*. Posso te ajudar com algum deles?"
   - NÃO continue como se fosse pedido de bolo inteiro sem o cliente confirmar qual quer.
+  - NÃO invente quantidades de fatias/pedaços por tamanho.
 - NÃO fazemos outros estilos (chantilly, pasta americana, fondant, glacê etc.).
 - Se o cliente pedir outro estilo:
   - Informe que não trabalhamos com esse estilo.
@@ -1277,6 +1298,8 @@ function detectIntent(msg) {
     if (/promo[çc][aã]o|desconto|cupom|oferta/.test(m))                 intents.push('promocoes');
     // Salgados específicos
     if (/salgado|salgadinho|coxinha|kibe|risole|pastel|empada|bolinha|combo/.test(m)) intents.push('salgados');
+    // Doces (FastSavory’s NÃO vende doces tradicionais)
+    if (/\bdoce|\bdoces|brigadeiro|cajuzinho|bem.casado|trufa|brownie|cupcake|torta\s*doce/i.test(m)) intents.push('doces');
     // Diminutivo, festa ou quantidade >20 → provavelmente mini salgados
     if (/salgadinho|pequenin|pequeninho|dos\s*pequeno|miniatura|minizinho|de\s*festa|pra\s*festa|para\s*festa|festinha/i.test(m) || (/\b(2[1-9]|[3-9]\d|\d{3,})\s*(salgad|coxinha|kibe|risole|pastel|empada|bolinha|unidade|un\b)/i.test(m) && !/grande|tradicional|normal/i.test(m))) intents.push('mini');
     // Cardápio / preços
@@ -2274,6 +2297,10 @@ async function handleGeminiCore(req, res) {
             + '\n- Se o pedido > R$50 e PIX: primeiro pergunte integral ou 50% entrada. Só gere a tag DEPOIS da resposta.]';
     } else if (intents.includes('entrega')) {
         intentHint = '\n[FOCO: ENTREGA/BAIRRO. Se bairro não estiver na tabela, use a taxa padrão indicada no contexto. Se há pedido em andamento, atualize com bairro e mostre orçamento.]';
+    }
+    // Dica extra: cliente pediu doces
+    if (intents.includes('doces')) {
+        intentHint += '\n[⛔ ATENÇÃO: O cliente perguntou sobre DOCES. A FastSavory\'s NÃO vende doces tradicionais (brigadeiro, cajuzinho, bem-casado, trufa, brownie, cupcake etc.). NÃO diga "sim, fazemos doces". Esclareça com honestidade e ofereça o que temos: bolos (Naked Cake/Vulcão) e mini salgados. Se ele pedir "50 doces", NÃO interprete como mini salgados.]';
     }
     // Dica extra: salgado com quantidade mas sem especificar mini/grande
     if (hasSalgadoQty && !specifiedMini && !specifiedGrande && intents.includes('salgados')) {
