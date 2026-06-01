@@ -450,7 +450,8 @@ https://fastsavorys.vercel.app/pages/fast.html
 - O resumo do pedido SÓ deve aparecer na etapa 5 (ORÇAMENTO) ou na etapa 6 (CONFIRMAÇÃO). Nas etapas intermediárias (perguntando bairro, sabor, massa, fita), NÃO repita o pedido todo.
 
 ⛔ REGRA CRÍTICA — RESPONDA SÓ O QUE O CLIENTE PERGUNTOU:
-- Se o cliente perguntou o PREÇO, responda o preço. PARE. Não emende com pergunta sobre massa/recheio/sabores.
+- Se o cliente perguntou o PREÇO ("quanto é", "quanto custa", "qual o valor", "preço do cento"): responda o preço. PARE. NÃO pergunte sabores, NÃO pergunte entrega ou retirada, NÃO pergunte forma de pagamento. O cliente está CONSULTANDO, não comprando.
+- Se o cliente perguntou se ENTREGA ("vocês entregam?", "vc entrega?", "faz entrega?"): responda SIM e PARE. NÃO informe taxa, NÃO peça endereço, NÃO repita o pedido. É uma pergunta simples.
 - Se o cliente perguntou o TAMANHO, responda o tamanho. PARE. Não emende com pergunta sobre massa/recheio.
 - Se o cliente disse "vou ver", "deixa eu pensar", apenas confirme e ESPERE. Não repita as opções.
 - DESISTÊNCIA: Se o cliente disser "deixa", "deixa pra lá", "não quero mais", "obrigada" (sem pedir nada), "eu agradeço", "valeu" (sem pedido ativo) ou qualquer sinal de que desistiu ou encerrou, ACEITE a decisão, agradeça e PARE. NÃO insista, NÃO sugira alternativas, NÃO continue o roteiro.
@@ -1205,10 +1206,15 @@ const PRODUCT_PRICES = {
 function detectBairroInText(text) {
     const t = (text || '').toLowerCase()
         .normalize('NFD').replace(/[\u0300-\u036f]/g, ''); // remove accents for matching
+    // Avoid false positives: "centro/cento de salgados" is NOT bairro Centro
+    const falsePositivePatterns = /centr?o\s*(de\s*)?(salgad|mini|unidade|coxinha|quibe|bolinha)/i;
+    if (falsePositivePatterns.test(t)) return null;
     const sorted = Object.entries(BAIRRO_FEE_MAP).sort((a, b) => b[0].length - a[0].length);
     for (const [bairro, data] of sorted) {
         const bairroNorm = bairro.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-        if (t.includes(bairroNorm)) {
+        // Use word boundary to avoid partial matches
+        const re = new RegExp(`\\b${bairroNorm.replace(/\s+/g, '\\s+')}\\b`, 'i');
+        if (re.test(t)) {
             return { name: bairro, fee: data.fee, min: data.min };
         }
     }
@@ -2325,7 +2331,10 @@ async function handleGeminiCore(req, res) {
             + '\n- ⛔ NUNCA escreva o CNPJ como texto. NUNCA escreva a chave PIX como texto. USE APENAS AS TAGS acima. O sistema gera o copia-e-cola automaticamente.'
             + '\n- Se o pedido > R$50 e PIX: primeiro pergunte integral ou 50% entrada. Só gere a tag DEPOIS da resposta.]';
     } else if (intents.includes('entrega')) {
-        intentHint = '\n[FOCO: ENTREGA/BAIRRO. Se bairro não estiver na tabela, use a taxa padrão indicada no contexto. Se há pedido em andamento, atualize com bairro e mostre orçamento.]';
+        intentHint = '\n[FOCO: ENTREGA/BAIRRO. O cliente mencionou entrega.'
+            + '\n- Se o cliente APENAS perguntou "vocês entregam?" ou "faz entrega?": responda SIM ou NÃO de forma curta. NÃO mostre resumo do pedido, NÃO informe taxa, NÃO peça endereço ainda.'
+            + '\n- SÓ peça bairro/endereço quando o cliente CONFIRMAR que quer entrega para o pedido dele.'
+            + '\n- NUNCA informe taxa sem saber o bairro do cliente. Se bairro não foi informado, PERGUNTE.]';
     }
     // Dica extra: cliente pediu doces
     if (intents.includes('doces')) {
