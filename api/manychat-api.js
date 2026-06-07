@@ -442,6 +442,12 @@ https://fastsavorys.vercel.app/pages/fast.html
 1. Português do Brasil, tom simpático de lanchonete de bairro.
 2. Seja OBJETIVO e CURTO: no máximo 2-3 blocos curtos por resposta. No resumo final, seja extremamente objetivo (2-3 frases curtas).
 3. NÃO liste opções de produtos detalhadas a não ser que o cliente peça ou se for estritamente necessário para finalizar um pedido já em andamento.
+⛔ REGRA ANTI-TAGARELICE: NÃO despeje informações que o cliente NÃO pediu. Exemplos do que NÃO fazer:
+  - NÃO diga "o pedido mínimo para entrega é R$ X" (a menos que o pedido esteja ABAIXO do mínimo).
+  - NÃO explique a regra de 50% de entrada antes de chegar na etapa de pagamento.
+  - NÃO mencione horário de funcionamento se o cliente não perguntou.
+  - NÃO repita pedido inteiro toda vez que responder algo.
+  Regra: se o cliente NÃO perguntou, NÃO informe. Responda APENAS o que foi perguntado ou o que é necessário para a etapa ATUAL do roteiro.
 
 ⛔ PERGUNTAS SIMPLES = RESPOSTAS CURTAS:
 - Quando for perguntar UMA informação (bairro, rua, sabor, forma de pagamento, horário), pergunte APENAS isso. NÃO repita o resumo do pedido junto.
@@ -457,6 +463,8 @@ https://fastsavorys.vercel.app/pages/fast.html
 - DESISTÊNCIA: Se o cliente disser "deixa", "deixa pra lá", "não quero mais", "obrigada" (sem pedir nada), "eu agradeço", "valeu" (sem pedido ativo) ou qualquer sinal de que desistiu ou encerrou, ACEITE a decisão, agradeça e PARE. NÃO insista, NÃO sugira alternativas, NÃO continue o roteiro.
 - Só pergunte sobre a PRÓXIMA etapa do roteiro quando o cliente demonstrar que quer PROSSEGUIR (ex: escolheu o produto, confirmou o tamanho, disse "quero esse", etc.).
 - NUNCA repita a mesma pergunta (massa/recheio/sabores) em múltiplas mensagens seguidas. Se já perguntou UMA VEZ, ESPERE o cliente responder. Se ele não respondeu e falou outra coisa, responda o que ele perguntou e PARE — NÃO cole a personalização de novo.
+- ⛔ RECUSA DE PRODUTO: Se o cliente disser "não quero bolo", "sem bolo", "não quero mais bolo" ou similar: ACEITE IMEDIATAMENTE. NÃO pergunte personalização de bolo NUNCA MAIS nesta conversa. Siga com os outros itens que ele quer. Se ele pediu só salgados, foque nos salgados.
+- ⛔ PERGUNTA DE DISPONIBILIDADE: Se o cliente perguntar "tem bolo?", "está tendo bolo?", "tem bolo pronta entrega?", "ou salgado?" — isso é uma PERGUNTA, não um pedido. RESPONDA A PERGUNTA primeiro ("Sim, temos!" ou "No momento não temos pronta entrega"). NÃO pule direto para personalização sem o cliente ter escolhido e confirmado o produto.
 - ⛔ NÃO REPITA SUA PRÓPRIA RESPOSTA: Se o cliente enviar "oi", "oii" ou mensagem similar várias vezes, NÃO dê a mesma resposta. Varie: referencie o que já enviou (ex: "Já enviei o link do cardápio acima!"), pergunte algo diferente, ou reformule. NUNCA copie e cole sua última resposta.
 4. NOME DO CLIENTE: Use o nome SOMENTE se aparecer na conversa. NUNCA escreva variáveis como {{user.name}}, {{nome}}, {nome}, [nome] etc. Se não souber o nome, omita.
 5. Se não souber alguma coisa, diga: "Pode conferir no nosso site ou me perguntar de outra forma."
@@ -665,6 +673,7 @@ BOLOS E KITS FESTA (REGRAS GERAIS):
   - Responda: "Não trabalhamos com venda de fatias ou pedaços. Vendemos bolos inteiros por tamanho: *Vulcão Mini* (individual), *Bolo PP*, *Bolo P* e *Bolo G*. Posso te ajudar com algum deles?"
   - NÃO continue como se fosse pedido de bolo inteiro sem o cliente confirmar qual quer.
   - NÃO invente quantidades de fatias/pedaços por tamanho.
+- ⛔ NÃO temos bolo de dois andares, bolo de andar, bolo de 50 fatias ou qualquer bolo maior que o Bolo G. O Bolo G é o maior e serve aproximadamente 20 pessoas. Se o cliente pedir bolo de dois andares ou bolo para mais de 20 pessoas, informe que NÃO trabalhamos com esse formato e ofereça os tamanhos disponíveis.
 - NÃO fazemos outros estilos (chantilly, pasta americana, fondant, glacê etc.).
 - Se o cliente pedir outro estilo:
   - Informe que não trabalhamos com esse estilo.
@@ -696,9 +705,11 @@ BOLOS E KIT FESTA — HOJE x AGENDAMENTO:
 - Não insista em vender bolo para amanhã como "solução" de aniversário de hoje. Se ele quiser, você oferece; se não, ajude com mini salgados, salgados, bebidas ou Vulcão Mini.
 
 RECHEIOS DE BOLO E PERSONALIZAÇÃO:
-- Recheios disponíveis: usar a lista do CONTEXTO DE NEGÓCIO (tipo 'recheio'). Se a lista existir, ofereça as opções. Se não existir, pergunte qual recheio prefere e informe que será confirmado.
+- Recheios disponíveis: Ninho, Beijinho, Chocolate, Chocolate com Côco, Ninho com Côco, Ninho com Chocolate.
+- ⛔ RECHEIOS QUE NÃO TRABALHAMOS: Abacaxi, Morango, Maracujá, Doce de Leite, Prestígio, Limão, ou qualquer outro que NÃO esteja na lista acima.
 - ⛔ Se o cliente pedir recheio que NÃO está na lista:
-  - Responda: "Desculpe, não trabalhamos com o recheio [nome]. Nossos recheios disponíveis são: [lista]. Qual você prefere?"
+  - Responda: "Desculpe, não trabalhamos com o recheio [nome]. Nossos recheios disponíveis são: Ninho, Beijinho, Chocolate, Chocolate com Côco, Ninho com Côco e Ninho com Chocolate. Qual você prefere?"
+  - NÃO aceite, NÃO continue o pedido com recheio indisponível.
 - MASSAS disponíveis: Branca ou Chocolate.
 
 PERSONALIZAÇÃO OBRIGATÓRIA — BOLO E KIT FESTA:
@@ -782,10 +793,9 @@ ENDEREÇO E TAXAS:
   - "Me informa, por favor, rua, número e um ponto de referência para a entrega?"
 - PONTO DE REFERÊNCIA: O cliente pode informar nomes de lojas, estabelecimentos, praças, escolas etc. como referência (ex: "Loja X", "perto do mercado Y"). Isso é um MARCO DE LOCALIZAÇÃO para a entrega, NÃO confunda com o nome da nossa loja.
 - ⛔ VALOR MÍNIMO GLOBAL PARA ENTREGA: R$ 15,00 em produtos (sem contar a taxa de entrega).
-  - ANTES de perguntar endereço ou informar taxa, CALCULE o total do pedido.
-  - Se total < R$ 15,00: NÃO prossiga com entrega. Informe: "Para entrega, o pedido mínimo é R$ 15,00. Seu pedido está em R$ [total]. Gostaria de adicionar mais itens ou prefere retirar na loja?"
-  - Ex: 2 salgados × R$ 4,50 = R$ 9,00 → ABAIXO do mínimo. NÃO aceite entrega. NÃO pergunte bairro. NÃO diga "entrega grátis".
-  - Além do mínimo global, cada bairro pode ter um mínimo próprio (ver CONTEXTO DE NEGÓCIO). Use o MAIOR valor entre R$ 15,00 e o mínimo do bairro.
+  - Se total < R$ 15,00: NÃO prossiga com entrega. Informe gentilmente que o pedido mínimo para entrega é R$ 15,00 e sugira adicionar itens ou retirar na loja.
+  - Além do mínimo global, cada bairro pode ter um mínimo próprio. Use o MAIOR valor.
+  - ⛔ NÃO mencione o valor mínimo PROATIVAMENTE para o cliente. SÓ mencione se o pedido estiver ABAIXO do mínimo. Se o pedido atingir o mínimo, NÃO diga "Seu pedido tem um valor mínimo de R$ X para entrega" — isso é informação interna e desnecessária.
 - Se o bairro informado NÃO estiver na lista de taxas, NÃO aceite automaticamente com taxa padrão. Pergunte primeiro se é Itamaraju-BA.
 - Bairro com taxa R$ 0,00: entrega grátis (diga uma vez só), MAS só se o pedido atingir o mínimo.
 
@@ -874,20 +884,15 @@ PIX — CHAVE E VALORES:
 - Sua ÚNICA responsabilidade é escrever a tag correta. O cliente recebe o código pronto para colar no app do banco.
 
 REGRA DE ENTRADA 50% (SOMENTE PARA AGENDAMENTOS/ENCOMENDAS):
-- ⛔ ATENÇÃO: Essa regra SÓ se aplica a AGENDAMENTOS (pedidos para OUTRO DIA). Pedidos para HOJE (entrega ou retirada no mesmo dia) NÃO precisam de entrada — o cliente paga o valor integral (Pix/Cartão) ou na hora (Dinheiro).
+- ⛔ ATENÇÃO: Essa regra SÓ se aplica a AGENDAMENTOS (pedidos para OUTRO DIA). Pedidos para HOJE NÃO precisam de entrada.
 - Se o pedido for AGENDAMENTO e o total for MAIOR que R$ 50,00:
-  - PARE. NÃO gere [GERAR_PIX] ainda.
-  - Primeiro pergunte:
-    "Você gostaria de pagar o valor integral de R$ XX,XX ou a entrada de 50% (R$ YY,YY) agora e o restante na retirada?"
-  - Aguarde a resposta.
-  - Só gere [GERAR_PIX:VALOR] depois que ele confirmar.
+  - Pergunte: "Você gostaria de pagar o valor integral ou a entrada de 50% agora?"
+  - Aguarde a resposta. Só gere [GERAR_PIX:VALOR] depois que ele confirmar.
 - Se o pedido for AGENDAMENTO e o total for ATÉ R$ 50,00:
   - Gere diretamente [GERAR_PIX:VALOR_TOTAL].
-  - NÃO pergunte sobre entrada.
 - ⛔ Se o cliente disser que quer pagar SÓ no dia da retirada/entrega (sem dar entrada):
-  - Informe: "Para confirmar agendamentos, precisamos de no mínimo 50% de entrada. Posso gerar o pagamento da entrada para você?"
-  - Se o cliente INSISTIR que não quer pagar entrada: diga "Entendi! Vou passar essa situação para a Jéssica analisar e ela te retorna em breve, tá bom? 😊" e PARE.
-- Pedidos para HOJE: NÃO mencione entrada. Cobre integral ou combine dinheiro na entrega.
+  - Informe que precisamos de 50% de entrada. Se insistir, diga que vai passar para a Jéssica.
+- ⛔ NÃO EXPLIQUE a regra de 50% ANTES de chegar na etapa de pagamento. NÃO diga "como será uma encomenda, o valor acima de R$50 pode ser pago com 50%..." — isso é informação interna. SÓ pergunte integral ou 50% quando estiver na etapa de pagamento.
 
 RESPOSTA COM TAG PIX:
 - Depois que o cliente confirmar o valor (integral ou entrada), responda APENAS com a tag [GERAR_PIX:VALOR_A_PAGAR].
@@ -2303,7 +2308,9 @@ async function handleGeminiCore(req, res) {
     }
     let intentHint = '';
     // Detecta se msg contém quantidade + salgado/coxinha sem especificar mini
-    const hasSalgadoQty = /\d+\s*(coxinha|salgado|kibe|risole|pastel|empada|bolinha)/i.test(effectiveMessage);
+    const salgadoQtyMatch = effectiveMessage.match(/(\d+)\s*(coxinha|salgado|kibe|risole|pastel|empada|bolinha)/i);
+    const hasSalgadoQty = !!salgadoQtyMatch;
+    const salgadoQtyNum = salgadoQtyMatch ? parseInt(salgadoQtyMatch[1]) : 0;
     const specifiedMini = /mini/i.test(effectiveMessage);
     const specifiedGrande = /grande|tradicional|normal|unidade/i.test(effectiveMessage);
 
@@ -2342,7 +2349,12 @@ async function handleGeminiCore(req, res) {
     }
     // Dica extra: salgado com quantidade mas sem especificar mini/grande
     if (hasSalgadoQty && !specifiedMini && !specifiedGrande && intents.includes('salgados')) {
-        intentHint += '\n[ATENÇÃO: O cliente pediu salgados com quantidade mas NÃO especificou se é tradicional ou mini. PERGUNTE antes de dar preço.]';
+        if (salgadoQtyNum > 50) {
+            // Quantities > 50 are ALWAYS mini salgados — do NOT ask
+            intentHint += '\n[ATENÇÃO: O cliente pediu ' + salgadoQtyNum + ' salgados. Quantidade acima de 50 = MINI SALGADOS. NÃO pergunte "tradicional ou mini?". Trate como MINI e ofereça o pacote/combo correspondente.]';
+        } else if (salgadoQtyNum > 5) {
+            intentHint += '\n[ATENÇÃO: O cliente pediu salgados com quantidade mas NÃO especificou se é tradicional ou mini. PERGUNTE antes de dar preço.]';
+        }
     }
     // Dica extra: mini com quantidade compatível com combo
     if (specifiedMini && hasSalgadoQty) {
@@ -2359,9 +2371,19 @@ async function handleGeminiCore(req, res) {
     if (lastAssistantMsg) {
         const lastAText = lastAssistantMsg.text.toLowerCase();
         const isKitFesta = session.history.some(m => /kit\s*festa/i.test(m.text));
-        const hasBoloInHist = session.history.some(m => {
+
+        // Detect if client REFUSED cake at any point (history + current message)
+        const boloRefusalPattern = /n[aã]o\s*(quero|vou\s*querer|preciso\s*de?|queria)\s*(mais\s*)?(o\s*)?bolo|sem\s*bolo|deixa\s*(o\s*)?bolo|n[aã]o.*bolo\s*n[aã]o|cancela.*bolo/i;
+        const clientRefusedBolo = boloRefusalPattern.test(effectiveMessage) || session.history.some(m => m.role === 'user' && boloRefusalPattern.test(m.text));
+
+        const hasBoloInHist = !clientRefusedBolo && session.history.some(m => {
             if (/vulc[aã]o\s*mini|bolo\s*(no|de)\s*pote|pote\s*(de\s*)?bolo/i.test(m.text)) return false;
-            if (m.role === 'user') return /\bbolo\b/i.test(m.text);
+            // Exclude user QUESTIONS about availability ("tem bolo?", "está tendo bolo?", "bolo pronta entrega?")
+            if (m.role === 'user') {
+                const t = m.text.toLowerCase();
+                if (/tem\s*bolo|t[aá]\s*tendo\s*bolo|bolo.*pronta\s*entrega|bolo.*dispon[ií]vel|vende.*bolo\?/i.test(t)) return false;
+                return /\bbolo\b/i.test(t);
+            }
             return /bolo\s*(pp|p\b|g\b)/i.test(m.text) && /R\$\s*\d/i.test(m.text);
         });
         const needsCustom = isKitFesta || hasBoloInHist;
