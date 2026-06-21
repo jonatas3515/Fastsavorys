@@ -13,6 +13,17 @@
 const { createClient } = require('@supabase/supabase-js');
 const { notifyNewOrder, isConfigured } = require('./_lib/manychat');
 const Stripe = require('stripe');
+// CAIXINHA de cálculo/preços (calculadora determinística + validação de valores de pagamento)
+const {
+    fetchProductPriceMap,
+    estimateCartTotal,
+    validatePixAmount,
+    validateCartaoAmount,
+    parseBrlNumber,
+    normalizeTxt,
+} = require('./_lib/pricing');
+// CAIXINHA de pagamento (geradores puros: PIX copia-e-cola + link de cartão Stripe)
+const { generatePixBrCode, generateStripeCheckoutLink } = require('./_lib/payment');
 
 const MANYCHAT_API_BASE = 'https://api.manychat.com/fb';
 
@@ -38,52 +49,8 @@ try {
     console.error('[manychat-api] Stripe init error:', err.message);
 }
 
-/**
- * Gera link de pagamento via cartão usando Stripe Checkout
- * @param {number} amount - Valor em reais (ex: 85.00)
- * @param {string} customerName - Nome do cliente (opcional)
- * @returns {Promise<string|null>} - URL de checkout ou null em caso de erro
- */
-async function generateStripeCheckoutLink(amount, customerName = 'Cliente') {
-    if (!stripe) {
-        console.error('[manychat-api] Stripe not configured');
-        return null;
-    }
-
-    try {
-        const successUrl = process.env.CHECKOUT_SUCCESS_URL ||
-            `https://fastsavorys.vercel.app/pages/fast.html?payment=success`;
-        const cancelUrl = process.env.CHECKOUT_CANCEL_URL ||
-            `https://fastsavorys.vercel.app/pages/fast.html?payment=cancel`;
-
-        const session = await stripe.checkout.sessions.create({
-            mode: 'payment',
-            success_url: successUrl,
-            cancel_url: cancelUrl,
-            line_items: [{
-                price_data: {
-                    currency: 'brl',
-                    product_data: {
-                        name: `Pedido Fast Savory's`,
-                        description: `Pedido para ${customerName}`
-                    },
-                    unit_amount: Math.round(amount * 100) // Stripe usa centavos
-                },
-                quantity: 1
-            }],
-            metadata: {
-                source: 'manychat_bot',
-                customer_name: customerName
-            }
-        });
-
-        console.log(`[manychat-api] ✅ Stripe checkout session created: ${session.id}`);
-        return session.url;
-    } catch (err) {
-        console.error('[manychat-api] Stripe checkout error:', err.message);
-        return null;
-    }
-}
+// [CAIXINHA] generateStripeCheckoutLink foi movida para ./_lib/payment.js
+// (importada no topo). Recebe a instância `stripe` por parâmetro.
 
 // ==========================================
 // HELPERS
@@ -331,8 +298,10 @@ async function _handleAccept(body, res) {
 
     // PrintNode
     let printResult = { success: false, skipped: true };
-    const printNodeKey = process.env.PRINTNODE_API_KEY || 't2W6QKkr-yB56svr5ZHod5Kzvp0RTROOSE8bcbrVzDg';
-    const printerId = process.env.PRINTNODE_PRINTER_ID || '75185228';
+    // Credenciais SOMENTE via variáveis de ambiente (Vercel). Sem fallback hardcoded por segurança.
+    // Se não estiverem configuradas, a impressão é simplesmente pulada (guard abaixo).
+    const printNodeKey = process.env.PRINTNODE_API_KEY;
+    const printerId = process.env.PRINTNODE_PRINTER_ID;
 
     if (printNodeKey && printerId && order) {
         try {
@@ -698,8 +667,10 @@ BOLOS E KIT FESTA — HOJE x AGENDAMENTO:
   - Se hoje for DOMINGO ou a loja estiver fechada: também NÃO estarão disponíveis para hoje. Ofereça agendar para outro dia.
 - TODOS os outros bolos (Bolo P, Bolo G, Bolo PP, Vulcão P) e TODOS os Kits Festa:
   - NÃO podem ser feitos para o MESMO DIA (precisam de pelo menos 1 dia de antecedência para produzir).
-  - Se o cliente pedir para HOJE: recuse e diga "Nossos bolos precisam ser encomendados com pelo menos 1 dia de antecedência. Posso agendar para outro dia?"
-  - Se o cliente já pediu para uma DATA FUTURA (amanhã, domingo, semana que vem, etc.): NÃO repita a regra de antecedência. Confirme a data normalmente e siga o roteiro.
+  - ✅ "1 dia de antecedência" significa que um pedido feito HOJE pode ser produzido para AMANHÃ ou qualquer dia futuro. Pedir HOJE para AMANHÃ É VÁLIDO e deve ser ACEITO — inclusive à noite (até 23h59). O dia seguinte começa à meia-noite no horário de Itamaraju-BA; NUNCA recuse "amanhã" alegando que está "muito em cima" ou que "não dá tempo".
+  - Use a data informada em "[Hoje é ...]" e "Amanhã é ..." para saber qual o dia de hoje e de amanhã. NÃO calcule datas por conta própria.
+  - Só recuse quando o cliente pedir o bolo para o MESMO DIA (HOJE): diga "Nossos bolos precisam ser encomendados com pelo menos 1 dia de antecedência. Posso agendar para amanhã ou outro dia?"
+  - Se o cliente já pediu para uma DATA FUTURA (amanhã, domingo, semana que vem, etc.): ACEITE. NÃO repita a regra de antecedência. Confirme a data normalmente e siga o roteiro.
   - O bolo fica pronto na DATA que o cliente pediu, NÃO no dia anterior. Ex: se pediu para domingo, o bolo estará pronto no domingo.
   - Nessa resposta, NÃO liste tamanhos, preços nem recheios. Só liste se o cliente decidir encomendar e pedir para ver as opções.
 - Não insista em vender bolo para amanhã como "solução" de aniversário de hoje. Se ele quiser, você oferece; se não, ajude com mini salgados, salgados, bebidas ou Vulcão Mini.
@@ -875,6 +846,7 @@ PAGAMENTO VIA CARTÃO (LINK DE CHECKOUT):
   - Exemplo: [GERAR_LINK_CARTAO:93.50]
   - O link será substituído automaticamente pela URL de checkout do Stripe.
   - O cliente poderá pagar com cartão de crédito ou débito através do link.
+  - ⛔⛔ NUNCA escreva você mesmo uma URL/link de pagamento (ex: "https://pagamento.fastsavorys.com/checkout/..." ou qualquer link de cobrança). Esses links são INVENTADOS e NÃO FUNCIONAM. A ÚNICA forma correta é usar a tag [GERAR_LINK_CARTAO:VALOR]. O sistema cria o link REAL sozinho. Se você escrever uma URL de pagamento, o cliente NÃO conseguirá pagar.
 - NÃO pergunte sobre entrada/metade para cartão (só PIX tem essa opção).
 - Pagamento via cartão é sempre valor integral (100%).
 
@@ -1155,14 +1127,14 @@ const BAIRRO_FEE_MAP = {
     'portal do monte': { fee: 8, min: 30 },
     'monte pescoco': { fee: 8, min: 30 },
     'monte pescoço': { fee: 8, min: 30 },
-    'cristo redentor': { fee: 5, min: 15 },
-    'santo antonio': { fee: 5, min: 15 },
-    'santo antônio': { fee: 5, min: 15 },
-    'sao domingos': { fee: 3, min: 15 },
-    'são domingos': { fee: 3, min: 15 },
+    'cristo redentor': { fee: 6, min: 15 },
+    'santo antonio': { fee: 6, min: 15 },
+    'santo antônio': { fee: 6, min: 15 },
+    'sao domingos': { fee: 4, min: 15 },
+    'são domingos': { fee: 4, min: 15 },
     'vista da pedra': { fee: 8, min: 30 },
-    'varzea alegre': { fee: 5, min: 20 },
-    'várzea alegre': { fee: 5, min: 20 },
+    'varzea alegre': { fee: 6, min: 20 },
+    'várzea alegre': { fee: 6, min: 20 },
     '31 de marco': { fee: 6, min: 20 },
     '31 de março': { fee: 6, min: 20 },
     'sao bernardo': { fee: 8, min: 30 },
@@ -1172,7 +1144,7 @@ const BAIRRO_FEE_MAP = {
     'novo prado': { fee: 0, min: 15 },
     'bela vista': { fee: 8, min: 30 },
     'baixa fria': { fee: 5, min: 20 },
-    'beira rio': { fee: 5, min: 20 },
+    'beira rio': { fee: 6, min: 20 },
     'liberdade': { fee: 8, min: 30 },
     'primavera': { fee: 8, min: 30 },
     'marotinho': { fee: 8, min: 30 },
@@ -1198,16 +1170,6 @@ const BAIRRO_FEE_MAP = {
     'bnh': { fee: 6, min: 20 },
 };
 
-// Mini salgados pack prices (from menu — used for programmatic total estimation)
-const MINI_PACK_PRICES = { 20: 20, 30: 29, 40: 39, 50: 45, 100: 85, 150: 130 };
-
-// Individual product prices for estimation
-const PRODUCT_PRICES = {
-    'coxinha': 4.50, 'enroladinho': 4.00, 'risole': 4.50,
-    'vulcão mini': 15, 'vulcao mini': 15, 'bolo no pote': 10,
-    'coca-cola 350': 6, 'pepsi 1l': 8, 'pepsi 2l': 12, 'pepsi lata': 5.50,
-};
-
 function detectBairroInText(text) {
     const t = (text || '').toLowerCase()
         .normalize('NFD').replace(/[\u0300-\u036f]/g, ''); // remove accents for matching
@@ -1226,54 +1188,12 @@ function detectBairroInText(text) {
     return null;
 }
 
-function estimateCartTotal(history) {
-    const allText = history.map(m => m.text).join(' ');
-    let total = 0;
-    let items = [];
+// [CAIXINHA] Calculadora de pedido + validação de valores de pagamento foram movidas para
+// ./_lib/pricing.js (importadas no topo: fetchProductPriceMap, estimateCartTotal,
+// validatePixAmount, validateCartaoAmount, parseBrlNumber, normalizeTxt).
 
-    // 1) Mini salgados packs (check largest first)
-    const packQtys = Object.keys(MINI_PACK_PRICES).map(Number).sort((a, b) => b - a);
-    for (const qty of packQtys) {
-        const price = MINI_PACK_PRICES[qty];
-        const patterns = [
-            new RegExp(`\\b${qty}\\s*(mini|salgadinho|unidade)`, 'i'),
-            new RegExp(`mini.*salgad.*\\b${qty}\\b`, 'i'),
-            new RegExp(`\\b${qty}\\b.*mini.*salgad`, 'i'),
-        ];
-        if (patterns.some(p => p.test(allText))) {
-            total += price;
-            items.push(`${qty} mini salgados = R$ ${price.toFixed(2)}`);
-            break; // only one pack per order usually
-        }
-    }
-    // Also: "vou querer 100" / "quero 100" after mini salgados context
-    if (total === 0) {
-        const qtyMatch = allText.match(/(?:querer|quero|vou\s*querer|pode\s*ser)\s*(\d+)/i);
-        if (qtyMatch && /mini|salgadinho|festa|salgadinhos/i.test(allText)) {
-            const qty = parseInt(qtyMatch[1]);
-            if (MINI_PACK_PRICES[qty]) {
-                total += MINI_PACK_PRICES[qty];
-                items.push(`${qty} mini salgados = R$ ${MINI_PACK_PRICES[qty].toFixed(2)}`);
-            }
-        }
-    }
 
-    // 2) Individual salgados (coxinha × N)
-    for (const [prod, price] of Object.entries(PRODUCT_PRICES)) {
-        const re = new RegExp(`(\\d+)\\s*${prod}`, 'i');
-        const match = allText.match(re);
-        if (match) {
-            const qty = parseInt(match[1]);
-            const sub = qty * price;
-            total += sub;
-            items.push(`${qty}× ${prod} = R$ ${sub.toFixed(2)}`);
-        }
-    }
-
-    return { total, description: items.join(' + ') || '' };
-}
-
-function buildDeliveryFactHint(history, currentMessage) {
+function buildDeliveryFactHint(history, currentMessage, priceMap = null) {
     // Only look at USER messages for bairro detection (bot messages list ALL bairros)
     const userMsgs = history.filter(m => m.role === 'user').map(m => m.text);
     userMsgs.push(currentMessage);
@@ -1291,14 +1211,17 @@ function buildDeliveryFactHint(history, currentMessage) {
     }
     if (!bairroInfo) return '';
 
-    // Estimate order total from full conversation
-    const { total, description } = estimateCartTotal([...history, { role: 'user', text: currentMessage }]);
+    // Estimate order total from full conversation (calculadora determinística)
+    const { total, description, complete } = estimateCartTotal([...history, { role: 'user', text: currentMessage }], priceMap);
 
     const feeStr = bairroInfo.fee === 0 ? 'GRÁTIS' : `R$ ${bairroInfo.fee.toFixed(2)}`;
     let hint = `\n[⛔ DADOS VERIFICADOS PELO SISTEMA (USE ESTES VALORES — NÃO INVENTE):`;
     hint += `\n  BAIRRO: ${bairroInfo.name.toUpperCase()} → TAXA DE ENTREGA = ${feeStr} | PEDIDO MÍNIMO = R$ ${bairroInfo.min.toFixed(2)}`;
 
-    if (total > 0) {
+    // Só afirma o TOTAL quando a calculadora conseguiu precificar TUDO com segurança.
+    // Se complete=false (tem bolo/kit/combo ou houve remoção), NÃO crava um total — deixa a IA somar
+    // a partir do cardápio, para não injetar um valor possivelmente errado.
+    if (total > 0 && complete) {
         const effectiveMin = Math.max(15, bairroInfo.min);
         hint += `\n  PEDIDO: ${description} | TOTAL = R$ ${total.toFixed(2)}`;
         if (total >= effectiveMin) {
@@ -1309,11 +1232,30 @@ function buildDeliveryFactHint(history, currentMessage) {
             const falta = (effectiveMin - total).toFixed(2).replace('.', ',');
             hint += `\n  ❌ R$ ${total.toFixed(2)} < R$ ${effectiveMin.toFixed(2)} → ABAIXO DO MÍNIMO. Faltam R$ ${falta}. NÃO aceite entrega.`;
         }
+    } else if (total > 0 && !complete) {
+        hint += `\n  ⚠️ Pedido tem itens de preço fixo/variável (bolo/kit/combo) ou foi alterado. Some os valores a partir do CARDÁPIO acima com atenção. NÃO invente — confira item por item.`;
     }
 
     hint += `]`;
     console.log(`[delivery-hint] ${hint.replace(/\n/g, ' | ')}`);
     return hint;
+}
+
+// Lembrete just-in-time para o Bolo Vulcão Mini / Bolo no Pote.
+// Esses bolos NÃO têm personalização (massa/recheio/sabor) e PODEM ser entregues. O modelo às vezes
+// perde esse detalhe ao longo da conversa e os trata como bolo grande (pede personalização / diz que
+// é só retirada). Injeta um fato verificado para corrigir isso — só quando NÃO houver bolo grande/kit.
+function buildBoloFactHint(history, currentMessage) {
+    const allText = (history || []).map(m => m.text).join('\n') + '\n' + (currentMessage || '');
+    const t = normalizeTxt(allText);
+    const hasMiniVulcao = /(vulcao\s*mini|mini\s*vulcao|bolo\s*no\s*pote)/.test(t);
+    if (!hasMiniVulcao) return '';
+    // Se há bolo GRANDE ou kit festa no contexto, a regra é outra (retirada + personalização do grande).
+    const hasBoloGrande = /(bolo\s*(pp|p|g)\b|vulcao\s*p\b|kit\s*festa|naked)/.test(t);
+    if (hasBoloGrande) return '';
+    const boloHint = `\n[⛔ FATO VERIFICADO (pedido tem Bolo Vulcão Mini / Bolo no Pote): Esses bolos JÁ VÊM PRONTOS — sabor único. NÃO pergunte massa, recheio, sabor nem cor de fita. E eles PODEM SER ENTREGUES normalmente (NÃO são "apenas retirada"). NÃO os trate como bolo grande.]`;
+    console.log(`[bolo-hint] ${boloHint.replace(/\n/g, ' | ')}`);
+    return boloHint;
 }
 
 // --- Detecção de intenção simples (prioriza seções relevantes no prompt) ---
@@ -2334,7 +2276,7 @@ async function handleGeminiCore(req, res) {
         intentHint = '\n[FOCO: PAGAMENTO/PIX/CARTÃO. REGRAS CRÍTICAS:'
             + '\n- Se o cliente escolheu PIX e já confirmou o valor (integral ou entrada 50%): responda APENAS com a tag [GERAR_PIX:VALOR]. NENHUM texto junto. Exemplo: [GERAR_PIX:95.00]'
             + '\n- Se o cliente pediu "chave pix", "copia e cola", "manda o pix" sem valor definido: responda APENAS com [GERAR_PIX:] (sem valor).'
-            + '\n- Se o cliente escolheu CARTÃO: use [GERAR_LINK_CARTAO:VALOR_COM_TAXA].'
+            + '\n- Se o cliente escolheu CARTÃO: use [GERAR_LINK_CARTAO:VALOR_COM_TAXA]. ⛔ NUNCA escreva uma URL de pagamento você mesmo (links de checkout inventados NÃO funcionam) — use SOMENTE a tag; o sistema gera o link real.'
             + '\n- ⛔ NUNCA escreva o CNPJ como texto. NUNCA escreva a chave PIX como texto. USE APENAS AS TAGS acima. O sistema gera o copia-e-cola automaticamente.'
             + '\n- Se o pedido > R$50 e PIX: primeiro pergunte integral ou 50% entrada. Só gere a tag DEPOIS da resposta.]';
     } else if (intents.includes('entrega')) {
@@ -2502,68 +2444,33 @@ function getBrazilTime() {
     return new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Bahia' }));
 }
 
-function computeCRC16(payload) {
-    let crc = 0xFFFF;
-    for (let i = 0; i < payload.length; i++) {
-        crc ^= payload.charCodeAt(i) << 8;
-        for (let j = 0; j < 8; j++) {
-            if ((crc & 0x8000) !== 0) {
-                crc = (crc << 1) ^ 0x1021;
-            } else {
-                crc = crc << 1;
-            }
-        }
-    }
-    crc = crc & 0xFFFF;
-    return crc.toString(16).toUpperCase().padStart(4, '0');
-}
+// [CAIXINHA] computeCRC16 e generatePixBrCode foram movidas para ./_lib/payment.js
+// (generatePixBrCode importada no topo). Geram o PIX copia-e-cola localmente.
 
-function generatePixBrCode(amount = null) {
-    // Chave PIX: 63.160.686/0001-06 (20 chars: 63160686000106 - wait, CNPJ has 14 digits)
-    // Actually, string: "63.160.686/0001-06" has 18 chars. Wait, the user said 63.160.686/0001-06. If we remove punctuation: 63160686000106 (14 chars). We should use 14 chars for PIX payload.
-    const key = "63160686000106";
-    let payload = "000201";
-    // Merchant Account Information
-    const mai = "0014br.gov.bcb.pix01" + key.length.toString().padStart(2, '0') + key;
-    payload += "26" + mai.length.toString().padStart(2, '0') + mai;
-    // Merchant Category Code
-    payload += "52040000";
-    // Transaction Currency
-    payload += "5303986";
-    // Transaction Amount (optional)
-    if (amount && Number(amount) > 0) {
-        const amtStr = Number(amount).toFixed(2);
-        payload += "54" + amtStr.length.toString().padStart(2, '0') + amtStr;
-    }
-    // Country Code
-    payload += "5802BR";
-    // Merchant Name
-    const name = "JESSICA RODRIGUES DOS SANTOS".substring(0, 25);
-    payload += "59" + name.length.toString().padStart(2, '0') + name;
-    // Merchant City
-    const city = "Itamaraju";
-    payload += "60" + city.length.toString().padStart(2, '0') + city;
-    // Additional Data Field Template
-    const txid = "***";
-    const adft = "05" + txid.length.toString().padStart(2, '0') + txid;
-    payload += "62" + adft.length.toString().padStart(2, '0') + adft;
-    // CRC16
-    payload += "6304";
-    const crc = computeCRC16(payload);
-    return payload + crc;
-}
-
-    // Hora atual em Itamaraju-BA (UTC-3)
+    // Hora atual em Itamaraju-BA (UTC-3). Bahia não tem horário de verão, então é sempre UTC-3.
     const now = new Date().toLocaleString('pt-BR', { timeZone: 'America/Bahia', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', weekday: 'long' });
+    // "Amanhã" calculado de forma determinística no fuso de Itamaraju-BA (o dia seguinte começa à meia-noite local).
+    const nowBrazilForTomorrow = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Bahia' }));
+    const tomorrowBrazil = new Date(nowBrazilForTomorrow.getTime() + 24 * 60 * 60 * 1000);
+    const amanha = tomorrowBrazil.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', weekday: 'long' });
     const cleanName = name && /[a-zA-ZÀ-ÿ]{2,}/.test(name) ? name.trim() : '';
 
+    // --- Calculadora: carrega preços reais do cardápio (Supabase) uma única vez por requisição ---
+    const priceMap = await fetchProductPriceMap(supabaseAdmin);
+
     // --- Validação programática de entrega: injeta FATOS verificados para o modelo não inventar ---
-    const deliveryFactHint = buildDeliveryFactHint(session.history, effectiveMessage);
+    const deliveryFactHint = buildDeliveryFactHint(session.history, effectiveMessage, priceMap);
     if (deliveryFactHint) {
         intentHint += deliveryFactHint;
     }
 
-    const userMessage = `[Hoje é ${now}]${intentHint}` + (cleanName ? ` Cliente "${cleanName}" disse: ${effectiveMessage}` : ` ${effectiveMessage}`);
+    // --- Lembrete do Bolo Vulcão Mini / Bolo no Pote (sem personalização, pode entregar) ---
+    const boloFactHint = buildBoloFactHint(session.history, effectiveMessage);
+    if (boloFactHint) {
+        intentHint += boloFactHint;
+    }
+
+    const userMessage = `[Hoje é ${now}. Amanhã é ${amanha}]${intentHint}` + (cleanName ? ` Cliente "${cleanName}" disse: ${effectiveMessage}` : ` ${effectiveMessage}`);
 
     // --- Busca dados reais do Supabase e monta o prompt final ---
     const businessContext = await buildBusinessContext(intents);
@@ -2896,7 +2803,9 @@ function generatePixBrCode(amount = null) {
             amt = parseFloat(valMatch[1].replace(',', '.'));
             if (isNaN(amt)) amt = 0;
         }
-        pixBrCode = generatePixBrCode(amt > 0 ? amt : null);
+        // Segurança: rejeita valor alucinado pelo modelo (que não bate com a conversa)
+        const safeAmt = validatePixAmount(amt, session.history, effectiveMessage, priceMap);
+        pixBrCode = generatePixBrCode(safeAmt > 0 ? safeAmt : null);
         pixInjected = true;
         // Substitui a resposta INTEIRA pelo código puro — sem texto nenhum
         reply = pixBrCode;
@@ -2914,10 +2823,11 @@ function generatePixBrCode(amount = null) {
                 amt = parseFloat(valorMatch[1].replace(',', '.'));
                 if (isNaN(amt)) amt = 0;
             }
-            pixBrCode = generatePixBrCode(amt > 0 ? amt : null);
+            const safeAmt = validatePixAmount(amt, session.history, effectiveMessage, priceMap);
+            pixBrCode = generatePixBrCode(safeAmt > 0 ? safeAmt : null);
             pixInjected = true;
             reply = pixBrCode;
-            console.log(`[pix] ✅ PIX gerado via fallback (valor: ${amt > 0 ? 'R$' + amt.toFixed(2) : 'sem valor'})`);
+            console.log(`[pix] ✅ PIX gerado via fallback (valor: ${safeAmt > 0 ? 'R$' + safeAmt.toFixed(2) : 'sem valor'})`);
         }
     }
 
@@ -2932,7 +2842,8 @@ function generatePixBrCode(amount = null) {
                 amt = parseFloat(valMatch[1].replace(',', '.'));
                 if (isNaN(amt)) amt = 0;
             }
-            pixBrCode = generatePixBrCode(amt > 0 ? amt : null);
+            const safeAmt = validatePixAmount(amt, session.history, effectiveMessage, priceMap);
+            pixBrCode = generatePixBrCode(safeAmt > 0 ? safeAmt : null);
             pixInjected = true;
             reply = pixBrCode;
         }
@@ -2951,10 +2862,19 @@ function generatePixBrCode(amount = null) {
             if (isNaN(amt)) amt = 0;
         }
 
-        if (amt > 0 && stripe) {
+        // Segurança: rejeita valor alucinado pelo modelo (que não bate com a conversa)
+        const safeAmt = validateCartaoAmount(amt, session.history, effectiveMessage, priceMap);
+        if (safeAmt < 0) {
+            // Valor inventado: NÃO gera o link de cobrança. Pede confirmação / oferece Pix.
+            reply = reply.replace(gerarCartaoRegex, 'Deixa eu confirmar o valor certinho do seu pedido antes de gerar o link de pagamento, tá bom? 😊 Se preferir, posso te enviar a chave Pix.');
+        } else {
+            amt = safeAmt;
+        }
+
+        if (safeAmt >= 0 && amt > 0 && stripe) {
             // Gera link de checkout do Stripe de forma assíncrona
             // Como estamos em um contexto síncrono, usamos await aqui
-            const checkoutLink = await generateStripeCheckoutLink(amt, name || 'Cliente');
+            const checkoutLink = await generateStripeCheckoutLink(stripe, amt, name || 'Cliente');
             if (checkoutLink) {
                 // Substitui a tag pelo link de checkout
                 reply = reply.replace(gerarCartaoRegex, checkoutLink);
@@ -2967,6 +2887,41 @@ function generatePixBrCode(amount = null) {
         } else {
             // Se Stripe não configurado ou valor inválido
             reply = reply.replace(gerarCartaoRegex, '[Pagamento via cartão indisponível no momento. Use Pix.]');
+        }
+    }
+
+    // --- Fallback de SEGURANÇA: modelo escreveu um LINK DE PAGAMENTO FALSO (alucinado) ---
+    // Às vezes o modelo ignora a tag [GERAR_LINK_CARTAO:VALOR] e INVENTA uma URL de checkout
+    // (ex: https://pagamento.fastsavorys.com/checkout/...), que NÃO funciona. Detectamos qualquer
+    // URL de pagamento que NÃO seja do Stripe e a trocamos por um link REAL (se houver valor
+    // confiável) ou por uma mensagem segura. Espelha o fallback que já existe para o PIX.
+    {
+        const urls = reply.match(/https?:\/\/[^\s<>"')]+/gi) || [];
+        const fakePayUrl = urls.find(u =>
+            !/stripe\.com/i.test(u) &&
+            /(pagamento\.|\/checkout\/|\/pay\/|\/pagar|\/cobranca|payment)/i.test(u)
+        );
+        if (fakePayUrl) {
+            console.warn(`[cartao] ⚠️ Modelo gerou link de pagamento FALSO: ${fakePayUrl}. Substituindo por link real/seguro.`);
+            // Pega o MAIOR valor R$ citado na resposta (geralmente o total com a taxa de cartão)
+            let amt = 0;
+            for (const vm of reply.matchAll(/R\$\s*([0-9]{1,3}(?:\.[0-9]{3})*(?:,[0-9]{2})?|[0-9]+(?:[.,][0-9]{2})?)/gi)) {
+                const v = parseBrlNumber(vm[1]);
+                if (!isNaN(v) && v > amt) amt = v;
+            }
+            const safeAmt = validateCartaoAmount(amt, session.history, effectiveMessage, priceMap);
+            let realLink = null;
+            if (safeAmt > 0 && stripe) {
+                realLink = await generateStripeCheckoutLink(stripe, safeAmt, name || 'Cliente');
+            }
+            if (realLink) {
+                reply = reply.replace(fakePayUrl, realLink);
+                console.log(`[cartao] ✅ Link falso substituído pelo Stripe real (R$ ${safeAmt}).`);
+            } else {
+                // Sem valor confiável ou Stripe indisponível: remove o link falso e oferece Pix
+                reply = reply.replace(fakePayUrl, '').replace(/\n{3,}/g, '\n\n').trim();
+                reply += '\n\nDeixa eu confirmar o valor certinho pra gerar o link de pagamento, tá? 😊 Se preferir, posso te enviar a chave Pix.';
+            }
         }
     }
 
