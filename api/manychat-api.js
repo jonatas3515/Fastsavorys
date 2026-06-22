@@ -860,7 +860,7 @@ async function buildBusinessContext(intents) {
             const minNormal = c.min_order_pickup || 8;
             const minOff = c.min_order_pickup_offhours || 15;
             const minMorning = c.morning_rule_min_value || 25;
-            ctx += '\n  • Retirada 7h–11h (sem bolo): mínimo do carrinho = R$ ${Number(minMorning).toFixed(2)}';
+            ctx += `\n  • Retirada 7h–11h (sem bolo): mínimo do carrinho = R$ ${Number(minMorning).toFixed(2)}`;
             ctx += `\n  • Retirada 11h–14h: mínimo do carrinho = R$ ${Number(minOff).toFixed(2)}`;
             ctx += `\n  • Retirada 14h–18h: mínimo do carrinho = R$ ${Number(minNormal).toFixed(2)}`;
         }
@@ -2119,6 +2119,51 @@ function getBrazilTime() {
         orderReady = true;
         // Remove o bloco JSON da resposta visível ao cliente
         reply = reply.replace(ORDER_JSON_REGEX, '').trim();
+
+        // --- CORREÇÃO PROGRAMÁTICA DO TOTAL (a IA erra contas) ---
+        // A IA é ruim em aritmética. Quando a calculadora determinística consegue
+        // precificar TUDO com segurança (complete=true), o subtotal/total que a IA
+        // escreveu é SUBSTITUÍDO pelo valor correto — tanto no ORDER_JSON (cozinha)
+        // quanto no texto visível ao cliente. Pagamento em CARTÃO é pulado (tem
+        // acréscimo de taxa que esta calculadora não replica).
+        try {
+            const calc = estimateCartTotal([...session.history, { role: 'user', text: effectiveMessage }], priceMap);
+            const isCard = /cart[aã]o|cr[eé]dito|d[eé]bito/i.test(String(orderSummary.payment || ''));
+            // A calculadora IGNORA adicionais (sachê, topper, molho) sem marcar incompleto.
+            // Se houver esses itens na conversa, PULA a correção para não cobrar a menos.
+            const convText = [...session.history.filter(m => m.role === 'user').map(m => m.text), effectiveMessage].join(' ');
+            const hasUnpricedExtras = /\b(sach[eê]s?|ketchup|catchup|maionese|topper|molho|adicional|adicionais)\b/i.test(convText);
+            if (calc.complete && calc.total > 0 && !isCard && !hasUnpricedExtras) {
+                const fmt = (n) => `R$ ${n.toFixed(2).replace('.', ',')}`;
+                const onlyNum = (v) => parseBrlNumber(String(v == null ? '' : v).replace(/[^0-9.,]/g, ''));
+                const feeNum = onlyNum(orderSummary.delivery_fee) || 0;
+                const correctSubtotal = calc.total;
+                const correctTotal = calc.total + (isNaN(feeNum) ? 0 : feeNum);
+                const aiSubtotal = onlyNum(orderSummary.subtotal);
+                const aiTotal = onlyNum(orderSummary.total);
+                const TOL = 0.5;
+                const subtotalWrong = isNaN(aiSubtotal) || Math.abs(aiSubtotal - correctSubtotal) > TOL;
+                const totalWrong = isNaN(aiTotal) || Math.abs(aiTotal - correctTotal) > TOL;
+                if (subtotalWrong || totalWrong) {
+                    console.warn(`[calc-fix] Total corrigido pela calculadora: subtotal ${orderSummary.subtotal} → ${fmt(correctSubtotal)} | total ${orderSummary.total} → ${fmt(correctTotal)} | calc: ${calc.description}`);
+                    // Corrige o texto visível ao cliente (troca o token R$ errado pelo correto).
+                    if (!isNaN(aiTotal) && totalWrong) {
+                        const oldTotalTok = `R$ ${aiTotal.toFixed(2).replace('.', ',')}`;
+                        reply = reply.split(oldTotalTok).join(fmt(correctTotal));
+                    }
+                    // Só troca o subtotal no texto se for um valor DISTINTO do total (evita dupla troca).
+                    if (!isNaN(aiSubtotal) && subtotalWrong && (isNaN(aiTotal) || Math.abs(aiSubtotal - aiTotal) > 0.005)) {
+                        const oldSubTok = `R$ ${aiSubtotal.toFixed(2).replace('.', ',')}`;
+                        reply = reply.split(oldSubTok).join(fmt(correctSubtotal));
+                    }
+                    // Corrige o ORDER_JSON enviado para a cozinha/dona.
+                    orderSummary.subtotal = fmt(correctSubtotal);
+                    orderSummary.total = fmt(correctTotal);
+                }
+            }
+        } catch (e) {
+            console.warn('[calc-fix] erro ao corrigir total:', e.message);
+        }
     }
 
     // --- CHECAGEM DE FRASE CORTADA ---
