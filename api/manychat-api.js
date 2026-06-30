@@ -589,7 +589,8 @@ function buildDeliveryFactHint(history, currentMessage, priceMap = null) {
     // a partir do cardápio, para não injetar um valor possivelmente errado.
     if (total > 0 && complete) {
         const effectiveMin = Math.max(15, bairroInfo.min);
-        hint += `\n  PEDIDO: ${description} | TOTAL = R$ ${total.toFixed(2)}`;
+        hint += `\n  PEDIDO (ITENS EXATOS QUE O CLIENTE PEDIU): ${description} | TOTAL = R$ ${total.toFixed(2)}`;
+        hint += `\n  ⛔ NÃO adicione, NÃO invente e NÃO "complete" o pedido com itens que o cliente NÃO pediu. O total É EXATAMENTE R$ ${total.toFixed(2)}. Só mude esse valor se o PRÓPRIO cliente pedir mais itens explicitamente.`;
         if (total >= effectiveMin) {
             const totalComTaxa = total + bairroInfo.fee;
             hint += `\n  ✅ R$ ${total.toFixed(2)} ≥ R$ ${effectiveMin.toFixed(2)} → ENTREGA PERMITIDA.`;
@@ -622,6 +623,19 @@ function buildBoloFactHint(history, currentMessage) {
     const boloHint = `\n[⛔ FATO VERIFICADO (pedido tem Bolo Vulcão Mini / Bolo no Pote): Esses bolos JÁ VÊM PRONTOS — sabor único. NÃO pergunte massa, recheio, sabor nem cor de fita. E eles PODEM SER ENTREGUES normalmente (NÃO são "apenas retirada"). NÃO os trate como bolo grande.]`;
     console.log(`[bolo-hint] ${boloHint.replace(/\n/g, ' | ')}`);
     return boloHint;
+}
+
+// Guard para Kit Festa / bolo GRANDE (PP/P/G/Vulcão P): são APENAS RETIRADA e precisam de 1 dia de
+// antecedência (não podem ser para HOJE). O modelo às vezes libera entrega/mesmo-dia indevidamente,
+// principalmente quando renomeia "Kit Festa" para "Combo Festa". Injeta fato verificado.
+function buildKitFactHint(history, currentMessage) {
+    const allText = (history || []).map(m => m.text).join('\n') + '\n' + (currentMessage || '');
+    const t = normalizeTxt(allText);
+    const hasKitOuBoloGrande = /(kit\s*festa|combo\s*festa|festa\s*(pp|p|g)\b|bolo\s*(pp|p|g)\b|vulcao\s*p\b|naked)/.test(t);
+    if (!hasKitOuBoloGrande) return '';
+    const kitHint = `\n[⛔ FATO VERIFICADO (pedido contém Kit Festa e/ou bolo grande): (1) É APENAS RETIRADA na loja (Rua Palmeiras, 105, Novo Prado) — NUNCA ofereça nem aceite ENTREGA, nem mesmo para os salgados/bebidas do mesmo pedido. (2) Precisa de no mínimo 1 DIA de antecedência — NÃO pode ser para HOJE. Se o cliente pediu para hoje, recuse com educação e ofereça agendar para amanhã ou outro dia. NÃO confunda Kit Festa (bolo+refri+mini) com "combo de mini salgados".]`;
+    console.log(`[kit-hint] ${kitHint.replace(/\n/g, ' | ')}`);
+    return kitHint;
 }
 
 // --- Detecção de intenção simples (prioriza seções relevantes no prompt) ---
@@ -716,8 +730,11 @@ async function buildBusinessContext(intents) {
                     unavailable.push(p.name);
                     continue;
                 }
-                if (!grouped[p.category]) grouped[p.category] = [];
-                grouped[p.category].push(p);
+                // O admin salva combos com categoria 'combo' (singular), mas o cardápio usa 'combos'
+                // (plural). Sem normalizar, os combos somem do cardápio enviado à IA. Normaliza aqui.
+                const cat = p.category === 'combo' ? 'combos' : p.category;
+                if (!grouped[cat]) grouped[cat] = [];
+                grouped[cat].push(p);
             }
             // Ordem desejada das categorias
             const catOrder = ['salgados', 'mini', 'combos', 'bolos', 'kits', 'bebidas', 'adicionais'];
@@ -842,7 +859,10 @@ async function buildBusinessContext(intents) {
             ctx += `\n\nTAXAS DE CARTÃO: 1x = ${c.card_fee_1x}% | 2x = ${c.card_fee_2x}%`;
             ctx += '\n  (taxa de cartão é cobrada sobre o valor do pedido, NÃO sobre a taxa de entrega)';
             if (!c.delivery_enabled) {
-                ctx += `\n⚠️ DELIVERY DESATIVADO${c.delivery_disabled_reason ? ': ' + c.delivery_disabled_reason : ''}. Apenas retirada no local no momento.`;
+                ctx += `\n\n⛔ ENTREGAS TEMPORARIAMENTE SUSPENSAS${c.delivery_disabled_reason ? ' (' + c.delivery_disabled_reason + ')' : ''}.`;
+                ctx += '\n  - No momento atendemos APENAS RETIRADA na loja (Rua Palmeiras, 105, Novo Prado).';
+                ctx += '\n  - Se o cliente perguntar sobre ENTREGA: informe que as entregas estão temporariamente suspensas e retornarão assim que tudo for normalizado. ⛔ NÃO prometa horário de volta das entregas (ex: "a partir das 14h"), NÃO dê previsão de quando volta.';
+                ctx += '\n  - Você PODE combinar horário de RETIRADA normalmente, dentro do horário de funcionamento. Apenas NÃO confunda retirada com entrega.';
             }
         }
 
@@ -1834,6 +1854,12 @@ function getBrazilTime() {
     const boloFactHint = buildBoloFactHint(session.history, effectiveMessage);
     if (boloFactHint) {
         intentHint += boloFactHint;
+    }
+
+    // --- Guard Kit Festa / bolo grande (apenas retirada + 1 dia de antecedência) ---
+    const kitFactHint = buildKitFactHint(session.history, effectiveMessage);
+    if (kitFactHint) {
+        intentHint += kitFactHint;
     }
 
     const userMessage = `[Hoje é ${now}. Amanhã é ${amanha}]${intentHint}` + (cleanName ? ` Cliente "${cleanName}" disse: ${effectiveMessage}` : ` ${effectiveMessage}`);
