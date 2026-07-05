@@ -608,6 +608,48 @@ function buildDeliveryFactHint(history, currentMessage, priceMap = null) {
     return hint;
 }
 
+// Calcula o total FINAL do pedido (produtos + taxa de entrega, se houver) de forma determinística,
+// a partir da conversa inteira. Usado para BLINDAR a geração do PIX contra o modelo usando um valor
+// antigo/errado que foi mencionado em algum ponto anterior da conversa (ex: um total incorreto que a
+// IA disse antes de terminar de somar todos os itens). Só retorna um valor quando a calculadora
+// conseguiu precificar TUDO com segurança (complete=true) — caso contrário retorna null e quem chamou
+// deve confiar na validação por "valores mencionados" (validatePixAmount) como fallback.
+function computeDeterministicOrderTotal(history, currentMessage, priceMap = null) {
+    try {
+        const { total, complete } = estimateCartTotal([...(history || []), { role: 'user', text: currentMessage }], priceMap);
+        if (!complete || !(total > 0)) return null;
+        // Detecta bairro (taxa de entrega) na conversa — mensagem mais recente do cliente que citar um bairro.
+        const userMsgs = (history || []).filter(m => m.role === 'user').map(m => m.text);
+        userMsgs.push(currentMessage);
+        let bairroInfo = null;
+        for (let i = userMsgs.length - 1; i >= 0; i--) {
+            bairroInfo = detectBairroInText(userMsgs[i]);
+            if (bairroInfo) break;
+        }
+        const fee = bairroInfo ? bairroInfo.fee : 0;
+        return { total: total + fee, productsTotal: total, fee };
+    } catch (e) {
+        console.warn('[pix] computeDeterministicOrderTotal erro:', e.message);
+        return null;
+    }
+}
+
+// Resolve o valor FINAL a usar no PIX/link de cartão. Prioriza o total calculado
+// deterministicamente (produtos + taxa de entrega) sobre o valor que o modelo colocou na tag —
+// o modelo pode ter pego um total antigo/errado mencionado em algum ponto anterior da conversa
+// (ex: disse R$ 23,00 antes de somar todos os itens, e depois usa esse valor errado no PIX).
+// Só cai no valor do modelo (validado por validatePixAmount) quando a calculadora não tem certeza
+// (bolo/kit/combo no pedido, etc).
+function resolvePixFinalAmount(amt, history, currentMessage, priceMap) {
+    const detTotal = computeDeterministicOrderTotal(history, currentMessage, priceMap);
+    const safeAmt = validatePixAmount(amt, history, currentMessage, priceMap);
+    if (detTotal && Math.abs((safeAmt || 0) - detTotal.total) > 1.0) {
+        console.warn(`[pix] ⚠️ Valor da tag (R$ ${(safeAmt || 0).toFixed(2)}) difere do total calculado deterministicamente (R$ ${detTotal.total.toFixed(2)} = produtos R$ ${detTotal.productsTotal.toFixed(2)} + taxa R$ ${detTotal.fee.toFixed(2)}). Usando o valor calculado.`);
+        return detTotal.total;
+    }
+    return safeAmt;
+}
+
 // Lembrete just-in-time para o Bolo Vulcão Mini / Bolo no Pote.
 // Esses bolos NÃO têm personalização (massa/recheio/sabor) e PODEM ser entregues. O modelo às vezes
 // perde esse detalhe ao longo da conversa e os trata como bolo grande (pede personalização / diz que
@@ -633,7 +675,7 @@ function buildKitFactHint(history, currentMessage) {
     const t = normalizeTxt(allText);
     const hasKitOuBoloGrande = /(kit\s*festa|combo\s*festa|festa\s*(pp|p|g)\b|bolo\s*(pp|p|g)\b|vulcao\s*p\b|naked)/.test(t);
     if (!hasKitOuBoloGrande) return '';
-    const kitHint = `\n[⛔ FATO VERIFICADO (pedido contém Kit Festa e/ou bolo grande): (1) É APENAS RETIRADA na loja (Rua Palmeiras, 105, Novo Prado) — NUNCA ofereça nem aceite ENTREGA, nem mesmo para os salgados/bebidas do mesmo pedido. (2) Precisa de no mínimo 1 DIA de antecedência — NÃO pode ser para HOJE. Se o cliente pediu para hoje, recuse com educação e ofereça agendar para amanhã ou outro dia. NÃO confunda Kit Festa (bolo+refri+mini) com "combo de mini salgados".]`;
+    const kitHint = `\n[⛔ FATO VERIFICADO (pedido contém Kit Festa e/ou bolo grande): (1) É APENAS RETIRADA na loja (Rua Palmeiras, 105, Novo Prado) — NUNCA ofereça nem aceite ENTREGA, nem mesmo para os salgados/bebidas do mesmo pedido. (2) Precisa de no mínimo 1 DIA de antecedência — NÃO pode ser para HOJE. Se o cliente pediu para hoje, recuse com educação (diga que não é possível atender hoje e que fica para uma próxima) e PARE — ⛔ NÃO ofereça proativamente agendar para amanhã/outro dia (quem pede pra hoje está com urgência). Só mencione agendar outro dia SE o próprio cliente perguntar. NÃO confunda Kit Festa (bolo+refri+mini) com "combo de mini salgados".]`;
     console.log(`[kit-hint] ${kitHint.replace(/\n/g, ' | ')}`);
     return kitHint;
 }
@@ -2240,8 +2282,9 @@ function getBrazilTime() {
             amt = parseFloat(valMatch[1].replace(',', '.'));
             if (isNaN(amt)) amt = 0;
         }
-        // Segurança: rejeita valor alucinado pelo modelo (que não bate com a conversa)
-        const safeAmt = validatePixAmount(amt, session.history, effectiveMessage, priceMap);
+        // Segurança: prioriza o total calculado deterministicamente sobre o valor da tag (que pode
+        // ser um total antigo/errado mencionado antes na conversa)
+        const safeAmt = resolvePixFinalAmount(amt, session.history, effectiveMessage, priceMap);
         pixBrCode = generatePixBrCode(safeAmt > 0 ? safeAmt : null);
         pixInjected = true;
         // Substitui a resposta INTEIRA pelo código puro — sem texto nenhum
@@ -2260,7 +2303,7 @@ function getBrazilTime() {
                 amt = parseFloat(valorMatch[1].replace(',', '.'));
                 if (isNaN(amt)) amt = 0;
             }
-            const safeAmt = validatePixAmount(amt, session.history, effectiveMessage, priceMap);
+            const safeAmt = resolvePixFinalAmount(amt, session.history, effectiveMessage, priceMap);
             pixBrCode = generatePixBrCode(safeAmt > 0 ? safeAmt : null);
             pixInjected = true;
             reply = pixBrCode;
@@ -2279,7 +2322,7 @@ function getBrazilTime() {
                 amt = parseFloat(valMatch[1].replace(',', '.'));
                 if (isNaN(amt)) amt = 0;
             }
-            const safeAmt = validatePixAmount(amt, session.history, effectiveMessage, priceMap);
+            const safeAmt = resolvePixFinalAmount(amt, session.history, effectiveMessage, priceMap);
             pixBrCode = generatePixBrCode(safeAmt > 0 ? safeAmt : null);
             pixInjected = true;
             reply = pixBrCode;

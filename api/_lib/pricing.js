@@ -35,6 +35,19 @@ function normalizeTxt(s) {
     return (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 }
 
+// Números por extenso (1 a 12) usados com frequência em pedidos ("dois risole", "quatro coxinhas").
+// A calculadora só reconhecia dígitos (\d+); sem essa conversão, itens com quantidade por extenso
+// eram simplesmente ignorados/mesclados com o próximo item numerado, gerando total ERRADO mas com
+// complete=true (falsa confiança). Converte para dígito ANTES da varredura de chunks.
+const NUM_WORDS_PT = {
+    um: 1, uma: 1, dois: 2, duas: 2, tres: 3, quatro: 4, cinco: 5,
+    seis: 6, sete: 7, oito: 8, nove: 9, dez: 10, onze: 11, doze: 12,
+};
+function wordsToDigits(text) {
+    return (text || '').replace(/\b(um|uma|dois|duas|tres|quatro|cinco|seis|sete|oito|nove|dez|onze|doze)\b/g,
+        (w) => String(NUM_WORDS_PT[w]));
+}
+
 // Monta o mapa de preços a partir do cardápio do Supabase (fonte da verdade).
 // Retorna { units: {token: preço}, drinks: [{name, price}] }. Em caso de falha, retorna vazio
 // e a calculadora usa os preços de fallback.
@@ -85,79 +98,111 @@ function estimateCartTotal(history, priceMap = null) {
     const drinks = (priceMap && priceMap.drinks) || [];
 
     // Quantidades vêm SÓ das mensagens do cliente (o bot repete itens e causaria contagem dupla).
-    const userText = (history || []).filter(m => m.role === 'user').map(m => normalizeTxt(m.text)).join('\n');
+    const userMsgs = (history || []).filter(m => m.role === 'user').map(m => wordsToDigits(normalizeTxt(m.text)));
+    const fullUserText = userMsgs.join('\n');
 
-    let total = 0;
-    const items = [];
     let complete = true;
 
     // Remoção/alteração de itens torna o cálculo não confiável.
-    if (/\b(tira|tirar|remove|remover|retira|cancela|cancelar|troca|trocar|menos)\b/.test(userText)) {
+    if (/\b(tira|tirar|remove|remover|retira|cancela|cancelar|troca|trocar|menos)\b/.test(fullUserText)) {
         complete = false;
     }
     // Itens de preço fixo/variável que a calculadora não soma (bolos, kits, combos).
-    if (UNPRICEABLE_FOOD.test(userText)) {
+    if (UNPRICEABLE_FOOD.test(fullUserText)) {
         complete = false;
     }
 
-    // Varre "quantidade + descrição" e classifica cada pedaço em UMA categoria (evita contagem dupla).
-    const chunkRe = /(\d+)\s*([^\d,;\n]*)/g;
-    let m;
-    while ((m = chunkRe.exec(userText)) !== null) {
-        const qty = parseInt(m[1], 10);
-        const phrase = (m[2] || '').trim();
-        if (!qty || qty <= 0 || !phrase) continue;
+    // Salgados unitários e bebidas usam "a MENSAGEM mais recente vence" por item — é comum o cliente
+    // RESTATAR o pedido inteiro (ex: "vamos atualizar seu pedido...") repetindo itens já mencionados
+    // antes, o que causaria CONTAGEM DUPLA se apenas somássemos tudo. Mini/cento/genérico continuam
+    // aditivos (raramente são restatados por completo).
+    const salgadoQty = {};   // token -> qty (última mensagem que citou o token vence)
+    const drinkQty = {};     // nome do cardápio -> qty (última mensagem vence)
+    let miniTotal = 0;
+    let centoTotal = 0;
+    let genericTotal = 0;
+    const miniItems = [];
+    const centoItems = [];
+    const genericItems = [];
 
-        // "cento(s)" de mini salgados (1 cento = 100 un)
-        if (/\bcento?s?\b/.test(phrase)) {
-            const sub = qty * MINI_PACK_PRICES[100];
-            total += sub;
-            items.push(`${qty} cento(s) mini salgados = R$ ${sub.toFixed(2)}`);
-            continue;
+    const chunkRe = /(\d+)\s*([^\d,;\n]*)/g;
+
+    for (const msgText of userMsgs) {
+        const msgSalgado = {}; // acumula dentro da MESMA mensagem (ex: "2 coxinha e mais 1 coxinha")
+        const msgDrink = {};
+        let m;
+        chunkRe.lastIndex = 0;
+        while ((m = chunkRe.exec(msgText)) !== null) {
+            const qty = parseInt(m[1], 10);
+            const phrase = (m[2] || '').trim();
+            if (!qty || qty <= 0 || !phrase) continue;
+
+            // "cento(s)" de mini salgados (1 cento = 100 un)
+            if (/\bcento?s?\b/.test(phrase)) {
+                const sub = qty * MINI_PACK_PRICES[100];
+                centoTotal += sub;
+                centoItems.push(`${qty} cento(s) mini salgados = R$ ${sub.toFixed(2)}`);
+                continue;
+            }
+            // Pacote de mini salgados ("20 mini", "100 salgadinhos")
+            if (/\b(mini|salgadinho)/.test(phrase)) {
+                const sub = miniPackPrice(qty);
+                if (sub == null) { complete = false; continue; }
+                miniTotal += sub;
+                miniItems.push(`${qty} mini salgados = R$ ${sub.toFixed(2)}`);
+                continue;
+            }
+            // Salgado individual (grande) por token conhecido
+            let matchedUnit = null;
+            for (const tok of SALGADO_UNIT_TOKENS) {
+                if (phrase.includes(tok)) { matchedUnit = tok; break; }
+            }
+            if (matchedUnit) {
+                // Ambiguidade mini-vs-grande: se a quantidade é exatamente um tamanho de pacote de mini
+                // (20/30/40/50/100/150) e o cliente NÃO disse "grande/unidade", pode ser mini. Marca como
+                // incompleto para NÃO cravar um total que pode estar errado.
+                const isPackSize = !!MINI_PACK_PRICES[qty];
+                const explicitGrande = /\b(grande|unidade|tradicional|normal)\b/.test(phrase);
+                if (isPackSize && !explicitGrande) complete = false;
+                msgSalgado[matchedUnit] = (msgSalgado[matchedUnit] || 0) + qty;
+                continue;
+            }
+            // Bebida: casa pelo nome do cardápio (todas as palavras significativas presentes na frase)
+            const drink = drinks.find(d => d.name.split(/\s+/).filter(w => w.length > 2).every(w => phrase.includes(w)));
+            if (drink) {
+                msgDrink[drink.name] = (msgDrink[drink.name] || 0) + qty;
+                continue;
+            }
+            // Salgado genérico ("10 salgados grandes") — usa preço médio de fallback (aproximado)
+            if (/\bsalgad/.test(phrase)) {
+                const avg = units.coxinha || 4.50;
+                const sub = qty * avg;
+                genericTotal += sub;
+                genericItems.push(`${qty}x salgado (aprox.) = R$ ${sub.toFixed(2)}`);
+                continue;
+            }
+            // Quantidade seguida de palavra não-alimentar (endereço, etc.) → ignora silenciosamente.
         }
-        // Pacote de mini salgados ("20 mini", "100 salgadinhos")
-        if (/\b(mini|salgadinho)/.test(phrase)) {
-            const sub = miniPackPrice(qty);
-            if (sub == null) { complete = false; continue; }
-            total += sub;
-            items.push(`${qty} mini salgados = R$ ${sub.toFixed(2)}`);
-            continue;
-        }
-        // Salgado individual (grande) por token conhecido
-        let matchedUnit = null;
-        for (const tok of SALGADO_UNIT_TOKENS) {
-            if (phrase.includes(tok)) { matchedUnit = tok; break; }
-        }
-        if (matchedUnit) {
-            // Ambiguidade mini-vs-grande: se a quantidade é exatamente um tamanho de pacote de mini
-            // (20/30/40/50/100/150) e o cliente NÃO disse "grande/unidade", pode ser mini. Marca como
-            // incompleto para NÃO cravar um total que pode estar errado.
-            const isPackSize = !!MINI_PACK_PRICES[qty];
-            const explicitGrande = /\b(grande|unidade|tradicional|normal)\b/.test(phrase);
-            if (isPackSize && !explicitGrande) complete = false;
-            const sub = qty * units[matchedUnit];
-            total += sub;
-            items.push(`${qty}x ${matchedUnit} = R$ ${sub.toFixed(2)}`);
-            continue;
-        }
-        // Bebida: casa pelo nome do cardápio (todas as palavras significativas presentes na frase)
-        const drink = drinks.find(d => d.name.split(/\s+/).filter(w => w.length > 2).every(w => phrase.includes(w)));
-        if (drink) {
-            const sub = qty * drink.price;
-            total += sub;
-            items.push(`${qty}x ${drink.name} = R$ ${sub.toFixed(2)}`);
-            continue;
-        }
-        // Salgado genérico ("10 salgados grandes") — usa preço médio de fallback (aproximado)
-        if (/\bsalgad/.test(phrase)) {
-            const avg = units.coxinha || 4.50;
-            const sub = qty * avg;
-            total += sub;
-            items.push(`${qty}x salgado (aprox.) = R$ ${sub.toFixed(2)}`);
-            continue;
-        }
-        // Quantidade seguida de palavra não-alimentar (endereço, etc.) → ignora silenciosamente.
+        // Mensagem mais recente SOBRESCREVE a quantidade de cada token/bebida já visto antes.
+        for (const [tok, q] of Object.entries(msgSalgado)) salgadoQty[tok] = q;
+        for (const [name, q] of Object.entries(msgDrink)) drinkQty[name] = q;
     }
+
+    let total = miniTotal + centoTotal + genericTotal;
+    const items = [...centoItems, ...miniItems];
+    for (const [tok, q] of Object.entries(salgadoQty)) {
+        const sub = q * units[tok];
+        total += sub;
+        items.push(`${q}x ${tok} = R$ ${sub.toFixed(2)}`);
+    }
+    for (const [name, q] of Object.entries(drinkQty)) {
+        const drink = drinks.find(d => d.name === name);
+        const price = drink ? drink.price : 0;
+        const sub = q * price;
+        total += sub;
+        items.push(`${q}x ${name} = R$ ${sub.toFixed(2)}`);
+    }
+    items.push(...genericItems);
 
     return { total, description: items.join(' + ') || '', complete };
 }
