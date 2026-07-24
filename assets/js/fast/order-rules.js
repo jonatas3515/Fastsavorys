@@ -192,9 +192,10 @@ window.canUseDelivery = function (cartItems = window.cart, cartTotal = window.ca
     }
 
     // Regra 3: Bolo Mini e Salgados → permitido, mas verifica valor mínimo por bairro
+    // O mínimo GLOBAL para entrega é R$ 15,00, mesmo que o bairro não tenha mínimo cadastrado.
     if (neighborhood) {
-        const minValue = window.getMinDeliveryValue(neighborhood);
-        if (minValue > 0 && cartTotal < minValue) {
+        const minValue = Math.max(15, window.getMinDeliveryValue(neighborhood) || 0);
+        if (cartTotal < minValue) {
             const faltando = (minValue - cartTotal).toFixed(2).replace('.', ',');
             return {
                 allowed: false,
@@ -228,7 +229,7 @@ window.getMinDeliveryValue = function (neighborhood) {
 
     for (const [bairro, config] of Object.entries(fees)) {
         if (norm(bairro) === normalizedNeighborhood) {
-            return config.minOrder || config.min_order || 0;
+            return config.minOrder || config.min_order || config.min || 0;
         }
     }
 
@@ -707,9 +708,9 @@ window.updateNeighborhoodMinValueWarning = function () {
         return;
     }
 
-    const minValue = window.getMinDeliveryValue(neighborhood);
+    const minValue = Math.max(15, window.getMinDeliveryValue(neighborhood) || 0);
 
-    if (minValue > 0 && window.cartTotal < minValue) {
+    if (window.cartTotal < minValue) {
         const faltando = (minValue - window.cartTotal).toFixed(2).replace('.', ',');
         warningDiv.innerHTML = `🚚 <strong>Faltam R$ ${faltando}</strong> para liberarmos a entrega para o bairro <strong>${neighborhood}</strong>! Valor mínimo: R$ ${minValue.toFixed(2).replace('.', ',')}`;
         warningDiv.classList.remove('hidden');
