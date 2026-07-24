@@ -680,6 +680,27 @@ function buildKitFactHint(history, currentMessage) {
     return kitHint;
 }
 
+// Guard de pagamento: a opção de 50% de entrada SÓ pode ser oferecida quando o total do pedido for
+// MAIOR que R$ 50,00. O modelo às vezes oferece 50% em pedidos pequenos (ex: R$ 26,75). Injeta um
+// fato verificado com o total calculado deterministicamente para o modelo obedecer ao limiar correto.
+function buildPaymentFactHint(history, currentMessage, priceMap = null) {
+    const allText = (history || []).map(m => m.text).join(' ') + ' ' + (currentMessage || '');
+    const isPaymentCtx = /\b(pix|pagar|pagamento|gera.*pix|chave pix|copia e cola|cart[aã]o|dinheiro)\b/i.test(allText);
+    if (!isPaymentCtx) return '';
+    const det = computeDeterministicOrderTotal(history, currentMessage, priceMap);
+    if (!det || det.total <= 0) return '';
+    const totalFmt = det.total.toFixed(2).replace('.', ',');
+    let hint = `\n[⛔ FATO VERIFICADO (pagamento): O total do pedido é R$ ${totalFmt}. `;
+    if (det.total > 50) {
+        const entrada = (det.total * 0.5).toFixed(2).replace('.', ',');
+        hint += `Como o total é MAIOR que R$ 50,00, você PODE oferecer pagamento integral OU 50% de entrada (R$ ${entrada}). NÃO ofereça entrada abaixo de 50%. NÃO deixe o cliente pagar menos sem passar para a Jéssica.]`;
+    } else {
+        hint += `Como o total é R$ 50,00 ou MENOS, ⛔ NÃO ofereça 50% de entrada. Exija pagamento integral de R$ ${totalFmt}. Para PIX, gere [GERAR_PIX:${det.total.toFixed(2)}] depois que o cliente confirmar.]`;
+    }
+    console.log(`[payment-hint] ${hint.replace(/\n/g, ' | ')}`);
+    return hint;
+}
+
 // --- Detecção de intenção simples (prioriza seções relevantes no prompt) ---
 // Também serve para determinar se a mensagem é "clara" (handover se 3+ seguidas sem intenção)
 function detectIntent(msg) {
@@ -1902,6 +1923,12 @@ function getBrazilTime() {
     const kitFactHint = buildKitFactHint(session.history, effectiveMessage);
     if (kitFactHint) {
         intentHint += kitFactHint;
+    }
+
+    // --- Guard de pagamento (50% entrada só para total > R$ 50,00) ---
+    const paymentFactHint = buildPaymentFactHint(session.history, effectiveMessage, priceMap);
+    if (paymentFactHint) {
+        intentHint += paymentFactHint;
     }
 
     const userMessage = `[Hoje é ${now}. Amanhã é ${amanha}]${intentHint}` + (cleanName ? ` Cliente "${cleanName}" disse: ${effectiveMessage}` : ` ${effectiveMessage}`);
