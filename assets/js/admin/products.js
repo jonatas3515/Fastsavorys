@@ -158,6 +158,7 @@ async function loadProductsAdmin() {
         const { data: products, error } = await window.supabaseClient
             .from('fast_products')
             .select('*')
+            .order('catalog_order', { ascending: true, nullsFirst: true })
             .order('name', { ascending: true });
 
         if (error) throw error;

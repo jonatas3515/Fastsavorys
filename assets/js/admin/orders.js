@@ -831,17 +831,29 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initial Render call if needed (Core usually calls loadDashboardOrders)
 });
 // Subscription
+let ordersSubscription = null;
+
 function subscribeToOrders() {
     if (!window.supabaseClient) return;
     try {
-        window.supabaseClient
+        // Remove canal existente para evitar erro de callbacks duplicados apos subscribe()
+        if (ordersSubscription) {
+            window.supabaseClient.removeChannel(ordersSubscription);
+            ordersSubscription = null;
+        }
+
+        ordersSubscription = window.supabaseClient
             .channel('public:fast_orders')
             .on('postgres_changes', { event: '*', schema: 'public', table: 'fast_orders' }, payload => {
                 console.log('[Orders] Realtime Update:', payload);
                 loadDashboardOrders();
                 if (payload.eventType === 'INSERT') showToast('🔔 Novo pedido recebido!', 'success');
             })
-            .subscribe();
+            .subscribe(status => {
+                if (status === 'SUBSCRIBED') {
+                    console.log('[Orders] Realtime subscribed successfully');
+                }
+            });
     } catch (e) {
         console.error('Erro ao subscrever pedidos:', e);
     }
