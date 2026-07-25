@@ -799,8 +799,9 @@ async function buildBusinessContext(intents) {
                 if (!grouped[cat]) grouped[cat] = [];
                 grouped[cat].push(p);
             }
-            // Ordem desejada das categorias
-            const catOrder = ['salgados', 'mini', 'combos', 'bolos', 'kits', 'bebidas', 'adicionais'];
+            // Ordem desejada das categorias (conhecidas primeiro, extras em seguida)
+            const knownOrder = ['salgados', 'mini', 'combos', 'bolos', 'kits', 'bebidas', 'adicionais'];
+            const catOrder = [...new Set([...knownOrder, ...Object.keys(grouped)])];
             const catLabels = { salgados: 'SALGADOS', mini: 'MINI SALGADOS (CENTO/50 UN)', combos: '⚠️ COMBOS FECHADOS (NÃO ALTERAR ITENS NEM PREÇOS)', bolos: 'BOLOS', kits: 'KITS FESTA', bebidas: 'BEBIDAS', adicionais: 'ADICIONAIS' };
             for (const cat of catOrder) {
                 const items = grouped[cat];
