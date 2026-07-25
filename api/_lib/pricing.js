@@ -18,12 +18,12 @@ const PRODUCT_PRICES = {
 };
 
 // Tokens canônicos de salgados individuais (grandes) reconhecidos pela calculadora.
-const SALGADO_UNIT_TOKENS = ['coxinha', 'enroladinho', 'risole', 'rissole', 'quibe', 'kibe', 'bolinha', 'bolinho', 'empada', 'pastel', 'cazulo', 'croquete', 'esfiha', 'esfirra'];
+const SALGADO_UNIT_TOKENS = ['coxinha', 'enroladinho', 'risole', 'rissole', 'quibe', 'kibe', 'bolinha', 'bolinho', 'empadinha', 'empada', 'pastel', 'cazulo', 'croquete', 'esfiha', 'esfirra'];
 
 // Preços-padrão (fallback) caso o cardápio do Supabase não carregue.
 const SALGADO_UNIT_FALLBACK = {
     coxinha: 4.50, enroladinho: 4.00, risole: 4.50, rissole: 4.50, quibe: 4.50, kibe: 4.50,
-    bolinha: 4.50, bolinho: 4.50, empada: 4.50, pastel: 4.50, cazulo: 4.50, croquete: 4.50,
+    bolinha: 4.50, bolinho: 4.50, empadinha: 4.50, empada: 4.50, pastel: 4.50, cazulo: 4.50, croquete: 4.50,
     esfiha: 4.50, esfirra: 4.50,
 };
 
@@ -44,15 +44,18 @@ const NUM_WORDS_PT = {
     seis: 6, sete: 7, oito: 8, nove: 9, dez: 10, onze: 11, doze: 12,
 };
 function wordsToDigits(text) {
-    return (text || '').replace(/\b(um|uma|dois|duas|tres|quatro|cinco|seis|sete|oito|nove|dez|onze|doze)\b/g,
-        (w) => String(NUM_WORDS_PT[w]));
+    return (text || '')
+        .replace(/\b(um|uma|dois|duas|tres|quatro|cinco|seis|sete|oito|nove|dez|onze|doze)\b/g,
+            (w) => String(NUM_WORDS_PT[w]))
+        // 'cento' sem número antes vira '1 cento' para o regex de quantidade.
+        .replace(/(?<!\d\s)(cento|centos?|cem)\b/g, '1 $1');
 }
 
 // Monta o mapa de preços a partir do cardápio do Supabase (fonte da verdade).
-// Retorna { units: {token: preço}, drinks: [{name, price}] }. Em caso de falha, retorna vazio
-// e a calculadora usa os preços de fallback.
+// Retorna { units: {token: preço}, drinks: [{name, price}], miniPacks: {type:qty: preço} }.
+// Em caso de falha, retorna vazio e a calculadora usa os preços de fallback.
 async function fetchProductPriceMap(supabaseAdmin) {
-    const map = { units: {}, drinks: [] };
+    const map = { units: {}, drinks: [], miniPacks: {} };
     if (!supabaseAdmin) return map;
     try {
         const { data } = await supabaseAdmin.from('fast_products')
@@ -68,6 +71,20 @@ async function fetchProductPriceMap(supabaseAdmin) {
             } else if (p.category === 'salgados') {
                 for (const tok of SALGADO_UNIT_TOKENS) {
                     if (nm.includes(tok)) { map.units[tok] = price; break; }
+                }
+            }
+
+            // Pacotes de mini salgados/empadinhas/coxinhas (ex: Mini Empadinhas 100, Mini Coxinha 12)
+            if (p.category === 'mini' || nm.includes('mini')) {
+                const qtyMatch = nm.match(/(\d+)\s*(?:un|uni|unid|unidades)?/);
+                const qty = qtyMatch ? parseInt(qtyMatch[1], 10) : 0;
+                if (qty > 0) {
+                    let type = 'salgado';
+                    for (const tok of SALGADO_UNIT_TOKENS) {
+                        if (nm.includes(tok)) { type = tok; break; }
+                    }
+                    const key = `${type}:${qty}`;
+                    map.miniPacks[key] = price;
                 }
             }
         }
@@ -96,6 +113,15 @@ function miniPackPrice(qty) {
 function estimateCartTotal(history, priceMap = null) {
     const units = Object.assign({}, SALGADO_UNIT_FALLBACK, (priceMap && priceMap.units) || {});
     const drinks = (priceMap && priceMap.drinks) || [];
+    const miniPacks = (priceMap && priceMap.miniPacks) || {};
+
+    // Detecta o tipo de mini salgado mencionado (empada, coxinha, etc.) ou null se generico.
+    function extractMiniType(phrase) {
+        for (const tok of SALGADO_UNIT_TOKENS) {
+            if (phrase.includes(tok)) return tok;
+        }
+        return null;
+    }
 
     // Quantidades vêm SÓ das mensagens do cliente (o bot repete itens e causaria contagem dupla).
     const userMsgs = (history || []).filter(m => m.role === 'user').map(m => wordsToDigits(normalizeTxt(m.text)));
@@ -137,20 +163,36 @@ function estimateCartTotal(history, priceMap = null) {
             const phrase = (m[2] || '').trim();
             if (!qty || qty <= 0 || !phrase) continue;
 
-            // "cento(s)" de mini salgados (1 cento = 100 un)
-            if (/\bcento?s?\b/.test(phrase)) {
-                const sub = qty * MINI_PACK_PRICES[100];
-                centoTotal += sub;
-                centoItems.push(`${qty} cento(s) mini salgados = R$ ${sub.toFixed(2)}`);
-                continue;
-            }
-            // Pacote de mini salgados ("20 mini", "100 salgadinhos")
-            if (/\b(mini|salgadinho)/.test(phrase)) {
-                const sub = miniPackPrice(qty);
-                if (sub == null) { complete = false; continue; }
-                miniTotal += sub;
-                miniItems.push(`${qty} mini salgados = R$ ${sub.toFixed(2)}`);
-                continue;
+            // "cento(s)" ou quantidades que claramente se referem a pacotes de mini (20/30/40/50/100/150)
+            // com tipo especificado (empadinhas, coxinhas) → busca pacote específico do banco.
+            const isCento = /\bcento?s?\b/.test(phrase);
+            const isMini = /\b(mini|salgadinho)/.test(phrase);
+            if (isCento || isMini || MINI_PACK_PRICES[qty]) {
+                const wantedQty = isCento ? Math.max(qty * 100, 100) : qty;
+                const type = extractMiniType(phrase);
+
+                // Tenta pacote específico primeiro (ex: empada:100, coxinha:12)
+                if (type && miniPacks[`${type}:${wantedQty}`]) {
+                    const sub = miniPacks[`${type}:${wantedQty}`];
+                    miniTotal += sub;
+                    miniItems.push(`${wantedQty} mini ${type}(s) = R$ ${sub.toFixed(2)}`);
+                    continue;
+                }
+
+                // Tenta pacote generico de mini salgados
+                const sub = miniPackPrice(wantedQty);
+                if (sub != null && (isCento || isMini)) {
+                    miniTotal += sub;
+                    const label = isCento ? `${qty} cento(s) mini salgados` : `${wantedQty} mini salgados`;
+                    miniItems.push(`${label} = R$ ${sub.toFixed(2)}`);
+                    continue;
+                }
+
+                // Quantidade compatível com pacote mini, mas sem preço específico nem genérico conhecido
+                if (isCento || isMini || (MINI_PACK_PRICES[qty] && !/\b(grande|unidade|tradicional|normal)\b/.test(phrase))) {
+                    complete = false;
+                    continue;
+                }
             }
             // Salgado individual (grande) por token conhecido
             let matchedUnit = null;
