@@ -51,6 +51,19 @@ function wordsToDigits(text) {
         .replace(/(?<!\d\s)(cento|centos?|cem)\b/g, '1 $1');
 }
 
+// Calcula o preço efetivo considerando promoção ativa no produto.
+function getEffectivePrice(product) {
+    const base = Number(product.price);
+    if (product.promo_active && product.promo_type && Number(product.promo_value) > 0) {
+        if (product.promo_type === 'percentage') {
+            return Math.max(0, base * (1 - Number(product.promo_value) / 100));
+        } else if (product.promo_type === 'fixed') {
+            return Math.max(0, base - Number(product.promo_value));
+        }
+    }
+    return base;
+}
+
 // Monta o mapa de preços a partir do cardápio do Supabase (fonte da verdade).
 // Retorna { units: {token: preço}, drinks: [{name, price}], miniPacks: {type:qty: preço} }.
 // Em caso de falha, retorna vazio e a calculadora usa os preços de fallback.
@@ -59,11 +72,11 @@ async function fetchProductPriceMap(supabaseAdmin) {
     if (!supabaseAdmin) return map;
     try {
         const { data } = await supabaseAdmin.from('fast_products')
-            .select('name, price, category, visible');
+            .select('name, price, category, visible, promo_active, promo_type, promo_value');
         if (!data) return map;
         for (const p of data) {
             if (p.visible === false) continue;
-            const price = Number(p.price);
+            const price = getEffectivePrice(p);
             if (!price || price <= 0) continue;
             const nm = normalizeTxt(p.name);
             if (p.category === 'bebidas') {

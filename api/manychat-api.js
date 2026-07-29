@@ -753,7 +753,7 @@ async function buildBusinessContext(intents) {
         const [productsRes, promotionsRes, feesRes, configRes, hoursRes, storeStatusRes, optionsRes, couponsRes] = await Promise.all([
             // Produtos (todos, filtrados depois)
             supabaseAdmin.from('fast_products')
-                .select('name, description, price, category, emoji, requires_preorder, is_encomenda, block_massa, block_recheio, visible')
+                .select('name, description, price, category, emoji, requires_preorder, is_encomenda, block_massa, block_recheio, visible, promo_active, promo_type, promo_value')
                 .order('category').order('name'),
             // Promoções ativas
             supabaseAdmin.from('fast_promotions')
@@ -808,7 +808,18 @@ async function buildBusinessContext(intents) {
                 if (!items?.length) continue;
                 ctx += `\n\n[${catLabels[cat] || cat.toUpperCase()}]`;
                 for (const item of items) {
-                    let line = `\n  ${item.emoji || ''} ${item.name} — R$ ${Number(item.price).toFixed(2)}`;
+                    const originalPrice = Number(item.price);
+                    let effectivePrice = originalPrice;
+                    let promoText = '';
+                    if (item.promo_active && item.promo_type && Number(item.promo_value) > 0) {
+                        if (item.promo_type === 'percentage') {
+                            effectivePrice = originalPrice * (1 - Number(item.promo_value) / 100);
+                        } else if (item.promo_type === 'fixed') {
+                            effectivePrice = Math.max(0, originalPrice - Number(item.promo_value));
+                        }
+                        promoText = ` (de R$ ${originalPrice.toFixed(2)} por R$ ${effectivePrice.toFixed(2)}) [EM PROMOÇÃO]`;
+                    }
+                    let line = `\n  ${item.emoji || ''} ${item.name} — R$ ${effectivePrice.toFixed(2)}${promoText}`;
                     // Inclui descrição resumida se existir (máx 80 chars)
                     if (item.description) {
                         const desc = item.description.length > 80 ? item.description.substring(0, 80) + '…' : item.description;
@@ -860,14 +871,14 @@ async function buildBusinessContext(intents) {
             }
         }
 
-        // ============ PROMOÇÕES ATIVAS (APENAS SITE) ============
+        // ============ PROMOÇÕES ATIVAS ============
         if (promotionsRes.data?.length) {
-            ctx += '\n\nPROMOÇÕES ATIVAS (⛔ VÁLIDAS APENAS PARA PEDIDOS PELO SITE — NÃO aplicar no WhatsApp):';
+            ctx += '\n\nPROMOÇÕES ATIVAS (preços promocionais já refletidos no cardápio acima):';
             for (const p of promotionsRes.data) {
                 const desc = p.discount_type === 'percentage' ? `${p.value}% OFF` : `R$ ${Number(p.value).toFixed(2)} OFF`;
                 ctx += `\n  ${p.product_name}: ${desc}${p.description ? ' (' + p.description + ')' : ''}`;
             }
-            ctx += '\n  ⛔ REGRA CRÍTICA: Promoções são EXCLUSIVAS para pedidos feitos pelo SITE. No WhatsApp, SEMPRE informe o PREÇO CHEIO (sem desconto). Se o cliente pedir desconto, diga que não está autorizado, mas que há descontos especiais no site e indique os cupons ativos.';
+            ctx += '\n  ✅ Os preços acima já estão com desconto. Ao informar o preço, destaque que o produto está em promoção.';
             ctx += '\n  ⚠️ Promoções NÃO se aplicam a combos. Combos já têm preço fixo próprio — use o preço do combo direto, sem somar itens nem aplicar descontos.';
         }
 
@@ -1721,7 +1732,7 @@ async function handleGeminiCore(req, res) {
     } else if (intents.includes('mini')) {
         intentHint = '\n[FOCO: MINI SALGADOS. O cliente está perguntando sobre MINI SALGADOS (pode ter usado diminutivo como "salgadinhos", "pequeninos", "de festa", "pra festa", ou pedido quantidade alta). ASSUMA que são MINI salgados e responda com preços de MINI. NÃO pergunte se é tradicional ou mini. Se a quantidade bater com combo do cardápio (20, 30, 50, 100un), OFEREÇA O COMBO — é mais vantajoso que preço unitário.]';
     } else if (intents.includes('promocoes')) {
-        intentHint = '\n[FOCO: PROMOÇÕES/DESCONTO. O cliente perguntou sobre promoções ou desconto. REGRA: Você NÃO está autorizado a dar descontos pelo WhatsApp. Promoções e descontos são EXCLUSIVOS para pedidos feitos pelo SITE. Informe que sempre há descontos especiais no site e indique os cupons ativos (se houver no contexto). Envie o link do site.]';
+        intentHint = '\n[FOCO: PROMOÇÕES/DESCONTO. O cliente perguntou sobre promoções ou desconto. Os preços promocionais já estão no CARDÁPIO. Use os preços listados. Se um produto está em promoção, destaque: "está em promoção, de R$ X por R$ Y". Cupons adicionais são válidos pelo site.]';
     } else if (intents.includes('pagamento')) {
         intentHint = '\n[FOCO: PAGAMENTO/PIX/CARTÃO. REGRAS CRÍTICAS:'
             + '\n- Se o cliente escolheu PIX e já confirmou o valor (integral ou entrada 50%): responda APENAS com a tag [GERAR_PIX:VALOR]. NENHUM texto junto. Exemplo: [GERAR_PIX:95.00]'
