@@ -38,6 +38,7 @@ window.CheckoutModule = {
         document.addEventListener('change', (e) => {
             if (e.target.name === 'delivery') this.handleDeliveryChange(e);
             if (e.target.name === 'payment') this.handlePaymentChange(e);
+            if (e.target.id === 'noChangeNeeded') this.handleNoChangeToggle(e);
 
             // Auto-search client
             if (e.target.id === 'customerName' || e.target.id === 'customerPhone') this.handleClientSearch(e);
@@ -139,8 +140,29 @@ window.CheckoutModule = {
 
     handlePaymentChange: function (e) {
         const b = document.getElementById('moneyChangeBox');
-        if (e.target.value === 'dinheiro') b.classList.remove('hidden'); else b.classList.add('hidden');
+        if (e.target.value === 'dinheiro') {
+            b.classList.remove('hidden');
+        } else {
+            b.classList.add('hidden');
+            const cb = document.getElementById('noChangeNeeded');
+            if (cb) cb.checked = false;
+            const input = document.getElementById('moneyChangeValue');
+            if (input) input.value = '';
+            document.getElementById('changeValueWrapper')?.classList.remove('hidden');
+        }
         if (window.updateCheckoutFeeAndTotalFast) window.updateCheckoutFeeAndTotalFast();
+    },
+
+    handleNoChangeToggle: function (e) {
+        const input = document.getElementById('moneyChangeValue');
+        const wrapper = document.getElementById('changeValueWrapper');
+        if (!input || !wrapper) return;
+        if (e.target.checked) {
+            input.value = '';
+            wrapper.classList.add('hidden');
+        } else {
+            wrapper.classList.remove('hidden');
+        }
     },
 
     // Atualiza horário mínimo quando data é hoje
@@ -474,19 +496,13 @@ window.CheckoutModule = {
             // MOVED PAYMENT CHECK (Step 5) TO HERE (Before Saving)
             console.log('[Checkout] Checking Payment/Change...');
             const moneyChangeValue = document.getElementById('moneyChangeValue')?.value;
-            if (payment.value === 'dinheiro' && (!moneyChangeValue || parseFloat(moneyChangeValue) <= 0)) {
-                console.log('[Checkout] Opening confirmation modal for no change...');
-                document.getElementById('confirmationModalTitle').textContent = 'Confirmar Troco';
-                document.getElementById('confirmationModalText').textContent = 'Você não informou valor para troco. O entregador não levará troco. Deseja confirmar?';
-
-                const modal = document.getElementById('confirmationModal');
-                if (modal) {
-                    modal.classList.remove('hidden');
-                    this.onConfirmationConfirm = () => {
-                        this.proceedToSaveAndExecute(builtOrderData, draftMsg, draftOrderCode, customerPhone, hasBirthdayDiscount, birthdayDiscount);
-                    };
-                    return;
-                }
+            const noChangeNeeded = document.getElementById('noChangeNeeded')?.checked;
+            if (payment.value === 'dinheiro' && !noChangeNeeded && (!moneyChangeValue || parseFloat(moneyChangeValue) <= 0)) {
+                console.log('[Checkout] Cash without change info.');
+                alert('Por favor, informe o valor para o troco ou marque a opção "Não preciso de troco".');
+                this.isSubmitting = false;
+                if (document.getElementById('confirmOrder')) document.getElementById('confirmOrder').disabled = false;
+                return;
             }
 
             // If no issue, proceed directly
@@ -660,7 +676,11 @@ window.CheckoutModule = {
         }
         if (ctx.payment.value === 'dinheiro') {
             const ch = parseFloat(document.getElementById('moneyChangeValue').value || '0');
-            if (ch > 0) msg += `*Troco para:* R$ ${ch.toFixed(2).replace('.', ',')}\n`;
+            if (document.getElementById('noChangeNeeded')?.checked) {
+                msg += `*Troco:* Não preciso de troco\n`;
+            } else if (ch > 0) {
+                msg += `*Troco para:* R$ ${ch.toFixed(2).replace('.', ',')}\n`;
+            }
         }
 
         if (ctx.delivery.value === 'retirada') {
@@ -804,6 +824,10 @@ window.CheckoutModule = {
 
         document.querySelectorAll('input[name="payment"]').forEach(i => i.checked = false);
         document.getElementById('moneyChangeValue').value = '';
+        const noChangeNeeded = document.getElementById('noChangeNeeded');
+        if (noChangeNeeded) noChangeNeeded.checked = false;
+        const changeValueWrapper = document.getElementById('changeValueWrapper');
+        if (changeValueWrapper) changeValueWrapper.classList.remove('hidden');
         document.getElementById('moneyChangeBox').classList.add('hidden');
 
         document.querySelector('input[name="delivery"][value="retirada"]').checked = true;

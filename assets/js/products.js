@@ -829,10 +829,12 @@ let pendingCustomProduct = null;
 
 function openCustomOptionsModal(id, name, description, price, category) {
     const product = products.find(p => p.id === id);
-    const blockMassa = product?.blockMassa || false;
+    const rawName = (name || '').toLowerCase();
+    const isPoteOrVulcao = /pote|vulc[aã]o/i.test(rawName);
+    const blockMassa = (product?.blockMassa || false) || isPoteOrVulcao;
     const blockRecheio = product?.blockRecheio || false;
 
-    pendingCustomProduct = { id, name, description, price, category, blockMassa, blockRecheio };
+    pendingCustomProduct = { id, name, description, price, category, blockMassa, blockRecheio, isPoteOrVulcao };
 
     document.getElementById('customOptionsProductName').textContent = name;
     document.getElementById('customOptionsProductPrice').textContent = `R$ ${price.toFixed(2).replace('.', ',')}`;
@@ -845,8 +847,11 @@ function openCustomOptionsModal(id, name, description, price, category) {
         document.getElementById('salgadosSection').classList.add('hidden');
     }
 
-    renderDynamicCakeMassOptions();
-    renderDynamicFillingOptions();
+    // Bolo no Pote e Vulcão: massa fixa de chocolate, recheios limitados
+    const fillingAllowed = isPoteOrVulcao ? ['Ninho', 'Ninho com Chocolate', 'Chocolate'] : null;
+
+    renderDynamicCakeMassOptions(isPoteOrVulcao ? 'Massa de Chocolate' : null);
+    renderDynamicFillingOptions(fillingAllowed);
     renderDynamicSalgadosOptions(category === 'kits' ? 'miniSalgadosFlavors' : 'salgados');
 
     const cakeMassSection = document.getElementById('cakeMassSection');
@@ -874,7 +879,7 @@ function openCustomOptionsModal(id, name, description, price, category) {
     document.getElementById('customOptionsModal').classList.remove('hidden');
 }
 
-function renderDynamicCakeMassOptions() {
+function renderDynamicCakeMassOptions(preselect = null) {
     const container = document.querySelector('#cakeMassSection .space-y-2');
     if (!container) return;
 
@@ -886,17 +891,20 @@ function renderDynamicCakeMassOptions() {
 
     container.innerHTML = options.map(opt => `
     <label class="flex items-center p-2 border rounded-lg hover:bg-gray-50 cursor-pointer">
-      <input type="radio" name="cakeMass" value="${opt.name}" class="mr-3 text-rose-600">
+      <input type="radio" name="cakeMass" value="${opt.name}" class="mr-3 text-rose-600" ${preselect && opt.name === preselect ? 'checked' : ''}>
       <span>${opt.name}</span>
     </label>
   `).join('');
 }
 
-function renderDynamicFillingOptions() {
+function renderDynamicFillingOptions(allowed = null) {
     const container = document.querySelector('#fillingSection .space-y-2');
     if (!container) return;
 
-    const options = ProductOptionsModule.getVisible('filling');
+    let options = ProductOptionsModule.getVisible('filling');
+    if (Array.isArray(allowed) && allowed.length > 0) {
+        options = options.filter(o => allowed.includes(o.name));
+    }
     if (options.length === 0) {
         container.innerHTML = '<p class="text-gray-500 text-sm">Nenhuma opção disponível</p>';
         return;
