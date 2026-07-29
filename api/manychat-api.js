@@ -651,9 +651,8 @@ function resolvePixFinalAmount(amt, history, currentMessage, priceMap) {
 }
 
 // Lembrete just-in-time para o Bolo Vulcão Mini / Bolo no Pote.
-// Esses bolos NÃO têm personalização (massa/recheio/sabor) e PODEM ser entregues. O modelo às vezes
-// perde esse detalhe ao longo da conversa e os trata como bolo grande (pede personalização / diz que
-// é só retirada). Injeta um fato verificado para corrigir isso — só quando NÃO houver bolo grande/kit.
+// Esses bolos não permitem escolher MASSA (sempre Chocolate), mas o RECHEIO é OBRIGATÓRIO.
+// Eles PODEM ser entregues. O modelo às vezes perde esse detalhe. Injeta fato verificado.
 function buildBoloFactHint(history, currentMessage) {
     const allText = (history || []).map(m => m.text).join('\n') + '\n' + (currentMessage || '');
     const t = normalizeTxt(allText);
@@ -662,7 +661,7 @@ function buildBoloFactHint(history, currentMessage) {
     // Se há bolo GRANDE ou kit festa no contexto, a regra é outra (retirada + personalização do grande).
     const hasBoloGrande = /(bolo\s*(pp|p|g)\b|vulcao\s*p\b|kit\s*festa|naked)/.test(t);
     if (hasBoloGrande) return '';
-    const boloHint = `\n[⛔ FATO VERIFICADO (pedido tem Bolo Vulcão Mini / Bolo no Pote): Esses bolos JÁ VÊM PRONTOS — sabor único. NÃO pergunte massa, recheio, sabor nem cor de fita. E eles PODEM SER ENTREGUES normalmente (NÃO são "apenas retirada"). NÃO os trate como bolo grande.]`;
+    const boloHint = `\n[⛔ FATO VERIFICADO (pedido tem Bolo Vulcão Mini / Bolo no Pote): Massa SEMPRE Chocolate. O RECHEIO é OBRIGATÓRIO — opções: Ninho, Ninho com Chocolate, Chocolate. NÃO pergunte massa. Pergunte o recheio. Eles PODEM SER ENTREGUES normalmente (NÃO são "apenas retirada").]`;
     console.log(`[bolo-hint] ${boloHint.replace(/\n/g, ' | ')}`);
     return boloHint;
 }
@@ -829,10 +828,11 @@ async function buildBusinessContext(intents) {
                     if (cat === 'combos') line += ' [PREÇO FIXO - NÃO SOMAR ITENS]';
                     if ((item.requires_preorder || item.is_encomenda) && !/vulc[aã]o\s*mini|bolo\s*no\s*pote/i.test(item.name)) line += ' [ENCOMENDA - 1 dia antecedência]';
                     if (cat === 'bolos' || cat === 'kits') {
-                        if (item.block_massa && item.block_recheio) {
+                        const isPoteOrMiniVulcao = /vulc[aã]o\s*mini|bolo\s*no\s*pote/i.test(item.name);
+                        if (item.block_massa && item.block_recheio && !isPoteOrMiniVulcao) {
                             line += ' [sem personalização]';
-                        } else if (!item.block_recheio) {
-                            line += ' [escolhe recheio]';
+                        } else if (!item.block_recheio || isPoteOrMiniVulcao) {
+                            line += isPoteOrMiniVulcao ? ' [escolhe recheio - massa chocolate]' : ' [escolhe recheio]';
                         }
                     }
                     ctx += line;
@@ -1925,7 +1925,7 @@ function getBrazilTime() {
         intentHint += deliveryFactHint;
     }
 
-    // --- Lembrete do Bolo Vulcão Mini / Bolo no Pote (sem personalização, pode entregar) ---
+    // --- Lembrete do Bolo Vulcão Mini / Bolo no Pote (massa chocolate, escolhe recheio, pode entregar) ---
     const boloFactHint = buildBoloFactHint(session.history, effectiveMessage);
     if (boloFactHint) {
         intentHint += boloFactHint;
