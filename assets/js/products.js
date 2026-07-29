@@ -832,7 +832,7 @@ function openCustomOptionsModal(id, name, description, price, category) {
     const rawName = (name || '').toLowerCase();
     const isPoteOrVulcao = /pote|vulc[aã]o/i.test(rawName);
     const blockMassa = (product?.blockMassa || false) || isPoteOrVulcao;
-    const blockRecheio = product?.blockRecheio || false;
+    const blockRecheio = isPoteOrVulcao ? false : (product?.blockRecheio || false);
 
     pendingCustomProduct = { id, name, description, price, category, blockMassa, blockRecheio, isPoteOrVulcao };
 
