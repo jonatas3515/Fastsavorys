@@ -29,6 +29,8 @@ const { GEMINI_BASE_PROMPT, GREETING_NEW_SESSION, GREETING_CONTINUE_SESSION } = 
 
 const MANYCHAT_API_BASE = 'https://api.manychat.com/fb';
 
+const DEFAULT_ORDER_SUMMARY = { items: '', subtotal: '', delivery_mode: '', neighborhood: '', delivery_fee: '', payment: '', scheduled_date: '', scheduled_time: '', total: '', needs_owner_approval: false, client_name: '' };
+
 let supabaseAdmin = null;
 try {
     if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -1440,7 +1442,7 @@ const BUFFER_EMPTY_RESPONSE = {
     buffered: true,
     handover_to_human: false,
     order_ready: false,
-    order_summary: null
+    order_summary: DEFAULT_ORDER_SUMMARY
 };
 
 // Send consolidated reply to user via ManyChat Send Content API (async delivery)
@@ -1651,7 +1653,7 @@ async function handleGeminiCore(req, res) {
             return res.status(200).json({
                 version: 'v2',
                 content: { messages: [{ type: 'text', text: fallbackText }], actions: [], quick_replies: [] },
-                handover_to_human: false, order_ready: false, order_summary: null
+                handover_to_human: false, order_ready: false, order_summary: DEFAULT_ORDER_SUMMARY
             });
         }
     }
@@ -1664,7 +1666,7 @@ async function handleGeminiCore(req, res) {
             return res.status(200).json({
                 version: 'v2',
                 content: { messages: [{ type: 'text', text: 'Oi! 😊 Como posso te ajudar?' }], actions: [], quick_replies: [] },
-                handover_to_human: false, order_ready: false, order_summary: null
+                handover_to_human: false, order_ready: false, order_summary: DEFAULT_ORDER_SUMMARY
             });
         }
         // Se tem 1 char (ex: "k", "."), ignora
@@ -1692,7 +1694,31 @@ async function handleGeminiCore(req, res) {
     const greetingInstruction = session.isNewSession ? GREETING_NEW_SESSION : GREETING_CONTINUE_SESSION;
     let ownerApprovalNoticeCount = session.ownerApprovalNoticeCount || 0;
 
-    // --- Detecção de intenção ---
+    // --- Guard de perguntas sobre pizzas e hambúrgueres ---
+    const isPizzaOrBurger = /\b(pizza|pizzas|hamburguer|hamburguers|hambúrguer|hambúrgueres)\b/i.test(effectiveMessage);
+    if (isPizzaOrBurger) {
+        const partnerMsg = "A FastSavory's não trabalha com pizzas nem hambúrgueres. 🍕🍔\n\nIndicamos nosso parceiro *Império Burguer e Massas*:\nhttps://ccmpedidoonline.com.br/pedidoimperioburguerepizzas/index.php\n\nPosso te ajudar com algo do nosso cardápio?";
+        await saveSession(user_id, [
+            ...session.history,
+            { role: 'user', text: effectiveMessage },
+            { role: 'assistant', text: partnerMsg }
+        ], session.unclearCount || 0, ownerApprovalNoticeCount);
+        return res.status(200).json({
+            version: 'v2',
+            content: { messages: [{ type: 'text', text: partnerMsg }], actions: [], quick_replies: [] },
+            handover_to_human: false,
+            order_ready: false,
+            order_summary: DEFAULT_ORDER_SUMMARY
+        });
+    }
+
+    // --- Guard de pergunta apenas sobre conteúdo do kit/bolo ---
+    const isContentQuestion = /vem\s+o(que?|qu[eê])|o\s+que\s+inclui|o\s+que\s+vem|descri[çc][aã]o|o\s+que\s+tem/i.test(effectiveMessage);
+    if (isContentQuestion) {
+        intentHint += '\n[⛔ CONTEÚDO DO PRODUTO: o cliente está perguntando apenas o que o produto inclui/descrição. Responda APENAS a descrição e PARE. NÃO pergunte massa, recheio, sabores, data, horário, pagamento, entrega nem retirada.]';
+    }
+
+    // --- Detecção de intenção --
     const intents = detectIntent(effectiveMessage);
 
     // --- Handover direto: cliente pediu explicitamente para falar com atendente ---
@@ -1706,7 +1732,7 @@ async function handleGeminiCore(req, res) {
         return res.status(200).json({
             version: 'v2',
             content: { messages: [{ type: 'text', text: handoverDirectReply }], actions: [], quick_replies: [] },
-            handover_to_human: true, order_ready: false, order_summary: null
+            handover_to_human: true, order_ready: false, order_summary: DEFAULT_ORDER_SUMMARY
         });
     }
     let intentHint = '';
@@ -1896,7 +1922,7 @@ async function handleGeminiCore(req, res) {
             },
             handover_to_human: true,
             order_ready: false,
-            order_summary: null
+            order_summary: DEFAULT_ORDER_SUMMARY
         });
     }
 
@@ -2015,6 +2041,11 @@ function getBrazilTime() {
                 }
             }
         }
+    }
+
+    // Se o usuário só quer saber o conteúdo do produto, não forçar roteiro de personalização
+    if (isContentQuestion) {
+        personalizationPrefix = '';
     }
 
     // Monta prompt: PERSONALIZAÇÃO (início) + BASE + CONTEXTO + PERSONALIZAÇÃO (fim)
@@ -2163,7 +2194,7 @@ function getBrazilTime() {
         return res.status(200).json({
             version: 'v2',
             content: { messages: [{ type: 'text', text: 'Me desculpe, estou com uma dificuldade técnica momentânea 😕 Já vou chamar a Jéssica para te atender!' }], actions: [], quick_replies: [] },
-            handover_to_human: true, order_ready: false, order_summary: null
+            handover_to_human: true, order_ready: false, order_summary: DEFAULT_ORDER_SUMMARY
         });
     }
 
@@ -2214,13 +2245,13 @@ function getBrazilTime() {
     const ORDER_JSON_REGEX = /---ORDER_JSON---\s*([\s\S]*?)\s*---END_ORDER_JSON---/;
     const jsonMatch = reply.match(ORDER_JSON_REGEX);
     let orderReady = false;
-    let orderSummary = null;
+    let orderSummary = { ...DEFAULT_ORDER_SUMMARY };
     if (jsonMatch) {
         try {
-            orderSummary = JSON.parse(jsonMatch[1].trim());
+            orderSummary = { ...DEFAULT_ORDER_SUMMARY, ...JSON.parse(jsonMatch[1].trim()) };
         } catch (e) {
             // Fallback: JSON inválido, usa texto bruto como resumo
-            orderSummary = { raw_summary: jsonMatch[1].trim() };
+            orderSummary = { ...DEFAULT_ORDER_SUMMARY, raw_summary: jsonMatch[1].trim() };
         }
         orderSummary.client_name = name || 'Não informado';
         orderReady = true;
