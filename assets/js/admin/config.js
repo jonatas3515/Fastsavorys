@@ -759,7 +759,6 @@ window.BannerModule = {
         const active = (document.getElementById('bannerActive')?.checked ?? document.getElementById('bannerEnabled')?.checked) ?? true;
         const link = (document.getElementById('bannerLinkUrl')?.value || document.getElementById('bannerLink')?.value || '').trim();
         const alt = (document.getElementById('bannerAltText')?.value || '').trim();
-        const fallbackText = (document.getElementById('bannerFallbackText')?.value || '').trim();
 
         let imageUrl = this.config?.image_url;
 
@@ -796,20 +795,17 @@ window.BannerModule = {
         const updates = {
             store_id: 1,
             enabled: active,
-            link_url: link,
-            alt_text: alt,
-            fallback_text: fallbackText,
-            image_url: imageUrl,
+            link_url: link || null,
+            alt_text: alt || null,
+            image_url: imageUrl || null,
             updated_at: new Date().toISOString()
         };
 
         try {
-            // Upsert
-            if (this.config?.id) updates.id = this.config.id;
-
+            // Upsert com conflito por store_id garante atualizacao/criacao do registro unico
             const { error } = await window.supabaseClient
                 .from('fast_banner_config')
-                .upsert(updates);
+                .upsert(updates, { onConflict: 'store_id' });
 
             if (error) throw error;
 
@@ -817,7 +813,7 @@ window.BannerModule = {
             this.loadConfig().then(() => this.loadAdminForm()); // Reload UI
         } catch (e) {
             console.error('Save failed:', e);
-            showToast('Erro ao salvar banner.', 'error');
+            showToast('Erro ao salvar banner: ' + e.message, 'error');
         }
     }
 };
