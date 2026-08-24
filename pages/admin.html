@@ -1080,8 +1080,9 @@
                                     placeholder="Ex: 🎉 Promoção de Verão! Até 15% OFF em todos os salgados!"
                                     class="w-full px-3 py-2 border rounded-lg resize-none"></textarea>
                             </div>
-                            <button id="saveBannerBtn"
-                                class="bg-rose-600 text-white px-6 py-2 rounded-lg hover:bg-rose-700">Salvar
+                            <button type="button" id="saveBannerBtn"
+                                class="bg-rose-600 text-white px-6 py-2 rounded-lg hover:bg-rose-700"
+                                onclick="window.BannerModule && window.BannerModule.save ? window.BannerModule.save() : alert('Módulo do banner ainda não carregou. Aguarde ou recarregue com Ctrl+F5.')">Salvar
                                 Banner</button>
                         </div>
                     </div>
@@ -1813,8 +1814,8 @@
                         placeholder="Anuncie aqui" />
                 </div>
 
-                <!-- Save Button -->
-                <button onclick="BannerModule.save()"
+                <!-- Save Button (legacy panel) -->
+                <button type="button"
                     class="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-lg font-bold shadow-lg shadow-purple-200 transition-all transform hover:scale-[1.01] flex items-center justify-center gap-2">
                     💾 Salvar Configuração
                 </button>
@@ -2083,7 +2084,7 @@
     <!-- Modularized Admin Scripts -->
     <script src="../assets/js/admin/clients.js"></script>
     <script src="../assets/js/admin/auth.js"></script>
-    <script src="../assets/js/admin/config.js"></script>
+    <script src="../assets/js/admin/config.js?v=2"></script>
     <script src="../assets/js/admin/products.js"></script>
     <script src="../assets/js/admin/promotions.js"></script>
     <script src="../assets/js/admin/reports.js"></script>

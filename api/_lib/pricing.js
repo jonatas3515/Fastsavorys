@@ -8,11 +8,12 @@
 // ============================================================================
 
 // Pacotes de mini salgados (do cardápio) — usados na estimativa programática do total.
-const MINI_PACK_PRICES = { 20: 20, 30: 29, 40: 39, 50: 45, 100: 85, 150: 130 };
+// FALLBACK: Agora os valores vêm preferencialmente do banco de dados (fetchProductPriceMap).
+const MINI_PACK_PRICES = { 20: 20, 30: 30, 40: 39, 50: 45, 100: 85, 150: 130 };
 
-// Preços individuais (fallback legado de estimativa).
+// Preços individuais (fallback legado de estimativa). [DEPRECATED] Mantido por compatibilidade.
 const PRODUCT_PRICES = {
-    'coxinha': 4.50, 'enroladinho': 4.00, 'risole': 4.50,
+    'coxinha': 4.25, 'enroladinho': 4.25, 'risole': 4.50,
     'vulcão mini': 15, 'vulcao mini': 15, 'bolo no pote': 10,
     'coca-cola 350': 6, 'pepsi 1l': 8, 'pepsi 2l': 12, 'pepsi lata': 5.50,
 };
@@ -22,7 +23,7 @@ const SALGADO_UNIT_TOKENS = ['coxinha', 'enroladinho', 'risole', 'rissole', 'qui
 
 // Preços-padrão (fallback) caso o cardápio do Supabase não carregue.
 const SALGADO_UNIT_FALLBACK = {
-    coxinha: 4.50, enroladinho: 4.00, risole: 4.50, rissole: 4.50, quibe: 4.50, kibe: 4.50,
+    coxinha: 4.25, enroladinho: 4.25, risole: 4.50, rissole: 4.50, quibe: 4.50, kibe: 4.50,
     bolinha: 4.50, bolinho: 4.50, empadinha: 4.50, empada: 4.50, pastel: 4.50, cazulo: 4.50, croquete: 4.50,
     esfiha: 4.50, esfirra: 4.50,
 };
@@ -51,6 +52,33 @@ function wordsToDigits(text) {
         .replace(/(?<!\d\s)(cento|centos?|cem)\b/g, '1 $1');
 }
 
+// Tokens genéricos de bebida que o cliente pode usar (ex: "refrigerante", "refri").
+const DRINK_GENERIC_TOKENS = /\b(refrigerante|refri|guarana|suco|agua|cerveja)\b/;
+
+// Palavras que indicam item alimentar — se a calculadora encontrar uma dessas mas não conseguir
+// precificar, deve marcar complete=false para NÃO cravar um total possivelmente errado.
+const FOOD_INDICATOR_WORDS = /\b(refrigerante|refri|guarana|suco|agua|cerveja|bebida|pepsi|coca|fanta|x-coxinha|x coxinha|xcoxinha)\b/;
+
+// Converte variações de bebidas para tokens sem dígitos para não quebrar o parser de chunks (\d+)
+function normalizeBeverages(text) {
+    return (text || '')
+        // 1 Litro
+        .replace(/\b(refrigerante|refri|pepsi|coca(?:\s*cola)?|guarana|fanta|suco)\s+(?:de\s+)?(?:1\s*litros?|1\s*l)\b/gi,
+            (_, drink) => `${drink.replace(/\s+/g, '')}_umlitro`)
+        .replace(/\b(?:1\s*litros?|1\s*l)\s+(?:de\s+)?(refrigerante|refri|pepsi|coca(?:\s*cola)?|guarana|fanta|suco)\b/gi,
+            (_, drink) => `${drink.replace(/\s+/g, '')}_umlitro`)
+        // 2 Litros
+        .replace(/\b(refrigerante|refri|pepsi|coca(?:\s*cola)?|guarana|fanta|suco)\s+(?:de\s+)?(?:2\s*litros?|2\s*l)\b/gi,
+            (_, drink) => `${drink.replace(/\s+/g, '')}_doislitros`)
+        .replace(/\b(?:2\s*litros?|2\s*l)\s+(?:de\s+)?(refrigerante|refri|pepsi|coca(?:\s*cola)?|guarana|fanta|suco)\b/gi,
+            (_, drink) => `${drink.replace(/\s+/g, '')}_doislitros`)
+        // Lata / 350ml
+        .replace(/\b(refrigerante|refri|pepsi|coca(?:\s*cola)?|guarana|fanta|suco)\s+(?:de\s+)?(?:lata|350\s*ml|350)\b/gi,
+            (_, drink) => `${drink.replace(/\s+/g, '')}_lata`)
+        .replace(/\b(?:lata|350\s*ml|350)\s+(?:de\s+)?(refrigerante|refri|pepsi|coca(?:\s*cola)?|guarana|fanta|suco)\b/gi,
+            (_, drink) => `${drink.replace(/\s+/g, '')}_lata`);
+}
+
 // Calcula o preço efetivo considerando promoção ativa no produto.
 function getEffectivePrice(product) {
     const base = Number(product.price);
@@ -64,10 +92,21 @@ function getEffectivePrice(product) {
     return base;
 }
 
+// --- Cache em memória para mapas de preços e taxas (TTL 60 segundos) ---
+let _productPriceMapCache = null;
+let _productPriceMapCacheExpiresAt = 0;
+let _deliveryFeeMapCache = null;
+let _deliveryFeeMapCacheExpiresAt = 0;
+const CACHE_TTL_MS = 60 * 1000; // 60 segundos
+
 // Monta o mapa de preços a partir do cardápio do Supabase (fonte da verdade).
 // Retorna { units: {token: preço}, drinks: [{name, price}], miniPacks: {type:qty: preço} }.
 // Em caso de falha, retorna vazio e a calculadora usa os preços de fallback.
-async function fetchProductPriceMap(supabaseAdmin) {
+async function fetchProductPriceMap(supabaseAdmin, forceRefresh = false) {
+    const now = Date.now();
+    if (!forceRefresh && _productPriceMapCache && now < _productPriceMapCacheExpiresAt) {
+        return _productPriceMapCache;
+    }
     const map = { units: {}, drinks: [], miniPacks: {} };
     if (!supabaseAdmin) return map;
     try {
@@ -101,6 +140,8 @@ async function fetchProductPriceMap(supabaseAdmin) {
                 }
             }
         }
+        _productPriceMapCache = map;
+        _productPriceMapCacheExpiresAt = now + CACHE_TTL_MS;
     } catch (e) {
         console.warn('[calc] fetchProductPriceMap erro:', e.message);
     }
@@ -108,10 +149,50 @@ async function fetchProductPriceMap(supabaseAdmin) {
 }
 
 // Preço de um pacote de mini salgados pela quantidade. Retorna null se não souber calcular.
-function miniPackPrice(qty) {
+function miniPackPrice(qty, dbMiniPacks = null) {
+    if (dbMiniPacks && dbMiniPacks[`salgado:${qty}`] !== undefined) return dbMiniPacks[`salgado:${qty}`];
     if (MINI_PACK_PRICES[qty]) return MINI_PACK_PRICES[qty];
     if (qty > 0 && qty % 100 === 0) return (qty / 100) * MINI_PACK_PRICES[100]; // múltiplos de cento
     return null;
+}
+
+// Busca as taxas de entrega da tabela fast_delivery_fees no Supabase
+async function fetchDeliveryFeeMap(supabaseAdmin, forceRefresh = false) {
+    const now = Date.now();
+    if (!forceRefresh && _deliveryFeeMapCache && now < _deliveryFeeMapCacheExpiresAt) {
+        return _deliveryFeeMapCache;
+    }
+    const feeMap = {};
+    if (!supabaseAdmin) return feeMap;
+    try {
+        const { data, error } = await supabaseAdmin.from('fast_delivery_fees')
+            .select('neighborhood, fee, min_order_value');
+        if (error) {
+            console.warn('[calc] fetchDeliveryFeeMap erro no Supabase:', error.message);
+            return feeMap;
+        }
+        if (!data) return feeMap;
+        
+        for (const row of data) {
+            const name = (row.neighborhood || '').toLowerCase().trim();
+            if (!name) continue;
+            const entry = {
+                fee: Number(row.fee || 0),
+                min: Number(row.min_order_value || 0)
+            };
+            feeMap[name] = entry;
+            // Adiciona também versão normalizada (sem acentos)
+            const norm = normalizeTxt(name);
+            if (norm && norm !== name) {
+                feeMap[norm] = entry;
+            }
+        }
+        _deliveryFeeMapCache = feeMap;
+        _deliveryFeeMapCacheExpiresAt = now + CACHE_TTL_MS;
+    } catch (e) {
+        console.warn('[calc] fetchDeliveryFeeMap exceção:', e.message);
+    }
+    return feeMap;
 }
 
 // ==========================================
@@ -137,7 +218,7 @@ function estimateCartTotal(history, priceMap = null) {
     }
 
     // Quantidades vêm SÓ das mensagens do cliente (o bot repete itens e causaria contagem dupla).
-    const userMsgs = (history || []).filter(m => m.role === 'user').map(m => wordsToDigits(normalizeTxt(m.text)));
+    const userMsgs = (history || []).filter(m => m.role === 'user').map(m => normalizeBeverages(wordsToDigits(normalizeTxt(m.text))));
     const fullUserText = userMsgs.join('\n');
 
     let complete = true;
@@ -193,7 +274,7 @@ function estimateCartTotal(history, priceMap = null) {
                 }
 
                 // Tenta pacote generico de mini salgados
-                const sub = miniPackPrice(wantedQty);
+                const sub = miniPackPrice(wantedQty, miniPacks);
                 if (sub != null && (isCento || isMini)) {
                     miniTotal += sub;
                     const label = isCento ? `${qty} cento(s) mini salgados` : `${wantedQty} mini salgados`;
@@ -222,10 +303,39 @@ function estimateCartTotal(history, priceMap = null) {
                 msgSalgado[matchedUnit] = (msgSalgado[matchedUnit] || 0) + qty;
                 continue;
             }
-            // Bebida: casa pelo nome do cardápio (todas as palavras significativas presentes na frase)
-            const drink = drinks.find(d => d.name.split(/\s+/).filter(w => w.length > 2).every(w => phrase.includes(w)));
-            if (drink) {
-                msgDrink[drink.name] = (msgDrink[drink.name] || 0) + qty;
+            // Bebida: tenta casar por tokens normalizados de marca e tamanho (1L, 2L, lata/350ml)
+            let matchedDrink = null;
+            const p = phrase.toLowerCase();
+
+            if (p.includes('_umlitro') || p.includes('1l') || p.includes('1 litro')) {
+                if (p.includes('coca')) matchedDrink = drinks.find(d => d.name.includes('coca') && (d.name.includes('1l') || d.name.includes('1 litro')));
+                else if (p.includes('pepsi')) matchedDrink = drinks.find(d => d.name.includes('pepsi') && (d.name.includes('1l') || d.name.includes('1 litro')));
+                else if (p.includes('guarana')) matchedDrink = drinks.find(d => d.name.includes('guarana') && (d.name.includes('1l') || d.name.includes('1 litro')));
+                else matchedDrink = drinks.find(d => d.name.includes('1l') || d.name.includes('1 litro')); // genérico 1L
+            } else if (p.includes('_doislitros') || p.includes('2l') || p.includes('2 litros')) {
+                if (p.includes('coca')) matchedDrink = drinks.find(d => d.name.includes('coca') && (d.name.includes('2l') || d.name.includes('2 litros')));
+                else if (p.includes('pepsi')) matchedDrink = drinks.find(d => d.name.includes('pepsi') && (d.name.includes('2l') || d.name.includes('2 litros')));
+                else if (p.includes('guarana')) matchedDrink = drinks.find(d => d.name.includes('guarana') && (d.name.includes('2l') || d.name.includes('2 litros')));
+                else matchedDrink = drinks.find(d => d.name.includes('2l') || d.name.includes('2 litros')); // genérico 2L
+            } else if (p.includes('_lata') || p.includes('lata') || p.includes('350ml') || p.includes('350')) {
+                if (p.includes('coca')) matchedDrink = drinks.find(d => d.name.includes('coca') && (d.name.includes('lata') || d.name.includes('350')));
+                else if (p.includes('pepsi')) matchedDrink = drinks.find(d => d.name.includes('pepsi') && (d.name.includes('lata') || d.name.includes('350')));
+                else if (p.includes('fanta')) matchedDrink = drinks.find(d => d.name.includes('fanta') && (d.name.includes('lata') || d.name.includes('350')));
+                else if (p.includes('guarana')) matchedDrink = drinks.find(d => d.name.includes('guarana') && (d.name.includes('lata') || d.name.includes('350')));
+                else matchedDrink = drinks.find(d => d.name.includes('lata') || d.name.includes('350')); // genérico lata
+            } else {
+                // Match padrão por palavras completas do cardápio
+                matchedDrink = drinks.find(d => d.name.split(/\s+/).filter(w => w.length > 2).every(w => phrase.includes(w)));
+            }
+
+            if (matchedDrink) {
+                msgDrink[matchedDrink.name] = (msgDrink[matchedDrink.name] || 0) + qty;
+                continue;
+            }
+
+            // Bebida genérica SEM volume ou com volume não encontrado no cardápio
+            if (DRINK_GENERIC_TOKENS.test(phrase) || /_umlitro|_doislitros|_lata/.test(phrase)) {
+                complete = false;
                 continue;
             }
             // Salgado genérico ("10 salgados grandes") — usa preço médio de fallback (aproximado)
@@ -234,6 +344,12 @@ function estimateCartTotal(history, priceMap = null) {
                 const sub = qty * avg;
                 genericTotal += sub;
                 genericItems.push(`${qty}x salgado (aprox.) = R$ ${sub.toFixed(2)}`);
+                continue;
+            }
+            // SAFETY NET: se a phrase contém palavra que indica item alimentar/bebida conhecida
+            // mas não casou com nada acima, a calculadora não pode confiar no total.
+            if (FOOD_INDICATOR_WORDS.test(phrase)) {
+                complete = false;
                 continue;
             }
             // Quantidade seguida de palavra não-alimentar (endereço, etc.) → ignora silenciosamente.
@@ -354,6 +470,7 @@ module.exports = {
     UNPRICEABLE_FOOD,
     normalizeTxt,
     fetchProductPriceMap,
+    fetchDeliveryFeeMap,
     miniPackPrice,
     estimateCartTotal,
     parseBrlNumber,

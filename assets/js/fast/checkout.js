@@ -593,6 +593,7 @@ window.CheckoutModule = {
             }
             cartTotalWithPromo += price * i.quantity;
             msg += `${i.quantity}x ${i.name}${discountText} - R$ ${(price * i.quantity).toFixed(2).replace('.', ',')}\n`;
+            if (i.description) msg += `   🥟 ${i.description}\n`;
             if (i.note) msg += `   📝 Obs: ${i.note}\n`;
         });
 

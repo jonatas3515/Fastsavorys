@@ -756,9 +756,11 @@ window.BannerModule = {
     },
 
     save: async function () {
-        const active = (document.getElementById('bannerActive')?.checked ?? document.getElementById('bannerEnabled')?.checked) ?? true;
+        if (!this.loaded) await this.loadConfig();
+
+        const active = (document.getElementById('bannerEnabled')?.checked ?? document.getElementById('bannerActive')?.checked) ?? true;
         const link = (document.getElementById('bannerLinkUrl')?.value || document.getElementById('bannerLink')?.value || '').trim();
-        const alt = (document.getElementById('bannerAltText')?.value || '').trim();
+        const alt = (document.getElementById('bannerFallbackText')?.value || document.getElementById('bannerAltText')?.value || '').trim();
 
         let imageUrl = this.config?.image_url;
 
@@ -882,6 +884,21 @@ document.addEventListener('DOMContentLoaded', () => {
     if (feesList) {
         feesList.addEventListener('click', handleFeeListClick);
         feesList.addEventListener('input', handleFeeListChange);
+    }
+});
+
+// Banner setup — carrega form e anexa clique ao botao de salvar
+document.addEventListener('DOMContentLoaded', () => {
+    if (window.BannerModule) {
+        window.BannerModule.loadAdminForm();
+        const saveBtn = document.getElementById('bannerSaveBtn');
+        if (saveBtn) {
+            saveBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                console.log('[Banner] Save button clicked');
+                window.BannerModule.save();
+            });
+        }
     }
 });
 

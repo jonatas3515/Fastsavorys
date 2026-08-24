@@ -16,6 +16,7 @@ const Stripe = require('stripe');
 // CAIXINHA de cálculo/preços (calculadora determinística + validação de valores de pagamento)
 const {
     fetchProductPriceMap,
+    fetchDeliveryFeeMap,
     estimateCartTotal,
     validatePixAmount,
     validateCartaoAmount,
@@ -26,10 +27,12 @@ const {
 const { generatePixBrCode, generateStripeCheckoutLink } = require('./_lib/payment');
 // CAIXINHA de atendimento (prompt/persona do Fast). Movido para ./_lib/prompt.js
 const { GEMINI_BASE_PROMPT, GREETING_NEW_SESSION, GREETING_CONTINUE_SESSION } = require('./_lib/prompt');
+// CAIXINHA de memória do cliente (persistência de fatos entre conversas)
+const { loadClientMemory, extractFactsFromConversation, saveClientMemory, formatMemoryForPrompt } = require('./_lib/memory');
 
 const MANYCHAT_API_BASE = 'https://api.manychat.com/fb';
 
-const DEFAULT_ORDER_SUMMARY = { items: '', subtotal: '', delivery_mode: '', neighborhood: '', delivery_fee: '', payment: '', scheduled_date: '', scheduled_time: '', total: '', needs_owner_approval: false, client_name: '' };
+const DEFAULT_ORDER_SUMMARY = { items: '', subtotal: '', delivery_mode: '', neighborhood: '', delivery_fee: '', payment: '', scheduled_date: '', scheduled_time: '', total: '', needs_owner_approval: 0, client_name: '' };
 
 let supabaseAdmin = null;
 try {
@@ -538,13 +541,14 @@ const BAIRRO_FEE_MAP = {
     'bnh': { fee: 6, min: 20 },
 };
 
-function detectBairroInText(text) {
+function detectBairroInText(text, feeMap = null) {
+    const map = feeMap || BAIRRO_FEE_MAP;
     const t = (text || '').toLowerCase()
         .normalize('NFD').replace(/[\u0300-\u036f]/g, ''); // remove accents for matching
     // Avoid false positives: "centro/cento de salgados" is NOT bairro Centro
     const falsePositivePatterns = /centr?o\s*(de\s*)?(salgad|mini|unidade|coxinha|quibe|bolinha)/i;
     if (falsePositivePatterns.test(t)) return null;
-    const sorted = Object.entries(BAIRRO_FEE_MAP).sort((a, b) => b[0].length - a[0].length);
+    const sorted = Object.entries(map).sort((a, b) => b[0].length - a[0].length);
     for (const [bairro, data] of sorted) {
         const bairroNorm = bairro.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
         // Use word boundary to avoid partial matches
@@ -561,7 +565,7 @@ function detectBairroInText(text) {
 // validatePixAmount, validateCartaoAmount, parseBrlNumber, normalizeTxt).
 
 
-function buildDeliveryFactHint(history, currentMessage, priceMap = null) {
+function buildDeliveryFactHint(history, currentMessage, priceMap = null, feeMap = null) {
     // Only look at USER messages for bairro detection (bot messages list ALL bairros)
     const userMsgs = history.filter(m => m.role === 'user').map(m => m.text);
     userMsgs.push(currentMessage);
@@ -574,7 +578,7 @@ function buildDeliveryFactHint(history, currentMessage, priceMap = null) {
     // Detect bairro from user messages (prefer most recent)
     let bairroInfo = null;
     for (let i = userMsgs.length - 1; i >= 0; i--) {
-        bairroInfo = detectBairroInText(userMsgs[i]);
+        bairroInfo = detectBairroInText(userMsgs[i], feeMap);
         if (bairroInfo) break;
     }
     if (!bairroInfo) return '';
@@ -616,7 +620,7 @@ function buildDeliveryFactHint(history, currentMessage, priceMap = null) {
 // IA disse antes de terminar de somar todos os itens). Só retorna um valor quando a calculadora
 // conseguiu precificar TUDO com segurança (complete=true) — caso contrário retorna null e quem chamou
 // deve confiar na validação por "valores mencionados" (validatePixAmount) como fallback.
-function computeDeterministicOrderTotal(history, currentMessage, priceMap = null) {
+function computeDeterministicOrderTotal(history, currentMessage, priceMap = null, feeMap = null) {
     try {
         const { total, complete } = estimateCartTotal([...(history || []), { role: 'user', text: currentMessage }], priceMap);
         if (!complete || !(total > 0)) return null;
@@ -625,7 +629,7 @@ function computeDeterministicOrderTotal(history, currentMessage, priceMap = null
         userMsgs.push(currentMessage);
         let bairroInfo = null;
         for (let i = userMsgs.length - 1; i >= 0; i--) {
-            bairroInfo = detectBairroInText(userMsgs[i]);
+            bairroInfo = detectBairroInText(userMsgs[i], feeMap);
             if (bairroInfo) break;
         }
         const fee = bairroInfo ? bairroInfo.fee : 0;
@@ -642,8 +646,8 @@ function computeDeterministicOrderTotal(history, currentMessage, priceMap = null
 // (ex: disse R$ 23,00 antes de somar todos os itens, e depois usa esse valor errado no PIX).
 // Só cai no valor do modelo (validado por validatePixAmount) quando a calculadora não tem certeza
 // (bolo/kit/combo no pedido, etc).
-function resolvePixFinalAmount(amt, history, currentMessage, priceMap) {
-    const detTotal = computeDeterministicOrderTotal(history, currentMessage, priceMap);
+function resolvePixFinalAmount(amt, history, currentMessage, priceMap, feeMap = null) {
+    const detTotal = computeDeterministicOrderTotal(history, currentMessage, priceMap, feeMap);
     const safeAmt = validatePixAmount(amt, history, currentMessage, priceMap);
     if (detTotal && Math.abs((safeAmt || 0) - detTotal.total) > 1.0) {
         console.warn(`[pix] ⚠️ Valor da tag (R$ ${(safeAmt || 0).toFixed(2)}) difere do total calculado deterministicamente (R$ ${detTotal.total.toFixed(2)} = produtos R$ ${detTotal.productsTotal.toFixed(2)} + taxa R$ ${detTotal.fee.toFixed(2)}). Usando o valor calculado.`);
@@ -684,11 +688,11 @@ function buildKitFactHint(history, currentMessage) {
 // Guard de pagamento: a opção de 50% de entrada SÓ pode ser oferecida quando o total do pedido for
 // MAIOR que R$ 50,00. O modelo às vezes oferece 50% em pedidos pequenos (ex: R$ 26,75). Injeta um
 // fato verificado com o total calculado deterministicamente para o modelo obedecer ao limiar correto.
-function buildPaymentFactHint(history, currentMessage, priceMap = null) {
+function buildPaymentFactHint(history, currentMessage, priceMap = null, feeMap = null) {
     const allText = (history || []).map(m => m.text).join(' ') + ' ' + (currentMessage || '');
     const isPaymentCtx = /\b(pix|pagar|pagamento|gera.*pix|chave pix|copia e cola|cart[aã]o|dinheiro)\b/i.test(allText);
     if (!isPaymentCtx) return '';
-    const det = computeDeterministicOrderTotal(history, currentMessage, priceMap);
+    const det = computeDeterministicOrderTotal(history, currentMessage, priceMap, feeMap);
     if (!det || det.total <= 0) return '';
     const totalFmt = det.total.toFixed(2).replace('.', ',');
     let hint = `\n[⛔ FATO VERIFICADO (pagamento): O total do pedido é R$ ${totalFmt}. `;
@@ -745,41 +749,54 @@ function detectIntent(msg) {
     return intents;
 }
 
+// --- Cache em memória para dados de negócio do Supabase (TTL 60 segundos) ---
+let _businessDataCache = null;
+let _businessDataCacheTs = 0;
+const BIZ_CACHE_TTL_MS = 60 * 1000;
+
 // --- Consultas ao Supabase: busca dados reais do negócio ---
-async function buildBusinessContext(intents) {
+async function buildBusinessContext(intents, forceRefresh = false) {
     if (!supabaseAdmin) return '(Dados do cardápio indisponíveis no momento)';
 
     try {
-        // Busca em paralelo: produtos, promoções, taxas, config, horários, status, opções de produto
-        const [productsRes, promotionsRes, feesRes, configRes, hoursRes, storeStatusRes, optionsRes, couponsRes] = await Promise.all([
-            // Produtos (todos, filtrados depois)
-            supabaseAdmin.from('fast_products')
-                .select('name, description, price, category, emoji, requires_preorder, is_encomenda, block_massa, block_recheio, visible, promo_active, promo_type, promo_value')
-                .order('category').order('name'),
-            // Promoções ativas
-            supabaseAdmin.from('fast_promotions')
-                .select('product_name, discount_type, value, description')
-                .eq('active', true),
-            // Taxas de entrega por bairro
-            supabaseAdmin.from('fast_delivery_fees')
-                .select('neighborhood, fee, min_order_value').order('fee').order('neighborhood'),
-            // Configurações da loja (taxas, mínimos, regras)
-            supabaseAdmin.from('fast_store_config')
-                .select('*').eq('id', 1).single(),
-            // Horários de funcionamento
-            supabaseAdmin.from('fast_business_hours')
-                .select('day_name, is_open, open_time, close_time').order('day_of_week'),
-            // Status da loja hoje
-            supabaseAdmin.from('fast_store_status')
-                .select('is_closed').eq('date', new Date().toISOString().split('T')[0]).maybeSingle(),
-            // Opções de produto: massas de bolo, recheios, sabores de salgados
-            supabaseAdmin.from('fast_product_options')
-                .select('type, name, visible').eq('visible', true).order('sort_order'),
-            // Cupons de desconto ativos
-            supabaseAdmin.from('fast_coupons')
-                .select('code, discount_type, value, min_order, max_discount_value, expiry_date, active')
-                .eq('active', true)
-        ]);
+        const now = Date.now();
+        let queryResults = _businessDataCache;
+        if (forceRefresh || !queryResults || now - _businessDataCacheTs >= BIZ_CACHE_TTL_MS) {
+            // Busca em paralelo: produtos, promoções, taxas, config, horários, status, opções de produto, cupons
+            queryResults = await Promise.all([
+                // Produtos (todos, filtrados depois)
+                supabaseAdmin.from('fast_products')
+                    .select('name, description, price, category, emoji, requires_preorder, is_encomenda, block_massa, block_recheio, visible, promo_active, promo_type, promo_value')
+                    .order('category').order('name'),
+                // Promoções ativas
+                supabaseAdmin.from('fast_promotions')
+                    .select('product_name, discount_type, value, description')
+                    .eq('active', true),
+                // Taxas de entrega por bairro
+                supabaseAdmin.from('fast_delivery_fees')
+                    .select('neighborhood, fee, min_order_value').order('fee').order('neighborhood'),
+                // Configurações da loja (taxas, mínimos, regras)
+                supabaseAdmin.from('fast_store_config')
+                    .select('*').eq('id', 1).single(),
+                // Horários de funcionamento
+                supabaseAdmin.from('fast_business_hours')
+                    .select('day_name, is_open, open_time, close_time').order('day_of_week'),
+                // Status da loja hoje
+                supabaseAdmin.from('fast_store_status')
+                    .select('is_closed').eq('date', new Date().toISOString().split('T')[0]).maybeSingle(),
+                // Opções de produto: massas de bolo, recheios, sabores de salgados
+                supabaseAdmin.from('fast_product_options')
+                    .select('type, name, visible').eq('visible', true).order('sort_order'),
+                // Cupons de desconto ativos
+                supabaseAdmin.from('fast_coupons')
+                    .select('code, discount_type, value, min_order, max_discount_value, expiry_date, active')
+                    .eq('active', true)
+            ]);
+            _businessDataCache = queryResults;
+            _businessDataCacheTs = now;
+        }
+
+        const [productsRes, promotionsRes, feesRes, configRes, hoursRes, storeStatusRes, optionsRes, couponsRes] = queryResults;
 
         // --- Montagem do contexto de negócio em texto ---
         let ctx = '';
@@ -948,9 +965,10 @@ async function buildBusinessContext(intents) {
         ctx += '\n  - Bolos (exceto Vulcão Mini) e Kits Festa: NÃO podem ser feitos para o mesmo dia. Se o cliente pedir para HOJE, recuse. Se já pediu para data futura, confirme normalmente SEM repetir regra de antecedência. Apenas RETIRADA na loja (Rua Palmeiras, 105, Novo Prado). NUNCA sugira entrega para eles.';
         ctx += '\n  - PEDIDO MISTO COM BOLO: Se o pedido incluir bolo grande OU kit festa junto com salgados/bebidas, o PEDIDO INTEIRO é apenas retirada. NÃO ofereça entrega separada para os salgados.';
         ctx += '\n  - Bolo Vulcão Mini (R$ 15,00): exceção — NÃO precisa de antecedência, pode ser pedido para HOJE (verificar disponibilidade). Pode ser ENTREGUE junto com salgados/bebidas.';
-        ctx += '\n  - Salgados, mini salgados, bebidas, combos: podem ser pedidos para o MESMO DIA.';
-        ctx += '\n    • ENTREGA (Mototáxi): das 7h às 18h, segunda a sábado, bairros listados, com taxa. (Aceite o horário que o cliente pedir dentro deste intervalo, não force para a tarde).';
-        ctx += '\n    • RETIRADA: 7h–18h na loja (Rua Palmeiras, 105, Novo Prado).';
+        ctx += '\n  - Salgados, mini salgados, bebidas, combos: podem ser pedidos para o MESMO DIA, com entrega/retirada SOMENTE das 14h às 18h (segunda a sábado).';
+        ctx += '\n    • ENTREGA MESMO DIA (Mototáxi): das 14h às 18h, segunda a sábado, bairros listados, com taxa. ⛔ NÃO aceite entrega para hoje antes das 14h.';
+        ctx += '\n    • RETIRADA MESMO DIA: 14h–18h na loja (Rua Palmeiras, 105, Novo Prado). ⛔ NÃO aceite retirada para hoje antes das 14h.';
+        ctx += '\n    • ENCOMENDAS (outro dia): ENTREGA e RETIRADA das 7h às 18h (seg-sáb) e 7h às 17h30 (dom/feriado, com aprovação da Jéssica).';
         ctx += '\n\nVALOR MÍNIMO POR FAIXA DE HORÁRIO (retirada):';
         if (configRes.data) {
             const c = configRes.data;
@@ -1230,10 +1248,27 @@ async function describeImage(imageUrl, apiKey, multimodalModel) {
     const text = await callGeminiMultimodal(
         apiKey, multimodalModel,
         { base64: media.base64, mimeType: mime },
-        'Analise esta imagem e descreva o conteúdo de forma concisa em português. Se contém texto (print de tela, cardápio, lista de produtos, conversa), extraia o texto relevante. Se é uma foto de produto, comida ou cenário, descreva brevemente. SOMENTE se for CLARAMENTE um comprovante bancário/recibo de pagamento (com dados de transferência, valor pago, data, instituição financeira), diga "COMPROVANTE DE PAGAMENTO" e extraia: valor, data, favorecido. Se NÃO for claramente um recibo bancário, NÃO diga "COMPROVANTE DE PAGAMENTO".',
-        1024, 12000
+        `Analise esta imagem com cuidado. Siga estas prioridades na ordem:
+
+1. COMPROVANTE DE PAGAMENTO: Se a imagem contiver QUALQUER sinal de transação bancária, transferência Pix, recibo de pagamento, comprovante de depósito ou movimentação financeira (mesmo que parcialmente visível) — identifique como "COMPROVANTE DE PAGAMENTO" e extraia TODOS os dados disponíveis no seguinte formato:
+   COMPROVANTE DE PAGAMENTO
+   - Tipo: (Pix / Transferência / Depósito / TED / DOC / outro)
+   - Valor: R$ X,XX
+   - Data e hora: DD/MM/AAAA HH:MM
+   - Pagador (quem enviou): nome completo
+   - Recebedor (favorecido): nome completo
+   - Instituição: banco ou fintech
+   - ID da transação / código: se visível
+   Sinais de comprovante: presença de valores monetários (R$), nomes de pessoas/empresas, datas, logos de bancos (Nubank, Itaú, Bradesco, Caixa, Inter, PicPay, PagBank, Mercado Pago, C6, etc.), palavras como "comprovante", "transferência", "Pix", "enviado", "recebido", "transação", "ID", interface de app bancário.
+
+2. TEXTO/DOCUMENTO: Se contém texto legível (print de tela, cardápio, lista, conversa de chat, mensagem), extraia o texto relevante de forma organizada.
+
+3. FOTO GERAL: Se é uma foto de produto, comida, cenário ou outra coisa, descreva brevemente em português.
+
+⛔ ATENÇÃO: Na dúvida entre comprovante e outra coisa, PREFIRA classificar como comprovante se houver elementos financeiros visíveis (valores R$, nomes, datas, interface bancária).`,
+        2048, 15000
     );
-    if (text) console.log(`[media] 🖼️ ✅ Image description OK: "${text.substring(0, 100)}"`);
+    if (text) console.log(`[media] 🖼️ ✅ Image description OK: "${text.substring(0, 150)}"`);
     else console.warn('[media] 🖼️ Image description failed or empty');
     return text;
 }
@@ -1440,8 +1475,8 @@ const BUFFER_EMPTY_RESPONSE = {
     version: 'v2',
     content: { messages: [], actions: [], quick_replies: [] },
     buffered: true,
-    handover_to_human: false,
-    order_ready: false,
+    handover_to_human: 0,
+    order_ready: 0,
     order_summary: DEFAULT_ORDER_SUMMARY
 };
 
@@ -1653,7 +1688,7 @@ async function handleGeminiCore(req, res) {
             return res.status(200).json({
                 version: 'v2',
                 content: { messages: [{ type: 'text', text: fallbackText }], actions: [], quick_replies: [] },
-                handover_to_human: false, order_ready: false, order_summary: DEFAULT_ORDER_SUMMARY
+                handover_to_human: 0, order_ready: 0, order_summary: DEFAULT_ORDER_SUMMARY
             });
         }
     }
@@ -1666,7 +1701,7 @@ async function handleGeminiCore(req, res) {
             return res.status(200).json({
                 version: 'v2',
                 content: { messages: [{ type: 'text', text: 'Oi! 😊 Como posso te ajudar?' }], actions: [], quick_replies: [] },
-                handover_to_human: false, order_ready: false, order_summary: DEFAULT_ORDER_SUMMARY
+                handover_to_human: 0, order_ready: 0, order_summary: DEFAULT_ORDER_SUMMARY
             });
         }
         // Se tem 1 char (ex: "k", "."), ignora
@@ -1685,19 +1720,26 @@ async function handleGeminiCore(req, res) {
         effectiveMessage = "Itens do pedido (múltiplas linhas):\n" + msgLines.map(l => `- ${l}`).join('\n');
     }
 
-    // --- Carrega sessão: histórico de conversa e contador de msgs sem intenção ---
-    const session = await loadSession(user_id);
+    // --- Carrega sessão e memória do cliente em paralelo para máxima velocidade ---
+    const [session, clientMemory] = await Promise.all([
+        loadSession(user_id),
+        loadClientMemory(supabaseAdmin, user_id)
+    ]);
     console.log(`[gemini] Sessão carregada: isNew=${session.isNewSession}, histLen=${session.history.length}, user_id=${user_id}`);
     if (session.history.length > 0) {
         console.log(`[gemini] Última msg histórico: role=${session.history[session.history.length - 1].role}, text="${session.history[session.history.length - 1].text.substring(0, 80)}..."`);
     }
+    if (clientMemory) {
+        console.log(`[memory] 📋 Memória carregada para ${user_id}: ${clientMemory.interaction_count} interações`);
+    }
     const greetingInstruction = session.isNewSession ? GREETING_NEW_SESSION : GREETING_CONTINUE_SESSION;
     let ownerApprovalNoticeCount = session.ownerApprovalNoticeCount || 0;
 
-    // --- Guard de perguntas sobre pizzas e hambúrgueres ---
-    const isPizzaOrBurger = /\b(pizza|pizzas|hamburguer|hamburguers|hambúrguer|hambúrgueres)\b/i.test(effectiveMessage);
+    // --- Guard de perguntas sobre pizzas e hambúrgueres (mini pizza é produto nosso, não interceptar) ---
+    const hasMiniPizza = /\b(mini\s*pizza|mini\s*pizzas|minipizza|minipizzas)\b/i.test(effectiveMessage);
+    const isPizzaOrBurger = !hasMiniPizza && /\b(pizza|pizzas|hamburguer|hamburguers|hambúrguer|hambúrgueres)\b/i.test(effectiveMessage);
     if (isPizzaOrBurger) {
-        const partnerMsg = "A FastSavory's não trabalha com pizzas nem hambúrgueres. 🍕🍔\n\nIndicamos nosso parceiro *Império Burguer e Massas*:\nhttps://ccmpedidoonline.com.br/pedidoimperioburguerepizzas/index.php\n\nPosso te ajudar com algo do nosso cardápio?";
+        const partnerMsg = "A FastSavory's não trabalha com pizzas grandes nem hambúrgueres. 🍕🍔\n\nIndicamos nosso parceiro *Império Burguer e Massas*:\nhttps://ccmpedidoonline.com.br/pedidoimperioburguerepizzas/index.php\n\nPosso te ajudar com algo do nosso cardápio?";
         await saveSession(user_id, [
             ...session.history,
             { role: 'user', text: effectiveMessage },
@@ -1706,8 +1748,8 @@ async function handleGeminiCore(req, res) {
         return res.status(200).json({
             version: 'v2',
             content: { messages: [{ type: 'text', text: partnerMsg }], actions: [], quick_replies: [] },
-            handover_to_human: false,
-            order_ready: false,
+            handover_to_human: 0,
+            order_ready: 0,
             order_summary: DEFAULT_ORDER_SUMMARY
         });
     }
@@ -1732,7 +1774,7 @@ async function handleGeminiCore(req, res) {
         return res.status(200).json({
             version: 'v2',
             content: { messages: [{ type: 'text', text: handoverDirectReply }], actions: [], quick_replies: [] },
-            handover_to_human: true, order_ready: false, order_summary: DEFAULT_ORDER_SUMMARY
+            handover_to_human: 1, order_ready: 0, order_summary: DEFAULT_ORDER_SUMMARY
         });
     }
     let intentHint = '';
@@ -1920,8 +1962,8 @@ async function handleGeminiCore(req, res) {
                 actions: [],
                 quick_replies: []
             },
-            handover_to_human: true,
-            order_ready: false,
+            handover_to_human: 1,
+            order_ready: 0,
             order_summary: DEFAULT_ORDER_SUMMARY
         });
     }
@@ -1942,11 +1984,14 @@ function getBrazilTime() {
     const amanha = tomorrowBrazil.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', weekday: 'long' });
     const cleanName = name && /[a-zA-ZÀ-ÿ]{2,}/.test(name) ? name.trim() : '';
 
-    // --- Calculadora: carrega preços reais do cardápio (Supabase) uma única vez por requisição ---
-    const priceMap = await fetchProductPriceMap(supabaseAdmin);
+    // --- Calculadora: carrega preços reais do cardápio (Supabase com cache 60s) em paralelo ---
+    const [priceMap, feeMap] = await Promise.all([
+        fetchProductPriceMap(supabaseAdmin),
+        fetchDeliveryFeeMap(supabaseAdmin)
+    ]);
 
     // --- Validação programática de entrega: injeta FATOS verificados para o modelo não inventar ---
-    const deliveryFactHint = buildDeliveryFactHint(session.history, effectiveMessage, priceMap);
+    const deliveryFactHint = buildDeliveryFactHint(session.history, effectiveMessage, priceMap, feeMap);
     if (deliveryFactHint) {
         intentHint += deliveryFactHint;
     }
@@ -1964,9 +2009,15 @@ function getBrazilTime() {
     }
 
     // --- Guard de pagamento (50% entrada só para total > R$ 50,00) ---
-    const paymentFactHint = buildPaymentFactHint(session.history, effectiveMessage, priceMap);
+    const paymentFactHint = buildPaymentFactHint(session.history, effectiveMessage, priceMap, feeMap);
     if (paymentFactHint) {
         intentHint += paymentFactHint;
+    }
+
+    // --- Memória do cliente: injeta fatos de interações anteriores no prompt ---
+    const memoryHint = formatMemoryForPrompt(clientMemory);
+    if (memoryHint) {
+        intentHint += memoryHint;
     }
 
     const userMessage = `[Hoje é ${now}. Amanhã é ${amanha}]${intentHint}` + (cleanName ? ` Cliente "${cleanName}" disse: ${effectiveMessage}` : ` ${effectiveMessage}`);
@@ -2194,7 +2245,7 @@ function getBrazilTime() {
         return res.status(200).json({
             version: 'v2',
             content: { messages: [{ type: 'text', text: 'Me desculpe, estou com uma dificuldade técnica momentânea 😕 Já vou chamar a Jéssica para te atender!' }], actions: [], quick_replies: [] },
-            handover_to_human: true, order_ready: false, order_summary: DEFAULT_ORDER_SUMMARY
+            handover_to_human: 1, order_ready: 0, order_summary: DEFAULT_ORDER_SUMMARY
         });
     }
 
@@ -2354,7 +2405,7 @@ function getBrazilTime() {
         }
         // Segurança: prioriza o total calculado deterministicamente sobre o valor da tag (que pode
         // ser um total antigo/errado mencionado antes na conversa)
-        const safeAmt = resolvePixFinalAmount(amt, session.history, effectiveMessage, priceMap);
+        const safeAmt = resolvePixFinalAmount(amt, session.history, effectiveMessage, priceMap, feeMap);
         pixBrCode = generatePixBrCode(safeAmt > 0 ? safeAmt : null);
         pixInjected = true;
         // Substitui a resposta INTEIRA pelo código puro — sem texto nenhum
@@ -2373,7 +2424,7 @@ function getBrazilTime() {
                 amt = parseFloat(valorMatch[1].replace(',', '.'));
                 if (isNaN(amt)) amt = 0;
             }
-            const safeAmt = resolvePixFinalAmount(amt, session.history, effectiveMessage, priceMap);
+            const safeAmt = resolvePixFinalAmount(amt, session.history, effectiveMessage, priceMap, feeMap);
             pixBrCode = generatePixBrCode(safeAmt > 0 ? safeAmt : null);
             pixInjected = true;
             reply = pixBrCode;
@@ -2392,7 +2443,7 @@ function getBrazilTime() {
                 amt = parseFloat(valMatch[1].replace(',', '.'));
                 if (isNaN(amt)) amt = 0;
             }
-            const safeAmt = resolvePixFinalAmount(amt, session.history, effectiveMessage, priceMap);
+            const safeAmt = resolvePixFinalAmount(amt, session.history, effectiveMessage, priceMap, feeMap);
             pixBrCode = generatePixBrCode(safeAmt > 0 ? safeAmt : null);
             pixInjected = true;
             reply = pixBrCode;
@@ -2490,6 +2541,15 @@ function getBrazilTime() {
     ];
     const _saveErr = await saveSession(user_id, updatedHistory, unclearCount, ownerApprovalNoticeCount);
 
+    // --- Memória do cliente: extrai fatos da conversa e salva para próxima vez ---
+    const newFacts = extractFactsFromConversation(updatedHistory, clientMemory?.memories);
+    if (newFacts) {
+        // Fire-and-forget: não bloqueia a resposta
+        saveClientMemory(supabaseAdmin, user_id, newFacts).catch(e =>
+            console.warn('[memory] async save error:', e.message)
+        );
+    }
+
     return res.status(200).json({
         version: 'v2',
         content: {
@@ -2497,8 +2557,8 @@ function getBrazilTime() {
             actions: [],
             quick_replies: []
         },
-        handover_to_human: false,
-        order_ready: orderReady,       // <-- true quando pedido confirmado pelo cliente
+        handover_to_human: 0,
+        order_ready: orderReady ? 1 : 0,       // <-- true quando pedido confirmado pelo cliente
         order_summary: orderSummary    // <-- dados do pedido para enviar à Jéssica via ManyChat
     });
 }
@@ -2510,10 +2570,25 @@ module.exports = async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST,OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Webhook-Secret,X-API-Key');
 
     if (req.method === 'OPTIONS') return res.status(200).end();
     if (req.method !== 'POST') return res.status(200).json({ success: false, error: 'Use POST' });
+
+    // --- SEGURANÇA (Etapa 2): Validação de Webhook Secret ---
+    const requiredSecret = process.env.MANYCHAT_WEBHOOK_SECRET;
+    if (requiredSecret) {
+        const providedSecret = req.headers['x-webhook-secret'] ||
+            req.headers['x-api-key'] ||
+            (req.headers['authorization'] || '').replace(/^Bearer\s+/i, '').trim() ||
+            req.query.secret ||
+            req.query.token;
+
+        if (!providedSecret || providedSecret !== requiredSecret) {
+            console.warn('[security] ⛔ Acesso negado ao webhook ManyChat: secret inválido ou ausente.');
+            return res.status(401).json({ success: false, error: 'Unauthorized: invalid webhook secret' });
+        }
+    }
 
     const type = req.query.type;
 
