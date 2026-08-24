@@ -43,9 +43,20 @@ module.exports = async function handler(req, res) {
         return res.status(500).json({ error: 'Database configuration missing' });
     }
 
-    // Verify Vercel Cron Signature (optional but recommended in prod)
-    // For now, we allow manual triggering if query param ?key=SECRET is present 
-    // or if it comes from Vercel's internal cron system.
+    // --- SEGURANÇA: Validação de CRON_SECRET ---
+    const requiredCronSecret = process.env.CRON_SECRET;
+    if (requiredCronSecret) {
+        const authHeader = req.headers['authorization'] || '';
+        const providedSecret = authHeader.replace(/^Bearer\s+/i, '').trim() ||
+            req.headers['x-cron-secret'] ||
+            req.query.key ||
+            req.query.secret;
+
+        if (!providedSecret || providedSecret !== requiredCronSecret) {
+            console.warn('[Cron] ⛔ Acesso negado ao cron de agendamentos: secret inválido ou ausente.');
+            return res.status(401).json({ success: false, error: 'Unauthorized: invalid cron secret' });
+        }
+    }
 
     const tomorrowDate = getBrasiliaTomorrow();
     console.log(`[Cron] Checking scheduled orders for date: ${tomorrowDate}`);

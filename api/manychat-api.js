@@ -69,12 +69,79 @@ function extractOrderCode(message) {
     return match ? `FAST-${match[1]}` : null;
 }
 
-function generateWhatsAppLink(phone, message) {
-    let formattedPhone = (phone || '').replace(/\D/g, '');
-    if (formattedPhone.length === 11) {
-        formattedPhone = '55' + formattedPhone;
+// ==========================================
+// TELEFONE & EVENTOS / ANALYTICS
+// ==========================================
+
+/**
+ * Normaliza número de telefone brasileiro para formatos padronizados:
+ * - canonical: '5573999998888' (com DDI 55, DDD e 9 dígitos para WhatsApp API / links)
+ * - national: '73999998888' (sem DDI 55, para busca/cadastro no Supabase)
+ * - display: '(73) 99999-8888' (formatado visualmente)
+ */
+function normalizeBrazilianPhone(rawPhone) {
+    if (!rawPhone) return { canonical: '', national: '', display: '', raw: '' };
+    let digits = String(rawPhone).replace(/\D/g, '');
+
+    // Remove zero inicial se houver (ex: 073999998888 -> 73999998888)
+    if (digits.startsWith('0') && digits.length >= 11) {
+        digits = digits.substring(1);
     }
-    return `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message || '')}`;
+
+    // Se já começa com 55 e tem 12 ou 13 dígitos
+    if (digits.startsWith('55') && (digits.length === 12 || digits.length === 13)) {
+        digits = digits.substring(2);
+    }
+
+    // Se tem 10 dígitos (DDD + 8 dígitos móvel antigo), adiciona o 9º dígito
+    if (digits.length === 10) {
+        const ddd = digits.substring(0, 2);
+        const num = digits.substring(2);
+        digits = `${ddd}9${num}`;
+    }
+
+    let national = digits;
+    let canonical = digits ? `55${digits}` : '';
+    let display = digits;
+
+    if (digits.length === 11) {
+        const ddd = digits.substring(0, 2);
+        const p1 = digits.substring(2, 7);
+        const p2 = digits.substring(7);
+        display = `(${ddd}) ${p1}-${p2}`;
+    }
+
+    return {
+        canonical,
+        national,
+        display,
+        raw: String(rawPhone).trim()
+    };
+}
+
+async function logBotEvent(supabaseAdmin, eventData) {
+    if (!supabaseAdmin || !eventData) return;
+    try {
+        const payload = {
+            manychat_user_id: String(eventData.user_id || 'unknown'),
+            event_type: eventData.event_type || 'interaction',
+            client_name: eventData.client_name || null,
+            client_phone: eventData.client_phone || null,
+            order_total: eventData.order_total || null,
+            details: eventData.details || {},
+            created_at: new Date().toISOString()
+        };
+        await supabaseAdmin.from('fast_bot_events').insert([payload]);
+    } catch (e) {
+        // Silencioso se tabela não existir ainda no Supabase
+        console.debug('[analytics] logBotEvent:', e.message);
+    }
+}
+
+function generateWhatsAppLink(phone, message) {
+    const norm = normalizeBrazilianPhone(phone);
+    const target = norm.canonical || (phone || '').replace(/\D/g, '');
+    return `https://wa.me/${target}?text=${encodeURIComponent(message || '')}`;
 }
 
 async function manychatRequest(endpoint, body) {
@@ -1821,6 +1888,13 @@ async function handleGeminiCore(req, res) {
     // --- Handover direto: cliente pediu explicitamente para falar com atendente ---
     if (intents.includes('handover_direto')) {
         const handoverDirectReply = 'Claro, vou chamar um atendente para te ajudar. Só um instante, por favor! 😊';
+        logBotEvent(supabaseAdmin, {
+            user_id,
+            event_type: 'handover_human',
+            client_name: name,
+            client_phone: req.body?.phone,
+            details: { reason: 'cliente solicitou atendente humano' }
+        }).catch(() => {});
         await saveSession(user_id, [
             ...session.history,
             { role: 'user', text: effectiveMessage },
@@ -2604,6 +2678,16 @@ function getBrazilTime() {
             console.warn('[memory] async save error:', e.message)
         );
     }
+
+    // --- Métricas do Bot (fire-and-forget): registra evento de atendimento ---
+    logBotEvent(supabaseAdmin, {
+        user_id,
+        event_type: orderReady ? 'order_ready' : 'interaction',
+        client_name: cleanName || name,
+        client_phone: req.body?.phone,
+        order_total: orderSummary?.total || null,
+        details: { subtotal: orderSummary?.subtotal, delivery_mode: orderSummary?.delivery_mode, neighborhood: orderSummary?.neighborhood }
+    }).catch(() => {});
 
     return res.status(200).json({
         version: 'v2',

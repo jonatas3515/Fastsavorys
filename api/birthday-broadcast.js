@@ -95,6 +95,21 @@ module.exports = async function handler(req, res) {
         return res.status(200).json({ success: false, error: 'Use GET or POST method' });
     }
 
+    // --- SEGURANÇA: Validação de CRON_SECRET ---
+    const requiredCronSecret = process.env.CRON_SECRET;
+    if (requiredCronSecret) {
+        const authHeader = req.headers['authorization'] || '';
+        const providedSecret = authHeader.replace(/^Bearer\s+/i, '').trim() ||
+            req.headers['x-cron-secret'] ||
+            req.query.key ||
+            req.query.secret;
+
+        if (!providedSecret || providedSecret !== requiredCronSecret) {
+            console.warn('[birthday-broadcast] ⛔ Acesso negado ao cron de aniversários: secret inválido ou ausente.');
+            return res.status(401).json({ success: false, error: 'Unauthorized: invalid cron secret' });
+        }
+    }
+
     if (!supabaseAdmin) {
         return res.status(200).json({ success: false, error: 'Database not configured' });
     }
