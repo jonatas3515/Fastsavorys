@@ -1055,6 +1055,42 @@ async function buildBusinessContext(intents, forceRefresh = false) {
 }
 
 // ==========================================
+// ANTI-SPAM & RATE LIMITING SYSTEM
+// ==========================================
+// Limita requisições por usuário para evitar abusos, loops de automação do ManyChat
+// e consumo desnecessário de cota do Gemini.
+const _userRequestTimestamps = new Map(); // userId -> Array<number> (timestamps em ms)
+const RATE_LIMIT_WINDOW_MS = 60 * 1000;  // Janela de 60 segundos
+const RATE_LIMIT_MAX_REQUESTS = 10;      // Máximo de 10 mensagens por minuto por usuário
+
+function checkRateLimit(userId) {
+    if (!userId) return { allowed: true };
+    const now = Date.now();
+    let timestamps = _userRequestTimestamps.get(userId) || [];
+    // Remove timestamps fora da janela de 60s
+    timestamps = timestamps.filter(ts => now - ts < RATE_LIMIT_WINDOW_MS);
+
+    if (timestamps.length >= RATE_LIMIT_MAX_REQUESTS) {
+        console.warn(`[rate-limit] ⚠️ Usuário ${userId} excedeu o limite (${timestamps.length} msgs em 60s). Interceptando.`);
+        return { allowed: false, count: timestamps.length };
+    }
+
+    timestamps.push(now);
+    _userRequestTimestamps.set(userId, timestamps);
+
+    // Limpeza periódica de memória se o Map crescer muito (> 5000 entradas)
+    if (_userRequestTimestamps.size > 5000) {
+        for (const [uid, list] of _userRequestTimestamps.entries()) {
+            const recent = list.filter(ts => now - ts < RATE_LIMIT_WINDOW_MS);
+            if (recent.length === 0) _userRequestTimestamps.delete(uid);
+            else _userRequestTimestamps.set(uid, recent);
+        }
+    }
+
+    return { allowed: true, count: timestamps.length };
+}
+
+// ==========================================
 // MESSAGE BUFFER SYSTEM (Phase 1 — text only)
 // ==========================================
 // When enabled, incoming text messages are buffered per user.
@@ -1664,6 +1700,25 @@ async function handleGeminiCore(req, res) {
 
     const rawMessage = message || req.body?.text || req.body?.content || '';
     const trimmed = rawMessage.trim();
+
+    // --- SEGURANÇA (Etapa 3): Proteção Anti-Spam / Anti-Loop por usuário ---
+    const rateCheck = checkRateLimit(user_id);
+    if (!rateCheck.allowed) {
+        return res.status(200).json({
+            version: 'v2',
+            content: {
+                messages: [{
+                    type: 'text',
+                    text: 'Recebemos várias mensagens suas em poucos segundos! 😊 Por favor, aguarde só um instante enquanto preparamos seu atendimento.'
+                }],
+                actions: [],
+                quick_replies: []
+            },
+            handover_to_human: 0,
+            order_ready: 0,
+            order_summary: DEFAULT_ORDER_SUMMARY
+        });
+    }
 
     // --- Load bot config for media processing settings ---
     const botConfig = await loadBotConfig();
