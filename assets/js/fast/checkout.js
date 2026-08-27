@@ -126,7 +126,9 @@ window.CheckoutModule = {
         try {
             const slot = document.getElementById('orderTimeSlot');
             if (slot) {
-                if (e.target.value === 'entrega') { slot.min = '07:00'; slot.max = '18:00'; }
+                const winStart = (window.storeConfig && window.storeConfig.order_window_start) || '07:00';
+                const winEnd = (window.storeConfig && window.storeConfig.order_window_end) || '18:00';
+                if (e.target.value === 'entrega') { slot.min = winStart; slot.max = winEnd; }
                 else { slot.removeAttribute('min'); slot.removeAttribute('max'); }
             }
         } catch (e2) { }
@@ -201,8 +203,10 @@ window.CheckoutModule = {
             // Data futura - REMOVER TODAS as restrições de horário
             timeInput.removeAttribute('min');
             timeInput.removeAttribute('max');
+            const winStart = (window.storeConfig && window.storeConfig.order_window_start) || '07:00';
+            const winEnd = (window.storeConfig && window.storeConfig.order_window_end) || '18:00';
             const hint = document.getElementById('orderTimeHint');
-            if (hint) hint.textContent = 'Horário de funcionamento: 07:00 às 18:00';
+            if (hint) hint.textContent = `Horário de funcionamento: ${winStart} às ${winEnd}`;
         }
     },
 

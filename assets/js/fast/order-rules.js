@@ -192,9 +192,14 @@ window.canUseDelivery = function (cartItems = window.cart, cartTotal = window.ca
     }
 
     // Regra 3: Bolo Mini e Salgados → permitido, mas verifica valor mínimo por bairro
-    // O mínimo GLOBAL para entrega é R$ 15,00, mesmo que o bairro não tenha mínimo cadastrado.
+    // O mínimo GLOBAL para entrega vem de storeConfig.min_order_delivery (padrão R$ 15,00)
+    const globalMinDelivery = (window.storeConfig && typeof window.storeConfig.min_order_delivery === 'number')
+        ? window.storeConfig.min_order_delivery
+        : 15;
+
     if (neighborhood) {
-        const minValue = Math.max(15, window.getMinDeliveryValue(neighborhood) || 0);
+        const neighborhoodMin = window.getMinDeliveryValue(neighborhood) || 0;
+        const minValue = Math.max(globalMinDelivery, neighborhoodMin);
         if (cartTotal < minValue) {
             const faltando = (minValue - cartTotal).toFixed(2).replace('.', ',');
             return {
@@ -203,6 +208,13 @@ window.canUseDelivery = function (cartItems = window.cart, cartTotal = window.ca
                 minValue: minValue
             };
         }
+    } else if (cartTotal < globalMinDelivery) {
+        const faltando = (globalMinDelivery - cartTotal).toFixed(2).replace('.', ',');
+        return {
+            allowed: false,
+            reason: `🚚 O valor mínimo para entrega é de R$ ${globalMinDelivery.toFixed(2).replace('.', ',')}. Faltam R$ ${faltando}.`,
+            minValue: globalMinDelivery
+        };
     }
 
     return { allowed: true, reason: '', minValue: 0 };
@@ -241,6 +253,17 @@ window.getMinDeliveryValue = function (neighborhood) {
 // ============================================
 
 /**
+ * Verifica se uma data específica está na lista de datas bloqueadas
+ * @param {string} dateStr - Data no formato YYYY-MM-DD
+ * @returns {Object|null} Objeto da data bloqueada ou null
+ */
+window.isDateBlocked = function (dateStr) {
+    if (!dateStr || !window.blockedDates || !window.blockedDates.length) return null;
+    const found = window.blockedDates.find(d => d.blocked_date === dateStr);
+    return found || null;
+};
+
+/**
  * Calcula a data mínima permitida para o pedido
  * @param {Array} cartItems - Itens do carrinho
  * @returns {Object} { minDate: string (YYYY-MM-DD), reason: string }
@@ -254,6 +277,15 @@ window.getMinOrderDate = function (cartItems = window.cart) {
 
     const today = window.formatYYYYMMDD(brasilia);
     const tomorrow = window.formatYYYYMMDD(new Date(brasilia.getTime() + 24 * 60 * 60 * 1000));
+
+    // Regra 0: Pedidos do mesmo dia desabilitados pelo administrador
+    if (window.storeConfig && window.storeConfig.same_day_orders_enabled === false) {
+        return {
+            minDate: tomorrow,
+            reason: '📅 Pedidos para o mesmo dia estão desativados no momento. Agende a partir de amanhã.',
+            canOrderToday: false
+        };
+    }
 
     // Regra 1: Kit Festa, Bolo G/P, Vulcão → sempre D+1 (mínimo amanhã)
     if (analysis.hasBoloGrande) {
@@ -285,9 +317,10 @@ window.getMinOrderDate = function (cartItems = window.cart) {
     if (analysis.hasSalgados) {
         const cutoffSalgados = 8 * 60; // 08:00
         if (tempoAtual > cutoffSalgados) {
+            const sameDayStart = (window.storeConfig && window.storeConfig.same_day_pickup_start) || '11:00';
             return {
                 minDate: today, // Ainda pode pedir para hoje, mas com restrições de horário
-                reason: '🥟 Salgados: após as 8h, pedidos para entrega/retirada somente a partir das 11h30.',
+                reason: `🥟 Salgados: após as 8h, pedidos para entrega/retirada para hoje somente a partir das ${sameDayStart}.`,
                 canOrderToday: true,
                 sameDayRestricted: true
             };
@@ -330,102 +363,106 @@ window.validateOrderTime = function (timeSlot, orderDate, cartItems = window.car
     const normalizeTime = (t) => (t || '').replace(/:/g, '').substring(0, 4).padStart(4, '0');
     const timeNum = parseInt(normalizeTime(timeSlot), 10);
 
-    // Limites gerais
-    const MIN_TIME = 700;  // 07:00
-    const MAX_TIME = 1800; // 18:00
+    // Janela geral de funcionamento (do Admin ou padrão 07:00 às 18:00)
+    const windowStart = (window.storeConfig && window.storeConfig.order_window_start) || '07:00';
+    const windowEnd = (window.storeConfig && window.storeConfig.order_window_end) || '18:00';
+    const minTimeNum = parseInt(normalizeTime(windowStart), 10);
+    const maxTimeNum = parseInt(normalizeTime(windowEnd), 10);
 
-    // Regra 1: Kit Festa, Bolo G/P, Vulcão → 7h-18h (D+1 já validado em getMinOrderDate)
-    if (analysis.hasBoloGrande) {
-        if (timeNum < MIN_TIME || timeNum > MAX_TIME) {
-            return {
-                allowed: false,
-                reason: `⏰ Para bolos e kits festa, a retirada deve ser entre 07:00 e 18:00.`
-            };
-        }
-        return { allowed: true, reason: '' };
-    }
-
-    // Regra 2: Vulcão Mini → 7h-18h
-    if (analysis.hasBoloMini) {
-        if (timeNum < MIN_TIME || timeNum > MAX_TIME) {
-            return {
-                allowed: false,
-                reason: `⏰ Para Bolo Vulcão Mini, o horário deve ser entre 07:00 e 18:00.`
-            };
-        }
-
-        // Verifica valor mínimo por bairro para entrega
-        if (isDelivery) {
-            // Validação já feita em canUseDelivery
-        }
-
-        return { allowed: true, reason: '' };
-    }
-
-    // Regra 3: Salgados
-    if (analysis.hasSalgados) {
-        if (isToday) {
-            // MESMO DIA: entrega/retirada 11:30-18:00
-            const MIN_SAME_DAY = 1130; // 11:30
-
-            if (timeNum < MIN_SAME_DAY || timeNum > MAX_TIME) {
-                return {
-                    allowed: false,
-                    reason: `⏰ Para pedidos no mesmo dia, o horário deve ser entre 11:30 e 18:00.`
-                };
-            }
-
-            // Entrega 11:30-14:00: mínimo R$ 20,00
-            if (isDelivery && timeNum >= 1130 && timeNum < 1400) {
-                const minValue = 20;
-                if (cartTotal < minValue) {
-                    return {
-                        allowed: false,
-                        reason: `💰 Para entrega entre 11:30 e 14:00, pedido mínimo de R$ ${minValue.toFixed(2).replace('.', ',')}.`
-                    };
-                }
-            }
-        } else {
-            // DATA FUTURA: 7h-18h com regras de valor mínimo
-            if (timeNum < MIN_TIME || timeNum > MAX_TIME) {
-                return {
-                    allowed: false,
-                    reason: `⏰ Para pedidos agendados, o horário deve ser entre 07:00 e 18:00.`
-                };
-            }
-
-            // 7h-11h: mínimo R$ 35,00
-            if (timeNum >= 700 && timeNum < 1100) {
-                const minValue = 35;
-                if (cartTotal < minValue) {
-                    return {
-                        allowed: false,
-                        reason: `💰 Para ${isDelivery ? 'entregas' : 'retiradas'} entre 07:00 e 11:00, pedido mínimo de R$ ${minValue.toFixed(2).replace('.', ',')}.`
-                    };
-                }
-            }
-
-            // 11h-14h: mínimo R$ 25,00
-            if (timeNum >= 1100 && timeNum < 1400) {
-                const minValue = 25;
-                if (cartTotal < minValue) {
-                    return {
-                        allowed: false,
-                        reason: `💰 Para ${isDelivery ? 'entregas' : 'retiradas'} entre 11:00 e 14:00, pedido mínimo de R$ ${minValue.toFixed(2).replace('.', ',')}.`
-                    };
-                }
-            }
-        }
-
-        return { allowed: true, reason: '' };
-    }
-
-    // Default: permitir horário comercial
-    if (timeNum < MIN_TIME || timeNum > MAX_TIME) {
+    // Validação geral da janela de pedidos
+    if (timeNum < minTimeNum || timeNum > maxTimeNum) {
         return {
             allowed: false,
-            reason: `⏰ O horário deve ser entre 07:00 e 18:00.`
+            reason: `⏰ O horário selecionado deve estar dentro da janela de funcionamento: das ${windowStart} às ${windowEnd}.`
         };
+    }
+
+    // Regra 1: Kit Festa, Bolo G/P, Vulcão → dentro da janela geral (D+1 já validado em getMinOrderDate)
+    if (analysis.hasBoloGrande) {
+        if (timeNum < minTimeNum || timeNum > maxTimeNum) {
+            return {
+                allowed: false,
+                reason: `⏰ Para bolos e kits festa, a retirada deve ser entre ${windowStart} e ${windowEnd}.`
+            };
+        }
+        return { allowed: true, reason: '' };
+    }
+
+    // Regra 2: Vulcão Mini → dentro da janela geral
+    if (analysis.hasBoloMini) {
+        if (timeNum < minTimeNum || timeNum > maxTimeNum) {
+            return {
+                allowed: false,
+                reason: `⏰ Para Bolo Vulcão Mini, o horário deve ser entre ${windowStart} e ${windowEnd}.`
+            };
+        }
+        return { allowed: true, reason: '' };
+    }
+
+    // Regra 3: Pedidos no Mesmo Dia
+    if (isToday) {
+        if (window.storeConfig && window.storeConfig.same_day_orders_enabled === false) {
+            return {
+                allowed: false,
+                reason: '📅 Pedidos para o mesmo dia estão desativados no momento. Selecione uma data futura.'
+            };
+        }
+
+        const sameDayStart = (window.storeConfig && window.storeConfig.same_day_pickup_start) || '11:00';
+        const sameDayEnd = (window.storeConfig && window.storeConfig.same_day_pickup_end) || windowEnd;
+        const sameDayStartNum = parseInt(normalizeTime(sameDayStart), 10);
+        const sameDayEndNum = parseInt(normalizeTime(sameDayEnd), 10);
+
+        if (timeNum < sameDayStartNum || timeNum > sameDayEndNum) {
+            return {
+                allowed: false,
+                reason: `⏰ Para pedidos no mesmo dia, o horário permitido é das ${sameDayStart} às ${sameDayEnd}.`
+            };
+        }
+
+        const sameDayMinValue = (window.storeConfig && typeof window.storeConfig.same_day_min_value === 'number')
+            ? window.storeConfig.same_day_min_value
+            : 15;
+        if (cartTotal < sameDayMinValue) {
+            const faltando = (sameDayMinValue - cartTotal).toFixed(2).replace('.', ',');
+            return {
+                allowed: false,
+                reason: `💰 Para pedidos no mesmo dia, o pedido mínimo é de R$ ${sameDayMinValue.toFixed(2).replace('.', ',')}. Faltam R$ ${faltando}.`
+            };
+        }
+    }
+
+    // Regra 4: REGRA DA MANHÃ (Configurável no Admin - ex: antes das 13h, mín. R$ 40,00)
+    // Aplica para entrega e retirada, agendado ou mesmo dia
+    const morningEnabled = window.storeConfig ? window.storeConfig.morning_rule_enabled !== false : true;
+    const morningEndTime = (window.storeConfig && window.storeConfig.morning_rule_end_time) || '13:00';
+    const morningMinValue = (window.storeConfig && typeof window.storeConfig.morning_rule_min_value === 'number')
+        ? window.storeConfig.morning_rule_min_value
+        : 40.00;
+    const morningEndNum = parseInt(normalizeTime(morningEndTime), 10);
+
+    if (morningEnabled && timeNum >= minTimeNum && timeNum < morningEndNum) {
+        if (cartTotal < morningMinValue) {
+            const faltando = (morningMinValue - cartTotal).toFixed(2).replace('.', ',');
+            return {
+                allowed: false,
+                reason: `🌅 Para pedidos entre ${windowStart} e ${morningEndTime} (${isDelivery ? 'entrega' : 'retirada'}), o pedido mínimo é de R$ ${morningMinValue.toFixed(2).replace('.', ',')}. Faltam R$ ${faltando}.`
+            };
+        }
+    }
+
+    // Regra 5: Mínimo Retirada Fora-Horário (ex: entre 12h e 14h se configurado diferente do mínimo padrão)
+    if (!isDelivery && timeNum >= 1200 && timeNum < 1400) {
+        const minOffhours = (window.storeConfig && typeof window.storeConfig.min_order_pickup_offhours === 'number')
+            ? window.storeConfig.min_order_pickup_offhours
+            : 15;
+        if (cartTotal < minOffhours) {
+            const faltando = (minOffhours - cartTotal).toFixed(2).replace('.', ',');
+            return {
+                allowed: false,
+                reason: `💰 Para retirada entre 12:00 e 14:00, o pedido mínimo é de R$ ${minOffhours.toFixed(2).replace('.', ',')}. Faltam R$ ${faltando}.`
+            };
+        }
     }
 
     return { allowed: true, reason: '' };
@@ -577,6 +614,16 @@ window.validateOrder = function (params = {}) {
         }
     }
 
+    // 3.5. Validar datas bloqueadas (feriados/folgas)
+    if (orderDate) {
+        const blocked = window.isDateBlocked ? window.isDateBlocked(orderDate) : null;
+        if (blocked) {
+            const [y, m, d] = orderDate.split('-');
+            const formattedDate = `${d}/${m}/${y}`;
+            errors.push(`🚫 A data selecionada (${formattedDate}) está bloqueada para pedidos. Motivo: ${blocked.reason || 'Loja fechada nesta data'}.`);
+        }
+    }
+
     // 4. Validar data mínima
     const minDateInfo = window.getMinOrderDate(cartItems);
     if (orderDate && orderDate < minDateInfo.minDate) {
@@ -678,17 +725,30 @@ window.updateOrderRulesUI = function () {
     // Atualiza info box de regras baseado no carrinho
     const orderRulesInfo = document.getElementById('orderRulesInfo');
     if (orderRulesInfo) {
+        const windowStart = (window.storeConfig && window.storeConfig.order_window_start) || '07:00';
+        const windowEnd = (window.storeConfig && window.storeConfig.order_window_end) || '18:00';
+        const morningEnabled = window.storeConfig ? window.storeConfig.morning_rule_enabled !== false : true;
+        const morningEndTime = (window.storeConfig && window.storeConfig.morning_rule_end_time) || '13:00';
+        const morningMinValue = (window.storeConfig && typeof window.storeConfig.morning_rule_min_value === 'number')
+            ? window.storeConfig.morning_rule_min_value
+            : 40.00;
+        const sameDayStart = (window.storeConfig && window.storeConfig.same_day_pickup_start) || '11:00';
+        const sameDayMinValue = (window.storeConfig && typeof window.storeConfig.same_day_min_value === 'number')
+            ? window.storeConfig.same_day_min_value
+            : 15.00;
+
         let rulesHtml = '';
 
         if (analysis.hasBoloGrande) {
-            rulesHtml = `<strong>🎂 Bolos e Kits Festa:</strong> Mínimo 1 dia de antecedência. Retirada das 07:00 às 18:00. <strong>Apenas retirada, sem entrega.</strong>`;
+            rulesHtml = `<strong>🎂 Bolos e Kits Festa:</strong> Mínimo 1 dia de antecedência. Retirada das ${windowStart} às ${windowEnd}. <strong>Apenas retirada, sem entrega.</strong>`;
         } else if (analysis.hasBoloMini) {
-            rulesHtml = `<strong>🌋 Vulcão Mini:</strong> Pedidos até 10h para o mesmo dia. Após 10h, só para o dia seguinte. Horário: 07:00-18:00.`;
+            rulesHtml = `<strong>🌋 Vulcão Mini:</strong> Pedidos até 10h para o mesmo dia. Após 10h, só para o dia seguinte. Horário: ${windowStart}-${windowEnd}.`;
         } else if (analysis.hasSalgados) {
-            rulesHtml = `<strong>🥟 Salgados:</strong> Mesmo dia: pedir até 8h (entrega/retirada 11:30-18h). Data futura: 07:00-18:00.<br>
-                        <span class="text-xs">• 11:30-14:00: mín. R$ 20 | 07:00-11:00: mín. R$ 35 | 11:00-14:00: mín. R$ 25</span>`;
+            const morningText = morningEnabled ? `• Manhã (${windowStart}-${morningEndTime}): mín. R$ ${morningMinValue.toFixed(2).replace('.', ',')}` : '';
+            rulesHtml = `<strong>🥟 Salgados:</strong> Mesmo dia: pedir até 8h (disponível ${sameDayStart}-${windowEnd}, mín. R$ ${sameDayMinValue.toFixed(2).replace('.', ',')}). Encomendas: ${windowStart}-${windowEnd}.<br>
+                        <span class="text-xs">${morningText}</span>`;
         } else {
-            rulesHtml = `<strong>📋 Horário de funcionamento:</strong> 07:00 às 18:00`;
+            rulesHtml = `<strong>📋 Horário de funcionamento:</strong> ${windowStart} às ${windowEnd}`;
         }
 
         orderRulesInfo.innerHTML = rulesHtml;
@@ -708,7 +768,10 @@ window.updateNeighborhoodMinValueWarning = function () {
         return;
     }
 
-    const minValue = Math.max(15, window.getMinDeliveryValue(neighborhood) || 0);
+    const globalMinDelivery = (window.storeConfig && typeof window.storeConfig.min_order_delivery === 'number')
+        ? window.storeConfig.min_order_delivery
+        : 15;
+    const minValue = Math.max(globalMinDelivery, window.getMinDeliveryValue(neighborhood) || 0);
 
     if (window.cartTotal < minValue) {
         const faltando = (minValue - window.cartTotal).toFixed(2).replace('.', ',');

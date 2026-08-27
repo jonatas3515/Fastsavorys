@@ -121,6 +121,9 @@ async function fetchProductPriceMap(supabaseAdmin, forceRefresh = false) {
             if (p.category === 'bebidas') {
                 map.drinks.push({ name: nm, price });
             } else if (p.category === 'salgados') {
+                // ⛔ X-Coxinha é um produto DIFERENTE de Coxinha (R$ 17 vs R$ 4,50).
+                // Não deve sobrescrever o token 'coxinha'. Tratamos como item especial.
+                if (/x[- ]?coxinha/i.test(nm)) continue; // pula X-Coxinha — não é salgado unitário simples
                 for (const tok of SALGADO_UNIT_TOKENS) {
                     if (nm.includes(tok)) { map.units[tok] = price; break; }
                 }
@@ -357,6 +360,17 @@ function estimateCartTotal(history, priceMap = null) {
         // Mensagem mais recente SOBRESCREVE a quantidade de cada token/bebida já visto antes.
         for (const [tok, q] of Object.entries(msgSalgado)) salgadoQty[tok] = q;
         for (const [name, q] of Object.entries(msgDrink)) drinkQty[name] = q;
+    }
+
+    // ⛔ CORREÇÃO DE DOUBLE-COUNTING: Se o cliente disse "2 salgados grandes" e depois especificou
+    // "1 risole 1 coxinha", os itens específicos SÃO os 2 salgados — não devemos somar ambos.
+    // Se temos itens específicos de salgado E genéricos, os específicos prevalecem (o genérico era
+    // apenas uma forma do cliente pedir antes de escolher os sabores).
+    const hasSpecificSalgados = Object.keys(salgadoQty).length > 0;
+    if (hasSpecificSalgados && genericTotal > 0) {
+        console.log(`[calc] ⚠️ Zerando genericTotal (R$ ${genericTotal.toFixed(2)}) porque há itens específicos de salgado`);
+        genericTotal = 0;
+        genericItems.length = 0;
     }
 
     let total = miniTotal + centoTotal + genericTotal;

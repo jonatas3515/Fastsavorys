@@ -19,6 +19,33 @@ async function loadStoreConfig() {
     }
 }
 
+window.blockedDates = [];
+async function loadBlockedDates() {
+    try {
+        if (!window.supabaseClient) {
+            window.blockedDates = [];
+            return [];
+        }
+        const { data, error } = await window.supabaseClient
+            .from('fast_blocked_dates')
+            .select('*')
+            .order('blocked_date', { ascending: true });
+
+        if (error) throw error;
+        window.blockedDates = data || [];
+        localStorage.setItem('fastBlockedDates', JSON.stringify(window.blockedDates));
+        return window.blockedDates;
+    } catch (e) {
+        console.warn('[BlockedDates] Usando fallback/cache:', e.message);
+        const saved = localStorage.getItem('fastBlockedDates');
+        if (saved) {
+            try { window.blockedDates = JSON.parse(saved); } catch (err) { }
+        }
+        return window.blockedDates || [];
+    }
+}
+window.loadBlockedDates = loadBlockedDates;
+
 async function loadBusinessHours() {
     try {
         const { data, error } = await window.supabaseClient

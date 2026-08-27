@@ -33,6 +33,7 @@ document.addEventListener('DOMContentLoaded', async function () {
                     // Usar StoreConfigService se disponível, senão fallback para loadStoreConfig global
                     (window.StoreConfigService ? window.StoreConfigService.load() : (typeof loadStoreConfig === 'function' ? loadStoreConfig() : Promise.resolve())).catch(function (e) { console.error('[INIT] loadStoreConfig erro:', e); }),
                     (typeof loadBusinessHours === 'function' ? loadBusinessHours() : Promise.resolve()).catch(function (e) { console.error('[INIT] loadBusinessHours erro:', e); }),
+                    (typeof loadBlockedDates === 'function' ? loadBlockedDates() : Promise.resolve()).catch(function (e) { console.error('[INIT] loadBlockedDates erro:', e); }),
                     // loadDeliveryFees removido ou movido? Check if exists.
                     (typeof loadDeliveryFees === 'function' ? loadDeliveryFees() : Promise.resolve()).catch(function (e) { console.error('[INIT] loadDeliveryFees erro:', e); }),
                     (window.ProductOptionsModule ? window.ProductOptionsModule.load() : Promise.resolve()).catch(function (e) { console.error('[INIT] ProductOptionsModule erro:', e); }),

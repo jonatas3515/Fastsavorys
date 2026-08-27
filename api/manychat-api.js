@@ -18,6 +18,7 @@ const {
     fetchProductPriceMap,
     fetchDeliveryFeeMap,
     estimateCartTotal,
+    collectMentionedAmounts,
     validatePixAmount,
     validateCartaoAmount,
     parseBrlNumber,
@@ -642,16 +643,27 @@ function buildDeliveryFactHint(history, currentMessage, priceMap = null, feeMap 
     const isDeliveryCtx = /entrega|entregar|delivery|bairro|endereço|para qual bairro/i.test(allTexts);
     if (!isDeliveryCtx) return '';
 
+    // Estimate order total from full conversation (calculadora determinística)
+    const { total, description, complete } = estimateCartTotal([...history, { role: 'user', text: currentMessage }], priceMap);
+
     // Detect bairro from user messages (prefer most recent)
     let bairroInfo = null;
     for (let i = userMsgs.length - 1; i >= 0; i--) {
         bairroInfo = detectBairroInText(userMsgs[i], feeMap);
         if (bairroInfo) break;
     }
-    if (!bairroInfo) return '';
 
-    // Estimate order total from full conversation (calculadora determinística)
-    const { total, description, complete } = estimateCartTotal([...history, { role: 'user', text: currentMessage }], priceMap);
+    // Se AINDA NÃO informou bairro, mas o total é conhecido e está ABAIXO do pedido mínimo global (R$ 15,00):
+    // Interrompe imediatamente para a IA NÃO pedir bairro nem rua, mas sim avisar do mínimo!
+    if (!bairroInfo) {
+        if (total > 0 && complete && total < 15.00) {
+            const falta = (15.00 - total).toFixed(2).replace('.', ',');
+            const hint = `\n[⛔ FATO VERIFICADO (pedido mínimo de entrega): O total dos produtos é R$ ${total.toFixed(2).replace('.', ',')} (${description}), que é MENOR que o pedido mínimo global de R$ 15,00 para entrega. ⛔ NÃO aceite entrega e NÃO pergunte o bairro nem o endereço. Informe gentilmente ao cliente: "Nosso pedido mínimo para entrega é de R$ 15,00 (faltam R$ ${falta} em produtos). Você gostaria de adicionar mais algum item ao pedido ou prefere retirar na nossa loja (Rua Palmeiras, 105, Novo Prado)?"]`;
+            console.log(`[delivery-hint] ${hint.replace(/\n/g, ' | ')}`);
+            return hint;
+        }
+        return '';
+    }
 
     const feeStr = bairroInfo.fee === 0 ? 'GRÁTIS' : `R$ ${bairroInfo.fee.toFixed(2)}`;
     let hint = `\n[⛔ DADOS VERIFICADOS PELO SISTEMA (USE ESTES VALORES — NÃO INVENTE):`;
@@ -670,7 +682,7 @@ function buildDeliveryFactHint(history, currentMessage, priceMap = null, feeMap 
             hint += ` Total com taxa: R$ ${total.toFixed(2)} + ${feeStr} = R$ ${totalComTaxa.toFixed(2)}`;
         } else {
             const falta = (effectiveMin - total).toFixed(2).replace('.', ',');
-            hint += `\n  ❌ R$ ${total.toFixed(2)} < R$ ${effectiveMin.toFixed(2)} → ABAIXO DO MÍNIMO. Faltam R$ ${falta}. NÃO aceite entrega.`;
+            hint += `\n  ❌ R$ ${total.toFixed(2)} < R$ ${effectiveMin.toFixed(2)} → ABAIXO DO MÍNIMO. Faltam R$ ${falta}. ⛔ NÃO aceite entrega e NÃO peça endereço/rua/número. Diga com simpatia que o pedido mínimo para entrega é R$ ${effectiveMin.toFixed(2).replace('.', ',')} e sugira adicionar itens ou retirar na loja (Rua Palmeiras, 105, Novo Prado).`;
         }
     } else if (total > 0 && !complete) {
         hint += `\n  ⚠️ Pedido tem itens de preço fixo/variável (bolo/kit/combo) ou foi alterado. Some os valores a partir do CARDÁPIO acima com atenção. NÃO invente — confira item por item.`;
@@ -755,21 +767,143 @@ function buildKitFactHint(history, currentMessage) {
 // Guard de pagamento: a opção de 50% de entrada SÓ pode ser oferecida quando o total do pedido for
 // MAIOR que R$ 50,00. O modelo às vezes oferece 50% em pedidos pequenos (ex: R$ 26,75). Injeta um
 // fato verificado com o total calculado deterministicamente para o modelo obedecer ao limiar correto.
+// FALLBACK: quando a calculadora não consegue precificar (bolo/kit/combo → complete=false), usa o
+// maior valor monetário mencionado na conversa como estimativa do total.
 function buildPaymentFactHint(history, currentMessage, priceMap = null, feeMap = null) {
     const allText = (history || []).map(m => m.text).join(' ') + ' ' + (currentMessage || '');
-    const isPaymentCtx = /\b(pix|pagar|pagamento|gera.*pix|chave pix|copia e cola|cart[aã]o|dinheiro)\b/i.test(allText);
-    if (!isPaymentCtx) return '';
+    const isPaymentCtx = /\b(pix|pagar|pagamento|gera.*pix|chave pix|copia e cola|cart[aã]o|dinheiro|retirada|entrada|confirm)\b/i.test(allText);
+    // Também ativa se tem kit/bolo no contexto e já está em fase avançada (horário/data definidos)
+    const hasKitOrBolo = /\b(kit\s*festa|bolo\s*(pp|p|g)\b|vulc[aã]o\s*p\b|naked)\b/i.test(allText);
+    const isAdvancedStage = /\b(hor[aá]rio|agenda|amanh[ãa]|retirada|18h|17h)\b/i.test(allText);
+    if (!isPaymentCtx && !(hasKitOrBolo && isAdvancedStage)) return '';
+    let orderTotal = null;
     const det = computeDeterministicOrderTotal(history, currentMessage, priceMap, feeMap);
-    if (!det || det.total <= 0) return '';
-    const totalFmt = det.total.toFixed(2).replace('.', ',');
+    if (det && det.total > 0) {
+        orderTotal = det.total;
+    } else if (hasKitOrBolo) {
+        // FALLBACK: para kits/bolos onde a calculadora determinística não fecha
+        const t = normalizeTxt(allText);
+        if (/kit\s*festa\s*g\b/.test(t)) orderTotal = 250;
+        else if (/kit\s*festa\s*p\b/.test(t)) orderTotal = 150;
+        else if (/kit\s*festa\s*pp\b/.test(t)) orderTotal = 110;
+        else if (/bolo\s*g\b/.test(t)) orderTotal = 145;
+        else if (/bolo\s*p\b/.test(t)) orderTotal = 95;
+        else if (/bolo\s*pp\b/.test(t)) orderTotal = 70;
+        else if (/vulcao\s*mini/.test(t)) orderTotal = 15;
+        else if (/bolo\s*(no|de)\s*pote/.test(t)) orderTotal = 10;
+        else {
+            // Busca o valor mais recente mencionado pelo bot
+            const botMsgs = (history || []).filter(m => m.role === 'assistant');
+            for (let i = botMsgs.length - 1; i >= 0; i--) {
+                const m = botMsgs[i].text.match(/R\$\s*(\d+[.,]\d{2})/);
+                if (m) {
+                    orderTotal = parseBrlNumber(m[1]);
+                    break;
+                }
+            }
+        }
+    }
+    if (!orderTotal || orderTotal <= 0) return '';
+    const totalFmt = orderTotal.toFixed(2).replace('.', ',');
     let hint = `\n[⛔ FATO VERIFICADO (pagamento): O total do pedido é R$ ${totalFmt}. `;
-    if (det.total > 50) {
-        const entrada = (det.total * 0.5).toFixed(2).replace('.', ',');
-        hint += `Como o total é MAIOR que R$ 50,00, você PODE oferecer pagamento integral OU 50% de entrada (R$ ${entrada}). NÃO ofereça entrada abaixo de 50%. NÃO deixe o cliente pagar menos sem passar para a Jéssica.]`;
+    if (orderTotal > 50) {
+        const entrada = (orderTotal * 0.5).toFixed(2).replace('.', ',');
+        hint += `Como o total é MAIOR que R$ 50,00, o pedido SÓ PODE SER CONFIRMADO após o cliente pagar no mínimo 50% de entrada (R$ ${entrada}). `;
+        hint += `⛔⛔ REGRA CRÍTICA: Se o cliente disser "pago na retirada", "pago amanhã", "pago depois", "deixa que pago lá" ou qualquer variação de ADIAR o pagamento integral sem dar entrada agora: REJEITE com educação. Diga que para pedidos acima de R$ 50,00 precisamos de 50% de entrada via Pix para confirmar a reserva, e que o restante pode ser pago no dia da retirada/entrega. `;
+        hint += `NÃO ofereça entrada abaixo de 50%. NÃO deixe o cliente pagar menos sem passar para a Jéssica. NÃO diga "pode pagar hoje ou amanhã" — a entrada é OBRIGATÓRIA ANTES da confirmação.]`;
     } else {
-        hint += `Como o total é R$ 50,00 ou MENOS, ⛔ NÃO ofereça 50% de entrada. Exija pagamento integral de R$ ${totalFmt}. Para PIX, gere [GERAR_PIX:${det.total.toFixed(2)}] depois que o cliente confirmar.]`;
+        hint += `Como o total é R$ 50,00 ou MENOS, ⛔ NÃO ofereça 50% de entrada. Exija pagamento integral de R$ ${totalFmt}. Para PIX, gere [GERAR_PIX:${orderTotal.toFixed(2)}] depois que o cliente confirmar.]`;
     }
     console.log(`[payment-hint] ${hint.replace(/\n/g, ' | ')}`);
+    return hint;
+}
+
+// Guard de horário: detecta quando o cliente menciona horário de retirada/entrega após 18h (seg-sáb)
+// ou após 17h30 (dom/feriado). A IA às vezes aceita horários como 18:50 ou 19:00 que estão fora do
+// permitido. Injeta fato verificado para a IA rejeitar e sugerir horário válido.
+function buildScheduleFactHint(history, currentMessage) {
+    // Só analisa as ÚLTIMAS mensagens do CLIENTE (não do bot) para detectar horários propostos
+    const userMsgs = (history || []).filter(m => m.role === 'user').map(m => m.text);
+    userMsgs.push(currentMessage || '');
+    // Pega a última mensagem do cliente que menciona horário
+    const allUserText = userMsgs.join('\n');
+    // Regex para capturar horários no formato HH:MM, HHhMM, HH h, HH hrs, etc.
+    const timePatterns = /(\d{1,2})\s*(?::|h|hrs?)\s*(\d{0,2})/gi;
+    let match;
+    let latestHour = -1;
+    let latestMin = 0;
+    let latestRaw = '';
+    // Procura na mensagem ATUAL primeiro (prioridade)
+    const currentText = currentMessage || '';
+    const currentTimePatterns = /(\d{1,2})\s*(?::|h|hrs?)\s*(\d{0,2})/gi;
+    while ((match = currentTimePatterns.exec(currentText)) !== null) {
+        const h = parseInt(match[1], 10);
+        const m = parseInt(match[2] || '0', 10);
+        if (h >= 0 && h <= 23 && m >= 0 && m <= 59) {
+            latestHour = h;
+            latestMin = m;
+            latestRaw = match[0];
+        }
+    }
+    // Se não achou na mensagem atual, procura nas últimas 3 msgs do cliente
+    if (latestHour < 0) {
+        const recentUserMsgs = userMsgs.slice(-3);
+        for (const msg of recentUserMsgs) {
+            const re = /(\d{1,2})\s*(?::|h|hrs?)\s*(\d{0,2})/gi;
+            while ((match = re.exec(msg)) !== null) {
+                const h = parseInt(match[1], 10);
+                const m = parseInt(match[2] || '0', 10);
+                if (h >= 0 && h <= 23 && m >= 0 && m <= 59) {
+                    latestHour = h;
+                    latestMin = m;
+                    latestRaw = match[0];
+                }
+            }
+        }
+    }
+    if (latestHour < 0) return ''; // Nenhum horário encontrado
+    // Verifica se o contexto é de agendamento/retirada/entrega (não queremos falsos positivos)
+    const allText = (history || []).map(m => m.text).join(' ') + ' ' + (currentMessage || '');
+    const isScheduleCtx = /\b(retirada|retirar|entrega|entregar|buscar|pegar|agendar|agendamento|horário|hora)\b/i.test(allText);
+    if (!isScheduleCtx) return '';
+    // Detecta se é pedido para domingo/feriado (limite 17:30) ou dia normal (limite 18:00)
+    const isDomingo = /\bdomingo\b/i.test(allText);
+    const isFeriado = /\bferiado\b/i.test(allText);
+    const maxHour = (isDomingo || isFeriado) ? 17 : 18;
+    const maxMin = (isDomingo || isFeriado) ? 30 : 0;
+    const totalMinutes = latestHour * 60 + latestMin;
+    const maxTotalMinutes = maxHour * 60 + maxMin;
+    if (totalMinutes > maxTotalMinutes) {
+        const maxLabel = (isDomingo || isFeriado) ? '17h30' : '18h';
+        const dayLabel = isDomingo ? 'domingos' : (isFeriado ? 'feriados' : 'segunda a sábado');
+        const hint = `\n[⛔ FATO VERIFICADO (horário): O cliente solicitou horário "${latestRaw}" que é APÓS o limite de ${maxLabel} (${dayLabel}). ⛔ REJEITE este horário. Diga com educação: "Nosso horário de retirada/entrega vai até as ${maxLabel}. Você gostaria de agendar para outro horário?" NÃO aceite horários após ${maxLabel}.]`;
+        console.log(`[schedule-hint] ${hint.replace(/\n/g, ' | ')}`);
+        return hint;
+    }
+    return '';
+}
+
+// Guard de fita/laço do bolo: detecta quando a personalização (massa + recheio) já foi feita
+// mas a cor da fita ainda não foi perguntada. Só se aplica a bolos grandes (PP/P/G/Vulcão P)
+// e Kit Festa — NÃO se aplica a Vulcão Mini nem Bolo no Pote (não levam fita).
+function buildFitaFactHint(history, currentMessage) {
+    const allText = (history || []).map(m => m.text).join('\n') + '\n' + (currentMessage || '');
+    const t = normalizeTxt(allText);
+    // Verifica se tem bolo grande ou kit festa no pedido
+    const hasBoloGrandeOuKit = /(kit\s*festa|bolo\s*(pp|p|g)\b|vulcao\s*p\b|naked)/.test(t);
+    if (!hasBoloGrandeOuKit) return '';
+    // Verifica se a personalização já foi feita (massa e recheio respondidos pelo CLIENTE)
+    const userTexts = (history || []).filter(m => m.role === 'user').map(m => normalizeTxt(m.text)).join(' ');
+    const hasMassa = /\b(branca|chocolate)\b/.test(userTexts);
+    const hasRecheio = /\b(ninho|beijinho|chocolate\s*com|c[oô]co)\b/.test(userTexts);
+    if (!hasMassa || !hasRecheio) return ''; // Personalização ainda não completa
+    // Verifica se a fita já foi perguntada ou respondida
+    const botTexts = (history || []).filter(m => m.role === 'assistant').map(m => normalizeTxt(m.text)).join(' ');
+    const fitaAlreadyAsked = /fita|la[cç]o/.test(botTexts);
+    const fitaAnswered = /\b(verde|azul|rosa|vermelha|tanto faz)\b/.test(userTexts) && fitaAlreadyAsked;
+    if (fitaAlreadyAsked) return ''; // Já perguntou (respondida ou não, não repete)
+    const hint = `\n[⛔ ETAPA OBRIGATÓRIA — FITA/LAÇO DO BOLO: A personalização (massa + recheio) já foi respondida pelo cliente. AGORA, ANTES de avançar para data/horário/pagamento, você DEVE perguntar a cor da fita/laço do bolo: "Gostaria de escolher a cor da fita/laço do bolo? 🎀\n🟢 Verde  🔵 Azul  🩷 Rosa  🔴 Vermelha"\nSe o cliente disser "tanto faz" ou não quiser escolher, use rosa (padrão). ⛔ NÃO pule esta etapa.]`;
+    console.log(`[fita-hint] ${hint.replace(/\n/g, ' | ')}`);
     return hint;
 }
 
@@ -2141,6 +2275,18 @@ function getBrazilTime() {
     const paymentFactHint = buildPaymentFactHint(session.history, effectiveMessage, priceMap, feeMap);
     if (paymentFactHint) {
         intentHint += paymentFactHint;
+    }
+
+    // --- Guard de horário (rejeitar horários após 18h seg-sáb / 17h30 dom-feriado) ---
+    const scheduleFactHint = buildScheduleFactHint(session.history, effectiveMessage);
+    if (scheduleFactHint) {
+        intentHint += scheduleFactHint;
+    }
+
+    // --- Guard de fita/laço do bolo (perguntar cor após personalização completa) ---
+    const fitaFactHint = buildFitaFactHint(session.history, effectiveMessage);
+    if (fitaFactHint) {
+        intentHint += fitaFactHint;
     }
 
     // --- Memória do cliente: injeta fatos de interações anteriores no prompt ---
