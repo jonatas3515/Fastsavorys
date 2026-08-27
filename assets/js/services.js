@@ -635,16 +635,42 @@ window.BirthdayDiscountService = {
 
   saveConfig: async function (config) {
     try {
+      // Salvar localmente primeiro
+      localStorage.setItem('fastBirthdayDiscountConfig', JSON.stringify(config));
+
+      const payload = {
+        discount_type: config.discount_type || 'percentage',
+        discount_value: parseFloat(config.discount_value) || 0,
+        active: config.active !== false
+      };
+      if (config.valid_days !== undefined) {
+        payload.valid_days = parseInt(config.valid_days, 10) || 6;
+      }
+
       // Delete existing and insert new
       await window.supabaseClient.from('fast_birthday_discount').delete().neq('id', 0);
-      const { data, error } = await window.supabaseClient
+      
+      let { data, error } = await window.supabaseClient
         .from('fast_birthday_discount')
-        .insert(config)
+        .insert(payload)
         .select()
         .single();
 
+      // Se der erro de coluna 'valid_days' inexistente no Supabase, tenta salvar os outros campos
+      if (error && error.message && error.message.includes('valid_days')) {
+        console.warn('[BirthdayDiscount] Coluna valid_days não encontrada no Supabase. Salvando campos principais...');
+        delete payload.valid_days;
+        const retry = await window.supabaseClient
+          .from('fast_birthday_discount')
+          .insert(payload)
+          .select()
+          .single();
+        data = retry.data;
+        error = retry.error;
+      }
+
       if (error) throw error;
-      this.config = data;
+      this.config = { ...data, valid_days: config.valid_days ?? 6 };
       return true;
     } catch (e) {
       console.error('[BirthdayDiscount] Erro ao salvar config:', e);
