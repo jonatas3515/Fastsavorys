@@ -1,126 +1,212 @@
-
 // ========================================
-// REPORT HELPER FUNCTIONS
+// REPORTS & METRICS MODULE (ADMIN)
 // ========================================
 
 let currentReportPeriod = 'month';
+
+// Safe money parser
+function parseMoney(val) {
+    if (val === null || val === undefined) return 0;
+    if (typeof val === 'number') return isNaN(val) ? 0 : val;
+    if (typeof val === 'string') {
+        const cleaned = val.replace(/[^\d.,-]/g, '').replace(',', '.');
+        const num = parseFloat(cleaned);
+        return isNaN(num) ? 0 : num;
+    }
+    return 0;
+}
+
+// Safe date parser
+function safeDate(d) {
+    if (!d) return new Date(0);
+    const date = new Date(d);
+    return isNaN(date.getTime()) ? new Date(0) : date;
+}
+
+// Check if order is active/completed (exclude cancelled)
+function isOrderValid(order) {
+    if (!order) return false;
+    const status = (order.status || '').toLowerCase().trim();
+    return status !== 'cancelled' && status !== 'cancelado' && status !== 'canceled';
+}
+
+// Robust neighborhood extractor
+function getNeighborhoodName(order) {
+    if (!order) return null;
+    let n = null;
+
+    if (order.neighborhood && typeof order.neighborhood === 'string') {
+        n = order.neighborhood;
+    } else if (order.address) {
+        if (typeof order.address === 'object') {
+            n = order.address.neighborhood || order.address.bairro;
+        } else if (typeof order.address === 'string') {
+            const raw = order.address.trim();
+            if (raw.startsWith('{') && raw.endsWith('}')) {
+                try {
+                    const parsed = JSON.parse(raw);
+                    n = parsed.neighborhood || parsed.bairro;
+                } catch (e) { }
+            }
+            if (!n) {
+                // Try to extract from string e.g. "Rua A, 123 - Centro"
+                const parts = raw.split('-');
+                if (parts.length > 1) {
+                    n = parts[parts.length - 1].trim();
+                } else {
+                    const commaParts = raw.split(',');
+                    if (commaParts.length > 2) {
+                        n = commaParts[2].trim();
+                    }
+                }
+            }
+        }
+    }
+
+    if (!n && order.details) {
+        try {
+            const det = typeof order.details === 'string' ? JSON.parse(order.details) : order.details;
+            n = det.neighborhood || det.bairro;
+        } catch (e) { }
+    }
+
+    if (!n || typeof n !== 'string') return null;
+
+    n = n.trim();
+    if (!n || n.toLowerCase() === 'retirada' || n.toLowerCase() === 'balcao') return null;
+
+    // Capitalize words nicely
+    return n.toLowerCase().split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
 
 function getOrdersInPeriod(period) {
     const orders = window.orders || [];
     const now = new Date();
     let startDate;
-    let endDate; // Declare endDate here
+    let endDate;
 
     switch (period) {
         case 'today':
             startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-            endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1); // End of today
-            console.log('[Reports] Filter Today. Start:', startDate, 'End:', endDate);
+            endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
             break;
         case 'yesterday':
             startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-            endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate()); // End of yesterday
+            endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
             break;
         case 'week':
             startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
-            endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1); // End of today
+            endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
             break;
         case 'month':
             startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-            endDate = new Date(now.getFullYear(), now.getMonth() + 1, 1); // Start of next month
+            endDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
             break;
         case 'semester':
             startDate = new Date(now.getFullYear(), now.getMonth() - 6, 1);
-            endDate = new Date(now.getFullYear(), now.getMonth() + 1, 1); // Start of next month
+            endDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
             break;
         case 'year':
             startDate = new Date(now.getFullYear(), 0, 1);
-            endDate = new Date(now.getFullYear() + 1, 0, 1); // Start of next year
+            endDate = new Date(now.getFullYear() + 1, 0, 1);
             break;
         default:
             startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-            endDate = new Date(now.getFullYear(), now.getMonth() + 1, 1); // Start of next month
+            endDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
     }
-
-    // Helper helper for date safety
-    const safeDate = (d) => {
-        if (!d) return new Date(0);
-        return new Date(d);
-    };
 
     return orders.filter(o => {
         const d = safeDate(o.created_at || o.id);
-        if (period === 'yesterday') {
-            // Special case for exact day match if needed, but 'yesterday' usually implies last 24h or since yesterday 00:00.
-            // Let's assume start date inclusive.
-            // If strictly 'yesterday' (00:00 to 23:59), logic needs update.
-            // Current logic: >= startDate.
-            // For 'yesterday', let's stick to >= yesterday 00:00.
-            return d >= startDate;
-        }
-        return d >= startDate;
+        return d >= startDate && d < endDate;
     });
 }
 
 function calculateClientRanking(periodOrders) {
-    const validOrders = periodOrders.filter(order => {
-        const status = (order.status || '').toLowerCase();
-        return status.includes('paid') || status.includes('delivered') || status.includes('confirmed') ||
-            status.includes('pago') || status.includes('entregue') || status.includes('pronto') ||
-            status === 'preparing' || status === 'out_for_delivery';
-    });
-
+    const validOrders = (periodOrders || []).filter(isOrderValid);
     const clientTotals = {};
 
     validOrders.forEach(order => {
-        const key = order.client_phone || order.client_name;
+        const phone = (order.client_phone || '').replace(/\D/g, '');
+        const name = (order.client_name || '').trim();
+        const key = phone || name || `order-${order.id}`;
+
         if (!clientTotals[key]) {
             clientTotals[key] = {
-                name: order.client_name,
-                phone: order.client_phone,
+                name: name || 'Cliente',
+                phone: phone,
                 total: 0,
                 orderCount: 0
             };
         }
-        let val = 0;
-        const s = (order.status || '').toLowerCase();
 
-        if (['delivered', 'confirmed'].includes(s)) {
-            val = parseFloat(order.total || 0);
-        } else {
-            val = parseFloat(order.amount_paid || 0);
+        if (name && name.length > (clientTotals[key].name || '').length) {
+            clientTotals[key].name = name;
         }
 
-        clientTotals[key].total += val;
+        clientTotals[key].total += parseMoney(order.total);
         clientTotals[key].orderCount++;
     });
 
     return Object.values(clientTotals)
         .sort((a, b) => b.total - a.total)
-        .slice(0, 10);
+        .slice(0, 15);
 }
 
 function calculateTopProducts(periodOrders) {
     const productCounts = {};
+    const validOrders = (periodOrders || []).filter(isOrderValid);
 
-    periodOrders.forEach(order => {
+    validOrders.forEach(order => {
         let items = [];
         try {
             items = typeof order.items === 'string' ? JSON.parse(order.items) : (order.items || []);
         } catch (e) { items = []; }
 
+        if (!Array.isArray(items)) return;
+
         items.forEach(item => {
-            if (!productCounts[item.name]) {
-                productCounts[item.name] = { name: item.name, quantity: 0, revenue: 0 };
+            if (!item || !item.name) return;
+            const name = item.name.trim();
+            const qty = parseInt(item.quantity, 10) || 1;
+            const price = parseMoney(item.price || item.unit_price || 0);
+            const revenue = (item.total ? parseMoney(item.total) : (price * qty));
+
+            if (!productCounts[name]) {
+                productCounts[name] = { name: name, quantity: 0, revenue: 0 };
             }
-            productCounts[item.name].quantity += item.quantity || 1;
-            productCounts[item.name].revenue += (item.price || 0) * (item.quantity || 1);
+            productCounts[name].quantity += qty;
+            productCounts[name].revenue += revenue;
         });
     });
 
     return Object.values(productCounts)
         .sort((a, b) => b.quantity - a.quantity)
         .slice(0, 8);
+}
+
+function calculateNeighborhoodStats(orders) {
+    const stats = {};
+    const validOrders = (orders || []).filter(isOrderValid);
+
+    validOrders.forEach(order => {
+        const n = getNeighborhoodName(order);
+        if (!n) return;
+
+        const key = n.toLowerCase();
+        if (!stats[key]) {
+            stats[key] = {
+                name: n,
+                count: 0,
+                total: 0
+            };
+        }
+
+        stats[key].count++;
+        stats[key].total += parseMoney(order.total);
+    });
+
+    return Object.values(stats)
+        .sort((a, b) => b.count - a.count);
 }
 
 function updatePeriodButtons() {
@@ -143,17 +229,104 @@ function updatePeriodButtons() {
     });
 }
 
-function calculateNeighborhoodStats(orders) {
-    const stats = {};
-    orders.forEach(o => {
-        if (!o.address || !o.address.neighborhood) return;
-        const n = o.address.neighborhood;
-        if (!stats[n]) stats[n] = 0;
-        stats[n]++;
-    });
-    return Object.entries(stats).sort((a, b) => b[1] - a[1]);
+function renderOrderHistoryList(orders) {
+    const historyList = document.getElementById('orderHistoryList');
+    if (!historyList) return;
+
+    const searchTerm = (document.getElementById('orderSearchClient')?.value || '').toLowerCase().trim();
+    let displayOrders = orders || [];
+
+    if (searchTerm) {
+        displayOrders = displayOrders.filter(o => {
+            const name = (o.client_name || '').toLowerCase();
+            const phone = (o.client_phone || '').toLowerCase();
+            const code = (o.order_code || '').toLowerCase();
+            return name.includes(searchTerm) || phone.includes(searchTerm) || code.includes(searchTerm);
+        });
+    }
+
+    if (displayOrders.length > 0) {
+        const formatDate = (d) => {
+            const date = new Date(d);
+            return isNaN(date.getTime()) ? 'Data inv.' : date.toLocaleDateString('pt-BR');
+        };
+
+        historyList.innerHTML = displayOrders.slice(0, 50).map(o => {
+            const date = formatDate(o.created_at || o.id);
+            let itemsCount = 0;
+            try {
+                const items = typeof o.items === 'string' ? JSON.parse(o.items) : (o.items || []);
+                itemsCount = items.length;
+            } catch (e) { }
+
+            const isCancelled = (o.status || '').toLowerCase().includes('cancel');
+
+            return `
+            <div class="p-2.5 bg-white border ${isCancelled ? 'border-red-200 bg-red-50/50' : 'border-gray-100'} rounded-lg hover:shadow-sm transition-shadow">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="font-medium text-gray-800 text-sm flex items-center gap-1.5">
+                            ${o.client_name || 'Cliente'}
+                            ${isCancelled ? '<span class="text-[10px] bg-red-100 text-red-600 px-1.5 py-0.5 rounded font-semibold">Cancelado</span>' : ''}
+                        </p>
+                        <p class="text-xs text-gray-500 mt-0.5">${date} | ${itemsCount} ${itemsCount === 1 ? 'item' : 'itens'}${o.order_code ? ` | <span class="font-mono text-gray-600">${o.order_code}</span>` : ''}</p>
+                    </div>
+                    <span class="font-bold ${isCancelled ? 'text-gray-400 line-through' : 'text-green-600'} text-sm">R$ ${parseMoney(o.total).toFixed(2).replace('.', ',')}</span>
+                </div>
+            </div>
+            `;
+        }).join('');
+    } else {
+        historyList.innerHTML = `<div class="text-center py-8 text-gray-500"><p class="text-4xl mb-2">📦</p><p class="text-sm">${searchTerm ? 'Nenhum cliente encontrado para essa busca.' : 'Nenhum pedido no período.'}</p></div>`;
+    }
 }
 
+function renderNeighborhoodChart(orders) {
+    const container = document.getElementById('neighborhoodChartContainer') || document.getElementById('chartsContainer');
+    if (!container) return;
+
+    const stats = calculateNeighborhoodStats(orders);
+
+    if (stats.length === 0) {
+        container.innerHTML = `
+            <div class="flex flex-col items-center justify-center h-full text-gray-400 py-8">
+                <span class="text-2xl mb-2">🔄</span>
+                <p class="text-sm">Nenhum pedido com entrega no período.</p>
+            </div>
+        `;
+        return;
+    }
+
+    const maxCount = Math.max(...stats.map(s => s.count), 1);
+    const topStats = stats.slice(0, 10);
+
+    const html = `
+        <div class="w-full space-y-3 max-h-80 overflow-y-auto pr-1 scrollbar-thin">
+            ${topStats.map((s, i) => {
+                const percentage = Math.round((s.count / maxCount) * 100);
+                const colors = ['bg-rose-500', 'bg-rose-400', 'bg-rose-300', 'bg-pink-400', 'bg-pink-300'];
+                const color = colors[Math.min(i, colors.length - 1)];
+
+                return `
+                <div class="flex items-center gap-3">
+                    <div class="w-28 text-right text-sm font-medium text-gray-700 truncate capitalize" title="${s.name}">${s.name}</div>
+                    <div class="flex-1 bg-gray-100 rounded-full h-6 relative overflow-hidden">
+                        <div class="${color} h-full rounded-full transition-all duration-500" style="width: ${percentage}%"></div>
+                        <span class="absolute inset-0 flex items-center justify-center text-xs font-bold ${percentage > 50 ? 'text-white' : 'text-gray-700'}">
+                            ${s.count} ${s.count === 1 ? 'pedido' : 'pedidos'}
+                        </span>
+                    </div>
+                    <div class="w-24 text-right text-xs text-green-600 font-bold">
+                        R$ ${s.total.toFixed(2).replace('.', ',')}
+                    </div>
+                </div>
+                `;
+            }).join('')}
+        </div>
+    `;
+
+    container.innerHTML = html;
+}
 
 function renderReportsData() {
     console.log('[Reports] Updating reports data...');
@@ -162,252 +335,65 @@ function renderReportsData() {
     // Ensure orders exist
     const orders = window.orders || [];
 
-    // Get orders filtered by the current global period
+    // Get orders filtered by current global period (Month, Semester, Year)
     const periodOrders = getOrdersInPeriod(currentReportPeriod);
+    const validPeriodOrders = periodOrders.filter(isOrderValid);
 
-    // --- Update KPI Cards (Summary) ---
-    // Filter paid/valid orders for revenue stats
-    // Logic: 
-    // - If Delivered/Confirmed: Use 'total' (assuming full payment received upon delivery)
-    // - If Scheduled/Pending/Preparing: Use 'amount_paid' (partial or full advance)
+    // 1. Period KPIs
+    const totalSales = validPeriodOrders.reduce((sum, o) => sum + parseMoney(o.total), 0);
+    const totalOrders = validPeriodOrders.length;
+    const avgTicket = totalOrders > 0 ? totalSales / totalOrders : 0;
 
-    // We filter orders that contribute to revenue (either delivered or have some payment)
-    const paidOrders = periodOrders.filter(o => {
-        const s = (o.status || '').toLowerCase();
-        const paid = parseFloat(o.amount_paid || 0);
-        return ['delivered', 'confirmed'].includes(s) || paid > 0 || (o.payment_status && o.payment_status.includes('paid'));
-    });
+    if (document.getElementById('reportSalesMonth')) {
+        document.getElementById('reportSalesMonth').textContent = `R$ ${totalSales.toFixed(2).replace('.', ',')}`;
+    }
+    if (document.getElementById('reportTicketAvg')) {
+        document.getElementById('reportTicketAvg').textContent = `R$ ${avgTicket.toFixed(2).replace('.', ',')}`;
+    }
 
-    const totalRevenue = paidOrders.reduce((sum, o) => {
-        const s = (o.status || '').toLowerCase();
-        if (['delivered', 'confirmed'].includes(s)) {
-            return sum + parseFloat(o.total || 0);
-        } else {
-            return sum + parseFloat(o.amount_paid || 0);
-        }
-    }, 0);
-
-    const totalOrders = periodOrders.length;
-    const avgOrder = paidOrders.length > 0 ? totalRevenue / paidOrders.length : 0;
-    const uniqueClients = new Set(periodOrders.map(o => o.client_phone || o.client_name)).size;
-
-    // Update Summary Cards
-    if (document.getElementById('totalRevenueCard')) document.getElementById('totalRevenueCard').textContent = `R$ ${totalRevenue.toFixed(2).replace('.', ',')}`;
-    if (document.getElementById('totalOrdersCard')) document.getElementById('totalOrdersCard').textContent = totalOrders;
-    if (document.getElementById('avgOrderCard')) document.getElementById('avgOrderCard').textContent = `R$ ${avgOrder.toFixed(2).replace('.', ',')}`;
-    if (document.getElementById('uniqueClientsCard')) document.getElementById('uniqueClientsCard').textContent = uniqueClients;
-
-    // Legacy support & Dashboard Widgets
-    // These should ALWAYS show TODAY's data, regardless of the selected period for the main report
+    // 2. Today's KPIs
     const ordersToday = getOrdersInPeriod('today');
-    const paidOrdersToday = ordersToday.filter(o => {
-        const s = (o.status || '').toLowerCase();
-        const paid = parseFloat(o.amount_paid || 0);
-        return ['delivered', 'confirmed'].includes(s) || paid > 0 || (o.payment_status && o.payment_status.includes('paid'));
-    });
-    const revenueToday = paidOrdersToday.reduce((sum, o) => {
-        const s = (o.status || '').toLowerCase();
-        if (['delivered', 'confirmed'].includes(s)) {
-            return sum + parseFloat(o.total || 0);
-        } else {
-            return sum + parseFloat(o.amount_paid || 0);
-        }
-    }, 0);
+    const validOrdersToday = ordersToday.filter(isOrderValid);
+    const salesToday = validOrdersToday.reduce((sum, o) => sum + parseMoney(o.total), 0);
 
-    // Update "Sales Today" specific elements (Dashboard/Sidebar/TopCards)
-    // Update KPIs (existing logic)
-    if (document.getElementById('reportSalesToday')) document.getElementById('reportSalesToday').textContent = `R$ ${ordersToday.reduce((sum, o) => sum + (parseFloat(o.total) || 0), 0).toFixed(2).replace('.', ',')}`;
-    if (document.getElementById('reportOrdersToday')) document.getElementById('reportOrdersToday').textContent = ordersToday.length;
-
-    // Calculate period stats
-    let totalSales = 0;
-    let totalOrdersForPeriod = periodOrders.length; // Renamed to avoid conflict with 'totalOrders' above
-
-    periodOrders.forEach(o => {
-        totalSales += (parseFloat(o.total) || 0);
-    });
-
-    const avgTicket = totalOrdersForPeriod > 0 ? totalSales / totalOrdersForPeriod : 0;
-
-    // Update Cards
-    if (document.getElementById('reportSalesMonth')) document.getElementById('reportSalesMonth').textContent = `R$ ${totalSales.toFixed(2).replace('.', ',')}`;
-    if (document.getElementById('reportTicketAvg')) document.getElementById('reportTicketAvg').textContent = `R$ ${avgTicket.toFixed(2).replace('.', ',')}`;
-
-    // --- Render Sub-Reports ---
-    const ranking = calculateClientRanking(periodOrders);
-    const rankingList = document.getElementById('clientRankingList');
-    if (rankingList) {
-        if (ranking.length > 0) {
-            rankingList.innerHTML = ranking.map((c, i) => `
-            <div class="flex items-center justify-between p-2 ${i < 3 ? 'bg-yellow-50 border border-yellow-200' : 'bg-white border'} rounded-lg">
-                <div class="flex items-center gap-3">
-                <span class="text-lg font-bold ${i === 0 ? 'text-yellow-500' : i === 1 ? 'text-gray-400' : i === 2 ? 'text-orange-400' : 'text-gray-600'}">${i + 1}º</span>
-                <div>
-                    <p class="font-medium text-gray-800 text-sm">${c.name}</p>
-                    <p class="text-xs text-gray-500">${c.orderCount} pedidos</p>
-                </div>
-                </div>
-                <span class="font-bold text-green-600">R$ ${c.total.toFixed(2).replace('.', ',')}</span>
-            </div>
-            `).join('');
-        } else {
-            rankingList.innerHTML = `<div class="text-center py-8 text-gray-500"><p class="text-4xl mb-2">🔄 </p><p>Nenhum pedido no período.</p></div>`;
-        }
+    if (document.getElementById('reportSalesToday')) {
+        document.getElementById('reportSalesToday').textContent = `R$ ${salesToday.toFixed(2).replace('.', ',')}`;
+    }
+    if (document.getElementById('reportOrdersToday')) {
+        document.getElementById('reportOrdersToday').textContent = validOrdersToday.length;
     }
 
-    // --- Order History ---
-    const historyList = document.getElementById('orderHistoryList');
-    if (historyList) {
-        if (periodOrders.length > 0) {
-            const formatDate = (d) => {
-                const date = new Date(d);
-                return isNaN(date.getTime()) ? 'Data inv.' : date.toLocaleDateString('pt-BR');
-            };
-
-            historyList.innerHTML = periodOrders.slice(0, 20).map(o => {
-                const date = formatDate(o.created_at || o.id);
-                let itemsCount = 0;
-                try {
-                    const items = typeof o.items === 'string' ? JSON.parse(o.items) : (o.items || []);
-                    itemsCount = items.length;
-                } catch (e) { }
-
-                return `
-                <div class="p-2 bg-white border rounded-lg">
-                    <div class="flex justify-between items-start">
-                    <div>
-                        <p class="font-medium text-gray-800 text-sm">${o.client_name || 'Cliente'}</p>
-                        <p class="text-xs text-gray-500">${date} | ${itemsCount} itens</p>
-                    </div>
-                    <span class="font-bold text-green-600 text-sm">R$ ${parseFloat(o.total || 0).toFixed(2).replace('.', ',')}</span>
-                    </div>
-                </div>
-                `;
-            }).join('');
-        } else {
-            historyList.innerHTML = `<div class="text-center py-8 text-gray-500"><p class="text-4xl mb-2">📦 </p><p>Nenhum pedido no período.</p></div>`;
-        }
-    }
-
-    // --- Top Products ---
+    // 3. Top Products (based on current general period)
     const topProductsList = document.getElementById('topProductsList');
     if (topProductsList) {
         const topProducts = calculateTopProducts(periodOrders);
         if (topProducts.length > 0) {
             topProductsList.innerHTML = topProducts.map((p, i) => `
-            <div class="flex items-center justify-between p-2 border-b last:border-0 border-gray-100">
+            <div class="flex items-center justify-between p-2.5 bg-white rounded-lg border border-gray-100 shadow-sm">
                 <div class="flex items-center gap-3">
-                    <span class="text-sm font-bold text-gray-500 w-6 text-center">${i + 1}</span>
-                    <span class="text-sm text-gray-700 truncate max-w-[150px]">${p.name}</span>
+                    <span class="text-xs font-bold w-6 h-6 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center">${i + 1}</span>
+                    <span class="text-sm font-medium text-gray-800 truncate max-w-[140px]" title="${p.name}">${p.name}</span>
                 </div>
                 <div class="text-right">
                     <p class="text-xs font-bold text-gray-800">${p.quantity} un.</p>
-                    <p class="text-[10px] text-gray-500">R$ ${p.revenue.toFixed(2).replace('.', ',')}</p>
+                    <p class="text-[10px] text-green-600 font-semibold">R$ ${p.revenue.toFixed(2).replace('.', ',')}</p>
                 </div>
             </div>
             `).join('');
         } else {
-            topProductsList.innerHTML = '<div class="text-center py-4 text-gray-400 text-sm">Sem dados</div>';
+            topProductsList.innerHTML = '<div class="text-center py-6 text-gray-400 text-sm col-span-full">Sem dados no período</div>';
         }
     }
 
-    // Update Neighborhood Chart
-    if (typeof renderNeighborhoodChart === 'function') {
-        renderNeighborhoodChart(periodOrders);
+    // 4. Order History (respects search input)
+    renderOrderHistoryList(periodOrders);
+
+    // 5. Update Client Ranking & Neighborhood Chart using their dedicated filters
+    if (typeof window.updateClientRanking === 'function') {
+        window.updateClientRanking();
     }
-}
-
-function calculateNeighborhoodStats(orders) {
-    const stats = {};
-
-    orders.forEach(order => {
-        if (!order.address) return;
-
-        let neighborhood = null;
-        if (typeof order.address === 'string') {
-            try {
-                const addr = JSON.parse(order.address);
-                neighborhood = addr.neighborhood || addr.bairro;
-            } catch (e) { }
-        } else {
-            neighborhood = order.address.neighborhood || order.address.bairro;
-        }
-
-        if (!neighborhood) return;
-
-        // Normalize neighborhood name
-        const n = neighborhood.trim();
-        const key = n.toLowerCase();
-
-        if (!stats[key]) {
-            stats[key] = {
-                name: n,
-                count: 0,
-                total: 0
-            };
-        }
-
-        stats[key].count++;
-        stats[key].total += parseFloat(order.total) || 0;
-    });
-
-    // Convert to array and sort by count (desc)
-    return Object.values(stats)
-        .sort((a, b) => b.count - a.count)
-        .slice(0, 5); // Take top 5
-}
-
-function renderNeighborhoodChart(orders) {
-    const container = document.getElementById('neighborhoodChartContainer');
-    // Fallback to old ID if new one missing
-    const target = container || document.getElementById('chartsContainer');
-
-    if (!target) return;
-
-    const stats = calculateNeighborhoodStats(orders);
-
-    if (stats.length === 0) {
-        target.innerHTML = `
-            <div class="flex flex-col items-center justify-center h-full text-gray-400 py-8">
-                <span class="text-2xl mb-2">🔄 </span>
-                <p>Nenhum pedido com entrega no período.</p>
-            </div>
-        `;
-        return;
-    }
-
-    const maxCount = Math.max(...stats.map(s => s.count));
-
-    const html = `
-        <div class="w-full">
-            <div class="space-y-4">
-                ${stats.map((s, i) => {
-        const percentage = (s.count / maxCount) * 100;
-        const colors = ['bg-rose-500', 'bg-rose-400', 'bg-rose-300', 'bg-pink-400', 'bg-pink-300'];
-        const color = colors[Math.min(i, colors.length - 1)];
-
-        return `
-                    <div class="flex items-center gap-3">
-                        <div class="w-24 text-right text-sm font-medium text-gray-700 truncate capitalize" title="${s.name}">${s.name}</div>
-                        <div class="flex-1 bg-gray-100 rounded-full h-6 relative overflow-hidden">
-                            <div class="${color} h-full rounded-full transition-all duration-500" style="width: ${percentage}%"></div>
-                            <span class="absolute inset-0 flex items-center justify-center text-xs font-bold ${percentage > 50 ? 'text-white' : 'text-gray-700'}">
-                                ${s.count} pedidos
-                            </span>
-                        </div>
-                        <div class="w-20 text-right text-xs text-green-600 font-bold">
-                            R$ ${s.total.toFixed(2).replace('.', ',')}
-                        </div>
-                    </div>
-                    `;
-    }).join('')}
-            </div>
-        </div>
-    `;
-
-    target.innerHTML = html;
-    if (target.id === 'chartsContainer') {
-        target.classList.remove('flex', 'items-center', 'justify-center', 'text-gray-400');
+    if (typeof window.updateNeighborhoodChart === 'function') {
+        window.updateNeighborhoodChart();
     }
 }
 
@@ -421,14 +407,15 @@ const MONTH_MAP = {
 };
 
 function filterOrdersByYearAndPeriod(orders, year, period) {
-    return orders.filter(o => {
-        const d = new Date(o.created_at);
+    return (orders || []).filter(o => {
+        const d = safeDate(o.created_at || o.id);
         if (isNaN(d.getTime())) return false;
-        if (d.getFullYear() !== parseInt(year)) return false;
+        
+        if (year !== 'all' && d.getFullYear() !== parseInt(year, 10)) return false;
         
         if (period === 'all') return true;
-        if (period === '1') return d.getMonth() < 6; // 1º Semestre
-        if (period === '2') return d.getMonth() >= 6; // 2º Semestre
+        if (period === '1') return d.getMonth() < 6; // 1º Semestre (Jan-Jun)
+        if (period === '2') return d.getMonth() >= 6; // 2º Semestre (Jul-Dez)
         if (MONTH_MAP[period] !== undefined) return d.getMonth() === MONTH_MAP[period];
         return true;
     });
@@ -454,19 +441,19 @@ window.updateClientRanking = function() {
     
     if (ranking.length > 0) {
         rankingList.innerHTML = ranking.map((c, i) => `
-        <div class="flex items-center justify-between p-2 ${i < 3 ? 'bg-yellow-50 border border-yellow-200' : 'bg-white border'} rounded-lg">
+        <div class="flex items-center justify-between p-2.5 ${i < 3 ? 'bg-amber-50/70 border border-amber-200/80 shadow-sm' : 'bg-white border border-gray-100'} rounded-lg">
             <div class="flex items-center gap-3">
-            <span class="text-lg font-bold ${i === 0 ? 'text-yellow-500' : i === 1 ? 'text-gray-400' : i === 2 ? 'text-orange-400' : 'text-gray-600'}">${i + 1}º</span>
-            <div>
-                <p class="font-medium text-gray-800 text-sm">${c.name}</p>
-                <p class="text-xs text-gray-500">${c.orderCount} pedidos</p>
+                <span class="text-base font-extrabold ${i === 0 ? 'text-amber-500' : i === 1 ? 'text-gray-400' : i === 2 ? 'text-amber-700' : 'text-gray-500'}">${i + 1}º</span>
+                <div>
+                    <p class="font-semibold text-gray-800 text-sm">${c.name}</p>
+                    <p class="text-xs text-gray-500">${c.orderCount} ${c.orderCount === 1 ? 'pedido' : 'pedidos'}</p>
+                </div>
             </div>
-            </div>
-            <span class="font-bold text-green-600">R$ ${c.total.toFixed(2).replace('.', ',')}</span>
+            <span class="font-bold text-green-600 text-sm">R$ ${c.total.toFixed(2).replace('.', ',')}</span>
         </div>
         `).join('');
     } else {
-        rankingList.innerHTML = `<div class="text-center py-8 text-gray-500"><p class="text-4xl mb-2">🔄</p><p>Nenhum pedido no período.</p></div>`;
+        rankingList.innerHTML = `<div class="text-center py-8 text-gray-500"><p class="text-4xl mb-2">🔄</p><p class="text-sm">Nenhum pedido no período selecionado.</p></div>`;
     }
 };
 
@@ -477,9 +464,6 @@ window.updateClientRanking = function() {
 window.updateNeighborhoodChart = function() {
     const yearSelect = document.getElementById('neighborhoodFilterYear');
     const periodSelect = document.getElementById('neighborhoodFilterPeriod');
-    const container = document.getElementById('neighborhoodChartContainer');
-    
-    if (!container) return;
     
     const year = yearSelect?.value || new Date().getFullYear().toString();
     const period = periodSelect?.value || 'all';
@@ -490,10 +474,16 @@ window.updateNeighborhoodChart = function() {
     renderNeighborhoodChart(filteredOrders);
 };
 
-// Add event listeners for neighborhood filters
+// Add event listeners for filters & search
 document.addEventListener('DOMContentLoaded', function() {
+    document.getElementById('rankingFilterYear')?.addEventListener('change', window.updateClientRanking);
+    document.getElementById('rankingFilterPeriod')?.addEventListener('change', window.updateClientRanking);
     document.getElementById('neighborhoodFilterYear')?.addEventListener('change', window.updateNeighborhoodChart);
     document.getElementById('neighborhoodFilterPeriod')?.addEventListener('change', window.updateNeighborhoodChart);
+    document.getElementById('orderSearchClient')?.addEventListener('input', function() {
+        const periodOrders = getOrdersInPeriod(currentReportPeriod);
+        renderOrderHistoryList(periodOrders);
+    });
 });
 
 // Expose globals
@@ -505,3 +495,6 @@ window.setReportPeriod = function (p) {
 };
 window.renderNeighborhoodChart = renderNeighborhoodChart;
 window.filterOrdersByYearAndPeriod = filterOrdersByYearAndPeriod;
+window.calculateTopProducts = calculateTopProducts;
+window.calculateNeighborhoodStats = calculateNeighborhoodStats;
+window.calculateClientRanking = calculateClientRanking;
