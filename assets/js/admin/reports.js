@@ -1,8 +1,19 @@
 // ========================================
-// REPORTS & METRICS MODULE (ADMIN)
+// REPORTS & METRICS MODULE (ADMIN) - UNIFIED
 // ========================================
 
-let currentReportPeriod = 'month';
+const MONTH_NAMES = [
+    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+];
+
+// Unified global filter state
+window.reportsFilterState = {
+    mode: 'month', // 'day', 'month', 'semester', 'year'
+    year: new Date().getFullYear(),
+    month: new Date().getMonth(), // 0 to 11
+    semester: new Date().getMonth() < 6 ? '1' : '2' // '1' or '2'
+};
 
 // Safe money parser
 function parseMoney(val) {
@@ -59,7 +70,7 @@ function normalizeNeighborhoodName(rawName) {
 
 // Robust extractor for neighborhood or pickup
 function getNeighborhoodOrPickup(order) {
-    if (!order) return null;
+    if (!order) return 'Retirados';
 
     const deliveryType = (order.delivery_type || order.delivery_mode || '').toLowerCase().trim();
     if (deliveryType === 'retirada' || deliveryType === 'balcao' || deliveryType === 'pickup') {
@@ -107,56 +118,68 @@ function getNeighborhoodOrPickup(order) {
         } catch (e) { }
     }
 
+    // Se nenhum endereço for informado, contabiliza como Retirados na Loja
     if (!n) {
-        if (!order.address || order.address === '' || order.address === '{}') {
-            return 'Retirados';
-        }
-        return null;
+        return 'Retirados';
     }
 
     return normalizeNeighborhoodName(n);
 }
 
-function getOrdersInPeriod(period) {
+// Get orders filtered by unified filter state
+function getOrdersInFilteredPeriod() {
     const orders = window.orders || [];
-    const now = new Date();
-    let startDate;
-    let endDate;
-
-    switch (period) {
-        case 'today':
-            startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-            endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-            break;
-        case 'yesterday':
-            startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
-            endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-            break;
-        case 'week':
-            startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
-            endDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-            break;
-        case 'month':
-            startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-            endDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-            break;
-        case 'semester':
-            startDate = new Date(now.getFullYear(), now.getMonth() - 6, 1);
-            endDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-            break;
-        case 'year':
-            startDate = new Date(now.getFullYear(), 0, 1);
-            endDate = new Date(now.getFullYear() + 1, 0, 1);
-            break;
-        default:
-            startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-            endDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-    }
+    const state = window.reportsFilterState;
 
     return orders.filter(o => {
+        if (!isOrderValid(o)) return false;
+
         const d = safeDate(o.created_at || o.id);
-        return d >= startDate && d < endDate;
+        if (isNaN(d.getTime())) return false;
+
+        if (state.mode === 'day') {
+            const today = new Date();
+            return d.getFullYear() === today.getFullYear() &&
+                d.getMonth() === today.getMonth() &&
+                d.getDate() === today.getDate();
+        }
+
+        if (d.getFullYear() !== state.year) return false;
+
+        if (state.mode === 'month') {
+            return d.getMonth() === state.month;
+        }
+
+        if (state.mode === 'semester') {
+            if (state.semester === '1') return d.getMonth() < 6;
+            if (state.semester === '2') return d.getMonth() >= 6;
+        }
+
+        if (state.mode === 'year') {
+            return true;
+        }
+
+        return true;
     });
+}
+
+// Get human readable period description
+function getPeriodDescription() {
+    const state = window.reportsFilterState;
+    if (state.mode === 'day') {
+        const today = new Date();
+        return `Hoje (${today.toLocaleDateString('pt-BR')})`;
+    }
+    if (state.mode === 'month') {
+        return `${MONTH_NAMES[state.month]} de ${state.year}`;
+    }
+    if (state.mode === 'semester') {
+        return `${state.semester}º Semestre de ${state.year} (${state.semester === '1' ? 'Jan a Jun' : 'Jul a Dez'})`;
+    }
+    if (state.mode === 'year') {
+        return `Ano de ${state.year} (Completo)`;
+    }
+    return '';
 }
 
 function calculateClientRanking(periodOrders) {
@@ -229,8 +252,7 @@ function calculateNeighborhoodStats(orders) {
     let pickupStats = null;
 
     validOrders.forEach(order => {
-        const name = getNeighborhoodOrPickup(order);
-        if (!name) return;
+        const name = getNeighborhoodOrPickup(order) || 'Retirados';
 
         if (name === 'Retirados') {
             if (!pickupStats) {
@@ -267,26 +289,6 @@ function calculateNeighborhoodStats(orders) {
         return [pickupStats, ...neighborhoodList];
     }
     return neighborhoodList;
-}
-
-function updatePeriodButtons() {
-    const buttons = {
-        'reportPeriodMonth': 'month',
-        'reportPeriodSemester': 'semester',
-        'reportPeriodYear': 'year'
-    };
-    Object.entries(buttons).forEach(([id, period]) => {
-        const btn = document.getElementById(id);
-        if (btn) {
-            if (currentReportPeriod === period) {
-                btn.classList.remove('bg-gray-200', 'text-gray-700');
-                btn.classList.add('bg-rose-600', 'text-white');
-            } else {
-                btn.classList.remove('bg-rose-600', 'text-white');
-                btn.classList.add('bg-gray-200', 'text-gray-700');
-            }
-        }
-    });
 }
 
 function renderOrderHistoryList(orders) {
@@ -358,26 +360,27 @@ function renderNeighborhoodChart(orders) {
     }
 
     const maxCount = Math.max(...stats.map(s => s.count), 1);
-    const topStats = stats.slice(0, 12);
+    const grandTotal = stats.reduce((sum, s) => sum + s.total, 0);
+    const grandCount = stats.reduce((sum, s) => sum + s.count, 0);
 
     const html = `
-        <div class="w-full space-y-3 max-h-80 overflow-y-auto pr-1 scrollbar-thin">
-            ${topStats.map((s, i) => {
-                const percentage = Math.round((s.count / maxCount) * 100);
-                
-                let color = 'bg-rose-500';
-                let labelPrefix = '';
-                if (s.isPickup) {
-                    color = 'bg-amber-500';
-                    labelPrefix = '🛍️ ';
-                } else {
-                    const colors = ['bg-rose-500', 'bg-rose-400', 'bg-rose-300', 'bg-pink-400', 'bg-pink-300'];
-                    const colorIdx = stats[0]?.isPickup ? (i - 1) : i;
-                    color = colors[Math.min(Math.max(0, colorIdx), colors.length - 1)];
-                }
+        <div class="w-full space-y-2.5 max-h-80 overflow-y-auto pr-1 scrollbar-thin">
+            ${stats.map((s, i) => {
+        const percentage = Math.round((s.count / maxCount) * 100);
 
-                return `
-                <div class="flex items-center gap-3 ${s.isPickup ? 'bg-amber-50/70 p-2 rounded-lg border border-amber-200' : ''}">
+        let color = 'bg-rose-500';
+        let labelPrefix = '';
+        if (s.isPickup) {
+            color = 'bg-amber-500';
+            labelPrefix = '🛍️ ';
+        } else {
+            const colors = ['bg-rose-500', 'bg-rose-400', 'bg-rose-300', 'bg-pink-400', 'bg-pink-300'];
+            const colorIdx = stats[0]?.isPickup ? (i - 1) : i;
+            color = colors[Math.min(Math.max(0, colorIdx), colors.length - 1)];
+        }
+
+        return `
+                <div class="flex items-center gap-3 ${s.isPickup ? 'bg-amber-50/70 p-2 rounded-lg border border-amber-200' : 'p-1'}">
                     <div class="w-28 text-right text-sm font-medium text-gray-700 truncate ${s.isPickup ? 'font-bold text-amber-900' : 'capitalize'}" title="${s.name}">
                         ${labelPrefix}${s.name}
                     </div>
@@ -392,49 +395,160 @@ function renderNeighborhoodChart(orders) {
                     </div>
                 </div>
                 `;
-            }).join('')}
+    }).join('')}
+        </div>
+        <div class="mt-3 pt-2.5 border-t border-gray-200 flex items-center justify-between text-xs text-gray-600 px-1 font-semibold">
+            <span>Total Distribuído:</span>
+            <span class="text-green-600 font-bold">${grandCount} pedidos • R$ ${grandTotal.toFixed(2).replace('.', ',')}</span>
         </div>
     `;
 
     container.innerHTML = html;
 }
 
+// Unified Render Function
 function renderReportsData() {
-    console.log('[Reports] Updating reports data...');
-    if (typeof updatePeriodButtons === 'function') updatePeriodButtons();
+    console.log('[Reports] Updating reports data with unified filters...');
 
-    // Ensure orders exist
-    const orders = window.orders || [];
+    const state = window.reportsFilterState;
+    const desc = getPeriodDescription();
 
-    // Get orders filtered by current global period (Month, Semester, Year)
-    const periodOrders = getOrdersInPeriod(currentReportPeriod);
-    const validPeriodOrders = periodOrders.filter(isOrderValid);
+    // 1. Update Mode Buttons
+    const buttons = {
+        'reportPeriodDay': 'day',
+        'reportPeriodMonth': 'month',
+        'reportPeriodSemester': 'semester',
+        'reportPeriodYear': 'year'
+    };
+    Object.entries(buttons).forEach(([id, mode]) => {
+        const btn = document.getElementById(id);
+        if (btn) {
+            if (state.mode === mode) {
+                btn.className = 'px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all bg-rose-600 text-white shadow-sm';
+            } else {
+                btn.className = 'px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all bg-gray-100 text-gray-700 hover:bg-gray-200';
+            }
+        }
+    });
 
-    // 1. Period KPIs
-    const totalSales = validPeriodOrders.reduce((sum, o) => sum + parseMoney(o.total), 0);
-    const totalOrders = validPeriodOrders.length;
+    // 2. Update Sub Controls Visibility
+    const monthSub = document.getElementById('monthSubControl');
+    const semSub = document.getElementById('semesterSubControl');
+    const yearSub = document.getElementById('yearSubControl');
+    const daySub = document.getElementById('daySubControl');
+
+    if (monthSub) monthSub.classList.toggle('hidden', state.mode !== 'month');
+    if (semSub) semSub.classList.toggle('hidden', state.mode !== 'semester');
+    if (yearSub) yearSub.classList.toggle('hidden', state.mode !== 'year');
+    if (daySub) daySub.classList.toggle('hidden', state.mode !== 'day');
+
+    // 3. Update Inputs values
+    const yearSelect = document.getElementById('reportFilterYear');
+    if (yearSelect && yearSelect.value !== String(state.year)) {
+        yearSelect.value = String(state.year);
+    }
+
+    const monthSelect = document.getElementById('reportFilterMonth');
+    if (monthSelect && monthSelect.value !== String(state.month)) {
+        monthSelect.value = String(state.month);
+    }
+
+    const semBtn1 = document.getElementById('semesterBtn1');
+    const semBtn2 = document.getElementById('semesterBtn2');
+    if (semBtn1 && semBtn2) {
+        if (state.semester === '1') {
+            semBtn1.className = 'px-3 py-1 rounded-md text-xs font-medium bg-rose-100 text-rose-700 border border-rose-200';
+            semBtn2.className = 'px-3 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200';
+        } else {
+            semBtn1.className = 'px-3 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200';
+            semBtn2.className = 'px-3 py-1 rounded-md text-xs font-medium bg-rose-100 text-rose-700 border border-rose-200';
+        }
+    }
+
+    // 4. Update Badges
+    const rankingBadge = document.getElementById('rankingPeriodBadge');
+    const topProdBadge = document.getElementById('topProductsPeriodBadge');
+    const neighBadge = document.getElementById('neighborhoodPeriodBadge');
+    if (rankingBadge) rankingBadge.textContent = desc;
+    if (topProdBadge) topProdBadge.textContent = desc;
+    if (neighBadge) neighBadge.textContent = desc;
+
+    // 5. Get Filtered Orders
+    const periodOrders = getOrdersInFilteredPeriod();
+    const totalSales = periodOrders.reduce((sum, o) => sum + parseMoney(o.total), 0);
+    const totalOrders = periodOrders.length;
     const avgTicket = totalOrders > 0 ? totalSales / totalOrders : 0;
+    const uniqueClients = new Set(periodOrders.map(o => (o.client_phone || '').replace(/\D/g, '') || o.client_name)).size;
+
+    // 6. Today's metrics (always calculated for 'today')
+    const today = new Date();
+    const ordersToday = (window.orders || []).filter(o => {
+        if (!isOrderValid(o)) return false;
+        const d = safeDate(o.created_at || o.id);
+        return d.getFullYear() === today.getFullYear() &&
+            d.getMonth() === today.getMonth() &&
+            d.getDate() === today.getDate();
+    });
+    const salesToday = ordersToday.reduce((sum, o) => sum + parseMoney(o.total), 0);
+
+    // Update Top Cards
+    if (document.getElementById('reportSalesToday')) {
+        document.getElementById('reportSalesToday').textContent = `R$ ${salesToday.toFixed(2).replace('.', ',')}`;
+    }
+    if (document.getElementById('reportOrdersTodaySubtitle')) {
+        document.getElementById('reportOrdersTodaySubtitle').textContent = `${ordersToday.length} ${ordersToday.length === 1 ? 'pedido hoje' : 'pedidos hoje'}`;
+    }
+
+    if (document.getElementById('reportOrdersToday')) {
+        document.getElementById('reportOrdersToday').textContent = totalOrders;
+    }
+    if (document.getElementById('reportClientsCount')) {
+        document.getElementById('reportClientsCount').textContent = `${uniqueClients} ${uniqueClients === 1 ? 'cliente no período' : 'clientes no período'}`;
+    }
 
     if (document.getElementById('reportSalesMonth')) {
         document.getElementById('reportSalesMonth').textContent = `R$ ${totalSales.toFixed(2).replace('.', ',')}`;
     }
+    if (document.getElementById('reportSalesPeriodLabel')) {
+        let label = 'Vendas no Período';
+        if (state.mode === 'day') label = 'Vendas Hoje';
+        else if (state.mode === 'month') label = `Vendas em ${MONTH_NAMES[state.month]}`;
+        else if (state.mode === 'semester') label = `Vendas no ${state.semester}º Semestre`;
+        else if (state.mode === 'year') label = `Vendas em ${state.year}`;
+        document.getElementById('reportSalesPeriodLabel').textContent = label;
+    }
+    if (document.getElementById('reportPeriodSubtitle')) {
+        document.getElementById('reportPeriodSubtitle').textContent = desc;
+    }
+
     if (document.getElementById('reportTicketAvg')) {
         document.getElementById('reportTicketAvg').textContent = `R$ ${avgTicket.toFixed(2).replace('.', ',')}`;
     }
 
-    // 2. Today's KPIs
-    const ordersToday = getOrdersInPeriod('today');
-    const validOrdersToday = ordersToday.filter(isOrderValid);
-    const salesToday = validOrdersToday.reduce((sum, o) => sum + parseMoney(o.total), 0);
-
-    if (document.getElementById('reportSalesToday')) {
-        document.getElementById('reportSalesToday').textContent = `R$ ${salesToday.toFixed(2).replace('.', ',')}`;
+    // 7. Render Sub-Reports
+    // Client Ranking
+    const rankingList = document.getElementById('clientRankingList');
+    if (rankingList) {
+        const ranking = calculateClientRanking(periodOrders);
+        if (ranking.length > 0) {
+            rankingList.innerHTML = ranking.map((c, i) => `
+            <div class="flex items-center justify-between p-2.5 ${i < 3 ? 'bg-amber-50/70 border border-amber-200/80 shadow-sm' : 'bg-white border border-gray-100'} rounded-lg">
+                <div class="flex items-center gap-3">
+                    <span class="text-base font-extrabold ${i === 0 ? 'text-amber-500' : i === 1 ? 'text-gray-400' : i === 2 ? 'text-amber-700' : 'text-gray-500'}">${i + 1}º</span>
+                    <div>
+                        <p class="font-semibold text-gray-800 text-sm">${c.name}</p>
+                        <p class="text-xs text-gray-500">${c.orderCount} ${c.orderCount === 1 ? 'pedido' : 'pedidos'}</p>
+                    </div>
+                </div>
+                <span class="font-bold text-green-600 text-sm">R$ ${c.total.toFixed(2).replace('.', ',')}</span>
+            </div>
+            `).join('');
+        } else {
+            rankingList.innerHTML = `<div class="text-center py-8 text-gray-500"><p class="text-4xl mb-2">🔄</p><p class="text-sm">Nenhum pedido no período.</p></div>`;
+        }
     }
-    if (document.getElementById('reportOrdersToday')) {
-        document.getElementById('reportOrdersToday').textContent = validOrdersToday.length;
-    }
 
-    // 3. Top Products (based on current general period)
+    // Top Products
     const topProductsList = document.getElementById('topProductsList');
     if (topProductsList) {
         const topProducts = calculateTopProducts(periodOrders);
@@ -456,116 +570,52 @@ function renderReportsData() {
         }
     }
 
-    // 4. Order History (respects search input)
+    // Neighborhood & Pickup Chart
+    renderNeighborhoodChart(periodOrders);
+
+    // Order History
     renderOrderHistoryList(periodOrders);
-
-    // 5. Update Client Ranking & Neighborhood Chart using their dedicated filters
-    if (typeof window.updateClientRanking === 'function') {
-        window.updateClientRanking();
-    }
-    if (typeof window.updateNeighborhoodChart === 'function') {
-        window.updateNeighborhoodChart();
-    }
 }
 
-// ========================================
-// FILTER HELPERS
-// ========================================
-
-const MONTH_MAP = {
-    jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5,
-    jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11
+// Filter Actions
+window.setReportMode = function (mode) {
+    window.reportsFilterState.mode = mode;
+    renderReportsData();
 };
 
-function filterOrdersByYearAndPeriod(orders, year, period) {
-    return (orders || []).filter(o => {
-        const d = safeDate(o.created_at || o.id);
-        if (isNaN(d.getTime())) return false;
-
-        if (year !== 'all' && d.getFullYear() !== parseInt(year, 10)) return false;
-
-        if (period === 'all') return true;
-        if (period === '1') return d.getMonth() < 6; // 1º Semestre (Jan-Jun)
-        if (period === '2') return d.getMonth() >= 6; // 2º Semestre (Jul-Dez)
-        if (MONTH_MAP[period] !== undefined) return d.getMonth() === MONTH_MAP[period];
-        return true;
-    });
-}
-
-// ========================================
-// CLIENT RANKING WITH FILTERS
-// ========================================
-
-window.updateClientRanking = function () {
-    const yearSelect = document.getElementById('rankingFilterYear');
-    const periodSelect = document.getElementById('rankingFilterPeriod');
-    const rankingList = document.getElementById('clientRankingList');
-
-    if (!rankingList) return;
-
-    const year = yearSelect?.value || new Date().getFullYear().toString();
-    const period = periodSelect?.value || 'all';
-
-    const orders = window.orders || [];
-    const filteredOrders = filterOrdersByYearAndPeriod(orders, year, period);
-    const ranking = calculateClientRanking(filteredOrders);
-
-    if (ranking.length > 0) {
-        rankingList.innerHTML = ranking.map((c, i) => `
-        <div class="flex items-center justify-between p-2.5 ${i < 3 ? 'bg-amber-50/70 border border-amber-200/80 shadow-sm' : 'bg-white border border-gray-100'} rounded-lg">
-            <div class="flex items-center gap-3">
-                <span class="text-base font-extrabold ${i === 0 ? 'text-amber-500' : i === 1 ? 'text-gray-400' : i === 2 ? 'text-amber-700' : 'text-gray-500'}">${i + 1}º</span>
-                <div>
-                    <p class="font-semibold text-gray-800 text-sm">${c.name}</p>
-                    <p class="text-xs text-gray-500">${c.orderCount} ${c.orderCount === 1 ? 'pedido' : 'pedidos'}</p>
-                </div>
-            </div>
-            <span class="font-bold text-green-600 text-sm">R$ ${c.total.toFixed(2).replace('.', ',')}</span>
-        </div>
-        `).join('');
-    } else {
-        rankingList.innerHTML = `<div class="text-center py-8 text-gray-500"><p class="text-4xl mb-2">🔄</p><p class="text-sm">Nenhum pedido no período selecionado.</p></div>`;
-    }
+window.onFilterYearChange = function (year) {
+    window.reportsFilterState.year = parseInt(year, 10) || new Date().getFullYear();
+    renderReportsData();
 };
 
-// ========================================
-// NEIGHBORHOOD CHART WITH FILTERS
-// ========================================
-
-window.updateNeighborhoodChart = function () {
-    const yearSelect = document.getElementById('neighborhoodFilterYear');
-    const periodSelect = document.getElementById('neighborhoodFilterPeriod');
-
-    const year = yearSelect?.value || new Date().getFullYear().toString();
-    const period = periodSelect?.value || 'all';
-
-    const orders = window.orders || [];
-    const filteredOrders = filterOrdersByYearAndPeriod(orders, year, period);
-
-    renderNeighborhoodChart(filteredOrders);
+window.onFilterMonthChange = function (month) {
+    window.reportsFilterState.month = parseInt(month, 10) || 0;
+    renderReportsData();
 };
 
-// Add event listeners for filters & search
+window.setSemesterSub = function (sem) {
+    window.reportsFilterState.semester = sem;
+    renderReportsData();
+};
+
+// Legacy alias handlers for backwards compatibility
+window.updateClientRanking = renderReportsData;
+window.updateNeighborhoodChart = renderReportsData;
+window.setReportPeriod = function (p) {
+    window.setReportMode(p);
+};
+
+// Setup Listeners
 document.addEventListener('DOMContentLoaded', function () {
-    document.getElementById('rankingFilterYear')?.addEventListener('change', window.updateClientRanking);
-    document.getElementById('rankingFilterPeriod')?.addEventListener('change', window.updateClientRanking);
-    document.getElementById('neighborhoodFilterYear')?.addEventListener('change', window.updateNeighborhoodChart);
-    document.getElementById('neighborhoodFilterPeriod')?.addEventListener('change', window.updateNeighborhoodChart);
     document.getElementById('orderSearchClient')?.addEventListener('input', function () {
-        const periodOrders = getOrdersInPeriod(currentReportPeriod);
+        const periodOrders = getOrdersInFilteredPeriod();
         renderOrderHistoryList(periodOrders);
     });
 });
 
 // Expose globals
 window.renderReportsData = renderReportsData;
-window.currentReportPeriod = currentReportPeriod;
-window.setReportPeriod = function (p) {
-    currentReportPeriod = p;
-    renderReportsData();
-};
-window.renderNeighborhoodChart = renderNeighborhoodChart;
-window.filterOrdersByYearAndPeriod = filterOrdersByYearAndPeriod;
 window.calculateTopProducts = calculateTopProducts;
 window.calculateNeighborhoodStats = calculateNeighborhoodStats;
 window.calculateClientRanking = calculateClientRanking;
+window.renderNeighborhoodChart = renderNeighborhoodChart;

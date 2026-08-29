@@ -1116,94 +1116,155 @@
                 <!-- Reports Panel -->
                 <main id="reportsPanelFast"
                     class="admin-panel admin-card p-6 hidden animate-fade-in mx-auto w-full max-w-7xl">
-                    <h2 class="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
-                        <span>📊</span> Relatórios e Métricas
-                    </h2>
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                    <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+                        <h2 class="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                            <span>📊</span> Relatórios e Métricas
+                        </h2>
+                    </div>
+
+                    <!-- Top KPI Cards -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                         <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-                            <p class="text-sm text-gray-500">Vendas Hoje</p>
-                            <p class="text-2xl font-bold text-gray-800" id="reportSalesToday">R$ 0,00</p>
+                            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Vendas Hoje</p>
+                            <p class="text-2xl font-bold text-gray-800 mt-1" id="reportSalesToday">R$ 0,00</p>
+                            <p class="text-xs text-gray-400 mt-1" id="reportOrdersTodaySubtitle">0 pedidos hoje</p>
                         </div>
                         <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-                            <p class="text-sm text-gray-500">Total de Pedidos</p>
-                            <p class="text-2xl font-bold text-gray-800" id="reportOrdersToday">0</p>
+                            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider" id="reportOrdersPeriodLabel">Total de Pedidos</p>
+                            <p class="text-2xl font-bold text-gray-800 mt-1" id="reportOrdersToday">0</p>
+                            <p class="text-xs text-gray-400 mt-1" id="reportClientsCount">0 clientes no período</p>
                         </div>
                         <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-                            <p class="text-sm text-gray-500">Vendas Mês</p>
-                            <p class="text-2xl font-bold text-gray-800" id="reportSalesMonth">R$ 0,00</p>
+                            <p class="text-xs font-semibold text-rose-600 uppercase tracking-wider" id="reportSalesPeriodLabel">Vendas no Mês</p>
+                            <p class="text-2xl font-bold text-rose-600 mt-1" id="reportSalesMonth">R$ 0,00</p>
+                            <p class="text-xs text-gray-400 mt-1" id="reportPeriodSubtitle">Mês atual</p>
                         </div>
                         <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-                            <p class="text-sm text-gray-500">Ticket Médio</p>
-                            <p class="text-2xl font-bold text-gray-800" id="reportTicketAvg">R$ 0,00</p>
+                            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Ticket Médio</p>
+                            <p class="text-2xl font-bold text-gray-800 mt-1" id="reportTicketAvg">R$ 0,00</p>
+                            <p class="text-xs text-gray-400 mt-1">Por pedido no período</p>
                         </div>
                     </div>
-                    <!-- Period Filter -->
-                    <div class="mb-6">
-                        <label class="block text-sm font-medium text-gray-700 mb-2">Período Geral</label>
-                        <div class="flex flex-wrap gap-2">
-                            <button id="reportPeriodMonth" onclick="setReportPeriod('month')"
-                                class="px-4 py-2 bg-rose-600 text-white rounded-lg text-sm font-medium transition-colors">Mensal</button>
-                            <button id="reportPeriodSemester" onclick="setReportPeriod('semester')"
-                                class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 transition-colors">Semestral</button>
-                            <button id="reportPeriodYear" onclick="setReportPeriod('year')"
-                                class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-300 transition-colors">Anual</button>
+
+                    <!-- Unified Period Filter Bar -->
+                    <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 mb-6">
+                        <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+                            <div>
+                                <h3 class="text-sm font-bold text-gray-800 flex items-center gap-1.5">
+                                    <span>🗓️</span> Filtrar Período
+                                </h3>
+                                <p class="text-xs text-gray-500">Selecione o intervalo de datas para atualizar todos os relatórios</p>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <label class="text-xs font-semibold text-gray-600">Ano:</label>
+                                <select id="reportFilterYear" class="text-sm font-semibold border rounded-lg px-2.5 py-1.5 bg-gray-50 text-gray-700 outline-none focus:ring-2 focus:ring-rose-500"
+                                    onchange="onFilterYearChange(this.value)">
+                                    <option value="2024">2024</option>
+                                    <option value="2025">2025</option>
+                                    <option value="2026" selected>2026</option>
+                                    <option value="2027">2027</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <!-- Main Mode Buttons -->
+                        <div class="flex flex-wrap gap-2 items-center">
+                            <button id="reportPeriodDay" onclick="setReportMode('day')"
+                                class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all bg-gray-100 text-gray-700 hover:bg-gray-200">
+                                📅 Dia (Hoje)
+                            </button>
+                            <button id="reportPeriodMonth" onclick="setReportMode('month')"
+                                class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all bg-rose-600 text-white shadow-sm">
+                                📆 Mensal
+                            </button>
+                            <button id="reportPeriodSemester" onclick="setReportMode('semester')"
+                                class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all bg-gray-100 text-gray-700 hover:bg-gray-200">
+                                🌓 Semestral
+                            </button>
+                            <button id="reportPeriodYear" onclick="setReportMode('year')"
+                                class="px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all bg-gray-100 text-gray-700 hover:bg-gray-200">
+                                🏆 Anual
+                            </button>
+                        </div>
+
+                        <!-- Dynamic Sub-controls (Semester sub-buttons, Month picker, etc.) -->
+                        <div id="reportSubControls" class="mt-3 pt-3 border-t border-gray-100 flex flex-wrap items-center gap-2">
+                            <!-- Month Selector (Default) -->
+                            <div id="monthSubControl" class="flex items-center gap-2">
+                                <span class="text-xs text-gray-500 font-medium">Mês:</span>
+                                <select id="reportFilterMonth" class="text-xs border rounded-lg px-2 py-1 bg-white text-gray-700 font-medium outline-none focus:ring-2 focus:ring-rose-500"
+                                    onchange="onFilterMonthChange(this.value)">
+                                    <option value="0">Janeiro</option>
+                                    <option value="1">Fevereiro</option>
+                                    <option value="2">Março</option>
+                                    <option value="3">Abril</option>
+                                    <option value="4">Maio</option>
+                                    <option value="5">Junho</option>
+                                    <option value="6">Julho</option>
+                                    <option value="7">Agosto</option>
+                                    <option value="8">Setembro</option>
+                                    <option value="9">Outubro</option>
+                                    <option value="10">Novembro</option>
+                                    <option value="11">Dezembro</option>
+                                </select>
+                            </div>
+
+                            <!-- Semester Sub-buttons (Hidden when not in semester mode) -->
+                            <div id="semesterSubControl" class="hidden flex items-center gap-2">
+                                <span class="text-xs text-gray-500 font-medium">Semestre:</span>
+                                <button id="semesterBtn1" onclick="setSemesterSub('1')"
+                                    class="px-3 py-1 rounded-md text-xs font-medium bg-rose-100 text-rose-700 border border-rose-200">
+                                    1º Semestre (Jan - Jun)
+                                </button>
+                                <button id="semesterBtn2" onclick="setSemesterSub('2')"
+                                    class="px-3 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200">
+                                    2º Semestre (Jul - Dez)
+                                </button>
+                            </div>
+
+                            <!-- Year Mode Info Badge -->
+                            <div id="yearSubControl" class="hidden text-xs text-gray-600 bg-gray-50 px-2.5 py-1 rounded-md border border-gray-200 font-medium">
+                                ✨ Mostrando todos os pedidos do ano selecionado (1 de Janeiro a 31 de Dezembro)
+                            </div>
+
+                            <!-- Day Mode Info Badge -->
+                            <div id="daySubControl" class="hidden text-xs text-gray-600 bg-gray-50 px-2.5 py-1 rounded-md border border-gray-200 font-medium">
+                                ✨ Mostrando pedidos realizados no dia de hoje
+                            </div>
                         </div>
                     </div>
 
                     <div class="grid md:grid-cols-2 gap-6">
                         <!-- Client Ranking -->
-                        <div class="bg-gray-50 rounded-lg p-4">
+                        <div class="bg-gray-50 rounded-xl p-4 border border-gray-200/70">
                             <div class="flex flex-wrap items-center justify-between mb-4 gap-2">
-                                <h3 class="text-lg font-semibold text-gray-800">🏆 Ranking de Clientes</h3>
-                                <div class="flex gap-2">
-                                    <select id="rankingFilterYear" class="text-xs border rounded p-1 bg-white"
-                                        onchange="updateClientRanking()">
-                                        <option value="2024">2024</option>
-                                        <option value="2025">2025</option>
-                                        <option value="2026" selected>2026</option>
-                                    </select>
-                                    <select id="rankingFilterPeriod" class="text-xs border rounded p-1 bg-white"
-                                        onchange="updateClientRanking()">
-                                        <option value="all">Todo o ano</option>
-                                        <option value="1">1º Semestre</option>
-                                        <option value="2">2º Semestre</option>
-                                        <option value="jan">Janeiro</option>
-                                        <option value="feb">Fevereiro</option>
-                                        <option value="mar">Março</option>
-                                        <option value="apr">Abril</option>
-                                        <option value="may">Maio</option>
-                                        <option value="jun">Junho</option>
-                                        <option value="jul">Julho</option>
-                                        <option value="aug">Agosto</option>
-                                        <option value="sep">Setembro</option>
-                                        <option value="oct">Outubro</option>
-                                        <option value="nov">Novembro</option>
-                                        <option value="dec">Dezembro</option>
-                                    </select>
-                                </div>
+                                <h3 class="text-lg font-semibold text-gray-800 flex items-center gap-1.5">
+                                    <span>🏆</span> Ranking de Clientes
+                                </h3>
+                                <span class="text-xs bg-white text-gray-600 px-2 py-1 rounded border border-gray-200" id="rankingPeriodBadge">Período Selecionado</span>
                             </div>
-                            <p class="text-sm text-gray-600 mb-4">Clientes que mais gastaram no período selecionado:</p>
-                            <div id="clientRankingList" class="space-y-2 max-h-80 overflow-y-auto pr-2 scrollbar-thin">
+                            <p class="text-xs text-gray-500 mb-3">Clientes com maior valor em compras:</p>
+                            <div id="clientRankingList" class="space-y-2 max-h-80 overflow-y-auto pr-1 scrollbar-thin">
                                 <div class="text-center py-8 text-gray-500">
                                     <p class="text-4xl mb-2">📈</p>
-                                    <p>Nenhum pedido registrado ainda.</p>
-                                    <p class="text-xs mt-2">Os pedidos serão registrados no Supabase para análise.</p>
+                                    <p>Carregando ranking...</p>
                                 </div>
                             </div>
                         </div>
 
                         <!-- Order History -->
-                        <div class="bg-gray-50 rounded-lg p-4">
-                            <h3 class="text-lg font-semibold text-gray-800 mb-4">📋 Histórico de Pedidos</h3>
-                            <div class="mb-4">
-                                <input type="text" id="orderSearchClient" placeholder="Buscar por cliente..."
-                                    class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-rose-500 outline-none" />
+                        <div class="bg-gray-50 rounded-xl p-4 border border-gray-200/70">
+                            <h3 class="text-lg font-semibold text-gray-800 mb-4 flex items-center gap-1.5">
+                                <span>📋</span> Histórico de Pedidos
+                            </h3>
+                            <div class="mb-3">
+                                <input type="text" id="orderSearchClient" placeholder="Buscar por cliente, telefone ou código..."
+                                    class="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-rose-500 outline-none bg-white" />
                             </div>
-                            <div id="orderHistoryList" class="space-y-2 max-h-80 overflow-y-auto pr-2 scrollbar-thin">
+                            <div id="orderHistoryList" class="space-y-2 max-h-80 overflow-y-auto pr-1 scrollbar-thin">
                                 <div class="text-center py-8 text-gray-500">
                                     <p class="text-4xl mb-2">🛒</p>
-                                    <p>Nenhum pedido registrado ainda.</p>
-                                    <p class="text-xs mt-2">Os pedidos enviados via WhatsApp serão salvos aqui.</p>
+                                    <p>Carregando histórico...</p>
                                 </div>
                             </div>
                         </div>
@@ -1212,51 +1273,33 @@
                     <!-- Charts Section (2 Columns) -->
                     <div class="mt-6 grid lg:grid-cols-2 gap-6">
                         <!-- Top Products -->
-                        <div class="bg-gray-50 rounded-lg p-4">
-                            <h3 class="text-lg font-semibold text-gray-800 mb-4">🔥 Produtos Mais Pedidos</h3>
-                            <div id="topProductsList" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div class="bg-gray-50 rounded-xl p-4 border border-gray-200/70">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="text-lg font-semibold text-gray-800 flex items-center gap-1.5">
+                                    <span>🔥</span> Produtos Mais Pedidos
+                                </h3>
+                                <span class="text-xs bg-white text-gray-600 px-2 py-1 rounded border border-gray-200" id="topProductsPeriodBadge">Mais vendidos</span>
+                            </div>
+                            <div id="topProductsList" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                                 <div class="text-center py-6 text-gray-500 col-span-full">
                                     <p class="text-4xl mb-2">🍽️</p>
-                                    <p>Aguardando dados de pedidos...</p>
+                                    <p>Aguardando dados...</p>
                                 </div>
                             </div>
                         </div>
 
                         <!-- Neighborhood Orders Chart -->
-                        <div class="bg-gray-50 rounded-lg p-4">
+                        <div class="bg-gray-50 rounded-xl p-4 border border-gray-200/70">
                             <div class="flex flex-wrap items-center justify-between mb-4 gap-2">
-                                <h3 class="text-lg font-semibold text-gray-800">🗺️ Pedidos por Bairro</h3>
-                                <div class="flex gap-2">
-                                    <select id="neighborhoodFilterYear" class="text-xs border rounded p-1 bg-white"
-                                        onchange="updateNeighborhoodChart()">
-                                        <option value="2024">2024</option>
-                                        <option value="2025">2025</option>
-                                        <option value="2026" selected>2026</option>
-                                    </select>
-                                    <select id="neighborhoodFilterPeriod" class="text-xs border rounded p-1 bg-white"
-                                        onchange="updateNeighborhoodChart()">
-                                        <option value="all">Todo o ano</option>
-                                        <option value="1">1º Semestre</option>
-                                        <option value="2">2º Semestre</option>
-                                        <option value="jan">Janeiro</option>
-                                        <option value="feb">Fevereiro</option>
-                                        <option value="mar">Março</option>
-                                        <option value="apr">Abril</option>
-                                        <option value="may">Maio</option>
-                                        <option value="jun">Junho</option>
-                                        <option value="jul">Julho</option>
-                                        <option value="aug">Agosto</option>
-                                        <option value="sep">Setembro</option>
-                                        <option value="oct">Outubro</option>
-                                        <option value="nov">Novembro</option>
-                                        <option value="dec">Dezembro</option>
-                                    </select>
-                                </div>
+                                <h3 class="text-lg font-semibold text-gray-800 flex items-center gap-1.5">
+                                    <span>🗺️</span> Pedidos por Bairro & Retirada
+                                </h3>
+                                <span class="text-xs bg-white text-gray-600 px-2 py-1 rounded border border-gray-200" id="neighborhoodPeriodBadge">Distribuição</span>
                             </div>
                             <div id="neighborhoodChartContainer" class="space-y-2">
                                 <div class="text-center py-6 text-gray-500">
                                     <p class="text-4xl mb-2">📍</p>
-                                    <p>Aguardando dados de pedidos...</p>
+                                    <p>Aguardando dados...</p>
                                 </div>
                             </div>
                         </div>
