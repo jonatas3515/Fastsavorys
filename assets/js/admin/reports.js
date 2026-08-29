@@ -30,11 +30,43 @@ function isOrderValid(order) {
     return status !== 'cancelled' && status !== 'cancelado' && status !== 'canceled';
 }
 
-// Robust neighborhood extractor
-function getNeighborhoodName(order) {
-    if (!order) return null;
-    let n = null;
+// Neighborhood normalizer with unifications requested
+function normalizeNeighborhoodName(rawName) {
+    if (!rawName || typeof rawName !== 'string') return null;
+    let n = rawName.trim().toLowerCase();
 
+    // Remove accents
+    n = n.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
+    // Check if it's store pickup
+    if (n === 'retirada' || n === 'retirados' || n === 'balcao' || n === 'retirar na loja' || n === 'buscar na loja') {
+        return 'Retirados';
+    }
+
+    // Regra Cidade Baixa: "centro cidade baixa", "cidade baixa", "cidade baixa centro"
+    if (n.includes('cidade baixa') || n.includes('centro cidade baixa')) {
+        return 'Cidade Baixa';
+    }
+
+    // Regra Centro: "cidade alta", "centro cidade alta", "centro", "acentro cidade alta"
+    if (n.includes('cidade alta') || n === 'centro' || n === 'acentro' || n.includes('centro') || n.includes('acentro')) {
+        return 'Centro';
+    }
+
+    // Outros bairros: Capitaliza as palavras
+    return rawName.trim().toLowerCase().split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+}
+
+// Robust extractor for neighborhood or pickup
+function getNeighborhoodOrPickup(order) {
+    if (!order) return null;
+
+    const deliveryType = (order.delivery_type || order.delivery_mode || '').toLowerCase().trim();
+    if (deliveryType === 'retirada' || deliveryType === 'balcao' || deliveryType === 'pickup') {
+        return 'Retirados';
+    }
+
+    let n = null;
     if (order.neighborhood && typeof order.neighborhood === 'string') {
         n = order.neighborhood;
     } else if (order.address) {
@@ -49,7 +81,9 @@ function getNeighborhoodName(order) {
                 } catch (e) { }
             }
             if (!n) {
-                // Try to extract from string e.g. "Rua A, 123 - Centro"
+                if (raw.toLowerCase().includes('retirada') || raw.toLowerCase().includes('balcao')) {
+                    return 'Retirados';
+                }
                 const parts = raw.split('-');
                 if (parts.length > 1) {
                     n = parts[parts.length - 1].trim();
@@ -66,17 +100,21 @@ function getNeighborhoodName(order) {
     if (!n && order.details) {
         try {
             const det = typeof order.details === 'string' ? JSON.parse(order.details) : order.details;
+            if (det.delivery_mode === 'retirada' || det.delivery_type === 'retirada') {
+                return 'Retirados';
+            }
             n = det.neighborhood || det.bairro;
         } catch (e) { }
     }
 
-    if (!n || typeof n !== 'string') return null;
+    if (!n) {
+        if (!order.address || order.address === '' || order.address === '{}') {
+            return 'Retirados';
+        }
+        return null;
+    }
 
-    n = n.trim();
-    if (!n || n.toLowerCase() === 'retirada' || n.toLowerCase() === 'balcao') return null;
-
-    // Capitalize words nicely
-    return n.toLowerCase().split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+    return normalizeNeighborhoodName(n);
 }
 
 function getOrdersInPeriod(period) {
@@ -188,14 +226,31 @@ function calculateNeighborhoodStats(orders) {
     const stats = {};
     const validOrders = (orders || []).filter(isOrderValid);
 
-    validOrders.forEach(order => {
-        const n = getNeighborhoodName(order);
-        if (!n) return;
+    let pickupStats = null;
 
-        const key = n.toLowerCase();
+    validOrders.forEach(order => {
+        const name = getNeighborhoodOrPickup(order);
+        if (!name) return;
+
+        if (name === 'Retirados') {
+            if (!pickupStats) {
+                pickupStats = {
+                    name: 'Retirados',
+                    isPickup: true,
+                    count: 0,
+                    total: 0
+                };
+            }
+            pickupStats.count++;
+            pickupStats.total += parseMoney(order.total);
+            return;
+        }
+
+        const key = name.toLowerCase();
         if (!stats[key]) {
             stats[key] = {
-                name: n,
+                name: name,
+                isPickup: false,
                 count: 0,
                 total: 0
             };
@@ -205,8 +260,13 @@ function calculateNeighborhoodStats(orders) {
         stats[key].total += parseMoney(order.total);
     });
 
-    return Object.values(stats)
-        .sort((a, b) => b.count - a.count);
+    const neighborhoodList = Object.values(stats).sort((a, b) => b.count - a.count);
+
+    // Retirados sempre no topo acima dos bairros
+    if (pickupStats) {
+        return [pickupStats, ...neighborhoodList];
+    }
+    return neighborhoodList;
 }
 
 function updatePeriodButtons() {
@@ -291,25 +351,36 @@ function renderNeighborhoodChart(orders) {
         container.innerHTML = `
             <div class="flex flex-col items-center justify-center h-full text-gray-400 py-8">
                 <span class="text-2xl mb-2">🔄</span>
-                <p class="text-sm">Nenhum pedido com entrega no período.</p>
+                <p class="text-sm">Nenhum pedido no período.</p>
             </div>
         `;
         return;
     }
 
     const maxCount = Math.max(...stats.map(s => s.count), 1);
-    const topStats = stats.slice(0, 10);
+    const topStats = stats.slice(0, 12);
 
     const html = `
         <div class="w-full space-y-3 max-h-80 overflow-y-auto pr-1 scrollbar-thin">
             ${topStats.map((s, i) => {
                 const percentage = Math.round((s.count / maxCount) * 100);
-                const colors = ['bg-rose-500', 'bg-rose-400', 'bg-rose-300', 'bg-pink-400', 'bg-pink-300'];
-                const color = colors[Math.min(i, colors.length - 1)];
+                
+                let color = 'bg-rose-500';
+                let labelPrefix = '';
+                if (s.isPickup) {
+                    color = 'bg-amber-500';
+                    labelPrefix = '🛍️ ';
+                } else {
+                    const colors = ['bg-rose-500', 'bg-rose-400', 'bg-rose-300', 'bg-pink-400', 'bg-pink-300'];
+                    const colorIdx = stats[0]?.isPickup ? (i - 1) : i;
+                    color = colors[Math.min(Math.max(0, colorIdx), colors.length - 1)];
+                }
 
                 return `
-                <div class="flex items-center gap-3">
-                    <div class="w-28 text-right text-sm font-medium text-gray-700 truncate capitalize" title="${s.name}">${s.name}</div>
+                <div class="flex items-center gap-3 ${s.isPickup ? 'bg-amber-50/70 p-2 rounded-lg border border-amber-200' : ''}">
+                    <div class="w-28 text-right text-sm font-medium text-gray-700 truncate ${s.isPickup ? 'font-bold text-amber-900' : 'capitalize'}" title="${s.name}">
+                        ${labelPrefix}${s.name}
+                    </div>
                     <div class="flex-1 bg-gray-100 rounded-full h-6 relative overflow-hidden">
                         <div class="${color} h-full rounded-full transition-all duration-500" style="width: ${percentage}%"></div>
                         <span class="absolute inset-0 flex items-center justify-center text-xs font-bold ${percentage > 50 ? 'text-white' : 'text-gray-700'}">
@@ -410,9 +481,9 @@ function filterOrdersByYearAndPeriod(orders, year, period) {
     return (orders || []).filter(o => {
         const d = safeDate(o.created_at || o.id);
         if (isNaN(d.getTime())) return false;
-        
+
         if (year !== 'all' && d.getFullYear() !== parseInt(year, 10)) return false;
-        
+
         if (period === 'all') return true;
         if (period === '1') return d.getMonth() < 6; // 1º Semestre (Jan-Jun)
         if (period === '2') return d.getMonth() >= 6; // 2º Semestre (Jul-Dez)
@@ -425,20 +496,20 @@ function filterOrdersByYearAndPeriod(orders, year, period) {
 // CLIENT RANKING WITH FILTERS
 // ========================================
 
-window.updateClientRanking = function() {
+window.updateClientRanking = function () {
     const yearSelect = document.getElementById('rankingFilterYear');
     const periodSelect = document.getElementById('rankingFilterPeriod');
     const rankingList = document.getElementById('clientRankingList');
-    
+
     if (!rankingList) return;
-    
+
     const year = yearSelect?.value || new Date().getFullYear().toString();
     const period = periodSelect?.value || 'all';
-    
+
     const orders = window.orders || [];
     const filteredOrders = filterOrdersByYearAndPeriod(orders, year, period);
     const ranking = calculateClientRanking(filteredOrders);
-    
+
     if (ranking.length > 0) {
         rankingList.innerHTML = ranking.map((c, i) => `
         <div class="flex items-center justify-between p-2.5 ${i < 3 ? 'bg-amber-50/70 border border-amber-200/80 shadow-sm' : 'bg-white border border-gray-100'} rounded-lg">
@@ -461,26 +532,26 @@ window.updateClientRanking = function() {
 // NEIGHBORHOOD CHART WITH FILTERS
 // ========================================
 
-window.updateNeighborhoodChart = function() {
+window.updateNeighborhoodChart = function () {
     const yearSelect = document.getElementById('neighborhoodFilterYear');
     const periodSelect = document.getElementById('neighborhoodFilterPeriod');
-    
+
     const year = yearSelect?.value || new Date().getFullYear().toString();
     const period = periodSelect?.value || 'all';
-    
+
     const orders = window.orders || [];
     const filteredOrders = filterOrdersByYearAndPeriod(orders, year, period);
-    
+
     renderNeighborhoodChart(filteredOrders);
 };
 
 // Add event listeners for filters & search
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('rankingFilterYear')?.addEventListener('change', window.updateClientRanking);
     document.getElementById('rankingFilterPeriod')?.addEventListener('change', window.updateClientRanking);
     document.getElementById('neighborhoodFilterYear')?.addEventListener('change', window.updateNeighborhoodChart);
     document.getElementById('neighborhoodFilterPeriod')?.addEventListener('change', window.updateNeighborhoodChart);
-    document.getElementById('orderSearchClient')?.addEventListener('input', function() {
+    document.getElementById('orderSearchClient')?.addEventListener('input', function () {
         const periodOrders = getOrdersInPeriod(currentReportPeriod);
         renderOrderHistoryList(periodOrders);
     });
