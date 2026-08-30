@@ -759,7 +759,7 @@ function buildKitFactHint(history, currentMessage) {
     const t = normalizeTxt(allText);
     const hasKitOuBoloGrande = /(kit\s*festa|combo\s*festa|festa\s*(pp|p|g)\b|bolo\s*(pp|p|g)\b|vulcao\s*p\b|naked)/.test(t);
     if (!hasKitOuBoloGrande) return '';
-    const kitHint = `\n[⛔ FATO VERIFICADO (pedido contém Kit Festa e/ou bolo grande): (1) É APENAS RETIRADA na loja (Rua Palmeiras, 105, Novo Prado) — NUNCA ofereça nem aceite ENTREGA, nem mesmo para os salgados/bebidas do mesmo pedido. (2) Precisa de no mínimo 1 DIA de antecedência — NÃO pode ser para HOJE. Se o cliente pediu para hoje, recuse com educação (diga que não é possível atender hoje e que fica para uma próxima) e PARE — ⛔ NÃO ofereça proativamente agendar para amanhã/outro dia (quem pede pra hoje está com urgência). Só mencione agendar outro dia SE o próprio cliente perguntar. NÃO confunda Kit Festa (bolo+refri+mini) com "combo de mini salgados".]`;
+    const kitHint = `\n[⛔ REGRA DE NEGÓCIO (Kit Festa / Bolo Grande): (1) Bolos grandes e Kits Festa são APENAS RETIRADA na loja (Rua Palmeiras, 105, Novo Prado) e precisam de no mínimo 1 DIA de antecedência. (2) Se o cliente estiver apenas tirando dúvidas ou consultando (preços, se entrega, o que vem, localização da loja, etc.), responda APENAS a dúvida dele de forma objetiva e pergunte se ele gostaria de encomendar. NÃO inicie personalização (massa/recheio/sabores) nem assuma qual produto ele quer antes de o cliente confirmar explicitamente.]`;
     console.log(`[kit-hint] ${kitHint.replace(/\n/g, ' | ')}`);
     return kitHint;
 }
@@ -2010,6 +2010,8 @@ async function handleGeminiCore(req, res) {
         });
     }
 
+    let intentHint = '';
+
     // --- Guard de pergunta apenas sobre conteúdo do kit/bolo ---
     const isContentQuestion = /vem\s+o(que?|qu[eê])|o\s+que\s+inclui|o\s+que\s+vem|descri[çc][aã]o|o\s+que\s+tem/i.test(effectiveMessage);
     if (isContentQuestion) {
@@ -2040,7 +2042,7 @@ async function handleGeminiCore(req, res) {
             handover_to_human: 1, order_ready: 0, order_summary: DEFAULT_ORDER_SUMMARY
         });
     }
-    let intentHint = '';
+
     // Detecta se msg contém quantidade + salgado/coxinha sem especificar mini
     const salgadoQtyMatch = effectiveMessage.match(/(\d+)\s*(coxinha|salgado|kibe|risole|pastel|empada|bolinha)/i);
     const hasSalgadoQty = !!salgadoQtyMatch;
@@ -2055,7 +2057,7 @@ async function handleGeminiCore(req, res) {
     if (intents.includes('social') && !hasNewProductIntent) {
         intentHint = '\n[FOCO: MENSAGEM SOCIAL/PESSOAL. O cliente NÃO está pedindo comida — é uma mensagem de carinho, aniversário, elogio ou afeto. Responda com CALOR HUMANO e BREVIDADE. Agradeça de coração. Diga que vai repassar o carinho para a Jéssica (proprietária). NÃO mencione horário de funcionamento, cardápio, preços nem tente vender. NÃO pergunte "o que deseja pedir?". Se for elogio sobre um produto (bolo, salgado), agradeça e diga que fica feliz, e que está à disposição para futuros pedidos. Se for mensagem de aniversário para a Jéssica, agradeça muito e diga que vai passar para ela.]';
     } else if (intents.includes('bolos') || intents.includes('opcoes_bolo')) {
-        intentHint = '\n[FOCO: BOLO/KIT FESTA. Siga o ROTEIRO DE PEDIDO: 1) produto+preço, 2) entrega/retirada (se o pedido contiver bolo grande ou kit, o PEDIDO INTEIRO é apenas retirada — NÃO ofereça entrega para nenhum item separado), 3) personalização (massa+recheio+fita), 4) sabores dos mini salgados (se kit festa). Uma pergunta por vez. NÃO pule direto para pagamento.]';
+        intentHint = '\n[FOCO: BOLO/KIT FESTA. Lembre-se: bolos grandes e Kits Festa são apenas para retirada na loja e precisam de 1 dia de antecedência. Se o cliente estiver apenas tirando dúvidas (preço, se entrega, sabores, etc.), responda a dúvida e pergunte com simpatia se ele gostaria de encomendar. NÃO inicie personalização (massa/recheio/sabores) antes da confirmação do cliente.]';
     } else if (intents.includes('bebidas')) {
         intentHint = '\n[FOCO: O cliente perguntou sobre BEBIDAS.]';
     } else if (intents.includes('agendamento')) {
@@ -2100,79 +2102,44 @@ async function handleGeminiCore(req, res) {
     }
 
     // --- Detecção contextual de etapa de personalização (Kit Festa / Bolo) ---
-    // Fluxo: Produto → Entrega/Retirada → Recheio → Sabores → Pagamento
+    // SÓ atua se o cliente confirmou explicitamente que QUER encomendar/pedir e NÃO está apenas tirando dúvidas
     const lastAssistantMsg = [...session.history].reverse().find(m => m.role === 'assistant');
     if (lastAssistantMsg) {
-        const lastAText = lastAssistantMsg.text.toLowerCase();
-        const isKitFesta = session.history.some(m => /kit\s*festa/i.test(m.text));
+        const userAllTexts = session.history.filter(m => m.role === 'user').map(m => m.text.toLowerCase()).join(' ') + ' ' + effectiveMessage.toLowerCase();
 
         // Detect if client REFUSED cake at any point (history + current message)
         const boloRefusalPattern = /n[aã]o\s*(quero|vou\s*querer|preciso\s*de?|queria)\s*(mais\s*)?(o\s*)?bolo|sem\s*bolo|deixa\s*(o\s*)?bolo|n[aã]o.*bolo\s*n[aã]o|cancela.*bolo/i;
         const clientRefusedBolo = boloRefusalPattern.test(effectiveMessage) || session.history.some(m => m.role === 'user' && boloRefusalPattern.test(m.text));
 
-        const hasBoloInHist = !clientRefusedBolo && session.history.some(m => {
-            if (/vulc[aã]o\s*mini|bolo\s*(no|de)\s*pote|pote\s*(de\s*)?bolo/i.test(m.text)) return false;
-            // Exclude user QUESTIONS about availability ("tem bolo?", "está tendo bolo?", "bolo pronta entrega?")
-            if (m.role === 'user') {
-                const t = m.text.toLowerCase();
-                if (/tem\s*bolo|t[aá]\s*tendo\s*bolo|bolo.*pronta\s*entrega|bolo.*dispon[ií]vel|vende.*bolo\?/i.test(t)) return false;
-                return /\bbolo\b/i.test(t);
-            }
-            return /bolo\s*(pp|p\b|g\b)/i.test(m.text) && /R\$\s*\d/i.test(m.text);
-        });
-        const needsCustom = isKitFesta || hasBoloInHist;
+        // Detecta se o cliente confirmou intenção de encomendar/pedir um bolo ou kit
+        const isKitFestaExplicit = /(quero|vou\s*querer|pode\s*ser|encomendar|fecha|faz\s*um)\s*(o\s*)?kit/i.test(userAllTexts);
+        const isBoloExplicit = !clientRefusedBolo && /(quero|vou\s*querer|pode\s*ser|encomendar|faz\s*um)\s*(um\s*|o\s*)?bolo\s*(pp|p\b|g\b|naked)?/i.test(userAllTexts);
+        const userConfirmedOrder = /^(sim|quero|vou querer|pode ser|confirmo|fecha|pode agendar|pode fazer|encomendar|quero pedir|vou ficar com|faz um|bora)\b/i.test(effectiveMessage.trim());
 
-        // Verifica se ENTREGA/RETIRADA já foi discutida
-        const deliveryAlreadyDiscussed = session.history.some(m => m.role === 'assistant' && /retirada|entrega|retirar.*loja|rua palmeiras/i.test(m.text.toLowerCase()));
-        // Verifica se PERSONALIZAÇÃO já foi perguntada (massa+recheio+sabores tudo junto)
-        const personalizacaoAsked = session.history.some(m => m.role === 'assistant' && /massa.*bolo|massa.*branca|massa.*chocolate|personalizar.*kit|personalizar.*bolo/i.test(m.text.toLowerCase()));
-        // Verifica itens já respondidos pelo cliente
-        const allUserTexts = session.history.filter(m => m.role === 'user').map(m => m.text.toLowerCase()).join(' ');
-        const allBotTexts = session.history.filter(m => m.role === 'assistant').map(m => m.text.toLowerCase()).join(' ');
-        const massaAnswered = /massa\s*(branca|chocolate)|branca|chocolate/i.test(allUserTexts) && personalizacaoAsked;
-        const recheioAnswered = /(ninho|beijinho|chocolate\s*com|c[oô]co)/i.test(allUserTexts) && (personalizacaoAsked || /recheio/i.test(allBotTexts));
-        const saboresAnswered = session.history.some(m => m.role === 'assistant' && /sabor.*salgado|mini\s*salgado.*sabor|escolher.*tipo/i.test(m.text.toLowerCase())) && session.history.some(m => m.role === 'user' && /coxinha|enroladinho|quibe|bolinha|cazulo|sortido|variado/i.test(m.text.toLowerCase()));
+        const isClientAskingQuestion = /\?|^(onde|quanto|qual|como|se\s*voc|voc[eê]s?|tem|vem|o\s*que|pre[cç]o)\b/i.test(effectiveMessage.trim()) || isContentQuestion;
 
-        const kitMatch = session.history.map(m => m.text).join(' ').match(/kit\s*festa\s*(pp|p|g)/i);
-        const kitSize = kitMatch ? kitMatch[1].toUpperCase() : 'P';
-        const maxSabores = (kitSize === 'G') ? 5 : 3;
+        const needsCustom = !isClientAskingQuestion && (isKitFestaExplicit || isBoloExplicit || (userConfirmedOrder && session.history.some(m => /kit\s*festa|bolo\s*(pp|p|g)/i.test(m.text))));
 
-        // Passo 1: Se bolo/kit escolhido mas entrega/retirada NÃO discutida → forçar pergunta de entrega/retirada
-        if (needsCustom && !deliveryAlreadyDiscussed) {
-            const botConfirmedProduct = /kit\s*festa|\bR\$\s*\d|ótima\s*escolha|bolo/i.test(lastAText);
-            if (botConfirmedProduct) {
+        if (needsCustom) {
+            const deliveryAlreadyDiscussed = session.history.some(m => m.role === 'assistant' && /retirada|entrega|retirar.*loja|rua palmeiras/i.test(m.text.toLowerCase()));
+            const personalizacaoAsked = session.history.some(m => m.role === 'assistant' && /massa.*bolo|massa.*branca|massa.*chocolate|personalizar.*kit|personalizar.*bolo/i.test(m.text.toLowerCase()));
+
+            const isKitFesta = isKitFestaExplicit || session.history.some(m => /kit\s*festa/i.test(m.text));
+            const kitMatch = session.history.map(m => m.text).join(' ').match(/kit\s*festa\s*(pp|p|g)/i);
+            const kitSize = kitMatch ? kitMatch[1].toUpperCase() : 'P';
+            const maxSabores = (kitSize === 'G') ? 5 : 3;
+
+            if (!deliveryAlreadyDiscussed) {
                 if (isKitFesta) {
-                    intentHint = '\n[⛔ ETAPA OBRIGATÓRIA: O cliente escolheu um KIT FESTA. Kits são APENAS para RETIRADA. Informe que a retirada é na Rua Palmeiras, 105, Novo Prado. NÃO pergunte personalização ainda — primeiro confirme a retirada.]';
+                    intentHint += '\n[Lembrete: Kits Festa são apenas para retirada na loja (Rua Palmeiras, 105, Novo Prado). Informe a retirada antes de finalizar.]';
                 } else {
-                    intentHint = '\n[⛔ ETAPA OBRIGATÓRIA: O cliente escolheu um BOLO mas você AINDA NÃO perguntou se é entrega ou retirada. Pergunte AGORA. Se for bolo, lembre que é APENAS retirada. NÃO pergunte personalização ainda.]';
+                    intentHint += '\n[Lembrete: Bolos grandes são apenas para retirada na loja. Informe a retirada antes de finalizar.]';
                 }
-            }
-        }
-        // Passo 2: Entrega/retirada discutida, personalização AINDA NÃO perguntada → perguntar TUDO de uma vez
-        else if (needsCustom && deliveryAlreadyDiscussed && !personalizacaoAsked) {
-            if (isKitFesta) {
-                intentHint = `\n[⛔ ETAPA OBRIGATÓRIA: Entrega/retirada já definida. Agora pergunte a PERSONALIZAÇÃO COMPLETA numa mensagem só:\n- MASSA do bolo: Branca ou Chocolate?\n- RECHEIO: Ninho, Beijinho, Chocolate, Chocolate com Côco, Ninho com Côco ou Ninho com Chocolate?\n- SABORES dos mini salgados (até ${maxSabores} tipos): Enroladinho de Salsicha, Coxinha, Quibe, Bolinha de Carne, Bolinha de Queijo, Cazulo de Queijo com Presunto?\nNÃO avance para data/horário/pagamento.]`;
-            } else {
-                intentHint = '\n[⛔ ETAPA OBRIGATÓRIA: Entrega/retirada já definida. Agora pergunte a PERSONALIZAÇÃO COMPLETA numa mensagem só:\n- MASSA do bolo: Branca ou Chocolate?\n- RECHEIO: Ninho, Beijinho, Chocolate, Chocolate com Côco, Ninho com Côco ou Ninho com Chocolate?\nNÃO avance para data/horário/pagamento.]';
-            }
-        }
-        // Passo 3: Personalização perguntada mas INCOMPLETA → reforçar o que falta
-        else if (needsCustom && personalizacaoAsked) {
-            const missing = [];
-            if (!massaAnswered) missing.push('MASSA (Branca ou Chocolate)');
-            if (!recheioAnswered) missing.push('RECHEIO (Ninho, Beijinho, Chocolate, Chocolate com Côco, Ninho com Côco, Ninho com Chocolate)');
-            if (isKitFesta && !saboresAnswered) missing.push(`SABORES dos mini salgados (até ${maxSabores} tipos)`);
-
-            if (missing.length > 0) {
-                intentHint = `\n[⛔ PERSONALIZAÇÃO INCOMPLETA: O cliente já respondeu parte, mas ainda falta: ${missing.join(', ')}. Confirme o que ele já escolheu e pergunte APENAS o que falta. NÃO avance para data/horário/pagamento até ter TUDO.]`;
-            } else {
-                // Check if ribbon color was already asked/answered
-                const fitaAsked = session.history.some(m => m.role === 'assistant' && /fita|laço|🎀/i.test(m.text));
-                const fitaAnswered = session.history.some(m => m.role === 'user' && /verde|azul|rosa|vermelha|tanto faz|qualquer/i.test(m.text)) && fitaAsked;
-                if (!fitaAsked && !isKitFesta) {
-                    intentHint += '\n[Personalização de massa e recheio completa! Agora pergunte a COR DA FITA/LAÇO do bolo: 🟢 Verde, 🔵 Azul, 🩷 Rosa, 🔴 Vermelha. Só depois siga para data/horário/pagamento.]';
+            } else if (!personalizacaoAsked) {
+                if (isKitFesta) {
+                    intentHint += `\n[Personalização do kit: pergunte a massa (Branca/Chocolate), recheio e até ${maxSabores} sabores de mini salgados juntos.]`;
                 } else {
-                    intentHint += '\n[Personalização completa (massa + recheio' + (isKitFesta ? ' + sabores' : '') + (fitaAnswered ? ' + fita' : '') + '). Siga o ROTEIRO DE PEDIDO: se encomenda pergunte data/horário, depois monte orçamento e pergunte forma de pagamento.]';
+                    intentHint += '\n[Personalização do bolo: pergunte a massa (Branca/Chocolate) e recheio juntos.]';
                 }
             }
         }
@@ -2300,90 +2267,8 @@ function getBrazilTime() {
     // --- Busca dados reais do Supabase e monta o prompt final ---
     const businessContext = await buildBusinessContext(intents);
 
-    // --- Instrução dinâmica de personalização (PREFIXO do prompt para máxima atenção) ---
-    let personalizationPrefix = '';
-    if (lastAssistantMsg) {
-        const hasKitInHistory = session.history.some(m => {
-            if (m.role === 'user') return /kit\s*festa/i.test(m.text);
-            // Bot: só conta se menciona tamanho específico (Kit Festa PP/P/G) com preço
-            return /kit\s*festa\s*(pp|p\b|g\b)/i.test(m.text) && /R\$\s*\d/i.test(m.text);
-        });
-        const hasBoloInHistory = session.history.some(m => {
-            if (/vulc[aã]o\s*mini|bolo\s*(no|de)\s*pote|pote\s*(de\s*)?bolo/i.test(m.text)) return false;
-            if (m.role === 'user') return /\bbolo\b/i.test(m.text);
-            // Bot: só conta se menciona tamanho específico (Bolo PP/P/G) com preço
-            return /bolo\s*(pp|p\b|g\b)/i.test(m.text) && /R\$\s*\d/i.test(m.text);
-        });
-        const needsCustomization = hasKitInHistory || hasBoloInHistory;
-
-        if (needsCustomization) {
-            const histDeliveryDiscussed = session.history.some(m => m.role === 'assistant' && /retirada|entrega|retirar.*loja|rua palmeiras/i.test(m.text.toLowerCase()));
-            const histRecheioAsked = session.history.some(m => m.role === 'assistant' && /recheio.*prefere|recheio.*qual|qual.*recheio/i.test(m.text.toLowerCase()));
-            const histSaboresAsked = session.history.some(m => m.role === 'assistant' && /sabor.*salgado|mini\s*salgado.*sabor|escolher.*tipo/i.test(m.text.toLowerCase()));
-            const botAlreadyListedKits = session.history.some(m => {
-                if (m.role !== 'assistant') return false;
-                // Requer menção a produto específico (com tamanho), não genérico
-                const hasSpecificProduct = /kit\s*festa\s*(pp|p\b|g\b)|bolo\s*(pp|p\b|g\b|vulc[aã]o)/i.test(m.text);
-                if (!hasSpecificProduct) return false;
-                return /\bR\$\s*\d/i.test(m.text) || /ótima\s*escolha/i.test(m.text);
-            });
-
-            // Verifica o que já foi respondido pelo cliente
-            const prefAllUserTexts = session.history.filter(m => m.role === 'user').map(m => m.text.toLowerCase()).join(' ');
-            const prefAllBotTexts = session.history.filter(m => m.role === 'assistant').map(m => m.text.toLowerCase()).join(' ');
-            const prefPersonalizacaoAsked = session.history.some(m => m.role === 'assistant' && /massa.*bolo|massa.*branca|massa.*chocolate|personalizar.*kit|personalizar.*bolo/i.test(m.text.toLowerCase()));
-            const prefMassaOk = /massa\s*(branca|chocolate)|branca|chocolate/i.test(prefAllUserTexts) && prefPersonalizacaoAsked;
-            const prefRecheioOk = /(ninho|beijinho|chocolate\s*com|c[oô]co)/i.test(prefAllUserTexts) && (prefPersonalizacaoAsked || /recheio/i.test(prefAllBotTexts));
-            const prefSaboresOk = /coxinha|enroladinho|quibe|bolinha|cazulo|sortido|variado/i.test(prefAllUserTexts) && /sabor.*salgado|mini\s*salgado.*sabor|escolher.*tipo/i.test(prefAllBotTexts);
-            const prefKitMatch = session.history.map(m => m.text).join(' ').match(/kit\s*festa\s*(pp|p|g)/i);
-            const prefKitSize = prefKitMatch ? prefKitMatch[1].toUpperCase() : 'P';
-            const prefMaxSab = (prefKitSize === 'G') ? 5 : 3;
-
-            if (!histDeliveryDiscussed && botAlreadyListedKits) {
-                // Entrega/retirada ainda não discutida → forçar antes da personalização
-                if (hasKitInHistory) {
-                    personalizationPrefix = '🚨🚨🚨 INSTRUÇÃO MÁXIMA PRIORIDADE — LEIA ANTES DE TUDO:\nO cliente escolheu um KIT FESTA. Kits são APENAS para RETIRADA na loja (Rua Palmeiras, 105, Novo Prado).\nInforme sobre a retirada PRIMEIRO. NÃO pergunte personalização ainda.\n🚨🚨🚨\n\n';
-                } else {
-                    personalizationPrefix = '🚨🚨🚨 INSTRUÇÃO MÁXIMA PRIORIDADE — LEIA ANTES DE TUDO:\nO cliente escolheu um BOLO. Você AINDA NÃO perguntou se é entrega ou retirada.\nPergunte AGORA. Bolos são APENAS retirada. NÃO pergunte personalização ainda.\n🚨🚨🚨\n\n';
-                }
-                console.log('[gemini] 🔵 ETAPA ENTREGA ativada: forçando entrega/retirada antes de personalização');
-            } else if (histDeliveryDiscussed && !prefPersonalizacaoAsked && botAlreadyListedKits) {
-                // Entrega/retirada já definida → perguntar personalização COMPLETA de uma vez
-                if (hasKitInHistory) {
-                    personalizationPrefix = `🚨🚨🚨 INSTRUÇÃO MÁXIMA PRIORIDADE — LEIA ANTES DE TUDO:\nEntrega/retirada já definida. Agora pergunte a PERSONALIZAÇÃO COMPLETA numa mensagem só:\n🍰 *Massa do bolo:* Branca ou Chocolate?\n🎂 *Recheio:* Ninho, Beijinho, Chocolate, Chocolate com Côco, Ninho com Côco ou Ninho com Chocolate?\n🥟 *Sabores dos mini salgados (até ${prefMaxSab} tipos):* Enroladinho de Salsicha, Coxinha, Quibe, Bolinha de Carne, Bolinha de Queijo ou Cazulo de Queijo com Presunto?\nNÃO avance para data/horário/pagamento.\n🚨🚨🚨\n\n`;
-                } else {
-                    personalizationPrefix = '🚨🚨🚨 INSTRUÇÃO MÁXIMA PRIORIDADE — LEIA ANTES DE TUDO:\nEntrega/retirada já definida. Agora pergunte a PERSONALIZAÇÃO COMPLETA numa mensagem só:\n🍰 *Massa do bolo:* Branca ou Chocolate?\n🎂 *Recheio:* Ninho, Beijinho, Chocolate, Chocolate com Côco, Ninho com Côco ou Ninho com Chocolate?\nNÃO avance para data/horário/pagamento.\n🚨🚨🚨\n\n';
-                }
-                console.log('[gemini] 🔴 ETAPA PERSONALIZAÇÃO ativada: forçando pergunta ALL-IN-ONE');
-            } else if (prefPersonalizacaoAsked) {
-                // Personalização perguntada → verificar se está completa ou falta algo
-                const prefMissing = [];
-                if (!prefMassaOk) prefMissing.push('MASSA (Branca ou Chocolate)');
-                if (!prefRecheioOk) prefMissing.push('RECHEIO');
-                if (hasKitInHistory && !prefSaboresOk) prefMissing.push(`SABORES dos mini salgados (até ${prefMaxSab} tipos)`);
-                if (prefMissing.length > 0) {
-                    personalizationPrefix = `🚨🚨🚨 INSTRUÇÃO MÁXIMA PRIORIDADE — LEIA ANTES DE TUDO:\nPersonalização INCOMPLETA. Ainda falta: ${prefMissing.join(', ')}.\nConfirme o que o cliente já escolheu e pergunte APENAS o que falta. NÃO avance para data/horário/pagamento.\n🚨🚨🚨\n\n`;
-                    console.log(`[gemini] 🟡 PERSONALIZAÇÃO INCOMPLETA: falta ${prefMissing.join(', ')}`);
-                }
-            }
-        }
-    }
-
-    // Se o usuário só quer saber o conteúdo do produto, não forçar roteiro de personalização
-    if (isContentQuestion) {
-        personalizationPrefix = '';
-    }
-
-    // Monta prompt: PERSONALIZAÇÃO (início) + BASE + CONTEXTO + PERSONALIZAÇÃO (fim)
-    let fullPrompt = personalizationPrefix + GEMINI_BASE_PROMPT + greetingInstruction + businessContext;
-    if (personalizationPrefix) {
-        fullPrompt += '\n\n' + personalizationPrefix; // Duplica no fim para efeito primazia-recência
-    }
-
-    // Flag: se estamos em etapa de personalização, reduzir temperatura para forçar compliance
-    const personalizationMode = personalizationPrefix.length > 0;
-    // DEBUG temporário: logar estado de personalização
-    console.log(`[gemini] DEBUG: personalizationMode=${personalizationMode}, histLen=${session.history.length}, isNew=${session.isNewSession}, prefixLen=${personalizationPrefix.length}`);
+    // Monta prompt: BASE + SAUDAÇÃO + CONTEXTO DE NEGÓCIO
+    let fullPrompt = GEMINI_BASE_PROMPT + greetingInstruction + businessContext;
 
     // Detecção de repetição de mensagem (mesma mensagem que a última do usuário)
     const normalizedAttempt = effectiveMessage.trim().toLowerCase();
@@ -2429,7 +2314,7 @@ function getBrazilTime() {
     const makeBody = (maxTokens = 800) => ({
         system_instruction: { parts: [{ text: fullPrompt }] },
         contents: contents,
-        generationConfig: { maxOutputTokens: maxTokens, temperature: personalizationMode ? 0.3 : 0.7 }
+        generationConfig: { maxOutputTokens: maxTokens, temperature: 0.7 }
     });
 
     // --- Chamada ao Gemini com cascata de 4 modelos (retry em 503/429 + validação de conteúdo) ---
