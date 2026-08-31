@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 
 <head>
@@ -4132,43 +4132,7 @@
     </div>
   </div>
 
-  <!-- ======================================== -->
-  <!-- MODAL: Mini Salgados (Flavor Selection) -->
-  <!-- ======================================== -->
-  <div id="miniSalgadosModal"
-    class="fixed inset-0 bg-black/80 z-50 hidden flex items-center justify-center p-4 backdrop-blur-sm">
-    <div class="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl animate-fade-in">
-      <div class="p-6 border-b border-gray-100 bg-gray-50/50 sticky top-0 z-10 backdrop-blur-md">
-        <h3 class="text-xl font-bold text-gray-800">Escolha os Sabores</h3>
-        <p id="miniSalgadosProductName" class="text-rose-600 font-medium mt-1"></p>
-        <div class="flex gap-2 text-xs mt-1">
-          <span class="bg-gray-100 text-gray-600 px-2 py-0.5 rounded">Mín: <span id="miniSalgadosMin">25</span></span>
-          <span class="bg-gray-100 text-gray-600 px-2 py-0.5 rounded">Máx: <span id="miniSalgadosMax">25</span></span>
-        </div>
-      </div>
 
-      <div class="p-6">
-        <div class="flex justify-between items-center mb-4 sticky top-0 bg-white z-10 py-2 border-b border-gray-50">
-          <span class="text-sm text-gray-600">Selecionados:</span>
-          <span id="miniSalgadosCounter" class="font-bold text-rose-600 bg-rose-50 px-3 py-1 rounded-full">0/25</span>
-        </div>
-
-        <div id="miniSalgadosContainer" class="space-y-3 pb-2">
-          <!-- Injected via JS -->
-        </div>
-
-        <div id="miniSalgadosError"
-          class="hidden mt-4 p-3 bg-red-50 text-red-600 rounded-lg text-sm border border-red-100 animate-pulse"></div>
-      </div>
-
-      <div class="p-4 border-t border-gray-100 bg-gray-50/50 flex gap-3 sticky bottom-0 z-10 backdrop-blur-md">
-        <button onclick="document.getElementById('miniSalgadosModal').classList.add('hidden')"
-          class="flex-1 py-3 text-gray-600 font-medium hover:bg-gray-100 rounded-xl transition-colors">Cancelar</button>
-        <button onclick="confirmMiniSalgados()"
-          class="flex-1 py-3 bg-rose-600 hover:bg-rose-700 text-white font-bold rounded-xl shadow-lg shadow-rose-200 transition-all active:scale-95">Confirmar</button>
-      </div>
-    </div>
-  </div>
 
   <script src="../assets/js/pix.js"></script>
   <script src="../assets/js/fast/auth-legacy.js"></script>

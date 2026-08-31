@@ -705,10 +705,37 @@ function renderUpsellSuggestions() {
 let pendingMiniProduct = null;
 let miniMaxFlavors = 3;
 
+function getMiniMaxFlavors(product) {
+    if (product?.flavor_selection?.maxFlavors) {
+        return parseInt(product.flavor_selection.maxFlavors, 10) || 3;
+    }
+    const str = ((product?.name || '') + ' ' + (product?.description || '')).toLowerCase();
+    if (/\b150\b/.test(str)) return 6;
+    if (/\b100\b|cento\b/.test(str)) return 5;
+    if (/\b50\b|meio\s*cento\b/.test(str)) return 4;
+    if (/\b40\b/.test(str)) return 3;
+    if (/\b30\b/.test(str)) return 3;
+    if (/\b20\b/.test(str)) return 2;
+    return 4;
+}
+
+function isMiniSalgadoProduct(product, category) {
+    if (!product && !category) return false;
+    const cat = (product?.category || category || '').toLowerCase();
+    const name = (product?.name || '').toLowerCase();
+    if (product?.flavor_selection && product.flavor_selection.enabled === false) {
+        return false;
+    }
+    if (cat === 'mini' || name.includes('mini-salgado') || name.includes('mini salgado') || name.includes('cento')) {
+        return true;
+    }
+    return false;
+}
+
 function openMiniSalgadosModal(product) {
+    if (!product) return;
     pendingMiniProduct = product;
-    const fs = product.flavor_selection;
-    miniMaxFlavors = fs?.maxFlavors || 3;
+    miniMaxFlavors = getMiniMaxFlavors(product);
 
     const promotion = (typeof promotions !== 'undefined') ? promotions.find(p => p.productId === product.id) : null;
     let displayPrice = product.price;
@@ -721,16 +748,43 @@ function openMiniSalgadosModal(product) {
     }
     pendingMiniProduct.displayPrice = displayPrice;
 
-    document.getElementById('miniProductName').textContent = product.name;
-    document.getElementById('miniProductPrice').textContent = `R$ ${displayPrice.toFixed(2).replace('.', ',')} `;
-    document.getElementById('miniFlavorLimit').textContent = `(até ${miniMaxFlavors})`;
-    document.getElementById('miniFlavorCounter').textContent = `Selecionados: 0 / ${miniMaxFlavors} `;
+    const nameEl = document.getElementById('miniProductName');
+    if (nameEl) nameEl.textContent = product.name;
+    const priceEl = document.getElementById('miniProductPrice');
+    if (priceEl) priceEl.textContent = `R$ ${displayPrice.toFixed(2).replace('.', ',')} `;
+    const limitEl = document.getElementById('miniFlavorLimit');
+    if (limitEl) limitEl.textContent = `(até ${miniMaxFlavors})`;
+    const counterEl = document.getElementById('miniFlavorCounter');
+    if (counterEl) counterEl.textContent = `Selecionados: 0 / ${miniMaxFlavors} `;
 
     const container = document.getElementById('miniFlavorsContainer');
-    const allFlavors = ProductOptionsModule.getVisible('miniSalgadosFlavors');
-    const availableIds = fs?.availableFlavors || allFlavors.map(f => f.id);
+    if (!container) return;
 
-    const flavors = allFlavors.filter(f => availableIds.includes(f.id));
+    let allFlavors = [];
+    if (window.ProductOptionsModule && typeof window.ProductOptionsModule.getVisible === 'function') {
+        allFlavors = window.ProductOptionsModule.getVisible('miniSalgadosFlavors');
+        if (!allFlavors || allFlavors.length === 0) {
+            allFlavors = window.ProductOptionsModule.getVisible('salgados');
+        }
+    }
+    if (!allFlavors || allFlavors.length === 0) {
+        allFlavors = (window.ProductOptionsModule?.defaults?.miniSalgadosFlavors) || [
+            { name: 'Coxinha', id: 1 },
+            { name: 'Enroladinho', id: 2 },
+            { name: 'Quibe', id: 3 },
+            { name: 'Bolinha de Carne', id: 4 },
+            { name: 'Bolinha de Queijo', id: 5 },
+            { name: 'Risole de Carne', id: 6 },
+            { name: 'Risole de Queijo', id: 7 },
+            { name: 'Rissole de Queijo e Presunto', id: 8 }
+        ];
+    }
+
+    const fs = product.flavor_selection;
+    const availableIds = fs?.availableFlavors;
+    const flavors = (availableIds && availableIds.length > 0)
+        ? allFlavors.filter(f => availableIds.includes(f.id))
+        : allFlavors;
 
     if (flavors.length === 0) {
         container.innerHTML = '<p class="text-gray-500 text-sm text-center py-4">Nenhum sabor disponível para este produto.</p>';
@@ -743,13 +797,16 @@ function openMiniSalgadosModal(product) {
         `).join('');
     }
 
-    document.getElementById('miniSalgadosError').classList.add('hidden');
-    document.getElementById('miniSalgadosModal').classList.remove('hidden');
+    const errEl = document.getElementById('miniSalgadosError');
+    if (errEl) errEl.classList.add('hidden');
+    const modalEl = document.getElementById('miniSalgadosModal');
+    if (modalEl) modalEl.classList.remove('hidden');
 }
 
 function closeMiniSalgadosModal() {
     pendingMiniProduct = null;
-    document.getElementById('miniSalgadosModal').classList.add('hidden');
+    const modalEl = document.getElementById('miniSalgadosModal');
+    if (modalEl) modalEl.classList.add('hidden');
 }
 
 function updateMiniFlavorCounter() {
@@ -787,27 +844,32 @@ function confirmMiniSalgados() {
     const errorEl = document.getElementById('miniSalgadosError');
 
     if (selectedFlavors.length === 0) {
-        errorEl.textContent = 'Selecione pelo menos um sabor.';
-        errorEl.classList.remove('hidden');
+        if (errorEl) {
+            errorEl.textContent = 'Selecione pelo menos um sabor.';
+            errorEl.classList.remove('hidden');
+        }
         return;
     }
 
     if (selectedFlavors.length > miniMaxFlavors) {
-        errorEl.textContent = `Selecione no máximo ${miniMaxFlavors} sabores.`;
-        errorEl.classList.remove('hidden');
+        if (errorEl) {
+            errorEl.textContent = `Selecione no máximo ${miniMaxFlavors} sabores.`;
+            errorEl.classList.remove('hidden');
+        }
         return;
     }
 
     const note = `Sabores: ${selectedFlavors.join(', ')}`;
+    const currentCart = window.cart || [];
 
-    const existingIndex = cart.findIndex(item =>
+    const existingIndex = currentCart.findIndex(item =>
         item.id === pendingMiniProduct.id && item.note === note
     );
 
     if (existingIndex !== -1) {
-        cart[existingIndex].quantity++;
+        currentCart[existingIndex].quantity++;
     } else {
-        cart.push({
+        currentCart.push({
             id: pendingMiniProduct.id,
             name: pendingMiniProduct.name,
             description: pendingMiniProduct.description || '',
@@ -818,9 +880,19 @@ function confirmMiniSalgados() {
         });
     }
 
-    updateCart();
+    window.cart = currentCart;
+    if (typeof window.updateCart === 'function') {
+        window.updateCart();
+    }
     closeMiniSalgadosModal();
 }
+
+window.getMiniMaxFlavors = getMiniMaxFlavors;
+window.isMiniSalgadoProduct = isMiniSalgadoProduct;
+window.openMiniSalgadosModal = openMiniSalgadosModal;
+window.closeMiniSalgadosModal = closeMiniSalgadosModal;
+window.confirmMiniSalgados = confirmMiniSalgados;
+window.updateMiniFlavorCounter = updateMiniFlavorCounter;
 
 // ========================================
 // CUSTOM PRODUCT OPTIONS MODAL (Kits/Bolos)

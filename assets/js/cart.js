@@ -329,16 +329,19 @@ document.addEventListener('click', function (e) {
             return;
         }
 
-        // For mini products with flavor selection enabled, open mini-salgados modal
-        // Assumes openMiniSalgadosModal is global
-        const product = window.products.find(p => p.id === id);
-        if (product && product.category === 'mini' && product.flavor_selection?.enabled) {
+        // For mini products with flavor selection, open mini-salgados modal
+        const product = (window.products || []).find(p => p.id === id) || {
+            id, name, description, price, category
+        };
+        const isMini = (typeof window.isMiniSalgadoProduct === 'function')
+            ? window.isMiniSalgadoProduct(product, category)
+            : (category === 'mini' || (product.name && /mini\s*salgado/i.test(product.name)));
+
+        if (isMini) {
             if (typeof window.openMiniSalgadosModal === 'function') {
                 window.openMiniSalgadosModal(product);
-            } else {
-                console.error('openMiniSalgadosModal not found');
+                return;
             }
-            return;
         }
 
         // For other products, add directly to cart

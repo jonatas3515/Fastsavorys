@@ -360,12 +360,23 @@ document.addEventListener('click', function (e) {
         }
 
         // Verifica flavor selection (Mini Salgados)
-        const product = (window.products || []).find(p => p.id === id);
-        if (product && product.category === 'mini' && product.flavor_selection?.enabled) {
-            if (window.openMiniSalgadosModal) {
+        const product = (window.products || []).find(p => p.id === id) || {
+            id: id,
+            name: btn.dataset.name,
+            description: btn.dataset.description || '',
+            price: parseFloat(btn.dataset.price),
+            category: category
+        };
+
+        const isMini = (typeof window.isMiniSalgadoProduct === 'function')
+            ? window.isMiniSalgadoProduct(product, category)
+            : (category === 'mini' || (product.name && /mini\s*salgado/i.test(product.name)));
+
+        if (isMini) {
+            if (typeof window.openMiniSalgadosModal === 'function') {
                 window.openMiniSalgadosModal(product);
+                return;
             }
-            return;
         }
 
         // Verifica Combo (permite escolher salgados)

@@ -327,15 +327,23 @@ window.CatalogModule = {
         }
 
         // Para mini salgados com seleção de sabores habilitada
-        if (product.category === 'mini' && product.flavor_selection?.enabled) {
+        const isMini = (typeof window.isMiniSalgadoProduct === 'function')
+            ? window.isMiniSalgadoProduct(product, product.category)
+            : (product.category === 'mini' || (product.name && /mini\s*salgado/i.test(product.name)));
+
+        if (isMini) {
             console.log('[Catalog] Produto mini com seleção de sabores:', product.name);
-            if (typeof openMiniSalgadosModal === 'function') {
+            if (typeof window.openMiniSalgadosModal === 'function') {
+                window.openMiniSalgadosModal(product);
+                return;
+            } else if (typeof openMiniSalgadosModal === 'function') {
                 openMiniSalgadosModal(product);
+                return;
             } else {
                 console.warn('[Catalog] openMiniSalgadosModal não disponível');
                 this.addProductDirectly(product);
+                return;
             }
-            return;
         }
 
         // Para outros produtos, adiciona diretamente com cálculo de promoção
