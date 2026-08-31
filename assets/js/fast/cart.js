@@ -379,15 +379,17 @@ document.addEventListener('click', function (e) {
             }
         }
 
-        // Verifica Combo (permite escolher salgados)
-        // Regra atualizada: Se categoria 'combos' OU nome contém 'combo', deve abrir modal
-        if (product && (product.category === 'combos' || (product.name && product.name.toLowerCase().includes('combo')))) {
+        // Verifica Combo (permite escolher salgados apenas para combos de salgados mistos, não de empadinhas)
+        const isCombo = product && (product.category === 'combos' || (product.name && product.name.toLowerCase().includes('combo')));
+        const isEmpadaProduct = product && /empada|empadinha/i.test((product.name || '') + ' ' + (product.description || ''));
+
+        if (isCombo && !isEmpadaProduct) {
             if (window.openComboSalgadosModal) {
                 window.openComboSalgadosModal(product);
+                return;
             } else {
                 console.error('Modal de combos não encontrado (openComboSalgadosModal)');
             }
-            return;
         }
 
         // Adição padrão

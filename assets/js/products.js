@@ -721,14 +721,35 @@ function getMiniMaxFlavors(product) {
 
 function isMiniSalgadoProduct(product, category) {
     if (!product && !category) return false;
-    const cat = (product?.category || category || '').toLowerCase();
     const name = (product?.name || '').toLowerCase();
+    const desc = (product?.description || '').toLowerCase();
+    const fullText = name + ' ' + desc;
+
+    // Se o admin desabilitou explicitamente
     if (product?.flavor_selection && product.flavor_selection.enabled === false) {
         return false;
     }
-    if (cat === 'mini' || name.includes('mini-salgado') || name.includes('mini salgado') || name.includes('cento')) {
-        return true;
+
+    // Se for empada ou empadinha, NUNCA abre modal de seleção de sabores mistos
+    if (/empada|empadinha/i.test(fullText)) {
+        return false;
     }
+
+    // Se for unidade individual / avulso (e não pacote), não abre modal
+    if (/\bunidade\b|\bavuls|1\s*un\b/i.test(name) && !/\b(20|30|40|50|100|150)\b/i.test(name)) {
+        return false;
+    }
+
+    // O modal aplica-se exclusivamente aos pacotes de mini-salgados: 20, 30, 40, 50, 100 e 150
+    const hasMiniPackageSize = /\b(20|30|40|50|100|150)\b|cento\b|meio\s*cento\b/i.test(name);
+
+    if (hasMiniPackageSize) {
+        const cat = (product?.category || category || '').toLowerCase();
+        if (cat === 'mini' || /mini\s*salgado|salgado/i.test(name)) {
+            return true;
+        }
+    }
+
     return false;
 }
 
