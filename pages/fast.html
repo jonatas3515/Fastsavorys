@@ -2398,8 +2398,9 @@
       const productDesc = (product.description || '').toLowerCase();
       const fullText = productName + ' ' + productDesc;
 
-      // Detecta se é o "Combo Só Pra Mim" (ou combo de mini salgados) vs "Combo Explosão" (salgados grandes)
-      const isMiniCombo = /s[oó]\s*pra\s*mim|mini/i.test(fullText);
+      // Detecta se é o "Combo Só Pra Mim" (ou combo exclusivo de mini-salgados).
+      // IMPORTANTE: NÃO testar "mini" solto na descrição toda, pois o Combo Explosão contém "mini vulcão" na descrição!
+      const isMiniCombo = /s[oó]\s*pra\s*mim/i.test(productName) || /mini\s*salgado/i.test(productName) || /mini\s*salgado/i.test(productDesc);
 
       const titleEl = document.getElementById('comboModalTitle');
       if (titleEl) {
@@ -2410,7 +2411,7 @@
       if (labelEl) {
         labelEl.innerHTML = isMiniCombo
           ? 'Escolha 2 sabores de mini-salgados: <span class="text-xs text-gray-500">(2 sabores)</span>'
-          : 'Escolha 2 salgados: <span class="text-xs text-gray-500">(2 opções)</span>';
+          : 'Escolha 2 salgados grandes: <span class="text-xs text-gray-500">(2 salgados)</span>';
       }
 
       document.getElementById('comboProductName').textContent = product.name;
