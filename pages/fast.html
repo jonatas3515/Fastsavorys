@@ -1431,7 +1431,7 @@
   <div id="comboSalgadosModal"
     class="fixed inset-0 bg-black bg-opacity-50 z-[60] hidden flex items-center justify-center p-4">
     <div class="bg-white rounded-xl p-6 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto shadow-2xl">
-      <h3 class="text-xl font-bold text-gray-800 mb-4">🔥 Escolha os Mini-Salgados do Combo</h3>
+      <h3 id="comboModalTitle" class="text-xl font-bold text-gray-800 mb-4">🔥 Escolha os Salgados do Combo</h3>
 
       <!-- Product Info -->
       <div class="mb-4 p-3 bg-gray-50 rounded-lg">
@@ -1441,8 +1441,8 @@
 
       <!-- Salgados Selection -->
       <div class="mb-4">
-        <label class="block font-semibold text-gray-800 mb-2">Escolha 2 sabores de mini-salgados:
-          <span class="text-xs text-gray-500">(2 sabores)</span>
+        <label id="comboModalLabel" class="block font-semibold text-gray-800 mb-2">Escolha 2 salgados:
+          <span class="text-xs text-gray-500">(2 opções)</span>
         </label>
         <p id="comboSalgadosCounter" class="text-xs text-rose-600 mb-2">Selecionados: 0/2</p>
         <div id="comboSalgadosContainer" class="space-y-2">
@@ -2394,30 +2394,61 @@
       console.log('[Modal] openComboSalgadosModal called for:', product.name);
       pendingComboProduct = product;
 
+      const productName = (product.name || '').toLowerCase();
+      const productDesc = (product.description || '').toLowerCase();
+      const fullText = productName + ' ' + productDesc;
+
+      // Detecta se é o "Combo Só Pra Mim" (ou combo de mini salgados) vs "Combo Explosão" (salgados grandes)
+      const isMiniCombo = /s[oó]\s*pra\s*mim|mini/i.test(fullText);
+
+      const titleEl = document.getElementById('comboModalTitle');
+      if (titleEl) {
+        titleEl.textContent = isMiniCombo ? '🔥 Escolha os Mini-Salgados do Combo' : '🔥 Escolha os Salgados do Combo';
+      }
+
+      const labelEl = document.getElementById('comboModalLabel');
+      if (labelEl) {
+        labelEl.innerHTML = isMiniCombo
+          ? 'Escolha 2 sabores de mini-salgados: <span class="text-xs text-gray-500">(2 sabores)</span>'
+          : 'Escolha 2 salgados: <span class="text-xs text-gray-500">(2 opções)</span>';
+      }
+
       document.getElementById('comboProductName').textContent = product.name;
       document.getElementById('comboProductPrice').textContent = `R$ ${product.price.toFixed(2).replace('.', ',')}`;
       document.getElementById('comboSalgadosCounter').textContent = `Selecionados: 0/${COMBO_MAX_SALGADOS}`;
 
-      // Usar sabores de mini-salgados da tabela fast_product_options (tipo 'miniSalgadosFlavors')
       const container = document.getElementById('comboSalgadosContainer');
 
       let salgados = [];
+      const optionType = isMiniCombo ? 'miniSalgadosFlavors' : 'salgados';
+
       if (window.ProductOptionsModule && typeof window.ProductOptionsModule.getVisible === 'function') {
-        salgados = window.ProductOptionsModule.getVisible('miniSalgadosFlavors');
+        salgados = ProductOptionsModule.getVisible(optionType);
       }
 
       if (!salgados || salgados.length === 0) {
-        salgados = [
-          { name: 'Coxinha' },
-          { name: 'Enroladinho de Salsicha' },
-          { name: 'Quibe' },
-          { name: 'Bolinha de Carne' },
-          { name: 'Bolinha de Queijo' },
-          { name: 'Cazulo de Presunto e Queijo' }
-        ];
+        if (isMiniCombo) {
+          salgados = [
+            { name: 'Coxinha' },
+            { name: 'Enroladinho de Salsicha' },
+            { name: 'Quibe' },
+            { name: 'Bolinha de Carne' },
+            { name: 'Bolinha de Queijo' },
+            { name: 'Cazulo de Presunto e Queijo' }
+          ];
+        } else {
+          salgados = [
+            { name: 'Coxinha' },
+            { name: 'Bolinha de Carne' },
+            { name: 'Cazulo de Presunto e Queijo' },
+            { name: 'Quibe' },
+            { name: 'Bolinha de Queijo' },
+            { name: 'Enroladinho de Salsicha' }
+          ];
+        }
       }
 
-      console.log('[Modal] Sabores de mini-salgados carregados para o combo:', salgados);
+      console.log(`[Modal] Sabores carregados para combo (${optionType}):`, salgados);
 
       container.innerHTML = salgados.map((s, idx) => {
         return `
