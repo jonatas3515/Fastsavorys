@@ -1431,7 +1431,7 @@
   <div id="comboSalgadosModal"
     class="fixed inset-0 bg-black bg-opacity-50 z-[60] hidden flex items-center justify-center p-4">
     <div class="bg-white rounded-xl p-6 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto shadow-2xl">
-      <h3 class="text-xl font-bold text-gray-800 mb-4">🔥 Escolha os Salgados do Combo</h3>
+      <h3 class="text-xl font-bold text-gray-800 mb-4">🔥 Escolha os Mini-Salgados do Combo</h3>
 
       <!-- Product Info -->
       <div class="mb-4 p-3 bg-gray-50 rounded-lg">
@@ -1441,8 +1441,8 @@
 
       <!-- Salgados Selection -->
       <div class="mb-4">
-        <label class="block font-semibold text-gray-800 mb-2">Escolha 2 salgados:
-          <span class="text-xs text-gray-500">(obrigatório)</span>
+        <label class="block font-semibold text-gray-800 mb-2">Escolha 2 sabores de mini-salgados:
+          <span class="text-xs text-gray-500">(2 sabores)</span>
         </label>
         <p id="comboSalgadosCounter" class="text-xs text-rose-600 mb-2">Selecionados: 0/2</p>
         <div id="comboSalgadosContainer" class="space-y-2">
@@ -2398,40 +2398,41 @@
       document.getElementById('comboProductPrice').textContent = `R$ ${product.price.toFixed(2).replace('.', ',')}`;
       document.getElementById('comboSalgadosCounter').textContent = `Selecionados: 0/${COMBO_MAX_SALGADOS}`;
 
-      // Usar salgados GRANDES da tabela fast_product_options (tipo 'salgados')
+      // Usar sabores de mini-salgados da tabela fast_product_options (tipo 'miniSalgadosFlavors')
       const container = document.getElementById('comboSalgadosContainer');
 
-      // Debug: Check ProductOptionsModule availability
-      if (!window.ProductOptionsModule) {
-        console.error('[Modal] ProductOptionsModule is undefined!');
-        container.innerHTML = '<p class="text-red-500 text-sm text-center py-4">Erro interno: Módulo de opções não carregado.</p>';
-        document.getElementById('comboSalgadosError').classList.add('hidden');
-        document.getElementById('comboSalgadosModal').classList.remove('hidden');
-        return;
+      let salgados = [];
+      if (window.ProductOptionsModule && typeof window.ProductOptionsModule.getVisible === 'function') {
+        salgados = window.ProductOptionsModule.getVisible('miniSalgadosFlavors');
       }
 
-      console.log('[Modal] Calling getVisible("salgados")...');
-      const salgados = ProductOptionsModule.getVisible('salgados');
-      console.log('[Modal] getVisible returned:', salgados);
-
-      if (salgados.length === 0) {
-        container.innerHTML = '<p class="text-gray-500 text-sm text-center py-4">Nenhum salgado disponível.</p>';
-      } else {
-        container.innerHTML = salgados.map((s, idx) => {
-          return `
-          <div class="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
-            <span class="font-medium text-gray-800">${s.name}</span>
-            <div class="flex items-center gap-2">
-              <button type="button" onclick="comboQtyChange(${idx}, -1)"
-                class="w-8 h-8 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold text-lg flex items-center justify-center">−</button>
-              <input type="number" min="0" max="${COMBO_MAX_SALGADOS}" value="0" readonly
-                class="combo-salgado-qty w-10 text-center font-bold text-gray-800 border-0 bg-transparent" data-idx="${idx}" data-name="${s.name}">
-              <button type="button" onclick="comboQtyChange(${idx}, 1)"
-                class="w-8 h-8 rounded-full bg-rose-600 hover:bg-rose-700 text-white font-bold text-lg flex items-center justify-center">+</button>
-            </div>
-          </div>`;
-        }).join('');
+      if (!salgados || salgados.length === 0) {
+        salgados = [
+          { name: 'Coxinha' },
+          { name: 'Enroladinho de Salsicha' },
+          { name: 'Quibe' },
+          { name: 'Bolinha de Carne' },
+          { name: 'Bolinha de Queijo' },
+          { name: 'Cazulo de Presunto e Queijo' }
+        ];
       }
+
+      console.log('[Modal] Sabores de mini-salgados carregados para o combo:', salgados);
+
+      container.innerHTML = salgados.map((s, idx) => {
+        return `
+        <div class="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50">
+          <span class="font-medium text-gray-800">${s.name}</span>
+          <div class="flex items-center gap-2">
+            <button type="button" onclick="comboQtyChange(${idx}, -1)"
+              class="w-8 h-8 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold text-lg flex items-center justify-center">−</button>
+            <input type="number" min="0" max="${COMBO_MAX_SALGADOS}" value="0" readonly
+              class="combo-salgado-qty w-10 text-center font-bold text-gray-800 border-0 bg-transparent" data-idx="${idx}" data-name="${s.name}">
+            <button type="button" onclick="comboQtyChange(${idx}, 1)"
+              class="w-8 h-8 rounded-full bg-rose-600 hover:bg-rose-700 text-white font-bold text-lg flex items-center justify-center">+</button>
+          </div>
+        </div>`;
+      }).join('');
 
       document.getElementById('comboSalgadosError').classList.add('hidden');
       document.getElementById('comboSalgadosModal').classList.remove('hidden');
