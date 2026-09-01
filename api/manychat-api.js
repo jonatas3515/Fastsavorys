@@ -728,11 +728,18 @@ function computeDeterministicOrderTotal(history, currentMessage, priceMap = null
 function resolvePixFinalAmount(amt, history, currentMessage, priceMap, feeMap = null) {
     const detTotal = computeDeterministicOrderTotal(history, currentMessage, priceMap, feeMap);
     const safeAmt = validatePixAmount(amt, history, currentMessage, priceMap);
-    if (detTotal && Math.abs((safeAmt || 0) - detTotal.total) > 1.0) {
-        console.warn(`[pix] ⚠️ Valor da tag (R$ ${(safeAmt || 0).toFixed(2)}) difere do total calculado deterministicamente (R$ ${detTotal.total.toFixed(2)} = produtos R$ ${detTotal.productsTotal.toFixed(2)} + taxa R$ ${detTotal.fee.toFixed(2)}). Usando o valor calculado.`);
+
+    if (detTotal && safeAmt) {
+        const minEntry = (detTotal.total / 2) - 1.0;
+        const maxTotal = detTotal.total + 1.0;
+        // Se safeAmt é um valor válido (entre 50% de entrada e 100% do total), respeita o safeAmt (incluindo valores redondos como R$ 50,00 pedidos pelo cliente)
+        if (safeAmt >= minEntry && safeAmt <= maxTotal) {
+            return safeAmt;
+        }
+        console.warn(`[pix] ⚠️ Valor da tag (R$ ${safeAmt.toFixed(2)}) fora da faixa esperada do pedido (R$ ${minEntry.toFixed(2)} - R$ ${maxTotal.toFixed(2)}). Usando o valor calculado de R$ ${detTotal.total.toFixed(2)}.`);
         return detTotal.total;
     }
-    return safeAmt;
+    return safeAmt || (detTotal ? detTotal.total : null);
 }
 
 // Lembrete just-in-time para o Bolo Vulcão Mini / Bolo no Pote.

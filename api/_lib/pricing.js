@@ -412,6 +412,17 @@ function collectMentionedAmounts(history, effectiveMessage, priceMap = null) {
         const v = parseBrlNumber(m[1]);
         if (!isNaN(v) && v > 0) bases.add(v);
     }
+
+    // Captura números explícitos expressos pelo cliente em contexto de pagamento (ex: "vou enviar 50", "passar 60", "pago 50", "50 reais", "manda de 50")
+    const payPattern = /(?:enviar|pagar|passar|transferir|dar|mandar|manda|pix|entrada|adiantar|ser|vou)\s*(?:de)?\s*(?:R\$\s*)?([0-9]+(?:[.,][0-9]{2})?)|([0-9]+(?:[.,][0-9]{2})?)\s*(?:reais|conto)/gi;
+    while ((m = payPattern.exec(joined)) !== null) {
+        const numStr = m[1] || m[2];
+        if (numStr) {
+            const v = parseBrlNumber(numStr);
+            if (!isNaN(v) && v > 0) bases.add(v);
+        }
+    }
+
     const est = estimateCartTotal([...(history || [])], priceMap);
     if (est.total > 0) bases.add(est.total);
     return bases;
@@ -421,13 +432,13 @@ function collectMentionedAmounts(history, effectiveMessage, priceMap = null) {
 // VALIDAÇÃO DE SEGURANÇA DO VALOR DO PIX
 // ==========================================
 // O modelo às vezes alucina o valor dentro de [GERAR_PIX:VALOR]. Esta função só aceita o valor se
-// ele corresponder a algum valor JÁ MENCIONADO na conversa (total) ou à metade dele (entrada 50%),
-// ou ao total estimado programaticamente. Se for "inventado", retorna null para gerar PIX SEM valor.
+// ele corresponder a algum valor JÁ MENCIONADO na conversa (total), à metade dele (entrada 50%),
+// a um valor de entrada personalizado proposto pelo cliente, ou ao total estimado programaticamente.
 function validatePixAmount(amt, history, effectiveMessage, priceMap = null) {
     if (!amt || amt <= 0) return amt; // PIX sem valor: nada a validar
     try {
         const bases = collectMentionedAmounts(history, effectiveMessage, priceMap);
-        // Candidatos válidos: cada valor mencionado e sua metade (entrada de 50%)
+        // Candidatos válidos: cada valor mencionado, sua metade (entrada de 50%) e valores personalizados
         const candidates = new Set();
         for (const b of bases) {
             candidates.add(b);
