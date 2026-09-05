@@ -23,7 +23,7 @@ const SALGADO_UNIT_TOKENS = ['coxinha', 'enroladinho', 'risole', 'rissole', 'qui
 
 // Preços-padrão (fallback) caso o cardápio do Supabase não carregue.
 const SALGADO_UNIT_FALLBACK = {
-    coxinha: 4.25, enroladinho: 4.25, risole: 4.50, rissole: 4.50, quibe: 4.50, kibe: 4.50,
+    coxinha: 4.50, enroladinho: 4.25, risole: 4.50, rissole: 4.50, quibe: 4.50, kibe: 4.50,
     bolinha: 4.50, bolinho: 4.50, empadinha: 4.50, empada: 4.50, pastel: 4.50, cazulo: 4.50, croquete: 4.50,
     esfiha: 4.50, esfirra: 4.50,
 };

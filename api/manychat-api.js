@@ -633,6 +633,12 @@ function detectBairroInText(text, feeMap = null) {
 // validatePixAmount, validateCartaoAmount, parseBrlNumber, normalizeTxt).
 
 
+function buildCartFactHint(history, currentMessage, priceMap = null) {
+    const { total, description, complete } = estimateCartTotal([...(history || []), { role: 'user', text: currentMessage }], priceMap);
+    if (!complete || !(total > 0)) return '';
+    return `\n[🛒 CARRINHO ATUAL (VALOR EXATO CALCULADO PELO SISTEMA): ${description} | SUBTOTAL PRODUTOS = R$ ${total.toFixed(2).replace('.', ',')}. Use este subtotal se for informar preços ao cliente.]`;
+}
+
 function buildDeliveryFactHint(history, currentMessage, priceMap = null, feeMap = null) {
     // Only look at USER messages for bairro detection (bot messages list ALL bairros)
     const userMsgs = history.filter(m => m.role === 'user').map(m => m.text);
@@ -653,14 +659,25 @@ function buildDeliveryFactHint(history, currentMessage, priceMap = null, feeMap 
         if (bairroInfo) break;
     }
 
-    // Se AINDA NÃO informou bairro, mas o total é conhecido e está ABAIXO do pedido mínimo global (R$ 15,00):
-    // Interrompe imediatamente para a IA NÃO pedir bairro nem rua, mas sim avisar do mínimo!
+    // Se AINDA NÃO informou bairro:
     if (!bairroInfo) {
-        if (total > 0 && complete && total < 15.00) {
-            const falta = (15.00 - total).toFixed(2).replace('.', ',');
-            const hint = `\n[⛔ FATO VERIFICADO (pedido mínimo de entrega): O total dos produtos é R$ ${total.toFixed(2).replace('.', ',')} (${description}), que é MENOR que o pedido mínimo global de R$ 15,00 para entrega. ⛔ NÃO aceite entrega e NÃO pergunte o bairro nem o endereço. Informe gentilmente ao cliente: "Nosso pedido mínimo para entrega é de R$ 15,00 (faltam R$ ${falta} em produtos). Você gostaria de adicionar mais algum item ao pedido ou prefere retirar na nossa loja (Rua Palmeiras, 105, Novo Prado)?"]`;
-            console.log(`[delivery-hint] ${hint.replace(/\n/g, ' | ')}`);
-            return hint;
+        if (total > 0 && complete) {
+            if (total < 15.00) {
+                const falta = (15.00 - total).toFixed(2).replace('.', ',');
+                const hint = `\n[⛔ FATO VERIFICADO (pedido mínimo de entrega): O total dos produtos é R$ ${total.toFixed(2).replace('.', ',')} (${description}), que é MENOR que o pedido mínimo global de R$ 15,00 para entrega. ⛔ NÃO aceite entrega e NÃO pergunte o bairro nem o endereço. Informe gentilmente ao cliente: "Nosso pedido mínimo para entrega é de R$ 15,00 (faltam R$ ${falta} em produtos). Você gostaria de adicionar mais algum item ao pedido ou prefere retirar na nossa loja (Rua Palmeiras, 105, Novo Prado)?"]`;
+                console.log(`[delivery-hint] ${hint.replace(/\n/g, ' | ')}`);
+                return hint;
+            } else {
+                // total >= 15.00: Pedido atingiu o mínimo! Injeta aviso explícito para a IA não alucinar que falta valor
+                const hint = `\n[⛔ FATO VERIFICADO (pedido de entrega):
+  PEDIDO ATUAL: ${description} | TOTAL PRODUTOS = R$ ${total.toFixed(2).replace('.', ',')}
+  ✅ O total dos produtos (R$ ${total.toFixed(2).replace('.', ',')}) ATINGIU o pedido mínimo global de R$ 15,00 para entrega.
+  ⛔ NUNCA diga que faltam valores para entrega nem repita mensagens antigas de valor mínimo — o pedido JÁ atinge o mínimo!
+  📍 O bairro ainda não foi informado ou identificado (termos como "na creche", "em casa", "aqui", etc. não são bairros).
+  👉 PERGUNTE para qual bairro seria a entrega para calcular a taxa.]`;
+                console.log(`[delivery-hint] ${hint.replace(/\n/g, ' | ')}`);
+                return hint;
+            }
         }
         return '';
     }
@@ -2231,6 +2248,11 @@ function getBrazilTime() {
     const deliveryFactHint = buildDeliveryFactHint(session.history, effectiveMessage, priceMap, feeMap);
     if (deliveryFactHint) {
         intentHint += deliveryFactHint;
+    } else {
+        const cartFactHint = buildCartFactHint(session.history, effectiveMessage, priceMap);
+        if (cartFactHint) {
+            intentHint += cartFactHint;
+        }
     }
 
     // --- Lembrete do Bolo Vulcão Mini / Bolo no Pote (massa chocolate, escolhe recheio, pode entregar) ---

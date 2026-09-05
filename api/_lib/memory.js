@@ -66,20 +66,21 @@ function extractFactsFromConversation(history, existingMemories = null) {
     else if (/\bdinheiro\b/.test(allUserNorm)) facts.preferencia_pagamento = 'dinheiro';
 
     // 3. Bairro — detecta no texto do usuário ou na confirmação do bot
+    const invalidBairros = /\b(seria|qual|para|qualquer|entrega|retirada|loja|itamaraju|favor|por favor)\b/i;
     const bairroUserPatterns = [
         /(?:moro|fico|estou|sou)\s+(?:do|no|na|em)\s+([a-zA-Z\u00c0-\u00ff\s]{3,30}?)(?:\.|,|\n|!|$)/i,
         /(?:bairro|endere[cç]o)[:\s]+([a-zA-Z\u00c0-\u00ff\s]{3,30}?)(?:\.|,|\n|!|$)/i,
     ];
     for (const pattern of bairroUserPatterns) {
         const match = allUserText.match(pattern);
-        if (match && match[1].trim().length > 2) {
+        if (match && match[1].trim().length > 2 && !invalidBairros.test(match[1].trim())) {
             facts.bairro = match[1].trim().replace(/\s+/g, ' ');
             break;
         }
     }
-    // Também checa confirmação do bot (mais confiável)
-    const botBairroMatch = allBotText.match(/bairro[:\s]+([a-zA-Z\u00c0-\u00ff\s]{3,30}?)(?:\.|,|\n|taxa|pedido|entrega)/i);
-    if (botBairroMatch && botBairroMatch[1].trim().length > 2) {
+    // Checa confirmação estruturada do bot (ex: "Bairro: Novo Prado" ou "bairro Novo Prado")
+    const botBairroMatch = allBotText.match(/bairro:\s*([a-zA-Z\u00c0-\u00ff\s]{3,30}?)(?:\.|,|\n|taxa|pedido|entrega|$)/i);
+    if (botBairroMatch && botBairroMatch[1].trim().length > 2 && !invalidBairros.test(botBairroMatch[1].trim())) {
         facts.bairro = botBairroMatch[1].trim().replace(/\s+/g, ' ');
     }
 
