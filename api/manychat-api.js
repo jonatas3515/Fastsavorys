@@ -2042,6 +2042,12 @@ async function handleGeminiCore(req, res) {
         intentHint += '\n[⛔ CONTEÚDO DO PRODUTO: o cliente está perguntando apenas o que o produto inclui/descrição. Responda APENAS a descrição e PARE. NÃO pergunte massa, recheio, sabores, data, horário, pagamento, entrega nem retirada.]';
     }
 
+    // --- Guard de pergunta sobre salgados congelados / crus / fritar em casa ---
+    const isFrozenQuestion = /\b(congelad[oa]s?|crus?|fritar\s+em\s+casa|sem\s+fritar|pr[aá]\s+fritar)\b/i.test(effectiveMessage);
+    if (isFrozenQuestion) {
+        intentHint += '\n[⛔ SALGADOS CONGELADOS OU CRUS: A FastSavory\'s NÃO trabalha com salgados congelados ou crus. Explique gentilmente com simpatia que não vendemos congelados para garantir a segurança e a máxima qualidade do produto (a fritura correta evita acidentes domésticos e que o salgado estoure, desmanche ou encharque de óleo). Informe que todos os nossos salgados são preparados e fritos fresquinhos na hora com muito carinho. Pergunte se gostaria de encomendar os salgados já prontos/fritinhos.]';
+    }
+
     // --- Detecção de intenção --
     const intents = detectIntent(effectiveMessage);
 
