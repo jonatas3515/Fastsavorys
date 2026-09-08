@@ -746,15 +746,21 @@ function resolvePixFinalAmount(amt, history, currentMessage, priceMap, feeMap = 
     const detTotal = computeDeterministicOrderTotal(history, currentMessage, priceMap, feeMap);
     const safeAmt = validatePixAmount(amt, history, currentMessage, priceMap);
 
-    if (detTotal && safeAmt) {
-        const minEntry = (detTotal.total / 2) - 1.0;
-        const maxTotal = detTotal.total + 1.0;
-        // Se safeAmt é um valor válido (entre 50% de entrada e 100% do total), respeita o safeAmt (incluindo valores redondos como R$ 50,00 pedidos pelo cliente)
-        if (safeAmt >= minEntry && safeAmt <= maxTotal) {
-            return safeAmt;
+    if (detTotal) {
+        // Pedido <= R$ 50: NUNCA permite 50% de entrada, o valor DEVE ser o total integral
+        if (detTotal.total <= 50.0) {
+            return detTotal.total;
         }
-        console.warn(`[pix] ⚠️ Valor da tag (R$ ${safeAmt.toFixed(2)}) fora da faixa esperada do pedido (R$ ${minEntry.toFixed(2)} - R$ ${maxTotal.toFixed(2)}). Usando o valor calculado de R$ ${detTotal.total.toFixed(2)}.`);
-        return detTotal.total;
+        if (safeAmt) {
+            const minEntry = (detTotal.total / 2) - 1.0;
+            const maxTotal = detTotal.total + 1.0;
+            // Se safeAmt é um valor válido (entre 50% de entrada e 100% do total), respeita o safeAmt
+            if (safeAmt >= minEntry && safeAmt <= maxTotal) {
+                return safeAmt;
+            }
+            console.warn(`[pix] ⚠️ Valor da tag (R$ ${safeAmt.toFixed(2)}) fora da faixa esperada do pedido (R$ ${minEntry.toFixed(2)} - R$ ${maxTotal.toFixed(2)}). Usando o valor calculado de R$ ${detTotal.total.toFixed(2)}.`);
+            return detTotal.total;
+        }
     }
     return safeAmt || (detTotal ? detTotal.total : null);
 }
@@ -763,41 +769,44 @@ function resolvePixFinalAmount(amt, history, currentMessage, priceMap, feeMap = 
 // Esses bolos não permitem escolher MASSA (sempre Chocolate), mas o RECHEIO é OBRIGATÓRIO.
 // Eles PODEM ser entregues. O modelo às vezes perde esse detalhe. Injeta fato verificado.
 function buildBoloFactHint(history, currentMessage) {
-    const allText = (history || []).map(m => m.text).join('\n') + '\n' + (currentMessage || '');
-    const t = normalizeTxt(allText);
-    const hasMiniVulcao = /(vulcao\s*mini|mini\s*vulcao|bolo\s*no\s*pote)/.test(t);
+    const userTexts = (history || []).filter(m => m.role === 'user').map(m => m.text).join('\n') + '\n' + (currentMessage || '');
+    const u = normalizeTxt(userTexts);
+    const hasMiniVulcao = /(vulcao\s*mini|mini\s*vulcao|mini\s*bolo|bolo\s*mini|bolo\s*no\s*pote)/.test(u);
     if (!hasMiniVulcao) return '';
-    // Se há bolo GRANDE ou kit festa no contexto, a regra é outra (retirada + personalização do grande).
-    const hasBoloGrande = /(bolo\s*(pp|p|g)\b|vulcao\s*p\b|kit\s*festa|naked)/.test(t);
-    if (hasBoloGrande) return '';
-    const boloHint = `\n[⛔ FATO VERIFICADO (pedido tem Bolo Vulcão Mini / Bolo no Pote): Massa SEMPRE Chocolate. O RECHEIO é OBRIGATÓRIO — opções: Ninho, Ninho com Chocolate, Chocolate. NÃO pergunte massa. Pergunte o recheio. Eles PODEM SER ENTREGUES normalmente (NÃO são "apenas retirada").]`;
+    // Só ignora se o CLIENTE explicitamente pediu um bolo grande ou kit
+    const hasBoloGrandeUser = /(bolo\s*(pp|p|g)\b|vulcao\s*p\b|kit\s*festa|naked)/.test(u);
+    if (hasBoloGrandeUser) return '';
+    const boloHint = `\n[⛔ FATO VERIFICADO (Bolo Vulcão Mini / Bolo no Pote):
+  - PRODUTO: Bolo Vulcão Mini (R$ 15,00) ou Bolo no Pote (R$ 10,00).
+  - Massa: SEMPRE Chocolate (não pergunte massa).
+  - Recheio: OBRIGATÓRIO escolher — opções: Ninho, Ninho com Chocolate, Chocolate.
+  - ENTREGA: ✅ PODEM SER ENTREGUES via delivery/mototáxi (NÃO diga que é "apenas retirada"!).
+  - DISPONIBILIDADE: ✅ Podem ser pedidos para HOJE (não precisam de 1 dia de antecedência).]`;
     console.log(`[bolo-hint] ${boloHint.replace(/\n/g, ' | ')}`);
     return boloHint;
 }
 
 // Guard para Kit Festa / bolo GRANDE (PP/P/G/Vulcão P): são APENAS RETIRADA e precisam de 1 dia de
-// antecedência (não podem ser para HOJE). O modelo às vezes libera entrega/mesmo-dia indevidamente,
-// principalmente quando renomeia "Kit Festa" para "Combo Festa". Injeta fato verificado.
+// antecedência (não podem ser para HOJE). Injeta fato verificado baseado no que o CLIENTE pediu.
 function buildKitFactHint(history, currentMessage) {
-    const allText = (history || []).map(m => m.text).join('\n') + '\n' + (currentMessage || '');
-    const t = normalizeTxt(allText);
-    const hasKitOuBoloGrande = /(kit\s*festa|combo\s*festa|festa\s*(pp|p|g)\b|bolo\s*(pp|p|g)\b|vulcao\s*p\b|naked)/.test(t);
+    const userTexts = (history || []).filter(m => m.role === 'user').map(m => m.text).join('\n') + '\n' + (currentMessage || '');
+    const u = normalizeTxt(userTexts);
+    const hasKitOuBoloGrande = /(kit\s*festa|combo\s*festa|festa\s*(pp|p|g)\b|bolo\s*(pp|p|g)\b|vulcao\s*p\b|naked)/.test(u);
     if (!hasKitOuBoloGrande) return '';
-    const kitHint = `\n[⛔ REGRA DE NEGÓCIO (Kit Festa / Bolo Grande): (1) Bolos grandes e Kits Festa são APENAS RETIRADA na loja (Rua Palmeiras, 105, Novo Prado) e precisam de no mínimo 1 DIA de antecedência. (2) Se o cliente estiver apenas tirando dúvidas ou consultando (preços, se entrega, o que vem, localização da loja, etc.), responda APENAS a dúvida dele de forma objetiva e pergunte se ele gostaria de encomendar. NÃO inicie personalização (massa/recheio/sabores) nem assuma qual produto ele quer antes de o cliente confirmar explicitamente.]`;
+    const kitHint = `\n[⛔ REGRA DE NEGÓCIO (Kit Festa / Bolo Grande): (1) Bolos grandes (PP, P, G, Vulcão P) e Kits Festa são APENAS RETIRADA na loja (Rua Palmeiras, 105, Novo Prado) e precisam de no mínimo 1 DIA de antecedência. (2) Se o cliente estiver apenas tirando dúvidas ou consultando (preços, se entrega, o que vem, localização da loja, etc.), responda APENAS a dúvida dele de forma objetiva e pergunte se ele gostaria de encomendar. NÃO inicie personalização (massa/recheio/sabores) nem assuma qual produto ele quer antes de o cliente confirmar explicitamente.]`;
     console.log(`[kit-hint] ${kitHint.replace(/\n/g, ' | ')}`);
     return kitHint;
 }
 
 // Guard de pagamento: a opção de 50% de entrada SÓ pode ser oferecida quando o total do pedido for
-// MAIOR que R$ 50,00. O modelo às vezes oferece 50% em pedidos pequenos (ex: R$ 26,75). Injeta um
+// MAIOR que R$ 50,00. O modelo às vezes oferece 50% em pedidos pequenos (ex: R$ 9,00 ou R$ 26,75). Injeta um
 // fato verificado com o total calculado deterministicamente para o modelo obedecer ao limiar correto.
-// FALLBACK: quando a calculadora não consegue precificar (bolo/kit/combo → complete=false), usa o
-// maior valor monetário mencionado na conversa como estimativa do total.
 function buildPaymentFactHint(history, currentMessage, priceMap = null, feeMap = null) {
+    const userTexts = (history || []).filter(m => m.role === 'user').map(m => m.text).join(' ') + ' ' + (currentMessage || '');
+    const u = normalizeTxt(userTexts);
     const allText = (history || []).map(m => m.text).join(' ') + ' ' + (currentMessage || '');
     const isPaymentCtx = /\b(pix|pagar|pagamento|gera.*pix|chave pix|copia e cola|cart[aã]o|dinheiro|retirada|entrada|confirm)\b/i.test(allText);
-    // Também ativa se tem kit/bolo no contexto e já está em fase avançada (horário/data definidos)
-    const hasKitOrBolo = /\b(kit\s*festa|bolo\s*(pp|p|g)\b|vulc[aã]o\s*p\b|naked)\b/i.test(allText);
+    const hasKitOrBolo = /\b(kit\s*festa|bolo\s*(pp|p|g)\b|vulc[aã]o\s*p\b|naked)\b/i.test(u);
     const isAdvancedStage = /\b(hor[aá]rio|agenda|amanh[ãa]|retirada|18h|17h)\b/i.test(allText);
     if (!isPaymentCtx && !(hasKitOrBolo && isAdvancedStage)) return '';
     let orderTotal = null;
@@ -805,38 +814,40 @@ function buildPaymentFactHint(history, currentMessage, priceMap = null, feeMap =
     if (det && det.total > 0) {
         orderTotal = det.total;
     } else if (hasKitOrBolo) {
-        // FALLBACK: para kits/bolos onde a calculadora determinística não fecha
-        const t = normalizeTxt(allText);
-        if (/kit\s*festa\s*g\b/.test(t)) orderTotal = 250;
-        else if (/kit\s*festa\s*p\b/.test(t)) orderTotal = 150;
-        else if (/kit\s*festa\s*pp\b/.test(t)) orderTotal = 110;
-        else if (/bolo\s*g\b/.test(t)) orderTotal = 145;
-        else if (/bolo\s*p\b/.test(t)) orderTotal = 95;
-        else if (/bolo\s*pp\b/.test(t)) orderTotal = 70;
-        else if (/vulcao\s*mini/.test(t)) orderTotal = 15;
-        else if (/bolo\s*(no|de)\s*pote/.test(t)) orderTotal = 10;
-        else {
-            // Busca o valor mais recente mencionado pelo bot
-            const botMsgs = (history || []).filter(m => m.role === 'assistant');
-            for (let i = botMsgs.length - 1; i >= 0; i--) {
-                const m = botMsgs[i].text.match(/R\$\s*(\d+[.,]\d{2})/);
-                if (m) {
-                    orderTotal = parseBrlNumber(m[1]);
-                    break;
-                }
-            }
-        }
+        if (/kit\s*festa\s*g\b/.test(u)) orderTotal = 250;
+        else if (/kit\s*festa\s*p\b/.test(u)) orderTotal = 150;
+        else if (/kit\s*festa\s*pp\b/.test(u)) orderTotal = 110;
+        else if (/bolo\s*g\b/.test(u)) orderTotal = 145;
+        else if (/bolo\s*p\b/.test(u)) orderTotal = 95;
+        else if (/bolo\s*pp\b/.test(u)) orderTotal = 70;
+        else if (/vulcao\s*mini|mini\s*bolo|bolo\s*mini/.test(u)) orderTotal = 15;
+        else if (/bolo\s*(no|de)\s*pote/.test(u)) orderTotal = 10;
+    } else {
+        // Para pedidos sem bolo ou com salgados
+        const { total } = estimateCartTotal([...(history || []), { role: 'user', text: currentMessage }], priceMap);
+        if (total > 0) orderTotal = total;
     }
     if (!orderTotal || orderTotal <= 0) return '';
     const totalFmt = orderTotal.toFixed(2).replace('.', ',');
     let hint = `\n[⛔ FATO VERIFICADO (pagamento): O total do pedido é R$ ${totalFmt}. `;
+
+    const currentIsPix = /\b(pix|no pix|pelo pix|via pix|quero pix|manda o pix|chave pix|copia e cola)\b/i.test(currentMessage);
+
     if (orderTotal > 50) {
         const entrada = (orderTotal * 0.5).toFixed(2).replace('.', ',');
         hint += `Como o total é MAIOR que R$ 50,00, o pedido SÓ PODE SER CONFIRMADO após o cliente pagar no mínimo 50% de entrada (R$ ${entrada}). `;
         hint += `⛔⛔ REGRA CRÍTICA: Se o cliente disser "pago na retirada", "pago amanhã", "pago depois", "deixa que pago lá" ou qualquer variação de ADIAR o pagamento integral sem dar entrada agora: REJEITE com educação. Diga que para pedidos acima de R$ 50,00 precisamos de 50% de entrada via Pix para confirmar a reserva, e que o restante pode ser pago no dia da retirada/entrega. `;
-        hint += `NÃO ofereça entrada abaixo de 50%. NÃO deixe o cliente pagar menos sem passar para a Jéssica. NÃO diga "pode pagar hoje ou amanhã" — a entrada é OBRIGATÓRIA ANTES da confirmação.]`;
+        hint += `NÃO ofereça entrada abaixo de 50%. NÃO deixe o cliente pagar menos sem passar para a Jéssica. `;
+        if (currentIsPix) {
+            hint += `👉 O cliente escolheu PIX: se ele já concordou com a entrada de 50%, responda APENAS com [GERAR_PIX:${(orderTotal * 0.5).toFixed(2)}]. Se ainda não confirmou o valor da entrada, pergunte se prefere a entrada de 50% (R$ ${entrada}) ou valor integral.`;
+        }
     } else {
-        hint += `Como o total é R$ 50,00 ou MENOS, ⛔ NÃO ofereça 50% de entrada. Exija pagamento integral de R$ ${totalFmt}. Para PIX, gere [GERAR_PIX:${orderTotal.toFixed(2)}] depois que o cliente confirmar.]`;
+        hint += `Como o total é R$ 50,00 ou MENOS, ⛔ NUNCA ofereça 50% de entrada. O pagamento é SEMPRE INTEGRAL de R$ ${totalFmt}. `;
+        if (currentIsPix) {
+            hint += `⚡ O CLIENTE ESCOLHEU PAGAMENTO NO PIX: Responda IMEDIATAMENTE e APENAS com a tag [GERAR_PIX:${orderTotal.toFixed(2)}]. NÃO pergunte a forma de pagamento de novo, NÃO faça novas perguntas e NÃO escreva nenhum texto junto com a tag!]`;
+        } else {
+            hint += `Para PIX, gere [GERAR_PIX:${orderTotal.toFixed(2)}] assim que o cliente escolher Pix.]`;
+        }
     }
     console.log(`[payment-hint] ${hint.replace(/\n/g, ' | ')}`);
     return hint;

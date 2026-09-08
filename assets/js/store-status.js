@@ -52,9 +52,12 @@ if (!window.checkBusinessHours) {
 }
 
 
-// REDEFINE updateOpenNotice to include Time Estimates
-function updateOpenNotice() {
+// SINGLE UNIFIED OPEN NOTICE BANNER
+async function updateOpenNotice() {
   const notice = document.getElementById('openNotice');
+  const deliveryBanner = document.getElementById('deliveryStatusBanner');
+  if (deliveryBanner) deliveryBanner.classList.add('hidden'); // Garante que a 2ª linha fique sempre oculta
+
   if (!notice) return;
 
   let text = '';
@@ -64,32 +67,42 @@ function updateOpenNotice() {
   if (storeClosedToday) {
     text = '🔴 Loja Fechada Temporariamente';
     colorClass = 'bg-red-100 text-red-800 border-red-200 border';
-  } else if (isOpen) {
-    text = '🟢 Estamos Abertos! Faça seu pedido.';
-    colorClass = 'bg-green-100 text-green-800 border-green-200 border';
-  } else {
+  } else if (!isOpen) {
     text = '🔴 Fechado no momento. Confira nossos horários.';
     colorClass = 'bg-red-100 text-red-800 border-red-200 border';
-  }
+  } else {
+    // Loja Aberta
+    const isHighDemand = await checkHighDemand();
+    const extraTime = isHighDemand ? (storeConfig.high_demand_extra_time || 15) : 0;
 
-  // Append Time Estimates if configured and open
-  if (isOpen && !storeClosedToday) {
-    const prep = (storeConfig.prep_time_min && storeConfig.prep_time_max) ?
-      `🕒 Preparo: ${storeConfig.prep_time_min}-${storeConfig.prep_time_max} min` : '';
+    if (storeConfig.delivery_enabled) {
+      text = '🟢 Estamos Abertos! Faça seu pedido.';
+      colorClass = isHighDemand ? 'bg-yellow-50 text-yellow-800 border-yellow-300 border' : 'bg-green-100 text-green-800 border-green-200 border';
 
-    const del = (storeConfig.delivery_enabled && storeConfig.delivery_time_min && storeConfig.delivery_time_max) ?
-      `🛵 Entrega: ${storeConfig.delivery_time_min}-${storeConfig.delivery_time_max} min` : '';
+      const prep = (storeConfig.prep_time_min && storeConfig.prep_time_max) ?
+        `🕒 Preparo: ${parseInt(storeConfig.prep_time_min) + extraTime}-${parseInt(storeConfig.prep_time_max) + extraTime} min` : '';
 
-    if (prep || del) {
-      text += ` • ${[prep, del].filter(Boolean).join(' • ')}`;
+      const del = (storeConfig.delivery_time_min && storeConfig.delivery_time_max) ?
+        `🛵 Entrega: ${parseInt(storeConfig.delivery_time_min) + extraTime}-${parseInt(storeConfig.delivery_time_max) + extraTime} min` : '';
+
+      const items = [prep, del].filter(Boolean);
+      if (isHighDemand) items.push('⚠️ Alta demanda');
+      if (items.length > 0) {
+        text += ` • ${items.join(' • ')}`;
+      }
+    } else {
+      const reason = storeConfig.delivery_disabled_reason || 'Apenas retirada na loja';
+      text = `🟢 Estamos Abertos! (🚫 Entregas suspensas: ${reason})`;
+      colorClass = 'bg-orange-50 text-orange-800 border-orange-200 border';
+
+      if (storeConfig.prep_time_min && storeConfig.prep_time_max) {
+        text += ` • 🕒 Preparo: ${storeConfig.prep_time_min}-${storeConfig.prep_time_max} min`;
+      }
     }
   }
 
   notice.textContent = text;
   notice.className = `text-sm py-2 px-3 rounded-lg my-2 text-center font-medium ${colorClass}`;
-
-  // Update delivery status banner
-  updateDeliveryStatusBanner();
 }
 
 // Verificar se há alta demanda (muitos pedidos em preparo)
@@ -124,55 +137,9 @@ async function checkHighDemand() {
   }
 }
 
-// Delivery status banner for public store
+// Manter compatibilidade com chamadas legadas
 async function updateDeliveryStatusBanner() {
-  const banner = document.getElementById('deliveryStatusBanner');
-  if (!banner) return;
-
-  const isOpen = isFastOpen() && !storeClosedToday;
-
-  // Only show delivery banner when store is open
-  if (!isOpen) {
-    banner.classList.add('hidden');
-    return;
-  }
-
-  banner.classList.remove('hidden');
-
-  // Verificar alta demanda
-  const isHighDemand = await checkHighDemand();
-  const extraTime = isHighDemand ? (storeConfig.high_demand_extra_time || 15) : 0;
-
-  if (storeConfig.delivery_enabled) {
-    // Delivery available
-    let deliveryText = '🛵 Entregas disponíveis';
-
-    // Add time estimates if configured (com ajuste de alta demanda)
-    if (storeConfig.delivery_time_min && storeConfig.delivery_time_max) {
-      const minTime = parseInt(storeConfig.delivery_time_min) + extraTime;
-      const maxTime = parseInt(storeConfig.delivery_time_max) + extraTime;
-      deliveryText += ` • Tempo estimado: ${minTime}-${maxTime} min`;
-    }
-    if (storeConfig.prep_time_min && storeConfig.prep_time_max) {
-      const minPrep = parseInt(storeConfig.prep_time_min) + extraTime;
-      const maxPrep = parseInt(storeConfig.prep_time_max) + extraTime;
-      deliveryText += ` • Preparo: ${minPrep}-${maxPrep} min`;
-    }
-
-    // Aviso de alta demanda
-    if (isHighDemand) {
-      deliveryText += ' • ⚠️ Alta demanda';
-    }
-
-    banner.innerHTML = deliveryText;
-    const demandClass = isHighDemand ? 'bg-yellow-50 text-yellow-700 border-yellow-200' : 'bg-green-50 text-green-700 border-green-200';
-    banner.className = `text-sm py-2 px-3 rounded-lg mb-2 text-center font-medium ${demandClass} border`;
-  } else {
-    // Delivery disabled
-    const reason = storeConfig.delivery_disabled_reason || 'No momento, apenas retirada na loja';
-    banner.innerHTML = `🚫 Entregas suspensas: <span class="font-semibold">${reason}</span>`;
-    banner.className = 'text-sm py-2 px-3 rounded-lg mb-2 text-center font-medium bg-orange-50 text-orange-700 border border-orange-200';
-  }
+  // Unificado no updateOpenNotice()
 }
 
 // ========================================
