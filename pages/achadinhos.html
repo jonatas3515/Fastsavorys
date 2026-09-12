@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 
 <head>
@@ -31,7 +31,8 @@
 
       <!-- Title Badge -->
       <div class="flex items-center gap-1.5 bg-yellow-400 text-gray-950 font-bold px-3 py-1 rounded-full text-xs sm:text-sm shadow-sm">
-        <span>🛍️ Achadinhos ML</span>
+        <span>Achadinhos</span>
+        <img src="../assets/img/ML-logo.png" alt="Mercado Livre" class="h-4 sm:h-5 object-contain" />
       </div>
 
       <!-- Action: Return to Food Menu -->
@@ -49,13 +50,14 @@
       <div class="inline-flex items-center gap-2 bg-black/80 text-yellow-300 px-3 py-1 rounded-full text-xs font-semibold mb-3">
         <span>✨ Recomendações Oficiais</span>
         <span>•</span>
+        <img src="../assets/img/ML-logo.png" alt="Mercado Livre" class="h-3.5 inline object-contain" />
         <span>Mercado Livre</span>
       </div>
       <h1 class="text-2xl sm:text-4xl font-extrabold text-gray-950 tracking-tight mb-2">
         Achadinhos & Ofertas da <span class="text-rose-700">FastSavory's</span>
       </h1>
       <p class="text-xs sm:text-base text-gray-800 font-medium max-w-2xl mx-auto leading-relaxed">
-        Selecionamos os melhores eletrodomésticos, utensílios de cozinha, embalagens e itens de festa com os melhores preços, frete rápido e a garantia segura do Mercado Livre!
+        Selecionamos as melhores ofertas em eletrodomésticos, cozinha, moda, eletrônicos, casa e muito mais com entrega rápida e a compra garantida do Mercado Livre!
       </p>
 
       <!-- Search Bar -->
@@ -64,7 +66,7 @@
         <input 
           type="text" 
           id="affiliateSearchInput" 
-          placeholder="Buscar air fryer, balança, formas, embalagens..."
+          placeholder="Buscar produtos, eletrônicos, cozinha, presentes..."
           class="w-full pl-10 pr-4 py-2.5 sm:py-3 rounded-2xl bg-white shadow-lg border border-yellow-200 focus:outline-none focus:ring-2 focus:ring-yellow-500 text-sm text-gray-800 placeholder-gray-400 font-medium"
         />
       </div>
@@ -74,32 +76,102 @@
   <!-- Main Content & Filters -->
   <main class="flex-1 max-w-7xl mx-auto w-full px-4 py-6 sm:py-8">
 
-    <!-- Categories Filter Strip -->
-    <div class="flex items-center gap-2 overflow-x-auto pb-3 mb-6 scrollbar-hide text-xs sm:text-sm">
+    <!-- Categories Filter Strip (Horizontal Scrollable) -->
+    <div class="flex items-center gap-2 overflow-x-auto pb-3 mb-6 scrollbar-hide text-xs sm:text-sm" style="scroll-behavior:smooth;-webkit-overflow-scrolling:touch;">
       <button 
-        class="affiliate-category-btn px-4 py-2 rounded-full bg-yellow-400 text-gray-900 font-bold shadow-md whitespace-nowrap transition"
+        class="affiliate-category-btn px-4 py-2 rounded-full bg-yellow-400 text-gray-900 font-bold shadow-md whitespace-nowrap transition flex-shrink-0"
         data-category="all">
         🏷️ Todas as Ofertas
       </button>
       <button 
-        class="affiliate-category-btn px-4 py-2 rounded-full bg-white text-gray-700 border border-gray-200 hover:bg-gray-100 whitespace-nowrap transition"
+        class="affiliate-category-btn px-4 py-2 rounded-full bg-white text-gray-700 border border-gray-200 hover:bg-gray-100 whitespace-nowrap transition flex-shrink-0"
         data-category="cozinha">
         🍳 Cozinha & Eletro
       </button>
       <button 
-        class="affiliate-category-btn px-4 py-2 rounded-full bg-white text-gray-700 border border-gray-200 hover:bg-gray-100 whitespace-nowrap transition"
+        class="affiliate-category-btn px-4 py-2 rounded-full bg-white text-gray-700 border border-gray-200 hover:bg-gray-100 whitespace-nowrap transition flex-shrink-0"
         data-category="confeitaria">
         🍰 Confeitaria & Formas
       </button>
       <button 
-        class="affiliate-category-btn px-4 py-2 rounded-full bg-white text-gray-700 border border-gray-200 hover:bg-gray-100 whitespace-nowrap transition"
+        class="affiliate-category-btn px-4 py-2 rounded-full bg-white text-gray-700 border border-gray-200 hover:bg-gray-100 whitespace-nowrap transition flex-shrink-0"
         data-category="embalagens">
         📦 Embalagens & Festas
       </button>
       <button 
-        class="affiliate-category-btn px-4 py-2 rounded-full bg-white text-gray-700 border border-gray-200 hover:bg-gray-100 whitespace-nowrap transition"
+        class="affiliate-category-btn px-4 py-2 rounded-full bg-white text-gray-700 border border-gray-200 hover:bg-gray-100 whitespace-nowrap transition flex-shrink-0"
         data-category="utilidades">
         🏠 Casa & Utilidades
+      </button>
+      <button 
+        class="affiliate-category-btn px-4 py-2 rounded-full bg-white text-gray-700 border border-gray-200 hover:bg-gray-100 whitespace-nowrap transition flex-shrink-0"
+        data-category="moda">
+        👗 Moda & Calçados
+      </button>
+      <button 
+        class="affiliate-category-btn px-4 py-2 rounded-full bg-white text-gray-700 border border-gray-200 hover:bg-gray-100 whitespace-nowrap transition flex-shrink-0"
+        data-category="supermercado">
+        🛒 Supermercado & Alimentos
+      </button>
+      <button 
+        class="affiliate-category-btn px-4 py-2 rounded-full bg-white text-gray-700 border border-gray-200 hover:bg-gray-100 whitespace-nowrap transition flex-shrink-0"
+        data-category="perfumaria">
+        🧴 Perfumaria & Beleza
+      </button>
+      <button 
+        class="affiliate-category-btn px-4 py-2 rounded-full bg-white text-gray-700 border border-gray-200 hover:bg-gray-100 whitespace-nowrap transition flex-shrink-0"
+        data-category="banho">
+        🚿 Cama, Mesa & Banho
+      </button>
+      <button 
+        class="affiliate-category-btn px-4 py-2 rounded-full bg-white text-gray-700 border border-gray-200 hover:bg-gray-100 whitespace-nowrap transition flex-shrink-0"
+        data-category="eletronicos">
+        ⚡ Eletrônicos & Áudio
+      </button>
+      <button 
+        class="affiliate-category-btn px-4 py-2 rounded-full bg-white text-gray-700 border border-gray-200 hover:bg-gray-100 whitespace-nowrap transition flex-shrink-0"
+        data-category="celulares">
+        📱 Celulares & Telefonia
+      </button>
+      <button 
+        class="affiliate-category-btn px-4 py-2 rounded-full bg-white text-gray-700 border border-gray-200 hover:bg-gray-100 whitespace-nowrap transition flex-shrink-0"
+        data-category="informatica">
+        💻 Informática & Acessórios
+      </button>
+      <button 
+        class="affiliate-category-btn px-4 py-2 rounded-full bg-white text-gray-700 border border-gray-200 hover:bg-gray-100 whitespace-nowrap transition flex-shrink-0"
+        data-category="brinquedos">
+        🧸 Brinquedos & Jogos
+      </button>
+      <button 
+        class="affiliate-category-btn px-4 py-2 rounded-full bg-white text-gray-700 border border-gray-200 hover:bg-gray-100 whitespace-nowrap transition flex-shrink-0"
+        data-category="presentes">
+        🎁 Presentes & Lembrancinhas
+      </button>
+      <button 
+        class="affiliate-category-btn px-4 py-2 rounded-full bg-white text-gray-700 border border-gray-200 hover:bg-gray-100 whitespace-nowrap transition flex-shrink-0"
+        data-category="bebes">
+        🍼 Bebês & Maternidade
+      </button>
+      <button 
+        class="affiliate-category-btn px-4 py-2 rounded-full bg-white text-gray-700 border border-gray-200 hover:bg-gray-100 whitespace-nowrap transition flex-shrink-0"
+        data-category="veiculos">
+        🚗 Veículos & Acessórios
+      </button>
+      <button 
+        class="affiliate-category-btn px-4 py-2 rounded-full bg-white text-gray-700 border border-gray-200 hover:bg-gray-100 whitespace-nowrap transition flex-shrink-0"
+        data-category="livros">
+        📚 Livros & Papelaria
+      </button>
+      <button 
+        class="affiliate-category-btn px-4 py-2 rounded-full bg-white text-gray-700 border border-gray-200 hover:bg-gray-100 whitespace-nowrap transition flex-shrink-0"
+        data-category="petshop">
+        🐶 Pet Shop
+      </button>
+      <button 
+        class="affiliate-category-btn px-4 py-2 rounded-full bg-white text-gray-700 border border-gray-200 hover:bg-gray-100 whitespace-nowrap transition flex-shrink-0"
+        data-category="construcao">
+        🔨 Ferramentas & Construção
       </button>
     </div>
 

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * FastSavory's - Admin Módulo de Achadinhos & Afiliados
  */
 
@@ -56,6 +56,28 @@ window.AffiliatesModule = (function () {
         ? `<span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-green-100 text-green-800">Ativo</span>`
         : `<span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-gray-100 text-gray-600">Pausado</span>`;
 
+      const categoryMap = {
+        cozinha: '🍳 Cozinha & Eletro',
+        confeitaria: '🍰 Confeitaria',
+        embalagens: '📦 Embalagens',
+        utilidades: '🏠 Casa & Utilidades',
+        moda: '👗 Moda & Calçados',
+        supermercado: '🛒 Supermercado',
+        perfumaria: '🧴 Perfumaria',
+        banho: '🚿 Cama, Mesa & Banho',
+        eletronicos: '⚡ Eletrônicos',
+        celulares: '📱 Celulares',
+        informatica: '💻 Informática',
+        brinquedos: '🧸 Brinquedos',
+        presentes: '🎁 Presentes',
+        bebes: '🍼 Bebês',
+        veiculos: '🚗 Veículos',
+        livros: '📚 Livros',
+        petshop: '🐶 Pet Shop',
+        construcao: '🔨 Construção'
+      };
+      const catLabel = categoryMap[item.category] || item.category || 'Geral';
+
       return `
         <tr class="hover:bg-gray-50 transition-colors border-b border-gray-100">
           <td class="p-3 text-center text-xs font-bold text-gray-400 w-12">${item.position || 0}</td>
@@ -67,7 +89,7 @@ window.AffiliatesModule = (function () {
             <div class="font-bold text-sm truncate">${escapeHtml(item.title)}</div>
             ${item.discount_tag ? `<span class="inline-block text-[10px] bg-yellow-100 text-yellow-800 font-bold px-1.5 py-0.2 rounded mt-0.5">${escapeHtml(item.discount_tag)}</span>` : ''}
           </td>
-          <td class="p-3 text-xs text-gray-600 capitalize">${escapeHtml(item.category || 'Geral')}</td>
+          <td class="p-3 text-xs text-gray-600">${escapeHtml(catLabel)}</td>
           <td class="p-3 font-bold text-sm text-gray-800">${escapeHtml(item.price_display || '-')}</td>
           <td class="p-3 text-center">${activeBadge}</td>
           <td class="p-3 text-right">
