@@ -523,14 +523,19 @@
         <!-- Tracking + Catalog buttons row -->
         <div class="flex flex-row justify-center gap-2 mb-1 sm:mb-2">
           <button id="openTrackingModalBtn" type="button"
-            class="text-xs sm:text-sm bg-gray-100 hover:bg-gray-200 text-gray-800 px-3 py-1.5 sm:py-2 rounded-lg font-medium flex-1 sm:flex-none sm:w-auto">
+            class="text-xs sm:text-sm bg-gray-100 hover:bg-gray-200 text-gray-800 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-medium flex-1 sm:flex-none sm:w-auto">
             🔎 Acompanhar pedido
           </button>
           <!-- CATALOG BUTTON (Public Store) - Added for catalog feature -->
           <button id="openCatalogBtnPublic" type="button" onclick="CatalogModule.open()"
-            class="text-xs sm:text-sm bg-gradient-to-r from-rose-500 to-purple-600 hover:from-rose-600 hover:to-purple-700 text-white px-3 py-1.5 sm:py-2 rounded-lg font-medium flex-1 sm:flex-none sm:w-auto">
+            class="text-xs sm:text-sm bg-gradient-to-r from-rose-500 to-purple-600 hover:from-rose-600 hover:to-purple-700 text-white px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-medium flex-1 sm:flex-none sm:w-auto">
             📚 Ver Catálogo
           </button>
+          <!-- ACHADINHOS BUTTON -->
+          <a href="achadinhos.html"
+            class="text-xs sm:text-sm bg-gradient-to-r from-yellow-400 to-amber-500 hover:from-yellow-500 hover:to-amber-600 text-gray-950 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-bold flex-1 sm:flex-none sm:w-auto flex items-center justify-center gap-1 shadow-sm transition">
+            <span>🛍️</span> Achadinhos ML
+          </a>
         </div>
 
         <!-- Desktop: Flex row with standardized buttons -->
@@ -565,6 +570,10 @@
           <button
             class="filter-tab px-4 py-2 rounded-lg bg-purple-200 text-purple-900 font-medium text-sm hover:bg-purple-300 min-w-[130px] text-center"
             data-filter="encomenda">📅 Encomendas</button>
+          <a href="achadinhos.html"
+            class="px-4 py-2 rounded-lg bg-yellow-400 text-gray-950 font-bold text-sm hover:bg-yellow-500 min-w-[130px] flex items-center justify-center gap-1.5 shadow-sm">
+            <span>🛍️</span> Achadinhos ML
+          </a>
           <a href="https://pedidos.site/pedidoimperioburguerepizzas" target="_blank"
             class="px-4 py-2 rounded-lg bg-orange-500 text-white font-medium text-sm hover:bg-orange-600 min-w-[130px] flex items-center justify-center gap-2">
             <img src="../assets/img/imperio-burguer-icon.png" alt="Império" class="h-5 w-5 rounded-full object-cover" />
@@ -575,6 +584,10 @@
         <!-- Mobile: Horizontal scrollable strip -->
         <div class="sm:hidden flex gap-2 py-2 overflow-x-auto scrollbar-hide"
           style="scroll-behavior:smooth;-webkit-overflow-scrolling:touch;">
+          <a href="achadinhos.html"
+            class="px-3 py-1.5 rounded-full bg-yellow-400 text-gray-950 font-bold text-xs flex items-center gap-1 whitespace-nowrap flex-shrink-0 shadow-sm">
+            <span>🛍️</span> Achadinhos ML
+          </a>
           <button
             class="category-tab active px-3 py-1.5 rounded-full text-white font-medium text-xs bg-red-600 whitespace-nowrap flex-shrink-0"
             data-category="salgados">🥟 Salgados</button>

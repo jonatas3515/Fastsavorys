@@ -383,6 +383,12 @@
                         <span class="text-2xl">⭐</span>
                         <span class="font-medium group-hover:text-white">Avaliações</span>
                     </button>
+                    <button onclick="showPanel('affiliatesPanelFast'); closeMobileSidebar()"
+                        class="w-full text-left px-4 py-3 hover:bg-gray-800 flex items-center gap-3 transition-colors border-l-4 border-transparent hover:border-yellow-500 focus:bg-gray-800 focus:border-yellow-500 group"
+                        id="nav-affiliates">
+                        <span class="text-2xl">🛍️</span>
+                        <span class="font-medium group-hover:text-white">Achadinhos ML</span>
+                    </button>
                     <div class="border-t border-gray-700 my-2"></div>
                     <button onclick="showPanel('configPanelFast'); closeMobileSidebar()"
                         class="w-full text-left px-4 py-3 hover:bg-gray-800 flex items-center gap-3 transition-colors border-l-4 border-transparent hover:border-rose-500 focus:bg-gray-800 focus:border-rose-500 group"
@@ -1878,6 +1884,168 @@
         </div>
     </main>
 
+    <!-- Affiliates / Achadinhos Panel -->
+    <main id="affiliatesPanelFast" class="admin-panel admin-card p-6 hidden animate-fade-in mx-auto w-full max-w-7xl">
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+            <div>
+                <h2 class="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                    <span>🛍️</span> Achadinhos & Ofertas (Mercado Livre)
+                </h2>
+                <p class="text-xs sm:text-sm text-gray-500 mt-1">
+                    Gerencie os produtos recomendados com seus links de afiliado.
+                </p>
+            </div>
+            <div class="flex flex-wrap gap-2 w-full md:w-auto">
+                <a href="https://www.mercadolivre.com.br/social/jonatasdonascimentocosta" target="_blank"
+                    class="px-4 py-2 bg-yellow-400 hover:bg-yellow-500 text-gray-950 font-bold text-xs sm:text-sm rounded-lg flex items-center gap-1.5 shadow-sm transition">
+                    <span>⭐ Meu Perfil ML</span>
+                    <span>↗</span>
+                </a>
+                <a href="achadinhos.html" target="_blank"
+                    class="px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs sm:text-sm rounded-lg flex items-center gap-1.5 border border-rose-200 transition">
+                    <span>👀 Ver Vitrine Pública</span>
+                </a>
+                <button onclick="AffiliatesModule.loadProducts()"
+                    class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg flex items-center gap-2 text-xs sm:text-sm font-medium transition">
+                    🔄 Atualizar
+                </button>
+                <button onclick="AffiliatesModule.openNewModal()"
+                    class="bg-yellow-500 hover:bg-yellow-600 text-gray-950 px-4 py-2 rounded-lg font-bold flex items-center gap-2 text-xs sm:text-sm shadow-md transition">
+                    <span>➕</span> Novo Achadinho
+                </button>
+            </div>
+        </div>
+
+        <!-- Table -->
+        <div class="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left border-collapse text-sm">
+                    <thead class="bg-gray-50 text-gray-600 text-xs uppercase tracking-wider">
+                        <tr>
+                            <th class="p-3 border-b text-center w-12">Pos.</th>
+                            <th class="p-3 border-b w-16">Foto</th>
+                            <th class="p-3 border-b">Produto / Selo</th>
+                            <th class="p-3 border-b">Categoria</th>
+                            <th class="p-3 border-b">Preço</th>
+                            <th class="p-3 border-b text-center">Status</th>
+                            <th class="p-3 border-b text-right">Ações</th>
+                        </tr>
+                    </thead>
+                    <tbody id="affiliateAdminTableBody" class="divide-y divide-gray-100">
+                        <tr>
+                            <td colspan="7" class="p-8 text-center text-gray-500">Carregando achadinhos...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <!-- Affiliate Product Modal -->
+    <div id="affiliateModal" class="fixed inset-0 bg-black bg-opacity-50 z-[200] hidden flex items-center justify-center p-4"
+        onclick="if(event.target===this) AffiliatesModule.closeModal()">
+        <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between mb-4 pb-2 border-b">
+                <h3 class="text-lg font-bold text-gray-800" id="affiliateModalTitle">➕ Novo Achadinho (Mercado Livre)</h3>
+                <button onclick="AffiliatesModule.closeModal()" class="text-gray-400 hover:text-gray-600 text-lg">✕</button>
+            </div>
+
+            <form id="affiliateForm" onsubmit="AffiliatesModule.saveProduct(event)" class="space-y-4 text-sm">
+                <input type="hidden" id="affiliateId" />
+
+                <div>
+                    <label class="block font-medium text-gray-700 mb-1">Título do Produto *</label>
+                    <input type="text" id="affiliateTitleInput" required placeholder="Ex: Fritadeira Elétrica Air Fryer 4L"
+                        class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-400 outline-none" />
+                </div>
+
+                <div>
+                    <label class="block font-medium text-gray-700 mb-1">Link de Afiliado (Mercado Livre) *</label>
+                    <input type="url" id="affiliateUrlInput" required placeholder="Ex: https://meli.la/2d54P4T"
+                        class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-400 outline-none" />
+                    <p class="text-[11px] text-gray-500 mt-1">Cole aqui o link encurtado gerado no seu aplicativo/painel de afiliados ML.</p>
+                </div>
+
+                <div>
+                    <label class="block font-medium text-gray-700 mb-1">URL da Foto do Produto *</label>
+                    <input type="url" id="affiliateImageUrlInput" required placeholder="https://http2.mlstatic.com/..."
+                        oninput="AffiliatesModule.updateImagePreview(this.value)"
+                        class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-400 outline-none" />
+                    <div class="flex items-center gap-3 mt-2">
+                        <img id="affiliateImagePreview" src="../assets/img/fast-logo.png" alt="Preview"
+                            class="w-14 h-14 object-contain border rounded-lg p-1 bg-gray-50" />
+                        <span class="text-xs text-gray-500">Dica: No Mercado Livre, clique com o botão direito na foto do anúncio e selecione "Copiar endereço da imagem".</span>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-medium text-gray-700 mb-1">Preço Atual</label>
+                        <input type="text" id="affiliatePriceInput" placeholder="Ex: R$ 289,90"
+                            class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-400 outline-none" />
+                    </div>
+                    <div>
+                        <label class="block font-medium text-gray-700 mb-1">Preço Riscado (opcional)</label>
+                        <input type="text" id="affiliateOriginalPriceInput" placeholder="Ex: R$ 399,90"
+                            class="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-yellow-400 outline-none" />
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-medium text-gray-700 mb-1">Categoria</label>
+                        <select id="affiliateCategoryInput" class="w-full px-3 py-2 border rounded-lg bg-white outline-none">
+                            <option value="cozinha">🍳 Cozinha & Eletro</option>
+                            <option value="confeitaria">🍰 Confeitaria & Formas</option>
+                            <option value="embalagens">📦 Embalagens & Festas</option>
+                            <option value="utilidades">🏠 Casa & Utilidades</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block font-medium text-gray-700 mb-1">Ordem (Posição)</label>
+                        <input type="number" id="affiliatePositionInput" value="1" min="1"
+                            class="w-full px-3 py-2 border rounded-lg outline-none" />
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block font-medium text-gray-700 mb-1">Selo / Tag (opcional)</label>
+                        <input type="text" id="affiliateTagInput" placeholder="Ex: 🔥 Mais Vendido"
+                            class="w-full px-3 py-2 border rounded-lg outline-none" />
+                    </div>
+                    <div>
+                        <label class="block font-medium text-gray-700 mb-1">Cor do Selo</label>
+                        <select id="affiliateBadgeColorInput" class="w-full px-3 py-2 border rounded-lg bg-white outline-none">
+                            <option value="amber">Amarelo (Padrão)</option>
+                            <option value="rose">Rosa / Vermelho</option>
+                            <option value="emerald">Verde</option>
+                            <option value="blue">Azul</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block font-medium text-gray-700 mb-1">Descrição Breve (opcional)</label>
+                    <textarea id="affiliateDescriptionInput" rows="2" placeholder="Ex: Ideal para preparar receitas rápidas sem óleo."
+                        class="w-full px-3 py-2 border rounded-lg outline-none resize-none"></textarea>
+                </div>
+
+                <div class="flex items-center gap-2 pt-2">
+                    <input type="checkbox" id="affiliateActiveInput" checked class="w-4 h-4 text-yellow-500 rounded" />
+                    <label for="affiliateActiveInput" class="font-medium text-gray-700 cursor-pointer">Produto Ativo (Visível na loja)</label>
+                </div>
+
+                <div class="flex justify-end gap-2 pt-4 border-t">
+                    <button type="button" onclick="AffiliatesModule.closeModal()"
+                        class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium">Cancelar</button>
+                    <button type="submit"
+                        class="px-5 py-2 bg-yellow-400 hover:bg-yellow-500 text-gray-950 font-bold rounded-lg shadow">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Product Form Modal -->
     <div id="productFormModal"
         class="fixed inset-0 bg-black bg-opacity-50 z-[200] hidden flex items-center justify-center"
@@ -2136,6 +2304,8 @@
     <script src="../assets/js/admin/rules.js"></script>
     <script src="../assets/js/admin/ratings.js"></script>
     <script src="../assets/js/admin/stripe.js"></script>
+    <script src="../assets/js/achadinhos-data.js"></script>
+    <script src="../assets/js/admin/affiliates.js"></script>
     <script src="../assets/js/admin/orders.js"></script>
     <script src="../assets/js/admin/core.js"></script>
 

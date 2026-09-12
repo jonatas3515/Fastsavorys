@@ -121,6 +121,9 @@ function switchAdminTab(targetId, btnElement) {
     if (targetId === 'rulesPanelFast' && window.RulesModule) {
         RulesModule.init();
     }
+    if (targetId === 'affiliatesPanelFast' && window.AffiliatesModule) {
+        AffiliatesModule.init();
+    }
 }
 
 function setupGlobalListeners() {
