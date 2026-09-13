@@ -80,6 +80,7 @@ async function fetchProductDetails(rawUrl) {
   let imageUrl = '';
   let price = '';
   let originalPrice = '';
+  let discountTag = '';
   let isPaused = false;
 
   const titleMatch =
@@ -94,23 +95,46 @@ async function fetchProductDetails(rawUrl) {
     imageUrl = imageMatch[1];
   }
 
-  const schemaMatch = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/i);
-  if (schemaMatch && schemaMatch[1]) {
-    try {
-      const schema = JSON.parse(schemaMatch[1]);
-      if (schema && schema.offers) {
-        const offerPrice = schema.offers.price || schema.offers.lowPrice;
-        if (offerPrice) {
-          price = `R$ ${Number(offerPrice).toFixed(2).replace('.', ',')}`;
-        }
-      }
-      if (!title && schema.name) title = schema.name;
-      if (!imageUrl && schema.image) {
-        imageUrl = Array.isArray(schema.image) ? schema.image[0] : schema.image;
-      }
-    } catch (err) {}
+  // 1. Check embedded Mercado Livre Social / PDP JSON state
+  const currMatch = html.match(/"current_price":\{"value":([0-9.]+)/i) || 
+                    html.match(/current_price.*?value.*?([0-9.]+)/i);
+  if (currMatch && currMatch[1]) {
+    price = `R$ ${Number(currMatch[1]).toFixed(2).replace('.', ',')}`;
   }
 
+  const prevMatch = html.match(/"previous_price":\{"value":([0-9.]+)/i) || 
+                    html.match(/previous_price.*?value.*?([0-9.]+)/i);
+  if (prevMatch && prevMatch[1]) {
+    originalPrice = `R$ ${Number(prevMatch[1]).toFixed(2).replace('.', ',')}`;
+  }
+
+  const discMatch = html.match(/"discount_label":\{"text":"([^"]+)"/i) || 
+                    html.match(/discount_label.*?text.*?"([^"]+)"/i);
+  if (discMatch && discMatch[1]) {
+    discountTag = discMatch[1];
+  }
+
+  // 2. Check JSON-LD schema fallback
+  if (!price) {
+    const schemaMatch = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/i);
+    if (schemaMatch && schemaMatch[1]) {
+      try {
+        const schema = JSON.parse(schemaMatch[1]);
+        if (schema && schema.offers) {
+          const offerPrice = schema.offers.price || schema.offers.lowPrice || (Array.isArray(schema.offers) ? schema.offers[0]?.price : null);
+          if (offerPrice) {
+            price = `R$ ${Number(offerPrice).toFixed(2).replace('.', ',')}`;
+          }
+        }
+        if (!title && schema.name) title = schema.name;
+        if (!imageUrl && schema.image) {
+          imageUrl = Array.isArray(schema.image) ? schema.image[0] : schema.image;
+        }
+      } catch (err) {}
+    }
+  }
+
+  // 3. Fallback price regex from Andes money HTML structure
   if (!price) {
     const priceFractionMatch = html.match(/class=["'][^"']*andes-money-amount__fraction[^"']*["']>([0-9.]+)</i);
     const priceCentsMatch = html.match(/class=["'][^"']*andes-money-amount__cents[^"']*["']>([0-9]{2})</i);
@@ -121,11 +145,14 @@ async function fetchProductDetails(rawUrl) {
     }
   }
 
-  const originalPriceMatch = html.match(
-    /class=["'][^"']*andes-money-amount--previous[^"']*[\s\S]*?class=["'][^"']*andes-money-amount__fraction[^"']*["']>([0-9.]+)</i
-  );
-  if (originalPriceMatch && originalPriceMatch[1]) {
-    originalPrice = `R$ ${originalPriceMatch[1]},00`;
+  // 4. Previous price fallback from Andes HTML
+  if (!originalPrice) {
+    const originalPriceMatch = html.match(
+      /class=["'][^"']*andes-money-amount--previous[^"']*[\s\S]*?class=["'][^"']*andes-money-amount__fraction[^"']*["']>([0-9.]+)</i
+    );
+    if (originalPriceMatch && originalPriceMatch[1]) {
+      originalPrice = `R$ ${originalPriceMatch[1]},00`;
+    }
   }
 
   if (
@@ -152,6 +179,7 @@ async function fetchProductDetails(rawUrl) {
     price_display: price || '',
     original_price: originalPrice || '',
     discount_percent: discountPercent,
+    discount_tag: discountTag || (discountPercent > 0 ? `${discountPercent}% OFF` : ''),
     is_active: !isPaused,
     final_url: targetUrl
   };

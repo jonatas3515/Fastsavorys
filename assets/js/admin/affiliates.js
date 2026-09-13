@@ -138,7 +138,7 @@ window.AffiliatesModule = (function () {
 
       const pct = calcDiscountPercent(item.original_price, item.price_display);
       const discountBadge = pct > 0 
-        ? `<span class="inline-block text-[10px] bg-red-600 text-white font-extrabold px-1.5 py-0.2 rounded mt-0.5">🔥 ${pct}% OFF</span>`
+        ? `<span class="inline-block text-[10px] bg-emerald-600 text-white font-extrabold px-1.5 py-0.2 rounded mt-0.5 shadow-sm">🔥 ${pct}% OFF</span>`
         : '';
 
       return `
@@ -152,7 +152,7 @@ window.AffiliatesModule = (function () {
             <div class="font-bold text-sm truncate">${escapeHtml(item.title)}</div>
             <div class="flex items-center gap-1 mt-0.5">
               ${discountBadge}
-              ${item.discount_tag ? `<span class="inline-block text-[10px] bg-yellow-100 text-yellow-800 font-bold px-1.5 py-0.2 rounded">${escapeHtml(item.discount_tag)}</span>` : ''}
+              ${item.discount_tag ? `<span class="inline-block text-[10px] bg-orange-100 text-orange-950 font-bold px-1.5 py-0.2 rounded border border-orange-200">${escapeHtml(item.discount_tag)}</span>` : ''}
             </div>
           </td>
           <td class="p-3 text-xs text-gray-600">${escapeHtml(catLabel)}</td>
@@ -168,7 +168,7 @@ window.AffiliatesModule = (function () {
               <button onclick="AffiliatesModule.openEditModal(${item.id})" 
                        class="p-1.5 text-amber-600 hover:bg-amber-50 rounded-lg text-xs font-medium" title="Editar">✏️</button>
               <button onclick="AffiliatesModule.deleteProduct(${item.id})" 
-                      class="p-1.5 text-red-600 hover:bg-red-50 rounded-lg text-xs font-medium" title="Excluir">🗑️</button>
+                       class="p-1.5 text-red-600 hover:bg-red-50 rounded-lg text-xs font-medium" title="Excluir">🗑️</button>
             </div>
           </td>
         </tr>
@@ -182,6 +182,8 @@ window.AffiliatesModule = (function () {
     if (form) form.reset();
     document.getElementById('affiliateModalTitle').textContent = '➕ Novo Achadinho (Mercado Livre)';
     document.getElementById('affiliateId').value = '';
+    document.getElementById('affiliateBadgeColorInput').value = 'orange';
+    document.getElementById('affiliateDescriptionInput').value = '🔸 ';
     document.getElementById('affiliateImagePreview').src = '../assets/img/fast-logo.png';
     document.getElementById('affiliateModal').classList.remove('hidden');
   }
@@ -201,7 +203,7 @@ window.AffiliatesModule = (function () {
     document.getElementById('affiliateOriginalPriceInput').value = item.original_price || '';
     document.getElementById('affiliateCategoryInput').value = item.category || 'cozinha';
     document.getElementById('affiliateTagInput').value = item.discount_tag || '';
-    document.getElementById('affiliateBadgeColorInput').value = item.badge_color || 'amber';
+    document.getElementById('affiliateBadgeColorInput').value = item.badge_color || 'orange';
     document.getElementById('affiliatePositionInput').value = item.position || 1;
     document.getElementById('affiliateActiveInput').checked = item.is_active !== false;
 
@@ -275,7 +277,9 @@ window.AffiliatesModule = (function () {
       }
 
       // Preenche tag se tiver desconto significativo
-      if (info.discount_percent > 0 && !document.getElementById('affiliateTagInput').value.trim()) {
+      if (info.discount_tag && !document.getElementById('affiliateTagInput').value.trim()) {
+        document.getElementById('affiliateTagInput').value = `⚡ ${info.discount_tag}`;
+      } else if (info.discount_percent > 0 && !document.getElementById('affiliateTagInput').value.trim()) {
         document.getElementById('affiliateTagInput').value = `⚡ ${info.discount_percent}% OFF`;
       }
 
@@ -507,6 +511,23 @@ window.AffiliatesModule = (function () {
       .replace(/'/g, '&#039;');
   }
 
+  function insertBullet(symbol = '🔸') {
+    const textarea = document.getElementById('affiliateDescriptionInput');
+    if (!textarea) return;
+
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const text = textarea.value;
+
+    const prefix = (start > 0 && text[start - 1] !== '\n' && text[start - 1] !== ' ') ? ' ' : '';
+    const insertion = `${prefix}${symbol} `;
+    
+    textarea.value = text.substring(0, start) + insertion + text.substring(end);
+    textarea.focus();
+    const newCursor = start + insertion.length;
+    textarea.setSelectionRange(newCursor, newCursor);
+  }
+
   return {
     init: loadProducts,
     loadProducts,
@@ -523,6 +544,7 @@ window.AffiliatesModule = (function () {
     checkAllLinksHealth,
     closeHealthModal,
     toggleProductActive,
-    fetchProductDataFromML
+    fetchProductDataFromML,
+    insertBullet
   };
 })();

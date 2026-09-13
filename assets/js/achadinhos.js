@@ -127,20 +127,22 @@
     if (emptyState) emptyState.classList.add('hidden');
 
     grid.innerHTML = filtered.map(item => {
-      // Cálculo automático de porcentagem de desconto
+      // Cálculo automático de porcentagem de desconto (Verde)
       const pct = calcDiscountPercent(item.original_price, item.price_display);
       const discountBadgeHtml = pct > 0 
-        ? `<span class="inline-flex items-center px-2 py-0.5 text-xs font-black rounded-full bg-gradient-to-r from-red-600 to-rose-600 text-white shadow-sm tracking-wide flex-shrink-0 animate-pulse">🔥 ${pct}% OFF</span>`
+        ? `<span class="inline-flex items-center px-2 py-0.5 text-xs font-black rounded-full bg-gradient-to-r from-emerald-600 to-green-600 text-white shadow-sm tracking-wide flex-shrink-0 animate-pulse">🔥 ${pct}% OFF</span>`
         : '';
 
-      // Cores para as badges secundárias
-      let badgeStyle = 'bg-yellow-100 text-yellow-800 border-yellow-300';
-      if (item.badge_color === 'rose') badgeStyle = 'bg-rose-100 text-rose-800 border-rose-300';
-      if (item.badge_color === 'emerald') badgeStyle = 'bg-emerald-100 text-emerald-800 border-emerald-300';
-      if (item.badge_color === 'blue') badgeStyle = 'bg-blue-100 text-blue-800 border-blue-300';
+      // Cores para as badges secundárias (Padrão: Laranja)
+      let badgeStyle = 'bg-orange-100 text-orange-950 border-orange-300 font-bold';
+      if (item.badge_color === 'amber') badgeStyle = 'bg-yellow-100 text-yellow-950 border-yellow-300 font-bold';
+      if (item.badge_color === 'rose') badgeStyle = 'bg-rose-100 text-rose-950 border-rose-300 font-bold';
+      if (item.badge_color === 'emerald') badgeStyle = 'bg-emerald-100 text-emerald-950 border-emerald-300 font-bold';
+      if (item.badge_color === 'blue') badgeStyle = 'bg-blue-100 text-blue-950 border-blue-300 font-bold';
+      if (item.badge_color === 'purple') badgeStyle = 'bg-purple-100 text-purple-950 border-purple-300 font-bold';
 
       const tagHtml = item.discount_tag 
-        ? `<span class="inline-flex items-center px-2 py-0.5 text-xs font-semibold rounded-full border ${badgeStyle} flex-shrink-0">${escapeHtml(item.discount_tag)}</span>` 
+        ? `<span class="inline-flex items-center px-2 py-0.5 text-xs rounded-full border ${badgeStyle} flex-shrink-0">${escapeHtml(item.discount_tag)}</span>` 
         : '';
 
       const originalPriceHtml = item.original_price 
