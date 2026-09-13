@@ -145,6 +145,11 @@ window.AffiliatesModule = (function () {
         ? `<span class="inline-block text-[10px] bg-emerald-600 text-white font-extrabold px-1.5 py-0.2 rounded mt-0.5 shadow-sm">🔥 ${pct}% OFF</span>`
         : '';
 
+      const isFastPick = Boolean(item.is_fast_pick || item.badge_color === 'fast_seal');
+      const fastPickBadge = isFastPick
+        ? `<span class="inline-flex items-center gap-1 text-[10px] bg-gradient-to-r from-pink-600 via-purple-600 to-indigo-600 text-white font-black px-2 py-0.5 rounded-full shadow-xs">✨ Selo Fast</span>`
+        : '';
+
       // Evita duplicidade de tag se já for apenas a indicação de desconto
       let showCustomTag = false;
       const customTagText = item.discount_tag ? item.discount_tag.trim() : '';
@@ -160,14 +165,17 @@ window.AffiliatesModule = (function () {
         : '';
 
       return `
-        <tr class="hover:bg-gray-50 transition-colors border-b border-gray-100">
+        <tr class="hover:bg-gray-50 transition-colors border-b border-gray-100 ${isFastPick ? 'bg-pink-50/20' : ''}">
           <td class="p-3 text-center text-xs font-bold text-gray-500 w-12">${index + 1}</td>
           <td class="p-3 w-16">
-            <img src="${escapeHtml(item.image_url)}" alt="" class="w-12 h-12 object-contain rounded-lg border bg-white p-1" 
+            <img src="${escapeHtml(item.image_url)}" alt="" class="w-12 h-12 object-contain rounded-lg border-2 ${isFastPick ? 'border-pink-500 ring-2 ring-pink-100' : 'border-gray-200'} bg-white p-1" 
                  onerror="this.src='../assets/img/fast-logo.png'" />
           </td>
           <td class="p-3 font-medium text-gray-900 max-w-xs">
-            <div class="font-bold text-sm truncate">${escapeHtml(item.title)}</div>
+            <div class="font-bold text-sm truncate flex items-center gap-1.5">
+              <span>${escapeHtml(item.title)}</span>
+              ${fastPickBadge}
+            </div>
             <div class="flex items-center gap-1 mt-0.5">
               ${discountBadge}
               ${customTagBadge}
@@ -206,6 +214,8 @@ window.AffiliatesModule = (function () {
     if (discountEl) discountEl.value = '';
     document.getElementById('affiliateTagInput').value = '';
     document.getElementById('affiliateBadgeColorInput').value = 'orange';
+    const isFastPickEl = document.getElementById('affiliateIsFastPickInput');
+    if (isFastPickEl) isFastPickEl.checked = false;
     document.getElementById('affiliateDescriptionInput').value = '🔸 ';
     document.getElementById('affiliateImagePreview').src = '../assets/img/fast-logo.png';
     document.getElementById('affiliateModal').classList.remove('hidden');
@@ -236,7 +246,11 @@ window.AffiliatesModule = (function () {
     const isDiscountOnly = /^[⚡🔥\s]*\d+%\s*OFF/i.test(tagVal.trim());
     document.getElementById('affiliateTagInput').value = isDiscountOnly ? '' : tagVal;
 
-    document.getElementById('affiliateBadgeColorInput').value = item.badge_color || 'orange';
+    const isFastPick = Boolean(item.is_fast_pick || item.badge_color === 'fast_seal');
+    const isFastPickEl = document.getElementById('affiliateIsFastPickInput');
+    if (isFastPickEl) isFastPickEl.checked = isFastPick;
+
+    document.getElementById('affiliateBadgeColorInput').value = item.badge_color || (isFastPick ? 'fast_seal' : 'orange');
     document.getElementById('affiliateActiveInput').checked = item.is_active !== false;
 
     // Atualiza preview da imagem
@@ -358,6 +372,12 @@ window.AffiliatesModule = (function () {
     const currentItem = editingId ? productsList.find(p => p.id == editingId) : null;
     const assignedPosition = currentItem && currentItem.position ? currentItem.position : (productsList.length + 1);
 
+    const isFastPick = document.getElementById('affiliateIsFastPickInput') ? document.getElementById('affiliateIsFastPickInput').checked : false;
+    let badgeColorVal = document.getElementById('affiliateBadgeColorInput').value;
+    if (isFastPick && badgeColorVal === 'orange') {
+      badgeColorVal = 'fast_seal';
+    }
+
     const payload = {
       title,
       description: document.getElementById('affiliateDescriptionInput').value.trim() || null,
@@ -367,7 +387,8 @@ window.AffiliatesModule = (function () {
       original_price: document.getElementById('affiliateOriginalPriceInput').value.trim() || null,
       category: document.getElementById('affiliateCategoryInput').value,
       discount_tag: document.getElementById('affiliateTagInput').value.trim() || null,
-      badge_color: document.getElementById('affiliateBadgeColorInput').value,
+      badge_color: isFastPick ? 'fast_seal' : badgeColorVal,
+      is_fast_pick: isFastPick,
       position: assignedPosition,
       is_active: document.getElementById('affiliateActiveInput').checked,
       updated_at: new Date().toISOString()
@@ -376,19 +397,32 @@ window.AffiliatesModule = (function () {
     try {
       if (window.supabaseClient) {
         if (editingId) {
-          const { error } = await window.supabaseClient
+          let res = await window.supabaseClient
             .from('fast_affiliate_products')
             .update(payload)
             .eq('id', editingId);
 
-          if (error) throw error;
+          if (res.error && res.error.message && res.error.message.includes('is_fast_pick')) {
+            delete payload.is_fast_pick;
+            res = await window.supabaseClient
+              .from('fast_affiliate_products')
+              .update(payload)
+              .eq('id', editingId);
+          }
+          if (res.error) throw res.error;
         } else {
           payload.created_at = new Date().toISOString();
-          const { error } = await window.supabaseClient
+          let res = await window.supabaseClient
             .from('fast_affiliate_products')
             .insert([payload]);
 
-          if (error) throw error;
+          if (res.error && res.error.message && res.error.message.includes('is_fast_pick')) {
+            delete payload.is_fast_pick;
+            res = await window.supabaseClient
+              .from('fast_affiliate_products')
+              .insert([payload]);
+          }
+          if (res.error) throw res.error;
         }
       }
 
@@ -658,8 +692,10 @@ window.AffiliatesModule = (function () {
     const discountText = pct > 0 ? ` (${pct}% OFF)` : '';
     const origPriceText = item.original_price ? `~${item.original_price}~ ➔ ` : '';
     const descText = item.description ? `\n${item.description}\n` : '';
+    const isFastPick = Boolean(item.is_fast_pick || item.badge_color === 'fast_seal');
+    const sealHeader = isFastPick ? '👑 *PRODUTO TESTADO E RECOMENDADO PELA FASTSAVORY\'S* ✨\n' : '';
 
-    return `🛍️ *ACHADINHO FASTSAVORY'S* ⭐\n🔥 *${item.title}*\n${descText}\n💰 *Preço:* ${origPriceText}*${item.price_display || 'Confira no link'}*${discountText}\n\n👉 *COMPRE COM DESCONTO AQUI:*\n${item.affiliate_url}\n\n✨ FastSavory's • Recomendações Mercado Livre\n🌐 https://fastsavorys.vercel.app/pages/achadinhos.html`;
+    return `${sealHeader}🛍️ *ACHADINHO FASTSAVORY'S* ⭐\n🔥 *${item.title}*\n${descText}\n💰 *Preço:* ${origPriceText}*${item.price_display || 'Confira no link'}*${discountText}\n\n👉 *COMPRE COM DESCONTO AQUI:*\n${item.affiliate_url}\n\n✨ FastSavory's • Recomendações Mercado Livre\n🌐 https://fastsavorys.vercel.app/pages/achadinhos.html`;
   }
 
   function openShareModal(id) {

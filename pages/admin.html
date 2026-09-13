@@ -2104,6 +2104,8 @@
                             <option value="rose">🔴 Vermelho</option>
                             <option value="blue">🔵 Azul</option>
                             <option value="purple">🟣 Roxo</option>
+                            <option value="pink">🌸 Rosa</option>
+                            <option value="fast_seal">✨ Selo Fast (Rosa & Roxo)</option>
                         </select>
                     </div>
                 </div>
@@ -2121,7 +2123,21 @@
                         class="w-full px-3 py-2 border rounded-lg outline-none resize-none"></textarea>
                 </div>
 
-                <div class="flex items-center gap-2 pt-2">
+                <!-- Selo FastSavory's (Eu uso / Recomendação Especial) -->
+                <div class="p-3 rounded-xl bg-gradient-to-r from-pink-50 via-purple-50 to-pink-50 border border-pink-200 flex items-center justify-between shadow-2xs">
+                    <div class="flex items-center gap-3">
+                        <input type="checkbox" id="affiliateIsFastPickInput" class="w-5 h-5 text-pink-600 rounded focus:ring-pink-500 cursor-pointer" />
+                        <div>
+                            <label for="affiliateIsFastPickInput" class="font-bold text-gray-900 text-sm cursor-pointer flex items-center gap-1.5">
+                                <span class="text-pink-600 font-extrabold">✨ Selo FastSavory's</span>
+                                <span class="text-[10px] bg-gradient-to-r from-pink-500 to-purple-600 text-white px-2 py-0.5 rounded-full font-black shadow-2xs">Já usei / Recomendo</span>
+                            </label>
+                            <p class="text-xs text-gray-500 mt-0.5">Aplica a moldura rosa/roxa especial e o selo de recomendação oficial na vitrine.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex items-center gap-2 pt-1">
                     <input type="checkbox" id="affiliateActiveInput" checked class="w-4 h-4 text-yellow-500 rounded" />
                     <label for="affiliateActiveInput" class="font-medium text-gray-700 cursor-pointer">Produto Ativo (Visível na loja)</label>
                 </div>

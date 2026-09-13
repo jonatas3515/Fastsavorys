@@ -1,4 +1,4 @@
-﻿/**
+/**
  * FastSavory's - Achadinhos & Vitrine de Ofertas do Mercado Livre
  * Produtos iniciais e dados de fallback caso o Supabase não retorne ou esteja offline.
  */
@@ -13,7 +13,8 @@ window.DEFAULT_AFFILIATE_PRODUCTS = [
     discount_tag: '🔥 Mais Vendido',
     image_url: 'https://http2.mlstatic.com/D_NQ_NP_2X_706051-MLA74668472579_022024-F.webp',
     affiliate_url: 'https://meli.la/2d54P4T',
-    badge_color: 'amber',
+    badge_color: 'fast_seal',
+    is_fast_pick: true,
     is_active: true,
     position: 1,
     clicks_count: 0
