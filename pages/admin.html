@@ -1752,6 +1752,10 @@
                                 class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg flex items-center gap-2 text-xs sm:text-sm font-medium transition">
                                 🔄 Atualizar
                             </button>
+                            <button onclick="AffiliatesModule.checkAllLinksHealth()"
+                                class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-1.5 text-xs sm:text-sm shadow-md transition">
+                                <span>🩺</span> Verificar Links
+                            </button>
                             <button onclick="AffiliatesModule.openNewModal()"
                                 class="bg-yellow-500 hover:bg-yellow-600 text-gray-950 px-4 py-2 rounded-lg font-bold flex items-center gap-2 text-xs sm:text-sm shadow-md transition">
                                 <span>➕</span> Novo Achadinho
@@ -2102,6 +2106,37 @@
                         class="px-5 py-2 bg-yellow-400 hover:bg-yellow-500 text-gray-950 font-bold rounded-lg shadow">Salvar</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Affiliate Links Health Checker Modal -->
+    <div id="affiliateHealthModal" class="fixed inset-0 bg-black bg-opacity-50 z-[200] hidden flex items-center justify-center p-4"
+        onclick="if(event.target===this) AffiliatesModule.closeHealthModal()">
+        <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between mb-4 pb-2 border-b">
+                <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
+                    <span>🩺</span> Verificador de Saúde dos Links
+                </h3>
+                <button onclick="AffiliatesModule.closeHealthModal()" class="text-gray-400 hover:text-gray-600 text-lg">✕</button>
+            </div>
+
+            <!-- Loading State -->
+            <div id="healthCheckerProgress" class="py-8 text-center">
+                <div class="inline-block animate-spin rounded-full h-9 w-9 border-4 border-blue-600 border-t-transparent"></div>
+                <p class="mt-3 text-sm text-gray-700 font-semibold" id="healthCheckerStatusText">Testando links no Mercado Livre...</p>
+                <p class="text-xs text-gray-400 mt-1">Isso leva apenas alguns segundos.</p>
+            </div>
+
+            <!-- Results Container -->
+            <div id="healthCheckerResults" class="hidden space-y-3">
+                <!-- Injected by JS -->
+            </div>
+
+            <div class="flex justify-between items-center pt-4 border-t mt-4">
+                <span class="text-xs text-gray-500 font-medium" id="healthCheckerSummary"></span>
+                <button type="button" onclick="AffiliatesModule.closeHealthModal()"
+                    class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium text-sm">Fechar</button>
+            </div>
         </div>
     </div>
 

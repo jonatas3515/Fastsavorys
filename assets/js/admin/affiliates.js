@@ -135,6 +135,11 @@ window.AffiliatesModule = (function () {
       };
       const catLabel = categoryMap[item.category] || item.category || 'Geral';
 
+      const pct = calcDiscountPercent(item.original_price, item.price_display);
+      const discountBadge = pct > 0 
+        ? `<span class="inline-block text-[10px] bg-red-600 text-white font-extrabold px-1.5 py-0.2 rounded mt-0.5">🔥 ${pct}% OFF</span>`
+        : '';
+
       return `
         <tr class="hover:bg-gray-50 transition-colors border-b border-gray-100">
           <td class="p-3 text-center text-xs font-bold text-gray-400 w-12">${item.position || 0}</td>
@@ -144,17 +149,23 @@ window.AffiliatesModule = (function () {
           </td>
           <td class="p-3 font-medium text-gray-900 max-w-xs">
             <div class="font-bold text-sm truncate">${escapeHtml(item.title)}</div>
-            ${item.discount_tag ? `<span class="inline-block text-[10px] bg-yellow-100 text-yellow-800 font-bold px-1.5 py-0.2 rounded mt-0.5">${escapeHtml(item.discount_tag)}</span>` : ''}
+            <div class="flex items-center gap-1 mt-0.5">
+              ${discountBadge}
+              ${item.discount_tag ? `<span class="inline-block text-[10px] bg-yellow-100 text-yellow-800 font-bold px-1.5 py-0.2 rounded">${escapeHtml(item.discount_tag)}</span>` : ''}
+            </div>
           </td>
           <td class="p-3 text-xs text-gray-600">${escapeHtml(catLabel)}</td>
-          <td class="p-3 font-bold text-sm text-gray-800">${escapeHtml(item.price_display || '-')}</td>
+          <td class="p-3 font-bold text-sm text-gray-800">
+            <div>${escapeHtml(item.price_display || '-')}</div>
+            ${item.original_price ? `<div class="text-[10px] text-gray-400 line-through">${escapeHtml(item.original_price)}</div>` : ''}
+          </td>
           <td class="p-3 text-center">${activeBadge}</td>
           <td class="p-3 text-right">
             <div class="flex items-center justify-end gap-1.5">
               <a href="${escapeHtml(item.affiliate_url)}" target="_blank" rel="noopener noreferrer" 
                  class="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg text-xs" title="Testar link no ML">🔗</a>
               <button onclick="AffiliatesModule.openEditModal(${item.id})" 
-                      class="p-1.5 text-amber-600 hover:bg-amber-50 rounded-lg text-xs font-medium" title="Editar">✏️</button>
+                       class="p-1.5 text-amber-600 hover:bg-amber-50 rounded-lg text-xs font-medium" title="Editar">✏️</button>
               <button onclick="AffiliatesModule.deleteProduct(${item.id})" 
                       class="p-1.5 text-red-600 hover:bg-red-50 rounded-lg text-xs font-medium" title="Excluir">🗑️</button>
             </div>
@@ -290,6 +301,129 @@ window.AffiliatesModule = (function () {
     }
   }
 
+  function calcDiscountPercent(origStr, currStr) {
+    if (!origStr || !currStr) return 0;
+    const parseNum = (str) => {
+      const clean = String(str).replace(/[^\d,\.]/g, '').replace(',', '.');
+      return parseFloat(clean);
+    };
+    const orig = parseNum(origStr);
+    const curr = parseNum(currStr);
+    if (!orig || !curr || orig <= curr) return 0;
+    const pct = Math.round(((orig - curr) / orig) * 100);
+    return pct > 0 && pct < 100 ? pct : 0;
+  }
+
+  async function checkAllLinksHealth() {
+    if (!productsList || productsList.length === 0) {
+      alert('Nenhum produto cadastrado para verificar.');
+      return;
+    }
+
+    const modal = document.getElementById('affiliateHealthModal');
+    const progress = document.getElementById('healthCheckerProgress');
+    const resultsContainer = document.getElementById('healthCheckerResults');
+    const statusText = document.getElementById('healthCheckerStatusText');
+    const summary = document.getElementById('healthCheckerSummary');
+
+    if (modal) modal.classList.remove('hidden');
+    if (progress) progress.classList.remove('hidden');
+    if (resultsContainer) {
+      resultsContainer.classList.add('hidden');
+      resultsContainer.innerHTML = '';
+    }
+    if (statusText) statusText.textContent = `Testando ${productsList.length} links no Mercado Livre...`;
+
+    try {
+      const response = await fetch('/api/check-affiliate-links', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ items: productsList })
+      });
+
+      if (!response.ok) throw new Error('Falha na resposta do verificador');
+
+      const data = await response.json();
+      const results = data.results || [];
+
+      let okCount = 0;
+      let pausedCount = 0;
+      let errorCount = 0;
+
+      resultsContainer.innerHTML = results.map(res => {
+        const prod = productsList.find(p => p.id == res.id) || { title: res.title || 'Produto', image_url: '../assets/img/fast-logo.png' };
+        
+        let statusBadge = `<span class="px-2.5 py-1 text-xs font-bold rounded-full bg-green-100 text-green-800 flex items-center gap-1">🟢 Online</span>`;
+        if (res.status === 'paused') {
+          pausedCount++;
+          statusBadge = `<span class="px-2.5 py-1 text-xs font-bold rounded-full bg-red-100 text-red-800 flex items-center gap-1">🔴 Pausado</span>`;
+        } else if (res.status === 'error' || res.status === 'timeout' || res.status === 'warning') {
+          errorCount++;
+          statusBadge = `<span class="px-2.5 py-1 text-xs font-bold rounded-full bg-amber-100 text-amber-800 flex items-center gap-1">⚠️ Atenção</span>`;
+        } else {
+          okCount++;
+        }
+
+        const pauseBtn = res.status === 'paused' && prod.is_active !== false
+          ? `<button onclick="AffiliatesModule.toggleProductActive(${prod.id}, false)" class="px-3 py-1 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold rounded-lg border border-red-200 transition">Pausar no Site</button>`
+          : '';
+
+        return `
+          <div class="p-3 bg-white border border-gray-100 rounded-xl flex items-center justify-between gap-3 shadow-sm">
+            <div class="flex items-center gap-3 min-w-0">
+              <img src="${escapeHtml(prod.image_url)}" alt="" class="w-10 h-10 object-contain rounded-lg bg-gray-50 border p-0.5 flex-shrink-0" onerror="this.src='../assets/img/fast-logo.png'" />
+              <div class="min-w-0">
+                <div class="font-bold text-sm text-gray-900 truncate">${escapeHtml(prod.title || res.title)}</div>
+                <div class="text-xs text-gray-500 truncate">${escapeHtml(res.statusText || res.url)}</div>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 flex-shrink-0">
+              ${statusBadge}
+              ${pauseBtn}
+              <a href="${escapeHtml(res.url)}" target="_blank" rel="noopener noreferrer" class="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg text-xs" title="Abrir link no ML">🔗</a>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      if (progress) progress.classList.add('hidden');
+      if (resultsContainer) resultsContainer.classList.remove('hidden');
+      if (summary) summary.textContent = `Resultado: ${okCount} online, ${pausedCount} pausados, ${errorCount} instáveis/aviso.`;
+
+    } catch (err) {
+      console.error('[HealthCheck] Erro:', err);
+      if (progress) progress.classList.add('hidden');
+      if (resultsContainer) {
+        resultsContainer.classList.remove('hidden');
+        resultsContainer.innerHTML = `<div class="p-4 bg-red-50 text-red-700 rounded-xl text-center text-sm font-medium">Erro ao verificar links: ${escapeHtml(err.message)}</div>`;
+      }
+    }
+  }
+
+  function closeHealthModal() {
+    document.getElementById('affiliateHealthModal')?.classList.add('hidden');
+  }
+
+  async function toggleProductActive(id, newStatus) {
+    try {
+      if (window.supabaseClient) {
+        const { error } = await window.supabaseClient
+          .from('fast_affiliate_products')
+          .update({ is_active: newStatus, updated_at: new Date().toISOString() })
+          .eq('id', id);
+
+        if (error) throw error;
+      }
+
+      if (window.showToast) window.showToast(newStatus ? 'Produto ativado no site!' : 'Produto pausado no site!', 'info');
+      await loadProducts();
+      closeHealthModal();
+    } catch (e) {
+      console.error('[ToggleActive] Erro:', e);
+      alert('Erro ao alterar status do produto.');
+    }
+  }
+
   function escapeHtml(str) {
     if (!str) return '';
     return String(str)
@@ -312,6 +446,9 @@ window.AffiliatesModule = (function () {
     handleSearch,
     handleCategoryFilter,
     handleStatusFilter,
-    clearFilters
+    clearFilters,
+    checkAllLinksHealth,
+    closeHealthModal,
+    toggleProductActive
   };
 })();

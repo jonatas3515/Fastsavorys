@@ -1,4 +1,4 @@
-﻿/**
+/**
  * FastSavory's - Módulo de Achadinhos & Ofertas (Mercado Livre Afiliados)
  */
 
@@ -102,14 +102,20 @@
     if (emptyState) emptyState.classList.add('hidden');
 
     grid.innerHTML = filtered.map(item => {
-      // Cores para as badges
+      // Cálculo automático de porcentagem de desconto
+      const pct = calcDiscountPercent(item.original_price, item.price_display);
+      const discountBadgeHtml = pct > 0 
+        ? `<span class="inline-block px-2.5 py-0.5 text-xs font-black rounded-full bg-gradient-to-r from-red-600 to-rose-600 text-white shadow-sm mb-1.5 tracking-wide animate-pulse">🔥 ${pct}% OFF</span>`
+        : '';
+
+      // Cores para as badges secundárias
       let badgeStyle = 'bg-yellow-100 text-yellow-800 border-yellow-300';
       if (item.badge_color === 'rose') badgeStyle = 'bg-rose-100 text-rose-800 border-rose-300';
       if (item.badge_color === 'emerald') badgeStyle = 'bg-emerald-100 text-emerald-800 border-emerald-300';
       if (item.badge_color === 'blue') badgeStyle = 'bg-blue-100 text-blue-800 border-blue-300';
 
       const tagHtml = item.discount_tag 
-        ? `<span class="inline-block px-2.5 py-0.5 text-xs font-semibold rounded-full border ${badgeStyle} mb-2">${escapeHtml(item.discount_tag)}</span>` 
+        ? `<span class="inline-block px-2.5 py-0.5 text-xs font-semibold rounded-full border ${badgeStyle} mb-1">${escapeHtml(item.discount_tag)}</span>` 
         : '';
 
       const originalPriceHtml = item.original_price 
@@ -118,7 +124,7 @@
 
       return `
         <div class="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 overflow-hidden flex flex-col group transform hover:-translate-y-1">
-          <!-- Imagem com Badge -->
+          <!-- Imagem com Badges -->
           <div class="relative w-full pt-[80%] bg-gray-50 overflow-hidden">
             <img 
               src="${escapeHtml(item.image_url)}" 
@@ -127,7 +133,8 @@
               class="absolute inset-0 w-full h-full object-contain p-3 group-hover:scale-105 transition-transform duration-300"
               onerror="this.src='../assets/img/fast-logo.png'; this.className='absolute inset-0 w-full h-full object-contain p-8 opacity-40';"
             />
-            <div class="absolute top-2 left-2 flex flex-col gap-1">
+            <div class="absolute top-2 left-2 flex flex-col items-start gap-1">
+              ${discountBadgeHtml}
               ${tagHtml}
             </div>
           </div>
@@ -164,6 +171,19 @@
         </div>
       `;
     }).join('');
+  }
+
+  function calcDiscountPercent(origStr, currStr) {
+    if (!origStr || !currStr) return 0;
+    const parseNum = (str) => {
+      const clean = String(str).replace(/[^\d,\.]/g, '').replace(',', '.');
+      return parseFloat(clean);
+    };
+    const orig = parseNum(origStr);
+    const curr = parseNum(currStr);
+    if (!orig || !curr || orig <= curr) return 0;
+    const pct = Math.round(((orig - curr) / orig) * 100);
+    return pct > 0 && pct < 100 ? pct : 0;
   }
 
   function escapeHtml(str) {
