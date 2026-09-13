@@ -67,6 +67,22 @@ window.AffiliatesModule = (function () {
     renderTable();
   }
 
+  function getFilteredProducts() {
+    return productsList.filter(item => {
+      const matchCat = categoryFilter === 'all' || item.category === categoryFilter;
+      const matchStatus = statusFilter === 'all' || 
+        (statusFilter === 'active' && item.is_active !== false) ||
+        (statusFilter === 'paused' && item.is_active === false);
+      const matchSearch = !searchQuery || 
+        (item.title && item.title.toLowerCase().includes(searchQuery)) ||
+        (item.description && item.description.toLowerCase().includes(searchQuery)) ||
+        (item.category && item.category.toLowerCase().includes(searchQuery)) ||
+        (item.discount_tag && item.discount_tag.toLowerCase().includes(searchQuery));
+
+      return matchCat && matchStatus && matchSearch;
+    });
+  }
+
   function renderTable() {
     const tbody = document.getElementById('affiliateAdminTableBody');
     if (!tbody) return;
@@ -82,19 +98,7 @@ window.AffiliatesModule = (function () {
       return;
     }
 
-    const filtered = productsList.filter(item => {
-      const matchCat = categoryFilter === 'all' || item.category === categoryFilter;
-      const matchStatus = statusFilter === 'all' || 
-        (statusFilter === 'active' && item.is_active !== false) ||
-        (statusFilter === 'paused' && item.is_active === false);
-      const matchSearch = !searchQuery || 
-        (item.title && item.title.toLowerCase().includes(searchQuery)) ||
-        (item.description && item.description.toLowerCase().includes(searchQuery)) ||
-        (item.category && item.category.toLowerCase().includes(searchQuery)) ||
-        (item.discount_tag && item.discount_tag.toLowerCase().includes(searchQuery));
-
-      return matchCat && matchStatus && matchSearch;
-    });
+    const filtered = getFilteredProducts();
 
     if (filtered.length === 0) {
       tbody.innerHTML = `
@@ -108,7 +112,7 @@ window.AffiliatesModule = (function () {
       return;
     }
 
-    tbody.innerHTML = filtered.map(item => {
+    tbody.innerHTML = filtered.map((item, index) => {
       const activeBadge = item.is_active 
         ? `<span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-green-100 text-green-800">Ativo</span>`
         : `<span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-gray-100 text-gray-600">Pausado</span>`;
@@ -141,9 +145,23 @@ window.AffiliatesModule = (function () {
         ? `<span class="inline-block text-[10px] bg-emerald-600 text-white font-extrabold px-1.5 py-0.2 rounded mt-0.5 shadow-sm">🔥 ${pct}% OFF</span>`
         : '';
 
+      // Evita duplicidade de tag se já for apenas a indicação de desconto
+      let showCustomTag = false;
+      const customTagText = item.discount_tag ? item.discount_tag.trim() : '';
+      if (customTagText) {
+        const isDiscountOnly = /^[⚡🔥\s]*\d+%\s*OFF/i.test(customTagText);
+        if (!isDiscountOnly || pct === 0) {
+          showCustomTag = true;
+        }
+      }
+
+      const customTagBadge = showCustomTag
+        ? `<span class="inline-block text-[10px] bg-orange-100 text-orange-950 font-bold px-1.5 py-0.2 rounded border border-orange-200">${escapeHtml(customTagText)}</span>`
+        : '';
+
       return `
         <tr class="hover:bg-gray-50 transition-colors border-b border-gray-100">
-          <td class="p-3 text-center text-xs font-bold text-gray-400 w-12">${item.position || 0}</td>
+          <td class="p-3 text-center text-xs font-bold text-gray-500 w-12">${index + 1}</td>
           <td class="p-3 w-16">
             <img src="${escapeHtml(item.image_url)}" alt="" class="w-12 h-12 object-contain rounded-lg border bg-white p-1" 
                  onerror="this.src='../assets/img/fast-logo.png'" />
@@ -152,7 +170,7 @@ window.AffiliatesModule = (function () {
             <div class="font-bold text-sm truncate">${escapeHtml(item.title)}</div>
             <div class="flex items-center gap-1 mt-0.5">
               ${discountBadge}
-              ${item.discount_tag ? `<span class="inline-block text-[10px] bg-orange-100 text-orange-950 font-bold px-1.5 py-0.2 rounded border border-orange-200">${escapeHtml(item.discount_tag)}</span>` : ''}
+              ${customTagBadge}
             </div>
           </td>
           <td class="p-3 text-xs text-gray-600">${escapeHtml(catLabel)}</td>
@@ -184,6 +202,9 @@ window.AffiliatesModule = (function () {
     if (form) form.reset();
     document.getElementById('affiliateModalTitle').textContent = '➕ Novo Achadinho (Mercado Livre)';
     document.getElementById('affiliateId').value = '';
+    const discountEl = document.getElementById('affiliateDiscountInput');
+    if (discountEl) discountEl.value = '';
+    document.getElementById('affiliateTagInput').value = '';
     document.getElementById('affiliateBadgeColorInput').value = 'orange';
     document.getElementById('affiliateDescriptionInput').value = '🔸 ';
     document.getElementById('affiliateImagePreview').src = '../assets/img/fast-logo.png';
@@ -204,9 +225,18 @@ window.AffiliatesModule = (function () {
     document.getElementById('affiliatePriceInput').value = item.price_display || '';
     document.getElementById('affiliateOriginalPriceInput').value = item.original_price || '';
     document.getElementById('affiliateCategoryInput').value = item.category || 'cozinha';
-    document.getElementById('affiliateTagInput').value = item.discount_tag || '';
+
+    const pct = calcDiscountPercent(item.original_price, item.price_display);
+    const discountEl = document.getElementById('affiliateDiscountInput');
+    if (discountEl) {
+      discountEl.value = pct > 0 ? `${pct}% OFF` : '';
+    }
+
+    const tagVal = item.discount_tag || '';
+    const isDiscountOnly = /^[⚡🔥\s]*\d+%\s*OFF/i.test(tagVal.trim());
+    document.getElementById('affiliateTagInput').value = isDiscountOnly ? '' : tagVal;
+
     document.getElementById('affiliateBadgeColorInput').value = item.badge_color || 'orange';
-    document.getElementById('affiliatePositionInput').value = item.position || 1;
     document.getElementById('affiliateActiveInput').checked = item.is_active !== false;
 
     // Atualiza preview da imagem
@@ -278,11 +308,14 @@ window.AffiliatesModule = (function () {
         document.getElementById('affiliateOriginalPriceInput').value = info.original_price;
       }
 
-      // Preenche tag se tiver desconto significativo
-      if (info.discount_tag && !document.getElementById('affiliateTagInput').value.trim()) {
-        document.getElementById('affiliateTagInput').value = `⚡ ${info.discount_tag}`;
-      } else if (info.discount_percent > 0 && !document.getElementById('affiliateTagInput').value.trim()) {
-        document.getElementById('affiliateTagInput').value = `⚡ ${info.discount_percent}% OFF`;
+      // Preenche campo de Desconto (e NÃO preenche Selo/Tag para evitar duplicação)
+      const discountEl = document.getElementById('affiliateDiscountInput');
+      if (discountEl) {
+        if (info.discount_percent > 0) {
+          discountEl.value = `${info.discount_percent}% OFF`;
+        } else if (info.discount_tag) {
+          discountEl.value = info.discount_tag;
+        }
       }
 
       // Preenche categoria detectada automaticamente
@@ -322,6 +355,9 @@ window.AffiliatesModule = (function () {
       return;
     }
 
+    const currentItem = editingId ? productsList.find(p => p.id == editingId) : null;
+    const assignedPosition = currentItem && currentItem.position ? currentItem.position : (productsList.length + 1);
+
     const payload = {
       title,
       description: document.getElementById('affiliateDescriptionInput').value.trim() || null,
@@ -332,7 +368,7 @@ window.AffiliatesModule = (function () {
       category: document.getElementById('affiliateCategoryInput').value,
       discount_tag: document.getElementById('affiliateTagInput').value.trim() || null,
       badge_color: document.getElementById('affiliateBadgeColorInput').value,
-      position: parseInt(document.getElementById('affiliatePositionInput').value) || 1,
+      position: assignedPosition,
       is_active: document.getElementById('affiliateActiveInput').checked,
       updated_at: new Date().toISOString()
     };
@@ -400,8 +436,9 @@ window.AffiliatesModule = (function () {
   }
 
   async function checkAllLinksHealth() {
-    if (!productsList || productsList.length === 0) {
-      alert('Nenhum produto cadastrado para verificar.');
+    const itemsToCheck = getFilteredProducts();
+    if (!itemsToCheck || itemsToCheck.length === 0) {
+      alert('Nenhum achadinho encontrado para os filtros atuais para verificar.');
       return;
     }
 
@@ -417,26 +454,41 @@ window.AffiliatesModule = (function () {
       resultsContainer.classList.add('hidden');
       resultsContainer.innerHTML = '';
     }
-    if (statusText) statusText.textContent = `Testando ${productsList.length} links no Mercado Livre...`;
+
+    const filterName = categoryFilter !== 'all' ? `da categoria "${categoryFilter}"` : 'da lista atual';
+    if (statusText) statusText.textContent = `Iniciando verificação de ${itemsToCheck.length} links ${filterName}...`;
 
     try {
-      const response = await fetch('/api/check-affiliate-links', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ items: productsList })
-      });
-
-      if (!response.ok) throw new Error('Falha na resposta do verificador');
-
-      const data = await response.json();
-      const results = data.results || [];
-
+      const chunkSize = 25;
+      let allResults = [];
       let okCount = 0;
       let pausedCount = 0;
       let errorCount = 0;
 
-      resultsContainer.innerHTML = results.map(res => {
-        const prod = productsList.find(p => p.id == res.id) || { title: res.title || 'Produto', image_url: '../assets/img/fast-logo.png' };
+      for (let i = 0; i < itemsToCheck.length; i += chunkSize) {
+        const chunk = itemsToCheck.slice(i, i + chunkSize);
+        const chunkIndexEnd = Math.min(i + chunkSize, itemsToCheck.length);
+        if (statusText) {
+          statusText.textContent = `Verificando links ${i + 1} a ${chunkIndexEnd} de ${itemsToCheck.length}...`;
+        }
+
+        const response = await fetch('/api/check-affiliate-links', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items: chunk })
+        });
+
+        if (!response.ok) throw new Error('Falha na resposta do verificador');
+
+        const data = await response.json();
+        const results = data.results || [];
+        allResults = allResults.concat(results);
+      }
+
+      resultsContainer.innerHTML = allResults.map(res => {
+        const prod = itemsToCheck.find(p => p.id == res.id) || 
+                     productsList.find(p => p.id == res.id) || 
+                     { title: res.title || 'Produto', image_url: '../assets/img/fast-logo.png' };
         
         let statusBadge = `<span class="px-2.5 py-1 text-xs font-bold rounded-full bg-green-100 text-green-800 flex items-center gap-1">🟢 Online</span>`;
         if (res.status === 'paused') {
@@ -473,7 +525,7 @@ window.AffiliatesModule = (function () {
 
       if (progress) progress.classList.add('hidden');
       if (resultsContainer) resultsContainer.classList.remove('hidden');
-      if (summary) summary.textContent = `Resultado: ${okCount} online, ${pausedCount} pausados, ${errorCount} instáveis/aviso.`;
+      if (summary) summary.textContent = `Resultado: ${okCount} online, ${pausedCount} pausados, ${errorCount} instáveis/aviso (${itemsToCheck.length} verificados).`;
 
     } catch (err) {
       console.error('[HealthCheck] Erro:', err);

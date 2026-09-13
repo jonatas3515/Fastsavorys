@@ -323,7 +323,7 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Nenhum link fornecido para verificação.' });
     }
 
-    const batch = itemsToCheck.slice(0, 20);
+    const batch = itemsToCheck.slice(0, 50);
 
     const results = await Promise.all(
       batch.map(async (item) => {

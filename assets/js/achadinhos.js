@@ -141,8 +141,18 @@
       if (item.badge_color === 'blue') badgeStyle = 'bg-blue-100 text-blue-950 border-blue-300 font-bold';
       if (item.badge_color === 'purple') badgeStyle = 'bg-purple-100 text-purple-950 border-purple-300 font-bold';
 
-      const tagHtml = item.discount_tag 
-        ? `<span class="inline-flex items-center px-2 py-0.5 text-xs rounded-full border ${badgeStyle} flex-shrink-0">${escapeHtml(item.discount_tag)}</span>` 
+      // Evita duplicidade de badge se a tag for apenas a indicação do mesmo desconto
+      let showTag = false;
+      const rawTag = item.discount_tag ? item.discount_tag.trim() : '';
+      if (rawTag) {
+        const isOnlyDiscountTag = /^[⚡🔥\s]*\d+%\s*OFF/i.test(rawTag);
+        if (!isOnlyDiscountTag || pct === 0) {
+          showTag = true;
+        }
+      }
+
+      const tagHtml = showTag 
+        ? `<span class="inline-flex items-center px-2 py-0.5 text-xs rounded-full border ${badgeStyle} flex-shrink-0">${escapeHtml(rawTag)}</span>` 
         : '';
 
       const originalPriceHtml = item.original_price 
