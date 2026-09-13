@@ -1759,6 +1759,50 @@
                         </div>
                     </div>
 
+                    <!-- Search & Filter Controls -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mb-6 bg-gray-50 p-4 rounded-xl border border-gray-100">
+                        <div class="relative">
+                            <span class="absolute left-3 top-2.5 text-gray-400">🔍</span>
+                            <input type="text" id="affiliateAdminSearchInput" placeholder="Buscar por título, categoria..."
+                                oninput="AffiliatesModule.handleSearch(this.value)"
+                                class="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-yellow-400 outline-none text-sm bg-white" />
+                        </div>
+                        <div>
+                            <select id="affiliateAdminCategoryFilter"
+                                onchange="AffiliatesModule.handleCategoryFilter(this.value)"
+                                class="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-yellow-400 outline-none bg-white text-sm">
+                                <option value="all">🏷️ Todas as Categorias</option>
+                                <option value="cozinha">🍳 Cozinha & Eletro</option>
+                                <option value="confeitaria">🍰 Confeitaria & Formas</option>
+                                <option value="embalagens">📦 Embalagens & Festas</option>
+                                <option value="utilidades">🏠 Casa & Utilidades</option>
+                                <option value="moda">👗 Moda & Calçados</option>
+                                <option value="supermercado">🛒 Supermercado & Alimentos</option>
+                                <option value="perfumaria">🧴 Perfumaria & Beleza</option>
+                                <option value="banho">🚿 Cama, Mesa & Banho</option>
+                                <option value="eletronicos">⚡ Eletrônicos & Áudio</option>
+                                <option value="celulares">📱 Celulares & Telefonia</option>
+                                <option value="informatica">💻 Informática & Acessórios</option>
+                                <option value="brinquedos">🧸 Brinquedos & Jogos</option>
+                                <option value="presentes">🎁 Presentes & Lembrancinhas</option>
+                                <option value="bebes">🍼 Bebês & Maternidade</option>
+                                <option value="veiculos">🚗 Veículos & Acessórios</option>
+                                <option value="livros">📚 Livros & Papelaria</option>
+                                <option value="petshop">🐶 Pet Shop</option>
+                                <option value="construcao">🔨 Ferramentas & Construção</option>
+                            </select>
+                        </div>
+                        <div>
+                            <select id="affiliateAdminStatusFilter"
+                                onchange="AffiliatesModule.handleStatusFilter(this.value)"
+                                class="w-full px-3 py-2 border border-gray-200 rounded-lg focus:ring-2 focus:ring-yellow-400 outline-none bg-white text-sm">
+                                <option value="all">⚡ Todos os Status</option>
+                                <option value="active">✅ Apenas Ativos</option>
+                                <option value="paused">⏸️ Apenas Pausados</option>
+                            </select>
+                        </div>
+                    </div>
+
                     <!-- Table -->
                     <div class="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-sm">
                         <div class="overflow-x-auto">

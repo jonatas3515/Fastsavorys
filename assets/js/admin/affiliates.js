@@ -5,6 +5,9 @@
 window.AffiliatesModule = (function () {
   let productsList = [];
   let editingId = null;
+  let searchQuery = '';
+  let categoryFilter = 'all';
+  let statusFilter = 'all';
 
   async function loadProducts() {
     const tbody = document.getElementById('affiliateAdminTableBody');
@@ -36,6 +39,34 @@ window.AffiliatesModule = (function () {
     renderTable();
   }
 
+  function handleSearch(val) {
+    searchQuery = (val || '').toLowerCase().trim();
+    renderTable();
+  }
+
+  function handleCategoryFilter(val) {
+    categoryFilter = val || 'all';
+    renderTable();
+  }
+
+  function handleStatusFilter(val) {
+    statusFilter = val || 'all';
+    renderTable();
+  }
+
+  function clearFilters() {
+    searchQuery = '';
+    categoryFilter = 'all';
+    statusFilter = 'all';
+    const sInput = document.getElementById('affiliateAdminSearchInput');
+    const cSelect = document.getElementById('affiliateAdminCategoryFilter');
+    const stSelect = document.getElementById('affiliateAdminStatusFilter');
+    if (sInput) sInput.value = '';
+    if (cSelect) cSelect.value = 'all';
+    if (stSelect) stSelect.value = 'all';
+    renderTable();
+  }
+
   function renderTable() {
     const tbody = document.getElementById('affiliateAdminTableBody');
     if (!tbody) return;
@@ -51,7 +82,33 @@ window.AffiliatesModule = (function () {
       return;
     }
 
-    tbody.innerHTML = productsList.map(item => {
+    const filtered = productsList.filter(item => {
+      const matchCat = categoryFilter === 'all' || item.category === categoryFilter;
+      const matchStatus = statusFilter === 'all' || 
+        (statusFilter === 'active' && item.is_active !== false) ||
+        (statusFilter === 'paused' && item.is_active === false);
+      const matchSearch = !searchQuery || 
+        (item.title && item.title.toLowerCase().includes(searchQuery)) ||
+        (item.description && item.description.toLowerCase().includes(searchQuery)) ||
+        (item.category && item.category.toLowerCase().includes(searchQuery)) ||
+        (item.discount_tag && item.discount_tag.toLowerCase().includes(searchQuery));
+
+      return matchCat && matchStatus && matchSearch;
+    });
+
+    if (filtered.length === 0) {
+      tbody.innerHTML = `
+        <tr>
+          <td colspan="7" class="p-8 text-center text-gray-400">
+            Nenhum achadinho encontrado para os filtros selecionados.
+            <button onclick="AffiliatesModule.clearFilters()" class="ml-2 text-yellow-600 underline font-semibold">Limpar Filtros</button>
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    tbody.innerHTML = filtered.map(item => {
       const activeBadge = item.is_active 
         ? `<span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-green-100 text-green-800">Ativo</span>`
         : `<span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-gray-100 text-gray-600">Pausado</span>`;
@@ -251,6 +308,10 @@ window.AffiliatesModule = (function () {
     closeModal,
     saveProduct,
     deleteProduct,
-    updateImagePreview
+    updateImagePreview,
+    handleSearch,
+    handleCategoryFilter,
+    handleStatusFilter,
+    clearFilters
   };
 })();
