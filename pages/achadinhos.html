@@ -279,6 +279,78 @@
     </div>
   </footer>
 
+  <!-- Share Modal -->
+  <div id="affiliateShareModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-[200] hidden flex items-center justify-center p-4" onclick="if(event.target===this) window.closeAffiliateShareModal()">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all">
+      <!-- Header -->
+      <div class="bg-gradient-to-r from-yellow-400 via-amber-400 to-yellow-500 p-4 sm:p-5 flex items-center justify-between text-gray-950">
+        <div class="flex items-center gap-2 font-black text-base sm:text-lg">
+          <span>📤</span>
+          <span>Compartilhar Oferta</span>
+        </div>
+        <button onclick="window.closeAffiliateShareModal()" class="w-8 h-8 rounded-full bg-black/10 hover:bg-black/20 flex items-center justify-center font-bold text-gray-900 transition">✕</button>
+      </div>
+
+      <!-- Product Preview Card -->
+      <div class="p-5 space-y-4">
+        <div class="flex gap-3 bg-gray-50 p-3 rounded-2xl border border-gray-100 items-center">
+          <img id="shareModalProductImg" src="../assets/img/fast-logo.png" alt="" class="w-16 h-16 object-contain rounded-xl bg-white border p-1 flex-shrink-0" />
+          <div class="min-w-0 flex-1">
+            <h4 id="shareModalProductTitle" class="font-bold text-gray-900 text-xs sm:text-sm line-clamp-2 leading-tight">Produto</h4>
+            <div class="flex items-center gap-1.5 mt-1">
+              <span id="shareModalProductPrice" class="font-black text-sm text-gray-900">R$ 0,00</span>
+              <span id="shareModalProductDiscount" class="text-[10px] bg-emerald-100 text-emerald-800 font-extrabold px-1.5 py-0.5 rounded-full"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick Share Buttons Grid -->
+        <div class="grid grid-cols-2 gap-2.5 text-xs sm:text-sm font-bold">
+          <!-- WhatsApp -->
+          <button onclick="window.shareToWhatsApp()" class="flex items-center justify-center gap-2 p-3 bg-green-500 hover:bg-green-600 text-white rounded-xl shadow-sm transition active:scale-95">
+            <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.771-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.312.045-.634.072-1.895-.448-1.517-.624-2.493-2.164-2.569-2.264-.075-.101-.607-.807-.607-1.539s.385-1.092.521-1.238c.137-.145.3-.182.4-.182s.2.008.287.013c.094.004.22.036.336.315.123.298.423 1.032.46 1.107.037.075.062.163.013.262-.05.099-.075.162-.15.249-.074.088-.157.196-.224.263-.075.074-.153.155-.066.305.087.149.388.641.832 1.036.572.509 1.055.666 1.205.741.149.075.237.062.324-.038.088-.099.374-.436.474-.585.099-.149.2-.124.336-.075.137.05.87.411 1.02.486.15.075.249.112.287.175.037.062.037.362-.107.767z"/></svg>
+            <span>WhatsApp</span>
+          </button>
+
+          <!-- Telegram -->
+          <button onclick="window.shareToTelegram()" class="flex items-center justify-center gap-2 p-3 bg-sky-500 hover:bg-sky-600 text-white rounded-xl shadow-sm transition active:scale-95">
+            <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .34z"/></svg>
+            <span>Telegram</span>
+          </button>
+
+          <!-- Facebook / Messenger -->
+          <button onclick="window.shareToFacebook()" class="flex items-center justify-center gap-2 p-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-sm transition active:scale-95">
+            <svg class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M12 2C6.36 2 2 6.13 2 11.7c0 2.91 1.19 5.43 3.14 7.18.16.15.27.36.27.59l-.08 1.83a.75.75 0 001.08.68l2.05-.91c.17-.08.36-.1.54-.06.98.27 2.03.42 3.11.42 5.64 0 10-4.13 10-9.7S17.64 2 12 2zm1.08 13.06l-2.58-2.75-5.03 2.75 5.53-5.88 2.66 2.75 4.95-2.75-5.53 5.88z"/></svg>
+            <span>Messenger</span>
+          </button>
+
+          <!-- Native Share Sheet (Instagram, etc.) -->
+          <button onclick="window.shareNative()" class="flex items-center justify-center gap-2 p-3 bg-gradient-to-r from-pink-500 via-rose-500 to-amber-500 text-white rounded-xl shadow-sm transition active:scale-95">
+            <span>📱</span>
+            <span>Mais Apps</span>
+          </button>
+        </div>
+
+        <!-- Copy Formatted Message Section -->
+        <div class="bg-gray-50 rounded-2xl p-3.5 border border-gray-200">
+          <div class="flex items-center justify-between mb-2">
+            <span class="text-xs font-bold text-gray-700">📝 Mensagem Pronta p/ Postar:</span>
+            <button onclick="window.copyShareText()" class="text-xs px-2.5 py-1 bg-yellow-400 hover:bg-yellow-500 text-gray-950 font-extrabold rounded-lg shadow-sm transition active:scale-95 flex items-center gap-1">
+              <span>📋 Copiar Texto</span>
+            </button>
+          </div>
+          <textarea id="shareModalTextPreview" readonly rows="4" class="w-full text-[11px] sm:text-xs text-gray-700 bg-white p-2.5 rounded-xl border border-gray-200 outline-none resize-none font-mono"></textarea>
+        </div>
+
+        <!-- Copy Link Only -->
+        <button onclick="window.copyShareLinkOnly()" class="w-full py-2.5 px-4 bg-gray-100 hover:bg-gray-200 text-gray-800 font-bold text-xs rounded-xl transition flex items-center justify-center gap-1.5 border border-gray-200 active:scale-95">
+          <span>🔗</span>
+          <span>Copiar Apenas o Link da Oferta</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Scripts -->
   <script src="../assets/js/supabase-init.js"></script>
   <script src="../assets/js/achadinhos-data.js"></script>

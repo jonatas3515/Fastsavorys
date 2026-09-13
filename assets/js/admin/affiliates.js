@@ -163,6 +163,8 @@ window.AffiliatesModule = (function () {
           <td class="p-3 text-center">${activeBadge}</td>
           <td class="p-3 text-right">
             <div class="flex items-center justify-end gap-1.5">
+              <button onclick="AffiliatesModule.openShareModal(${item.id})" 
+                      class="p-1.5 text-green-600 hover:bg-green-50 rounded-lg text-xs font-medium" title="Compartilhar Oferta">📤</button>
               <a href="${escapeHtml(item.affiliate_url)}" target="_blank" rel="noopener noreferrer" 
                  class="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg text-xs" title="Testar link no ML">🔗</a>
               <button onclick="AffiliatesModule.openEditModal(${item.id})" 
@@ -595,6 +597,108 @@ window.AffiliatesModule = (function () {
     textarea.setSelectionRange(newCursor, newCursor);
   }
 
+  // --- SHARE FUNCTIONALITY ---
+  let currentShareItem = null;
+
+  function buildShareText(item) {
+    if (!item) return '';
+    const pct = calcDiscountPercent(item.original_price, item.price_display);
+    const discountText = pct > 0 ? ` (${pct}% OFF)` : '';
+    const origPriceText = item.original_price ? `~${item.original_price}~ ➔ ` : '';
+    const descText = item.description ? `\n${item.description}\n` : '';
+
+    return `🛍️ *ACHADINHO FASTSAVORY'S* ⭐\n🔥 *${item.title}*\n${descText}\n💰 *Preço:* ${origPriceText}*${item.price_display || 'Confira no link'}*${discountText}\n\n👉 *COMPRE COM DESCONTO AQUI:*\n${item.affiliate_url}\n\n✨ FastSavory's • Recomendações Mercado Livre\n🌐 https://fastsavorys.vercel.app/pages/achadinhos.html`;
+  }
+
+  function openShareModal(id) {
+    const item = productsList.find(p => p.id == id);
+    if (!item) return;
+
+    currentShareItem = item;
+    const modal = document.getElementById('affiliateShareModal');
+    if (!modal) return;
+
+    document.getElementById('shareModalProductImg').src = item.image_url || '../assets/img/fast-logo.png';
+    document.getElementById('shareModalProductTitle').textContent = item.title;
+    document.getElementById('shareModalProductPrice').textContent = item.price_display || 'Ver Preço';
+
+    const pct = calcDiscountPercent(item.original_price, item.price_display);
+    const discBadge = document.getElementById('shareModalProductDiscount');
+    if (discBadge) {
+      if (pct > 0) {
+        discBadge.textContent = `🔥 ${pct}% OFF`;
+        discBadge.classList.remove('hidden');
+      } else {
+        discBadge.classList.add('hidden');
+      }
+    }
+
+    const shareMsg = buildShareText(item);
+    document.getElementById('shareModalTextPreview').value = shareMsg;
+
+    modal.classList.remove('hidden');
+  }
+
+  function closeShareModal() {
+    const modal = document.getElementById('affiliateShareModal');
+    if (modal) modal.classList.add('hidden');
+  }
+
+  function shareToWhatsApp() {
+    if (!currentShareItem) return;
+    const msg = buildShareText(currentShareItem);
+    const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank');
+  }
+
+  function shareToTelegram() {
+    if (!currentShareItem) return;
+    const msg = buildShareText(currentShareItem);
+    const url = `https://t.me/share/url?url=${encodeURIComponent(currentShareItem.affiliate_url)}&text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank');
+  }
+
+  function shareToFacebook() {
+    if (!currentShareItem) return;
+    const url = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(currentShareItem.affiliate_url)}`;
+    window.open(url, '_blank');
+  }
+
+  async function shareNative() {
+    if (!currentShareItem) return;
+    const msg = buildShareText(currentShareItem);
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: currentShareItem.title,
+          text: msg,
+          url: currentShareItem.affiliate_url
+        });
+      } catch (e) {}
+    } else {
+      copyShareText();
+    }
+  }
+
+  function copyShareText() {
+    if (!currentShareItem) return;
+    const msg = buildShareText(currentShareItem);
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(msg).then(() => {
+        alert('✨ Mensagem completa copiada! Agora basta colar no WhatsApp, Instagram, Telegram ou onde preferir.');
+      });
+    }
+  }
+
+  function copyShareLinkOnly() {
+    if (!currentShareItem) return;
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(currentShareItem.affiliate_url).then(() => {
+        alert('🔗 Link de afiliado copiado!');
+      });
+    }
+  }
+
   return {
     init: loadProducts,
     loadProducts,
@@ -614,6 +718,14 @@ window.AffiliatesModule = (function () {
     fetchProductDataFromML,
     insertBullet,
     pasteFromClipboard,
-    detectCategoryClient
+    detectCategoryClient,
+    openShareModal,
+    closeShareModal,
+    shareToWhatsApp,
+    shareToTelegram,
+    shareToFacebook,
+    shareNative,
+    copyShareText,
+    copyShareLinkOnly
   };
 })();

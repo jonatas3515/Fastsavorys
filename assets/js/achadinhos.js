@@ -183,23 +183,139 @@
                 <span class="text-lg sm:text-xl font-extrabold text-gray-900">${escapeHtml(item.price_display || 'Ver Preço')}</span>
               </div>
 
-              <a 
-                href="${escapeHtml(item.affiliate_url)}" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                class="w-full py-2.5 px-4 bg-gradient-to-r from-yellow-400 via-amber-400 to-yellow-500 hover:from-yellow-500 hover:to-amber-500 text-gray-900 font-bold text-xs sm:text-sm rounded-xl shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-1.5 text-center group-hover:ring-2 group-hover:ring-yellow-400 group-hover:ring-offset-1"
-              >
-                <span>Ver no Mercado Livre</span>
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                </svg>
-              </a>
+              <div class="flex items-center gap-2">
+                <a 
+                  href="${escapeHtml(item.affiliate_url)}" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  class="flex-1 py-2.5 px-3 bg-gradient-to-r from-yellow-400 via-amber-400 to-yellow-500 hover:from-yellow-500 hover:to-amber-500 text-gray-900 font-extrabold text-xs sm:text-sm rounded-xl shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-1.5 text-center group-hover:ring-2 group-hover:ring-yellow-400 group-hover:ring-offset-1"
+                >
+                  <span>Ver no Mercado Livre</span>
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                  </svg>
+                </a>
+                <button 
+                  type="button" 
+                  onclick="window.openShareModal(${item.id})"
+                  title="Compartilhar no WhatsApp, Telegram, etc."
+                  class="p-2.5 bg-gray-100 hover:bg-yellow-100 text-gray-700 hover:text-gray-950 border border-gray-200 hover:border-yellow-300 rounded-xl transition flex items-center justify-center flex-shrink-0 shadow-sm active:scale-95"
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                  </svg>
+                </button>
+              </div>
             </div>
           </div>
         </div>
       `;
     }).join('');
   }
+
+  // --- SHARE FUNCTIONALITY ---
+  let currentShareItem = null;
+
+  function buildShareText(item) {
+    if (!item) return '';
+    const pct = calcDiscountPercent(item.original_price, item.price_display);
+    const discountText = pct > 0 ? ` (${pct}% OFF)` : '';
+    const origPriceText = item.original_price ? `~${item.original_price}~ ➔ ` : '';
+    const descText = item.description ? `\n${item.description}\n` : '';
+
+    return `🛍️ *ACHADINHO FASTSAVORY'S* ⭐\n🔥 *${item.title}*\n${descText}\n💰 *Preço:* ${origPriceText}*${item.price_display || 'Confira no link'}*${discountText}\n\n👉 *COMPRE COM DESCONTO AQUI:*\n${item.affiliate_url}\n\n✨ FastSavory's • Recomendações Mercado Livre\n🌐 https://fastsavorys.vercel.app/pages/achadinhos.html`;
+  }
+
+  window.openShareModal = function (id) {
+    const item = affiliateProducts.find(p => p.id == id);
+    if (!item) return;
+
+    currentShareItem = item;
+    const modal = document.getElementById('affiliateShareModal');
+    if (!modal) return;
+
+    document.getElementById('shareModalProductImg').src = item.image_url || '../assets/img/fast-logo.png';
+    document.getElementById('shareModalProductTitle').textContent = item.title;
+    document.getElementById('shareModalProductPrice').textContent = item.price_display || 'Ver Preço';
+
+    const pct = calcDiscountPercent(item.original_price, item.price_display);
+    const discBadge = document.getElementById('shareModalProductDiscount');
+    if (discBadge) {
+      if (pct > 0) {
+        discBadge.textContent = `🔥 ${pct}% OFF`;
+        discBadge.classList.remove('hidden');
+      } else {
+        discBadge.classList.add('hidden');
+      }
+    }
+
+    const shareMsg = buildShareText(item);
+    document.getElementById('shareModalTextPreview').value = shareMsg;
+
+    modal.classList.remove('hidden');
+  };
+
+  window.closeAffiliateShareModal = function () {
+    const modal = document.getElementById('affiliateShareModal');
+    if (modal) modal.classList.add('hidden');
+  };
+
+  window.shareToWhatsApp = function () {
+    if (!currentShareItem) return;
+    const msg = buildShareText(currentShareItem);
+    const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank');
+  };
+
+  window.shareToTelegram = function () {
+    if (!currentShareItem) return;
+    const msg = buildShareText(currentShareItem);
+    const url = `https://t.me/share/url?url=${encodeURIComponent(currentShareItem.affiliate_url)}&text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank');
+  };
+
+  window.shareToFacebook = function () {
+    if (!currentShareItem) return;
+    const url = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(currentShareItem.affiliate_url)}`;
+    window.open(url, '_blank');
+  };
+
+  window.shareNative = async function () {
+    if (!currentShareItem) return;
+    const msg = buildShareText(currentShareItem);
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: currentShareItem.title,
+          text: msg,
+          url: currentShareItem.affiliate_url
+        });
+      } catch (e) {
+        // User cancelled or not supported
+      }
+    } else {
+      window.copyShareText();
+    }
+  };
+
+  window.copyShareText = function () {
+    if (!currentShareItem) return;
+    const msg = buildShareText(currentShareItem);
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(msg).then(() => {
+        alert('✨ Mensagem completa copiada! Agora basta colar no WhatsApp, Instagram, Telegram ou onde preferir.');
+      });
+    }
+  };
+
+  window.copyShareLinkOnly = function () {
+    if (!currentShareItem) return;
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(currentShareItem.affiliate_url).then(() => {
+        alert('🔗 Link de afiliado copiado!');
+      });
+    }
+  };
 
   function calcDiscountPercent(origStr, currStr) {
     if (!origStr || !currStr) return 0;
