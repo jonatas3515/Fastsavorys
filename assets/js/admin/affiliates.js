@@ -243,7 +243,7 @@ window.AffiliatesModule = (function () {
     }
 
     try {
-      const resp = await fetch(`/api/meli-product?url=${encodeURIComponent(rawUrl)}`);
+      const resp = await fetch(`/api/check-affiliate-links?action=fetch&url=${encodeURIComponent(rawUrl)}`);
       const data = await resp.json();
 
       if (!resp.ok || !data.success) {
