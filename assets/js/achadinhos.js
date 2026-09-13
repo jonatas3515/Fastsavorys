@@ -143,17 +143,10 @@
       if (item.badge_color === 'blue') badgeStyle = 'bg-blue-100 text-blue-950 border-blue-300 font-bold';
       if (item.badge_color === 'purple') badgeStyle = 'bg-purple-100 text-purple-950 border-purple-300 font-bold';
       if (item.badge_color === 'pink') badgeStyle = 'bg-pink-100 text-pink-950 border-pink-300 font-bold';
-      if (item.badge_color === 'fast_seal') badgeStyle = 'bg-gradient-to-r from-pink-600 to-purple-600 text-white font-extrabold shadow-sm border-transparent';
 
-      // Selo FastSavory's especial
+      // Selo FastSavory's
       const fastSealBadgeHtml = isFastPick
-        ? `<span class="inline-flex items-center gap-1 px-2.5 py-0.5 text-xs font-black rounded-full bg-gradient-to-r from-pink-600 via-purple-600 to-indigo-600 text-white shadow-md tracking-wide flex-shrink-0 animate-pulse">✨ Selo FastSavory's</span>`
-        : '';
-
-      const fastPickBannerHtml = isFastPick
-        ? `<div class="inline-flex items-center gap-1.5 px-2.5 py-0.5 mb-2 rounded-lg bg-gradient-to-r from-pink-50 to-purple-50 border border-pink-200 text-[11px] font-extrabold text-pink-700 shadow-2xs">
-             <span>👑</span> <span>Testado & Recomendado FastSavory's</span>
-           </div>`
+        ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-black rounded-full bg-gradient-to-r from-pink-600 to-purple-600 text-white shadow-sm flex-shrink-0">✨ Selo Fast</span>`
         : '';
 
       // Evita duplicidade de badge se a tag for apenas a indicação do mesmo desconto
@@ -174,28 +167,19 @@
         ? `<span class="text-xs text-gray-400 line-through mr-1.5">${escapeHtml(item.original_price)}</span>` 
         : '';
 
-      const cardClasses = isFastPick
-        ? "bg-white rounded-2xl shadow-md hover:shadow-2xl transition-all duration-300 border-2 border-pink-400 overflow-hidden flex flex-col group transform hover:-translate-y-1 relative ring-1 ring-purple-300/40"
-        : "bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 overflow-hidden flex flex-col group transform hover:-translate-y-1 relative";
-
-      const imageContainerClasses = isFastPick
-        ? "relative w-full pt-[80%] bg-gradient-to-br from-pink-50/90 via-purple-50/50 to-white overflow-hidden border-b-2 border-pink-300"
-        : "relative w-full pt-[80%] bg-gray-50 overflow-hidden";
-
-      const imageInnerBorder = isFastPick
-        ? `<div class="absolute inset-1.5 rounded-xl border-2 border-pink-400/50 pointer-events-none z-0"></div>`
-        : '';
+      const cardBorder = isFastPick 
+        ? 'border-2 border-pink-500 shadow-md ring-2 ring-purple-500/20' 
+        : 'border border-gray-100 shadow-sm';
 
       return `
-        <div class="${cardClasses}">
-          <!-- Imagem com Borda Diferenciada e Badges -->
-          <div class="${imageContainerClasses}">
-            ${imageInnerBorder}
+        <div class="bg-white rounded-2xl ${cardBorder} hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col group transform hover:-translate-y-1">
+          <!-- Imagem com Badges Horizontais Lado a Lado -->
+          <div class="relative w-full pt-[80%] bg-gray-50 overflow-hidden ${isFastPick ? 'border-b-2 border-pink-400' : ''}">
             <img 
               src="${escapeHtml(item.image_url)}" 
               alt="${escapeHtml(item.title)}" 
               loading="lazy"
-              class="absolute inset-0 w-full h-full object-contain p-3 group-hover:scale-105 transition-transform duration-300 relative z-1"
+              class="absolute inset-0 w-full h-full object-contain p-3 group-hover:scale-105 transition-transform duration-300"
               onerror="this.src='../assets/img/fast-logo.png'; this.className='absolute inset-0 w-full h-full object-contain p-8 opacity-40';"
             />
             <!-- Badges Lado a Lado -->
@@ -209,7 +193,6 @@
           <!-- Conteúdo -->
           <div class="p-4 sm:p-5 flex-1 flex flex-col justify-between">
             <div>
-              ${fastPickBannerHtml}
               <h3 class="font-bold text-gray-800 text-sm sm:text-base leading-snug line-clamp-2 group-hover:text-amber-600 transition-colors">
                 ${escapeHtml(item.title)}
               </h3>
