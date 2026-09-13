@@ -226,6 +226,78 @@ window.AffiliatesModule = (function () {
     }
   }
 
+  async function fetchProductDataFromML() {
+    const urlInput = document.getElementById('affiliateUrlInput');
+    const btn = document.getElementById('affiliateAutoFetchBtn');
+    if (!urlInput || !urlInput.value.trim()) {
+      alert('Por favor, cole primeiro o link de afiliado ou do produto no campo de URL!');
+      urlInput?.focus();
+      return;
+    }
+
+    const rawUrl = urlInput.value.trim();
+    const originalBtnText = btn ? btn.innerHTML : '';
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = `<span>⏳ Buscando dados...</span>`;
+    }
+
+    try {
+      const resp = await fetch(`/api/meli-product?url=${encodeURIComponent(rawUrl)}`);
+      const data = await resp.json();
+
+      if (!resp.ok || !data.success) {
+        throw new Error(data.error || 'Não foi possível extrair os dados do anúncio.');
+      }
+
+      const info = data.data;
+
+      // Preenche automaticamente o título se não tiver
+      const titleEl = document.getElementById('affiliateTitleInput');
+      if (info.title && (!titleEl.value.trim() || titleEl.value.trim() === '')) {
+        titleEl.value = info.title;
+      }
+
+      // Preenche foto
+      if (info.image_url) {
+        document.getElementById('affiliateImageUrlInput').value = info.image_url;
+        updateImagePreview(info.image_url);
+      }
+
+      // Preenche preço atual
+      if (info.price_display) {
+        document.getElementById('affiliatePriceInput').value = info.price_display;
+      }
+
+      // Preenche preço original riscado
+      if (info.original_price) {
+        document.getElementById('affiliateOriginalPriceInput').value = info.original_price;
+      }
+
+      // Preenche tag se tiver desconto significativo
+      if (info.discount_percent > 0 && !document.getElementById('affiliateTagInput').value.trim()) {
+        document.getElementById('affiliateTagInput').value = `⚡ ${info.discount_percent}% OFF`;
+      }
+
+      if (info.is_active === false) {
+        document.getElementById('affiliateActiveInput').checked = false;
+        alert('⚠️ Atenção: Este anúncio parece estar pausado ou finalizado no Mercado Livre.');
+      }
+
+      if (window.showToast) {
+        window.showToast('✨ Dados do anúncio preenchidos automaticamente!', 'success');
+      }
+    } catch (err) {
+      console.warn('[AutoFetch ML] Erro:', err);
+      alert(`Aviso: ${err.message || 'Não foi possível buscar automaticamente'}. Você ainda pode preencher os campos manualmente.`);
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = originalBtnText;
+      }
+    }
+  }
+
   async function saveProduct(event) {
     if (event) event.preventDefault();
 
@@ -450,6 +522,7 @@ window.AffiliatesModule = (function () {
     clearFilters,
     checkAllLinksHealth,
     closeHealthModal,
-    toggleProductActive
+    toggleProductActive,
+    fetchProductDataFromML
   };
 })();
