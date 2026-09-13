@@ -283,13 +283,19 @@ window.AffiliatesModule = (function () {
         document.getElementById('affiliateTagInput').value = `⚡ ${info.discount_percent}% OFF`;
       }
 
+      // Preenche categoria detectada automaticamente
+      const detectedCat = info.category || detectCategoryClient(info.title || '');
+      if (detectedCat && document.getElementById('affiliateCategoryInput')) {
+        document.getElementById('affiliateCategoryInput').value = detectedCat;
+      }
+
       if (info.is_active === false) {
         document.getElementById('affiliateActiveInput').checked = false;
         alert('⚠️ Atenção: Este anúncio parece estar pausado ou finalizado no Mercado Livre.');
       }
 
       if (window.showToast) {
-        window.showToast('✨ Dados do anúncio preenchidos automaticamente!', 'success');
+        window.showToast('✨ Dados do anúncio e categoria preenchidos automaticamente!', 'success');
       }
     } catch (err) {
       console.warn('[AutoFetch ML] Erro:', err);
@@ -511,6 +517,67 @@ window.AffiliatesModule = (function () {
       .replace(/'/g, '&#039;');
   }
 
+  async function pasteFromClipboard(targetInputId = 'affiliateUrlInput') {
+    const input = document.getElementById(targetInputId);
+    if (!input) return;
+
+    try {
+      if (navigator.clipboard && navigator.clipboard.readText) {
+        const text = await navigator.clipboard.readText();
+        if (text && text.trim()) {
+          input.value = text.trim();
+          input.focus();
+          if (window.showToast) {
+            window.showToast('📋 Link colado da área de transferência!', 'success');
+          }
+          return;
+        }
+      }
+      input.focus();
+      input.select();
+      alert('Pressione Ctrl + V para colar o link copiado.');
+    } catch (err) {
+      console.warn('[Paste] Erro ao ler área de transferência:', err);
+      input.focus();
+      input.select();
+      alert('Pressione Ctrl + V para colar.');
+    }
+  }
+
+  function detectCategoryClient(title = '') {
+    const text = (title || '').toLowerCase();
+    const rules = [
+      { category: 'joias', keywords: ['relogio', 'relógio', 'smartwatch', 'pulseira', 'colar', 'brinco', 'anel', 'corrente', 'pingente', 'alianca', 'aliança', 'joia', 'jóia', 'semijoia', 'ouro 18k', 'prata 925'] },
+      { category: 'celulares', keywords: ['smartphone', 'celular', 'iphone', 'xiaomi', 'galaxy', 'motorola', 'redmi', 'poco', 'realme', 'capinha', 'pelicula celular', 'carregador tipo c', 'carregador celular', 'suporte celular', 'ring light'] },
+      { category: 'informatica', keywords: ['notebook', 'computador', 'laptop', 'macbook', 'mouse', 'teclado', 'monitor', 'impressora', 'ssd', 'memoria ram', 'pendrive', 'pen drive', 'roteador', 'placa de video', 'gamer', 'gabinete', 'tablet', 'ipad'] },
+      { category: 'eletronicos', keywords: ['smart tv', 'tv', 'televisao', 'televisão', 'alexa', 'echo dot', 'fone de ouvido', 'fone bluetooth', 'headphone', 'airpod', 'caixa de som', 'jbl', 'soundbar', 'microfone', 'projetor', 'camera digital', 'drone', 'power bank'] },
+      { category: 'confeitaria', keywords: ['confeitaria', 'forma de bolo', 'forma silicone', 'bico de confeitar', 'bailarina bolo', 'espatula bolo', 'espátula bolo', 'cortador bolo', 'pasta americana', 'corante alimenticio', 'assadeira bolo'] },
+      { category: 'cozinha', keywords: ['air fryer', 'airfryer', 'fritadeira', 'panela', 'panelas', 'frigideira', 'liquidificador', 'batedeira', 'microondas', 'micro-ondas', 'fogao', 'fogão', 'cooktop', 'forno', 'cafeteira', 'nespresso', 'sanduicheira', 'grill', 'mixer', 'processador', 'chaleira', 'faqueiro', 'faca chef', 'prato', 'copo', 'talher', 'balanca cozinha', 'balança digital', 'garrafa termica'] },
+      { category: 'embalagens', keywords: ['embalagem', 'embalagens', 'caixa papelao', 'caixa papelão', 'caixa presente', 'saco kraft', 'sacola kraft', 'sacola papel', 'saquinho', 'fita adesiva', 'plastico bolha', 'saco plastico', 'descartavel', 'descartável', 'copo descartavel', 'marmita', 'kit festa'] },
+      { category: 'supermercado', keywords: ['whisky', 'gin', 'vodka', 'cerveja', 'vinho', 'espumante', 'refrigerante', 'suco', 'cafe em graos', 'café', 'capsula cafe', 'cha', 'chá', 'azeite', 'arroz', 'feijao', 'feijão', 'chocolate', 'bombom', 'biscoito', 'bolacha', 'doce de leite', 'nutella', 'snack', 'whey', 'creatina', 'suplemento', 'tempero', 'molho', 'bebida', 'alimento'] },
+      { category: 'perfumaria', keywords: ['perfume', 'colonia', 'colônia', 'eau de parfum', 'desodorante', 'hidratante', 'sabonete', 'shampoo', 'condicionador', 'mascara capilar', 'oleo capilar', 'skincare', 'serum facial', 'protetor solar', 'maquiagem', 'batom', 'base facial', 'rimel', 'delineador', 'esmalte'] },
+      { category: 'banho', keywords: ['toalha de banho', 'toalha de rosto', 'jogo de toalhas', 'lencol', 'lençol', 'edredom', 'cobertor', 'manta', 'travesseiro', 'fronha', 'cobre leito', 'jogo de cama', 'cortina banheiro', 'tapete banheiro'] },
+      { category: 'moda', keywords: ['camisa', 'camiseta', 'calca', 'calça', 'vestido', 'saia', 'bermuda', 'short', 'tenis', 'tênis', 'sapato', 'sandalia', 'sandália', 'bota', 'chinelo', 'havaianas', 'bolsa', 'mochila', 'carteira', 'cinto', 'jaqueta', 'moletom', 'casaco', 'biquini', 'biquíni', 'lingerie', 'meia', 'cueca', 'sutia', 'oculos de sol'] },
+      { category: 'brinquedos', keywords: ['brinquedo', 'brinquedos', 'boneca', 'boneco', 'carrinho', 'lego', 'jogo de tabuleiro', 'quebra cabeca', 'quebra-cabeça', 'pelucia', 'pelúcia', 'nerf', 'patinete', 'barbie', 'hot wheels', 'massinha', 'slime'] },
+      { category: 'bebes', keywords: ['bebe', 'bebê', 'fralda', 'pampers', 'huggies', 'mamadeira', 'chupeta', 'carrinho de bebe', 'berco', 'berço', 'body bebe', 'macacao bebe', 'mordedor', 'babador', 'lenço umedecido', 'cadeirinha carro'] },
+      { category: 'petshop', keywords: ['racao', 'ração', 'cachorro', 'gato', 'pet', 'coleira', 'guia cachorro', 'arranhador', 'caminha pet', 'cama pet', 'petisco', 'comedouro', 'bebedouro pet', 'areia gato', 'tapete higienico', 'shampoo pet'] },
+      { category: 'veiculos', keywords: ['automotivo', 'carro', 'moto', 'motocicleta', 'pneu', 'capacete', 'farol', 'oleo motor', 'óleo motor', 'som automotivo', 'camera de re', 'capa automotiva', 'cera automotiva'] },
+      { category: 'livros', keywords: ['livro', 'gibi', 'manga', 'mangá', 'quadrinhos', 'caderno', 'caneta', 'lapis de cor', 'estojo', 'papelaria', 'planner', 'agenda', 'marca texto', 'resma papel'] },
+      { category: 'construcao', keywords: ['furadeira', 'parafusadeira', 'martelete', 'martelo', 'chave de fenda', 'chave phillips', 'trena', 'serra eletrica', 'serra circular', 'esmerilhadeira', 'ferramenta', 'jogo de ferramentas', 'torneira', 'chuveiro', 'tomada', 'extensao eletrica', 'lampada led', 'tinta parede'] },
+      { category: 'presentes', keywords: ['presente', 'lembrancinha', 'caneca personalizada', 'kit presente', 'cesta cafe da manha', 'quadro decorativo', 'luminaria 3d', 'porta retrato', 'chaveiro'] },
+      { category: 'utilidades', keywords: ['organizador', 'pote hermetico', 'potes hermeticos', 'vassoura', 'mop', 'rodo', 'dispenser', 'lixeira', 'cabide', 'varal', 'cesto organizador', 'tapete', 'cortina', 'almofada', 'decoracao', 'decoração', 'prateleira', 'espelho', 'umidificador'] }
+    ];
+
+    for (const rule of rules) {
+      for (const kw of rule.keywords) {
+        if (text.includes(kw)) {
+          return rule.category;
+        }
+      }
+    }
+    return 'utilidades';
+  }
+
   function insertBullet(symbol = '🔸') {
     const textarea = document.getElementById('affiliateDescriptionInput');
     if (!textarea) return;
@@ -545,6 +612,8 @@ window.AffiliatesModule = (function () {
     closeHealthModal,
     toggleProductActive,
     fetchProductDataFromML,
-    insertBullet
+    insertBullet,
+    pasteFromClipboard,
+    detectCategoryClient
   };
 })();
