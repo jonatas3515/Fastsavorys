@@ -76,118 +76,174 @@
   <!-- Main Content & Filters -->
   <main class="flex-1 max-w-7xl mx-auto w-full px-4 py-6 sm:py-8">
 
-    <!-- Categories Filter Strip (Horizontal Scrollable) -->
-    <div class="flex items-center gap-2 overflow-x-auto pb-3 mb-6 scrollbar-hide text-xs sm:text-sm" style="scroll-behavior:smooth;-webkit-overflow-scrolling:touch;">
-      <button 
-        class="affiliate-category-btn px-4 py-2 rounded-full bg-yellow-400 text-gray-900 font-bold shadow-md whitespace-nowrap transition flex-shrink-0"
-        data-category="all">
-        🏷️ Todas as Ofertas
-      </button>
-      <button 
-        class="affiliate-category-btn px-4 py-2 rounded-full bg-white text-gray-700 border border-gray-200 hover:bg-gray-100 whitespace-nowrap transition flex-shrink-0"
-        data-category="cozinha">
-        🍳 Cozinha & Eletro
-      </button>
-      <button 
-        class="affiliate-category-btn px-4 py-2 rounded-full bg-white text-gray-700 border border-gray-200 hover:bg-gray-100 whitespace-nowrap transition flex-shrink-0"
-        data-category="confeitaria">
-        🍰 Confeitaria & Formas
-      </button>
-      <button 
-        class="affiliate-category-btn px-4 py-2 rounded-full bg-white text-gray-700 border border-gray-200 hover:bg-gray-100 whitespace-nowrap transition flex-shrink-0"
-        data-category="embalagens">
-        📦 Embalagens & Festas
-      </button>
-      <button 
-        class="affiliate-category-btn px-4 py-2 rounded-full bg-white text-gray-700 border border-gray-200 hover:bg-gray-100 whitespace-nowrap transition flex-shrink-0"
-        data-category="utilidades">
-        🏠 Casa & Utilidades
-      </button>
-      <button 
-        class="affiliate-category-btn px-4 py-2 rounded-full bg-white text-gray-700 border border-gray-200 hover:bg-gray-100 whitespace-nowrap transition flex-shrink-0"
-        data-category="moda">
-        👗 Moda & Calçados
-      </button>
-      <button 
-        class="affiliate-category-btn px-4 py-2 rounded-full bg-white text-gray-700 border border-gray-200 hover:bg-gray-100 whitespace-nowrap transition flex-shrink-0"
-        data-category="supermercado">
-        🛒 Supermercado & Alimentos
-      </button>
-      <button 
-        class="affiliate-category-btn px-4 py-2 rounded-full bg-white text-gray-700 border border-gray-200 hover:bg-gray-100 whitespace-nowrap transition flex-shrink-0"
-        data-category="perfumaria">
-        🧴 Perfumaria & Beleza
-      </button>
-      <button 
-        class="affiliate-category-btn px-4 py-2 rounded-full bg-white text-gray-700 border border-gray-200 hover:bg-gray-100 whitespace-nowrap transition flex-shrink-0"
-        data-category="banho">
-        🚿 Cama, Mesa & Banho
-      </button>
-      <button 
-        class="affiliate-category-btn px-4 py-2 rounded-full bg-white text-gray-700 border border-gray-200 hover:bg-gray-100 whitespace-nowrap transition flex-shrink-0"
-        data-category="eletronicos">
-        ⚡ Eletrônicos & Áudio
-      </button>
-      <button 
-        class="affiliate-category-btn px-4 py-2 rounded-full bg-white text-gray-700 border border-gray-200 hover:bg-gray-100 whitespace-nowrap transition flex-shrink-0"
-        data-category="celulares">
-        📱 Celulares & Telefonia
-      </button>
-      <button 
-        class="affiliate-category-btn px-4 py-2 rounded-full bg-white text-gray-700 border border-gray-200 hover:bg-gray-100 whitespace-nowrap transition flex-shrink-0"
-        data-category="informatica">
-        💻 Informática & Acessórios
-      </button>
-      <button 
-        class="affiliate-category-btn px-4 py-2 rounded-full bg-white text-gray-700 border border-gray-200 hover:bg-gray-100 whitespace-nowrap transition flex-shrink-0"
-        data-category="brinquedos">
-        🧸 Brinquedos & Jogos
-      </button>
-      <button 
-        class="affiliate-category-btn px-4 py-2 rounded-full bg-white text-gray-700 border border-gray-200 hover:bg-gray-100 whitespace-nowrap transition flex-shrink-0"
-        data-category="presentes">
-        🎁 Presentes & Lembrancinhas
-      </button>
-      <button 
-        class="affiliate-category-btn px-4 py-2 rounded-full bg-white text-gray-700 border border-gray-200 hover:bg-gray-100 whitespace-nowrap transition flex-shrink-0"
-        data-category="bebes">
-        🍼 Bebês & Maternidade
-      </button>
-      <button 
-        class="affiliate-category-btn px-4 py-2 rounded-full bg-white text-gray-700 border border-gray-200 hover:bg-gray-100 whitespace-nowrap transition flex-shrink-0"
-        data-category="veiculos">
-        🚗 Veículos & Acessórios
-      </button>
-      <button 
-        class="affiliate-category-btn px-4 py-2 rounded-full bg-white text-gray-700 border border-gray-200 hover:bg-gray-100 whitespace-nowrap transition flex-shrink-0"
-        data-category="livros">
-        📚 Livros & Papelaria
-      </button>
-      <button 
-        class="affiliate-category-btn px-4 py-2 rounded-full bg-white text-gray-700 border border-gray-200 hover:bg-gray-100 whitespace-nowrap transition flex-shrink-0"
-        data-category="petshop">
-        🐶 Pet Shop
-      </button>
-      <button 
-        class="affiliate-category-btn px-4 py-2 rounded-full bg-white text-gray-700 border border-gray-200 hover:bg-gray-100 whitespace-nowrap transition flex-shrink-0"
-        data-category="construcao">
-        🔨 Ferramentas & Construção
-      </button>
+    <!-- Mobile Category Select Dropdown (visible on mobile < md) -->
+    <div class="block md:hidden mb-6 bg-white p-3.5 rounded-2xl shadow-sm border border-gray-200">
+      <label for="affiliateMobileCategorySelect" class="block text-xs font-bold text-gray-600 uppercase tracking-wider mb-1.5 flex items-center gap-1.5">
+        <span>📂</span>
+        <span>Categorias:</span>
+      </label>
+      <div class="relative">
+        <select id="affiliateMobileCategorySelect" class="w-full appearance-none bg-yellow-50 border border-yellow-300 text-gray-900 font-bold text-sm rounded-xl px-4 py-2.5 pr-10 focus:outline-none focus:ring-2 focus:ring-yellow-500 shadow-inner">
+          <option value="all">🏷️ Todas as Ofertas</option>
+          <option value="cozinha">🍳 Cozinha & Eletro</option>
+          <option value="confeitaria">🍰 Confeitaria & Formas</option>
+          <option value="embalagens">📦 Embalagens & Festas</option>
+          <option value="utilidades">🏠 Casa & Utilidades</option>
+          <option value="moda">👗 Moda & Calçados</option>
+          <option value="joias">⌚ Joias & Relógios</option>
+          <option value="supermercado">🛒 Supermercado & Alimentos</option>
+          <option value="perfumaria">🧴 Perfumaria & Beleza</option>
+          <option value="banho">🚿 Cama, Mesa & Banho</option>
+          <option value="eletronicos">⚡ Eletrônicos & Áudio</option>
+          <option value="celulares">📱 Celulares & Telefonia</option>
+          <option value="informatica">💻 Informática & Acessórios</option>
+          <option value="brinquedos">🧸 Brinquedos & Jogos</option>
+          <option value="presentes">🎁 Presentes & Lembrancinhas</option>
+          <option value="bebes">🍼 Bebês & Maternidade</option>
+          <option value="veiculos">🚗 Veículos & Acessórios</option>
+          <option value="livros">📚 Livros & Papelaria</option>
+          <option value="petshop">🐶 Pet Shop</option>
+          <option value="construcao">🔨 Ferramentas & Construção</option>
+        </select>
+        <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-700">
+          <svg class="w-4 h-4 fill-current" viewBox="0 0 20 20"><path d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"/></svg>
+        </div>
+      </div>
     </div>
 
-    <!-- Products Grid -->
-    <div 
-      id="affiliateProductsGrid" 
-      class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6"
-    >
-      <!-- Cards rendered via JS -->
-    </div>
+    <!-- 2-Column Layout on Desktop (md+) -->
+    <div class="flex flex-col md:flex-row gap-6 sm:gap-8 items-start">
+      <!-- Left Sidebar (Desktop only) -->
+      <aside class="hidden md:block w-64 lg:w-72 flex-shrink-0 sticky top-20">
+        <div class="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
+          <div class="flex items-center justify-between pb-3 mb-3 border-b border-gray-100">
+            <h3 class="font-extrabold text-gray-900 text-sm uppercase tracking-wider flex items-center gap-2">
+              <span>📂</span> Categorias
+            </h3>
+            <span class="text-[10px] bg-yellow-100 text-yellow-800 font-bold px-2 py-0.5 rounded-full">Mercado Livre</span>
+          </div>
+          <nav class="flex flex-col space-y-1 max-h-[calc(100vh-140px)] overflow-y-auto pr-1">
+            <button 
+              class="affiliate-category-btn text-left px-3.5 py-2.5 rounded-xl bg-yellow-400 text-gray-950 font-bold shadow-sm transition flex items-center gap-2 text-sm w-full"
+              data-category="all">
+              <span>🏷️</span> <span>Todas as Ofertas</span>
+            </button>
+            <button 
+              class="affiliate-category-btn text-left px-3.5 py-2.5 rounded-xl text-gray-700 hover:bg-gray-100 transition flex items-center gap-2 text-sm w-full"
+              data-category="cozinha">
+              <span>🍳</span> <span>Cozinha & Eletro</span>
+            </button>
+            <button 
+              class="affiliate-category-btn text-left px-3.5 py-2.5 rounded-xl text-gray-700 hover:bg-gray-100 transition flex items-center gap-2 text-sm w-full"
+              data-category="confeitaria">
+              <span>🍰</span> <span>Confeitaria & Formas</span>
+            </button>
+            <button 
+              class="affiliate-category-btn text-left px-3.5 py-2.5 rounded-xl text-gray-700 hover:bg-gray-100 transition flex items-center gap-2 text-sm w-full"
+              data-category="embalagens">
+              <span>📦</span> <span>Embalagens & Festas</span>
+            </button>
+            <button 
+              class="affiliate-category-btn text-left px-3.5 py-2.5 rounded-xl text-gray-700 hover:bg-gray-100 transition flex items-center gap-2 text-sm w-full"
+              data-category="utilidades">
+              <span>🏠</span> <span>Casa & Utilidades</span>
+            </button>
+            <button 
+              class="affiliate-category-btn text-left px-3.5 py-2.5 rounded-xl text-gray-700 hover:bg-gray-100 transition flex items-center gap-2 text-sm w-full"
+              data-category="moda">
+              <span>👗</span> <span>Moda & Calçados</span>
+            </button>
+            <button 
+              class="affiliate-category-btn text-left px-3.5 py-2.5 rounded-xl text-gray-700 hover:bg-gray-100 transition flex items-center gap-2 text-sm w-full"
+              data-category="joias">
+              <span>⌚</span> <span>Joias & Relógios</span>
+            </button>
+            <button 
+              class="affiliate-category-btn text-left px-3.5 py-2.5 rounded-xl text-gray-700 hover:bg-gray-100 transition flex items-center gap-2 text-sm w-full"
+              data-category="supermercado">
+              <span>🛒</span> <span>Supermercado & Alimentos</span>
+            </button>
+            <button 
+              class="affiliate-category-btn text-left px-3.5 py-2.5 rounded-xl text-gray-700 hover:bg-gray-100 transition flex items-center gap-2 text-sm w-full"
+              data-category="perfumaria">
+              <span>🧴</span> <span>Perfumaria & Beleza</span>
+            </button>
+            <button 
+              class="affiliate-category-btn text-left px-3.5 py-2.5 rounded-xl text-gray-700 hover:bg-gray-100 transition flex items-center gap-2 text-sm w-full"
+              data-category="banho">
+              <span>🚿</span> <span>Cama, Mesa & Banho</span>
+            </button>
+            <button 
+              class="affiliate-category-btn text-left px-3.5 py-2.5 rounded-xl text-gray-700 hover:bg-gray-100 transition flex items-center gap-2 text-sm w-full"
+              data-category="eletronicos">
+              <span>⚡</span> <span>Eletrônicos & Áudio</span>
+            </button>
+            <button 
+              class="affiliate-category-btn text-left px-3.5 py-2.5 rounded-xl text-gray-700 hover:bg-gray-100 transition flex items-center gap-2 text-sm w-full"
+              data-category="celulares">
+              <span>📱</span> <span>Celulares & Telefonia</span>
+            </button>
+            <button 
+              class="affiliate-category-btn text-left px-3.5 py-2.5 rounded-xl text-gray-700 hover:bg-gray-100 transition flex items-center gap-2 text-sm w-full"
+              data-category="informatica">
+              <span>💻</span> <span>Informática & Acessórios</span>
+            </button>
+            <button 
+              class="affiliate-category-btn text-left px-3.5 py-2.5 rounded-xl text-gray-700 hover:bg-gray-100 transition flex items-center gap-2 text-sm w-full"
+              data-category="brinquedos">
+              <span>🧸</span> <span>Brinquedos & Jogos</span>
+            </button>
+            <button 
+              class="affiliate-category-btn text-left px-3.5 py-2.5 rounded-xl text-gray-700 hover:bg-gray-100 transition flex items-center gap-2 text-sm w-full"
+              data-category="presentes">
+              <span>🎁</span> <span>Presentes & Lembrancinhas</span>
+            </button>
+            <button 
+              class="affiliate-category-btn text-left px-3.5 py-2.5 rounded-xl text-gray-700 hover:bg-gray-100 transition flex items-center gap-2 text-sm w-full"
+              data-category="bebes">
+              <span>🍼</span> <span>Bebês & Maternidade</span>
+            </button>
+            <button 
+              class="affiliate-category-btn text-left px-3.5 py-2.5 rounded-xl text-gray-700 hover:bg-gray-100 transition flex items-center gap-2 text-sm w-full"
+              data-category="veiculos">
+              <span>🚗</span> <span>Veículos & Acessórios</span>
+            </button>
+            <button 
+              class="affiliate-category-btn text-left px-3.5 py-2.5 rounded-xl text-gray-700 hover:bg-gray-100 transition flex items-center gap-2 text-sm w-full"
+              data-category="livros">
+              <span>📚</span> <span>Livros & Papelaria</span>
+            </button>
+            <button 
+              class="affiliate-category-btn text-left px-3.5 py-2.5 rounded-xl text-gray-700 hover:bg-gray-100 transition flex items-center gap-2 text-sm w-full"
+              data-category="petshop">
+              <span>🐶</span> <span>Pet Shop</span>
+            </button>
+            <button 
+              class="affiliate-category-btn text-left px-3.5 py-2.5 rounded-xl text-gray-700 hover:bg-gray-100 transition flex items-center gap-2 text-sm w-full"
+              data-category="construcao">
+              <span>🔨</span> <span>Ferramentas & Construção</span>
+            </button>
+          </nav>
+        </div>
+      </aside>
 
-    <!-- Empty State -->
-    <div id="affiliateEmptyState" class="hidden py-16 text-center">
-      <div class="text-5xl mb-3">🔍</div>
-      <h3 class="text-lg font-bold text-gray-800">Nenhum achadinho encontrado</h3>
-      <p class="text-sm text-gray-500 mt-1">Tente pesquisar com outro termo ou selecione outra categoria.</p>
+      <!-- Main Product Area (Right Column) -->
+      <div class="flex-1 min-w-0 w-full">
+        <!-- Products Grid -->
+        <div 
+          id="affiliateProductsGrid" 
+          class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4 sm:gap-6"
+        >
+          <!-- Cards rendered via JS -->
+        </div>
+
+        <!-- Empty State -->
+        <div id="affiliateEmptyState" class="hidden py-16 text-center">
+          <div class="text-5xl mb-3">🔍</div>
+          <h3 class="text-lg font-bold text-gray-800">Nenhum achadinho encontrado</h3>
+          <p class="text-sm text-gray-500 mt-1">Tente pesquisar com outro termo ou selecione outra categoria.</p>
+        </div>
+      </div>
     </div>
 
     <!-- Affiliate Social Showcase Footer Callout -->

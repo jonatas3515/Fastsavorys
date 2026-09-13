@@ -119,6 +119,7 @@ window.AffiliatesModule = (function () {
         embalagens: '📦 Embalagens',
         utilidades: '🏠 Casa & Utilidades',
         moda: '👗 Moda & Calçados',
+        joias: '⌚ Joias & Relógios',
         supermercado: '🛒 Supermercado',
         perfumaria: '🧴 Perfumaria',
         banho: '🚿 Cama, Mesa & Banho',

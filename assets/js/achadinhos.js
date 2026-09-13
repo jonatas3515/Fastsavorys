@@ -26,21 +26,46 @@
       });
     }
 
-    // Filtros de Categoria
+    // Filtros de Categoria (Desktop Sidebar)
     const categoryButtons = document.querySelectorAll('.affiliate-category-btn');
     categoryButtons.forEach(btn => {
       btn.addEventListener('click', () => {
-        categoryButtons.forEach(b => {
-          b.classList.remove('bg-yellow-400', 'text-gray-900', 'shadow-md', 'font-bold');
-          b.classList.add('bg-white', 'text-gray-700', 'border', 'border-gray-200');
-        });
-        btn.classList.add('bg-yellow-400', 'text-gray-900', 'shadow-md', 'font-bold');
-        btn.classList.remove('bg-white', 'text-gray-700', 'border', 'border-gray-200');
-
-        currentCategory = btn.getAttribute('data-category') || 'all';
-        renderProducts();
+        const cat = btn.getAttribute('data-category') || 'all';
+        setCategory(cat);
       });
     });
+
+    // Filtro de Categoria (Mobile Select Dropdown)
+    const mobileSelect = document.getElementById('affiliateMobileCategorySelect');
+    if (mobileSelect) {
+      mobileSelect.addEventListener('change', (e) => {
+        setCategory(e.target.value || 'all');
+      });
+    }
+  }
+
+  function setCategory(cat) {
+    currentCategory = cat;
+
+    // Sincroniza botões da sidebar desktop
+    const categoryButtons = document.querySelectorAll('.affiliate-category-btn');
+    categoryButtons.forEach(b => {
+      if (b.getAttribute('data-category') === cat) {
+        b.classList.add('bg-yellow-400', 'text-gray-950', 'shadow-sm', 'font-bold');
+        b.classList.remove('text-gray-700', 'hover:bg-gray-100');
+      } else {
+        b.classList.remove('bg-yellow-400', 'text-gray-950', 'shadow-sm', 'font-bold');
+        b.classList.add('text-gray-700', 'hover:bg-gray-100');
+      }
+    });
+
+    // Sincroniza select mobile
+    const mobileSelect = document.getElementById('affiliateMobileCategorySelect');
+    if (mobileSelect && mobileSelect.value !== cat) {
+      mobileSelect.value = cat;
+    }
+
+    renderProducts();
   }
 
   async function fetchAffiliateProducts() {
@@ -105,7 +130,7 @@
       // Cálculo automático de porcentagem de desconto
       const pct = calcDiscountPercent(item.original_price, item.price_display);
       const discountBadgeHtml = pct > 0 
-        ? `<span class="inline-block px-2.5 py-0.5 text-xs font-black rounded-full bg-gradient-to-r from-red-600 to-rose-600 text-white shadow-sm mb-1.5 tracking-wide animate-pulse">🔥 ${pct}% OFF</span>`
+        ? `<span class="inline-flex items-center px-2 py-0.5 text-xs font-black rounded-full bg-gradient-to-r from-red-600 to-rose-600 text-white shadow-sm tracking-wide flex-shrink-0 animate-pulse">🔥 ${pct}% OFF</span>`
         : '';
 
       // Cores para as badges secundárias
@@ -115,7 +140,7 @@
       if (item.badge_color === 'blue') badgeStyle = 'bg-blue-100 text-blue-800 border-blue-300';
 
       const tagHtml = item.discount_tag 
-        ? `<span class="inline-block px-2.5 py-0.5 text-xs font-semibold rounded-full border ${badgeStyle} mb-1">${escapeHtml(item.discount_tag)}</span>` 
+        ? `<span class="inline-flex items-center px-2 py-0.5 text-xs font-semibold rounded-full border ${badgeStyle} flex-shrink-0">${escapeHtml(item.discount_tag)}</span>` 
         : '';
 
       const originalPriceHtml = item.original_price 
@@ -124,7 +149,7 @@
 
       return `
         <div class="bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 border border-gray-100 overflow-hidden flex flex-col group transform hover:-translate-y-1">
-          <!-- Imagem com Badges -->
+          <!-- Imagem com Badges Horizontais Lado a Lado -->
           <div class="relative w-full pt-[80%] bg-gray-50 overflow-hidden">
             <img 
               src="${escapeHtml(item.image_url)}" 
@@ -133,7 +158,8 @@
               class="absolute inset-0 w-full h-full object-contain p-3 group-hover:scale-105 transition-transform duration-300"
               onerror="this.src='../assets/img/fast-logo.png'; this.className='absolute inset-0 w-full h-full object-contain p-8 opacity-40';"
             />
-            <div class="absolute top-2 left-2 flex flex-col items-start gap-1">
+            <!-- Badges Lado a Lado -->
+            <div class="absolute top-2 left-2 right-2 flex flex-row flex-wrap items-center gap-1.5 z-10">
               ${discountBadgeHtml}
               ${tagHtml}
             </div>
