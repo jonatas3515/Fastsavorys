@@ -168,13 +168,13 @@
         : '';
 
       const cardBorder = isFastPick 
-        ? 'border-2 border-pink-500 shadow-md ring-2 ring-purple-500/20' 
+        ? 'border-4 border-pink-500 shadow-lg shadow-pink-100/50 ring-2 ring-purple-400/20' 
         : 'border border-gray-100 shadow-sm';
 
       return `
         <div class="bg-white rounded-2xl ${cardBorder} hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col group transform hover:-translate-y-1">
           <!-- Imagem com Badges Horizontais Lado a Lado -->
-          <div class="relative w-full pt-[80%] bg-gray-50 overflow-hidden ${isFastPick ? 'border-b-2 border-pink-400' : ''}">
+          <div class="relative w-full pt-[80%] bg-gray-50 overflow-hidden ${isFastPick ? 'border-b-4 border-pink-500' : ''}">
             <img 
               src="${escapeHtml(item.image_url)}" 
               alt="${escapeHtml(item.title)}" 
@@ -182,13 +182,19 @@
               class="absolute inset-0 w-full h-full object-contain p-3 group-hover:scale-105 transition-transform duration-300"
               onerror="this.src='../assets/img/fast-logo.png'; this.className='absolute inset-0 w-full h-full object-contain p-8 opacity-40';"
             />
-            <!-- Badges Lado a Lado -->
+            <!-- Badges Lado a Lado no topo da imagem -->
             <div class="absolute top-2 left-2 right-2 flex flex-row flex-wrap items-center gap-1.5 z-10">
-              ${fastSealBadgeHtml}
               ${discountBadgeHtml}
               ${tagHtml}
             </div>
           </div>
+
+          <!-- Selo FastSavory's em destaque no meio (entre a imagem e o título) -->
+          ${isFastPick ? `
+            <div class="bg-gradient-to-r from-pink-600 via-purple-600 to-pink-600 text-white py-1.5 px-2.5 text-center text-[10px] sm:text-xs font-black tracking-wide flex items-center justify-center gap-1 shadow-sm">
+              <span>👑</span> <span>PRODUTO TESTADO E RECOMENDADO PELA FASTSAVORY'S</span> <span>✨</span>
+            </div>
+          ` : ''}
 
           <!-- Conteúdo -->
           <div class="p-4 sm:p-5 flex-1 flex flex-col justify-between">
