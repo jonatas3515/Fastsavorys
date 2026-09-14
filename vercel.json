@@ -25,6 +25,10 @@
             "destination": "/api/manychat-api?type=gemini"
         },
         {
+            "source": "/p",
+            "destination": "/api/share"
+        },
+        {
             "source": "/api/sync-checkout-session",
             "destination": "/api/create-checkout-session?action=sync"
         }

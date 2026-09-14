@@ -86,7 +86,7 @@ function createProductCard(product) {
     }
 
     return `
-    <div class='bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow p-3 border ${borderClass} relative'>
+    <div id='fast-product-${product.id}' data-product-id='${product.id}' class='bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow p-3 border ${borderClass} relative'>
         ${promoBadge}
         ${topBadge}
         <div class='flex items-stretch gap-3'>
@@ -171,6 +171,28 @@ function renderProducts() {
     renderPromosSection();
     renderFavoritosSection();
     if (typeof window.renderRecentOrders === 'function') window.renderRecentOrders(); // might be in ui.js or distinct
+
+    // Deep-link: Scroll smoothly to product if requested in URL
+    try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const targetProdId = urlParams.get('product') || urlParams.get('p');
+        if (targetProdId && !window._scrolledToSharedProduct) {
+            window._scrolledToSharedProduct = true;
+            setTimeout(() => {
+                const card = document.getElementById(`fast-product-${targetProdId}`) ||
+                             document.querySelector(`[data-product-id="${targetProdId}"]`);
+                if (card) {
+                    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    card.classList.add('ring-4', 'ring-rose-500', 'transition-all', 'duration-500');
+                    setTimeout(() => {
+                        card.classList.remove('ring-4', 'ring-rose-500');
+                    }, 3500);
+                }
+            }, 300);
+        }
+    } catch (e) {
+        console.warn('[UI] Error scrolling to shared product:', e);
+    }
 }
 
 // Render Filtered Products
@@ -323,6 +345,44 @@ function showInlineMessage(elementId, message, type = 'success') {
 // --- FASTSAVORY'S PRODUCT SHARE FUNCTIONALITY ---
 let currentFastShareProduct = null;
 
+function buildFastProductShareUrl(product) {
+    if (!product) return 'https://fastsavorys.vercel.app/pages/fast.html';
+    const origin = (window.location.origin && !window.location.origin.includes('localhost') && !window.location.origin.includes('127.0.0.1'))
+        ? window.location.origin
+        : 'https://fastsavorys.vercel.app';
+
+    const promotion = (window.promotions || []).find(p => p.productId === product.id);
+    let displayPrice = product.price;
+    if (promotion) {
+        displayPrice = promotion.type === 'percentage' 
+            ? product.price * (1 - promotion.value / 100) 
+            : product.price - promotion.value;
+    } else if (product.promo && product.promo.active) {
+        displayPrice = product.promo.type === 'percent' 
+            ? product.price * (1 - product.promo.value / 100) 
+            : product.price - product.promo.value;
+    }
+    const priceFormatted = `R$ ${displayPrice.toFixed(2).replace('.', ',')}`;
+
+    let imgUrl = product.image || '';
+    if (imgUrl.startsWith('../')) {
+        imgUrl = `${origin}/${imgUrl.replace(/^(\.\.\/)+/, '')}`;
+    } else if (imgUrl.startsWith('/')) {
+        imgUrl = `${origin}${imgUrl}`;
+    } else if (imgUrl && !imgUrl.startsWith('http')) {
+        imgUrl = `${origin}/${imgUrl}`;
+    }
+
+    const params = new URLSearchParams();
+    if (product.id) params.set('id', product.id);
+    if (product.name) params.set('title', product.name);
+    if (priceFormatted) params.set('price', priceFormatted);
+    if (product.description) params.set('desc', product.description);
+    if (imgUrl) params.set('img', imgUrl);
+
+    return `${origin}/p?${params.toString()}`;
+}
+
 function buildFastProductShareText(product) {
     if (!product) return '';
     const promotion = (window.promotions || []).find(p => p.productId === product.id);
@@ -342,10 +402,9 @@ function buildFastProductShareText(product) {
         ? `~R$ ${product.price.toFixed(2).replace('.', ',')}~ ➔ ` 
         : '';
     const descText = product.description ? `\n😋 *Detalhes:* ${product.description}\n` : '';
-    const origin = window.location.origin || 'https://fastsavorys.vercel.app';
-    const storeUrl = `${origin}/pages/fast.html`;
+    const shareUrl = buildFastProductShareUrl(product);
 
-    return `🥟 *FASTSAVORY'S • CARDÁPIO & ENCOMENDAS* ✨\n🔥 *${product.name}*\n${descText}\n💰 *Preço:* ${origPriceText}*${priceText}*\n\n👉 *FAÇA SEU PEDIDO ONLINE AQUI:*\n${storeUrl}\n\n✨ FastSavory's • Salgados, Mini-Salgados, Bolos & Kits Festa\n📍 Rua Palmeiras, 105, Novo Prado, Itamaraju-BA\n🛵 Entregamos quentinho até você!`;
+    return `🥟 *FASTSAVORY'S • CARDÁPIO & ENCOMENDAS* ✨\n🔥 *${product.name}*\n${descText}\n💰 *Preço:* ${origPriceText}*${priceText}*\n\n👉 *FAÇA SEU PEDIDO ONLINE AQUI:*\n${shareUrl}\n\n✨ FastSavory's • Salgados, Mini-Salgados, Bolos & Kits Festa\n📍 Rua Palmeiras, 105, Novo Prado, Itamaraju-BA\n🛵 Entregamos quentinho até você!`;
 }
 
 window.openFastProductShareModal = function (id) {
@@ -411,32 +470,29 @@ window.shareFastProductToWhatsApp = function () {
 window.shareFastProductToTelegram = function () {
     if (!currentFastShareProduct) return;
     const msg = buildFastProductShareText(currentFastShareProduct);
-    const origin = window.location.origin || 'https://fastsavorys.vercel.app';
-    const storeUrl = `${origin}/pages/fast.html`;
-    const url = `https://t.me/share/url?url=${encodeURIComponent(storeUrl)}&text=${encodeURIComponent(msg)}`;
+    const shareUrl = buildFastProductShareUrl(currentFastShareProduct);
+    const url = `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(msg)}`;
     window.open(url, '_blank');
 };
 
 window.shareFastProductToFacebook = function () {
     if (!currentFastShareProduct) return;
-    const origin = window.location.origin || 'https://fastsavorys.vercel.app';
-    const storeUrl = `${origin}/pages/fast.html`;
-    const url = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(storeUrl)}`;
+    const shareUrl = buildFastProductShareUrl(currentFastShareProduct);
+    const url = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`;
     window.open(url, '_blank');
 };
 
 window.shareFastProductNative = async function () {
     if (!currentFastShareProduct) return;
     const msg = buildFastProductShareText(currentFastShareProduct);
-    const origin = window.location.origin || 'https://fastsavorys.vercel.app';
-    const storeUrl = `${origin}/pages/fast.html`;
+    const shareUrl = buildFastProductShareUrl(currentFastShareProduct);
 
     if (navigator.share) {
         try {
             await navigator.share({
                 title: currentFastShareProduct.name,
                 text: msg,
-                url: storeUrl
+                url: shareUrl
             });
         } catch (e) {
             // User cancelled
@@ -461,14 +517,16 @@ window.copyFastProductShareText = function () {
 };
 
 window.copyFastProductShareLink = function () {
-    const origin = window.location.origin || 'https://fastsavorys.vercel.app';
-    const storeUrl = `${origin}/pages/fast.html`;
+    const shareUrl = currentFastShareProduct 
+        ? buildFastProductShareUrl(currentFastShareProduct)
+        : (window.location.origin || 'https://fastsavorys.vercel.app') + '/pages/fast.html';
+
     if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(storeUrl).then(() => {
+        navigator.clipboard.writeText(shareUrl).then(() => {
             if (window.showToast) {
-                window.showToast('🔗 Link do cardápio copiado!', 'success');
+                window.showToast('🔗 Link do produto copiado com foto!', 'success');
             } else {
-                alert('🔗 Link do cardápio copiado!');
+                alert('🔗 Link do produto copiado!');
             }
         });
     }
@@ -483,3 +541,4 @@ window.showInlineMessage = showInlineMessage;
 window.loadProductsPublic = renderProducts; // Enforce UI module authority
 window.isProductAvailable = isProductAvailable; // Used by cart.js
 window.buildFastProductShareText = buildFastProductShareText;
+window.buildFastProductShareUrl = buildFastProductShareUrl;
