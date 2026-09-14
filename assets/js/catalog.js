@@ -228,8 +228,8 @@ window.CatalogModule = {
           ${price ? `<p class="text-xl sm:text-2xl font-bold text-rose-600">R$ ${price}</p>` : ''}
           ${phraseHtml}
         </div>
-        <!-- Botão Adicionar ao Carrinho -->
-        <div class="mt-3 flex justify-center">
+        <!-- Botão Adicionar ao Carrinho e Compartilhar -->
+        <div class="mt-3 flex items-center justify-center gap-2">
           <button 
             onclick="event.stopPropagation(); CatalogModule.addToCartFromCatalog(${product.id})"
             class="flex items-center justify-center gap-2 bg-rose-500 hover:bg-rose-600 text-white font-bold py-2 px-4 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 transform hover:scale-105"
@@ -237,6 +237,16 @@ window.CatalogModule = {
           >
             <span class="text-xl">+</span>
             <span class="text-sm">Adicionar</span>
+          </button>
+          <button 
+            type="button"
+            onclick="event.stopPropagation(); window.openFastProductShareModal('${product.id}')"
+            class="p-2.5 bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 rounded-full shadow-md hover:shadow-lg transition-all transform hover:scale-105 active:scale-95"
+            title="Compartilhar este produto"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+            </svg>
           </button>
         </div>
       </div>

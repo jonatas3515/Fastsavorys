@@ -95,7 +95,14 @@ function createProductCard(product) {
                 <div>
                     <div class='flex items-start justify-between gap-1'>
                         <h3 class='font-semibold text-gray-800 ${isAdditional ? 'text-sm' : 'text-sm'} leading-tight'>${product.name}</h3>
-                        <button class='favorite-btn text-lg p-0.5 hover:scale-110 transition-transform flex-shrink-0' data-id='${product.id}' title='Favorito'>${heartIcon}</button>
+                        <div class='flex items-center gap-0.5 flex-shrink-0'>
+                            <button type='button' onclick='event.stopPropagation(); window.openFastProductShareModal("${product.id}")' class='p-1 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg text-xs transition active:scale-95' title='Compartilhar este produto'>
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                                </svg>
+                            </button>
+                            <button class='favorite-btn text-lg p-0.5 hover:scale-110 transition-transform' data-id='${product.id}' title='Favorito'>${heartIcon}</button>
+                        </div>
                     </div>
                     <p class='text-xs text-gray-500 line-clamp-2 mt-0.5'>${product.description || ''}</p>
                 </div>
@@ -313,6 +320,160 @@ function showInlineMessage(elementId, message, type = 'success') {
     msgContainer.classList.remove('hidden');
 }
 
+// --- FASTSAVORY'S PRODUCT SHARE FUNCTIONALITY ---
+let currentFastShareProduct = null;
+
+function buildFastProductShareText(product) {
+    if (!product) return '';
+    const promotion = (window.promotions || []).find(p => p.productId === product.id);
+    let displayPrice = product.price;
+    if (promotion) {
+        displayPrice = promotion.type === 'percentage' 
+            ? product.price * (1 - promotion.value / 100) 
+            : product.price - promotion.value;
+    } else if (product.promo && product.promo.active) {
+        displayPrice = product.promo.type === 'percent' 
+            ? product.price * (1 - product.promo.value / 100) 
+            : product.price - product.promo.value;
+    }
+
+    const priceText = `R$ ${displayPrice.toFixed(2).replace('.', ',')}`;
+    const origPriceText = (displayPrice < product.price) 
+        ? `~R$ ${product.price.toFixed(2).replace('.', ',')}~ ➔ ` 
+        : '';
+    const descText = product.description ? `\n😋 *Detalhes:* ${product.description}\n` : '';
+    const origin = window.location.origin || 'https://fastsavorys.vercel.app';
+    const storeUrl = `${origin}/pages/fast.html`;
+
+    return `🥟 *FASTSAVORY'S • CARDÁPIO & ENCOMENDAS* ✨\n🔥 *${product.name}*\n${descText}\n💰 *Preço:* ${origPriceText}*${priceText}*\n\n👉 *FAÇA SEU PEDIDO ONLINE AQUI:*\n${storeUrl}\n\n✨ FastSavory's • Salgados, Mini-Salgados, Bolos & Kits Festa\n📍 Rua Palmeiras, 105, Novo Prado, Itamaraju-BA\n🛵 Entregamos quentinho até você!`;
+}
+
+window.openFastProductShareModal = function (id) {
+    const product = (window.products || []).find(p => p.id == id || String(p.id) === String(id));
+    if (!product) return;
+
+    currentFastShareProduct = product;
+    const modal = document.getElementById('fastProductShareModal');
+    if (!modal) return;
+
+    const imgEl = document.getElementById('fastShareModalProductImg');
+    if (imgEl) {
+        imgEl.src = product.image || '../assets/img/fast-logo.png';
+        imgEl.onerror = () => { imgEl.src = '../assets/img/fast-logo.png'; };
+    }
+
+    const titleEl = document.getElementById('fastShareModalProductTitle');
+    if (titleEl) titleEl.textContent = product.name || 'Produto';
+
+    const promotion = (window.promotions || []).find(p => p.productId === product.id);
+    let displayPrice = product.price;
+    if (promotion) {
+        displayPrice = promotion.type === 'percentage' ? product.price * (1 - promotion.value / 100) : product.price - promotion.value;
+    } else if (product.promo && product.promo.active) {
+        displayPrice = product.promo.type === 'percent' ? product.price * (1 - product.promo.value / 100) : product.price - product.promo.value;
+    }
+
+    const priceEl = document.getElementById('fastShareModalProductPrice');
+    if (priceEl) priceEl.textContent = `R$ ${displayPrice.toFixed(2).replace('.', ',')}`;
+
+    const catLabels = {
+        salgados: '🥟 Salgados',
+        mini: '🧁 Mini-Salgados',
+        kits: '🎁 Kits Festa',
+        bolos: '🎂 Bolos',
+        combo: '🔥 Combos',
+        combos: '🔥 Combos',
+        bebidas: '🥤 Bebidas',
+        adicionais: '➕ Extras'
+    };
+    const catEl = document.getElementById('fastShareModalProductCategory');
+    if (catEl) catEl.textContent = catLabels[product.category] || product.category || 'FastSavory\'s';
+
+    const shareMsg = buildFastProductShareText(product);
+    const textPreview = document.getElementById('fastShareModalTextPreview');
+    if (textPreview) textPreview.value = shareMsg;
+
+    modal.classList.remove('hidden');
+};
+
+window.closeFastProductShareModal = function () {
+    const modal = document.getElementById('fastProductShareModal');
+    if (modal) modal.classList.add('hidden');
+};
+
+window.shareFastProductToWhatsApp = function () {
+    if (!currentFastShareProduct) return;
+    const msg = buildFastProductShareText(currentFastShareProduct);
+    const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank');
+};
+
+window.shareFastProductToTelegram = function () {
+    if (!currentFastShareProduct) return;
+    const msg = buildFastProductShareText(currentFastShareProduct);
+    const origin = window.location.origin || 'https://fastsavorys.vercel.app';
+    const storeUrl = `${origin}/pages/fast.html`;
+    const url = `https://t.me/share/url?url=${encodeURIComponent(storeUrl)}&text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank');
+};
+
+window.shareFastProductToFacebook = function () {
+    if (!currentFastShareProduct) return;
+    const origin = window.location.origin || 'https://fastsavorys.vercel.app';
+    const storeUrl = `${origin}/pages/fast.html`;
+    const url = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(storeUrl)}`;
+    window.open(url, '_blank');
+};
+
+window.shareFastProductNative = async function () {
+    if (!currentFastShareProduct) return;
+    const msg = buildFastProductShareText(currentFastShareProduct);
+    const origin = window.location.origin || 'https://fastsavorys.vercel.app';
+    const storeUrl = `${origin}/pages/fast.html`;
+
+    if (navigator.share) {
+        try {
+            await navigator.share({
+                title: currentFastShareProduct.name,
+                text: msg,
+                url: storeUrl
+            });
+        } catch (e) {
+            // User cancelled
+        }
+    } else {
+        window.copyFastProductShareText();
+    }
+};
+
+window.copyFastProductShareText = function () {
+    if (!currentFastShareProduct) return;
+    const msg = buildFastProductShareText(currentFastShareProduct);
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(msg).then(() => {
+            if (window.showToast) {
+                window.showToast('✨ Mensagem copiada! Cole no Instagram, WhatsApp ou onde desejar.', 'success');
+            } else {
+                alert('✨ Mensagem copiada! Agora basta colar no Instagram, WhatsApp, Messenger ou onde desejar.');
+            }
+        });
+    }
+};
+
+window.copyFastProductShareLink = function () {
+    const origin = window.location.origin || 'https://fastsavorys.vercel.app';
+    const storeUrl = `${origin}/pages/fast.html`;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(storeUrl).then(() => {
+            if (window.showToast) {
+                window.showToast('🔗 Link do cardápio copiado!', 'success');
+            } else {
+                alert('🔗 Link do cardápio copiado!');
+            }
+        });
+    }
+};
+
 // Exports
 window.renderProducts = renderProducts;
 window.renderFilteredProducts = renderFilteredProducts;
@@ -321,3 +482,4 @@ window.showToast = showToast;
 window.showInlineMessage = showInlineMessage;
 window.loadProductsPublic = renderProducts; // Enforce UI module authority
 window.isProductAvailable = isProductAvailable; // Used by cart.js
+window.buildFastProductShareText = buildFastProductShareText;
