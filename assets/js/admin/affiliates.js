@@ -69,7 +69,15 @@ window.AffiliatesModule = (function () {
 
   function getFilteredProducts() {
     return productsList.filter(item => {
-      const matchCat = categoryFilter === 'all' || item.category === categoryFilter;
+      let matchCat = false;
+      if (categoryFilter === 'all') {
+        matchCat = true;
+      } else if (categoryFilter === 'fast_picks') {
+        matchCat = Boolean(item.is_fast_pick || item.badge_color === 'fast_seal');
+      } else {
+        matchCat = item.category === categoryFilter;
+      }
+
       const matchStatus = statusFilter === 'all' || 
         (statusFilter === 'active' && item.is_active !== false) ||
         (statusFilter === 'paused' && item.is_active === false);

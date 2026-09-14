@@ -50,12 +50,19 @@
     // Sincroniza botões da sidebar desktop
     const categoryButtons = document.querySelectorAll('.affiliate-category-btn');
     categoryButtons.forEach(b => {
-      if (b.getAttribute('data-category') === cat) {
-        b.classList.add('bg-yellow-400', 'text-gray-950', 'shadow-sm', 'font-bold');
-        b.classList.remove('text-gray-700', 'hover:bg-gray-100');
+      const bCat = b.getAttribute('data-category');
+      if (bCat === cat) {
+        if (cat === 'fast_picks') {
+          b.className = 'affiliate-category-btn text-left px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-pink-600 via-purple-600 to-pink-600 text-white font-black shadow-md transition flex items-center gap-2 text-sm w-full';
+        } else {
+          b.className = 'affiliate-category-btn text-left px-3.5 py-2.5 rounded-xl bg-yellow-400 text-gray-950 font-bold shadow-sm transition flex items-center gap-2 text-sm w-full';
+        }
       } else {
-        b.classList.remove('bg-yellow-400', 'text-gray-950', 'shadow-sm', 'font-bold');
-        b.classList.add('text-gray-700', 'hover:bg-gray-100');
+        if (bCat === 'fast_picks') {
+          b.className = 'affiliate-category-btn text-left px-3.5 py-2.5 rounded-xl text-pink-700 bg-pink-50 hover:bg-pink-100 border border-pink-200 font-bold transition flex items-center gap-2 text-sm w-full';
+        } else {
+          b.className = 'affiliate-category-btn text-left px-3.5 py-2.5 rounded-xl text-gray-700 hover:bg-gray-100 transition flex items-center gap-2 text-sm w-full';
+        }
       }
     });
 
@@ -110,7 +117,15 @@
     if (!grid) return;
 
     let filtered = affiliateProducts.filter(item => {
-      const matchCat = currentCategory === 'all' || item.category === currentCategory;
+      let matchCat = false;
+      if (currentCategory === 'all') {
+        matchCat = true;
+      } else if (currentCategory === 'fast_picks') {
+        matchCat = Boolean(item.is_fast_pick || item.badge_color === 'fast_seal');
+      } else {
+        matchCat = item.category === currentCategory;
+      }
+
       const matchSearch = !currentSearch || 
         (item.title && item.title.toLowerCase().includes(currentSearch)) ||
         (item.description && item.description.toLowerCase().includes(currentSearch)) ||
@@ -144,11 +159,6 @@
       if (item.badge_color === 'purple') badgeStyle = 'bg-purple-100 text-purple-950 border-purple-300 font-bold';
       if (item.badge_color === 'pink') badgeStyle = 'bg-pink-100 text-pink-950 border-pink-300 font-bold';
 
-      // Selo FastSavory's
-      const fastSealBadgeHtml = isFastPick
-        ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-black rounded-full bg-gradient-to-r from-pink-600 to-purple-600 text-white shadow-sm flex-shrink-0">✨ Selo Fast</span>`
-        : '';
-
       // Evita duplicidade de badge se a tag for apenas a indicação do mesmo desconto
       let showTag = false;
       const rawTag = item.discount_tag ? item.discount_tag.trim() : '';
@@ -171,9 +181,13 @@
         ? 'border-4 border-pink-500 shadow-lg shadow-pink-100/50 ring-2 ring-purple-400/20' 
         : 'border border-gray-100 shadow-sm';
 
+      const sealMedalHtml = isFastPick 
+        ? `<img src="../assets/img/fast-seal.png" alt="Selo FastSavory's" class="absolute top-1.5 right-1.5 w-11 h-15 sm:w-13 sm:h-17 object-contain drop-shadow-md z-20 pointer-events-none transform rotate-2 hover:rotate-0 transition-transform" />`
+        : '';
+
       return `
         <div class="bg-white rounded-2xl ${cardBorder} hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col group transform hover:-translate-y-1">
-          <!-- Imagem com Badges Horizontais Lado a Lado -->
+          <!-- Imagem com Badges e Selo Medalha -->
           <div class="relative w-full pt-[80%] bg-gray-50 overflow-hidden ${isFastPick ? 'border-b-4 border-pink-500' : ''}">
             <img 
               src="${escapeHtml(item.image_url)}" 
@@ -182,17 +196,24 @@
               class="absolute inset-0 w-full h-full object-contain p-3 group-hover:scale-105 transition-transform duration-300"
               onerror="this.src='../assets/img/fast-logo.png'; this.className='absolute inset-0 w-full h-full object-contain p-8 opacity-40';"
             />
-            <!-- Badges Lado a Lado no topo da imagem -->
-            <div class="absolute top-2 left-2 right-2 flex flex-row flex-wrap items-center gap-1.5 z-10">
+            <!-- Badges no topo esquerdo da imagem -->
+            <div class="absolute top-2 left-2 flex flex-row flex-wrap items-center gap-1.5 z-10 max-w-[70%]">
               ${discountBadgeHtml}
               ${tagHtml}
             </div>
+            <!-- Medalha Oficial FastSavory's no topo direito -->
+            ${sealMedalHtml}
           </div>
 
-          <!-- Selo FastSavory's em destaque no meio (entre a imagem e o título) -->
+          <!-- Selo FastSavory's em destaque no meio (2 linhas exatas) -->
           ${isFastPick ? `
-            <div class="bg-gradient-to-r from-pink-600 via-purple-600 to-pink-600 text-white py-1.5 px-2.5 text-center text-[10px] sm:text-xs font-black tracking-wide flex items-center justify-center gap-1 shadow-sm">
-              <span>👑</span> <span>PRODUTO TESTADO E RECOMENDADO PELA FASTSAVORY'S</span> <span>✨</span>
+            <div class="bg-gradient-to-r from-pink-600 via-purple-600 to-pink-600 text-white py-1 px-2 text-center shadow-sm">
+              <div class="text-[9.5px] sm:text-[10.5px] font-black uppercase tracking-wider flex items-center justify-center gap-1 leading-tight">
+                <span>👑</span> <span>PRODUTO TESTADO E RECOMENDADO</span>
+              </div>
+              <div class="text-[9.5px] sm:text-[10.5px] font-black uppercase tracking-wider text-pink-100 flex items-center justify-center gap-1 leading-tight mt-0.5">
+                <span>PELA FASTSAVORY'S</span> <span>✨</span>
+              </div>
             </div>
           ` : ''}
 
