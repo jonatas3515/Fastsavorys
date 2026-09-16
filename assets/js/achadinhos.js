@@ -7,6 +7,39 @@
   let currentCategory = 'all';
   let currentSearch = '';
 
+  const CATEGORY_GROUPS = {
+    group_casa: {
+      label: 'Casa & Cozinha',
+      icon: '🏠',
+      categories: ['cozinha', 'utilidades', 'banho']
+    },
+    group_festas: {
+      label: 'Confeitaria & Festas',
+      icon: '🎂',
+      categories: ['confeitaria', 'embalagens', 'presentes']
+    },
+    group_tech: {
+      label: 'Tecnologia & Celulares',
+      icon: '⚡',
+      categories: ['eletronicos', 'celulares', 'informatica']
+    },
+    group_moda: {
+      label: 'Moda & Beleza',
+      icon: '👗',
+      categories: ['moda', 'perfumaria', 'joias']
+    },
+    group_infantil: {
+      label: 'Infantil & Papelaria',
+      icon: '🧸',
+      categories: ['brinquedos', 'bebes', 'livros']
+    },
+    group_outros: {
+      label: 'Pet, Auto & Outros',
+      icon: '🐶',
+      categories: ['petshop', 'veiculos', 'construcao', 'supermercado']
+    }
+  };
+
   document.addEventListener('DOMContentLoaded', async () => {
     initAffiliateShowcase();
   });
@@ -26,16 +59,65 @@
       });
     }
 
-    // Filtros de Categoria (Desktop Sidebar)
-    const categoryButtons = document.querySelectorAll('.affiliate-category-btn');
-    categoryButtons.forEach(btn => {
+    // Botões fixos de topo (Todas as Ofertas e Testados Fast)
+    const topCategoryBtns = document.querySelectorAll('.affiliate-category-btn[data-category="all"], .affiliate-category-btn[data-category="fast_picks"]');
+    topCategoryBtns.forEach(btn => {
       btn.addEventListener('click', () => {
+        closeAllAccordions();
         const cat = btn.getAttribute('data-category') || 'all';
         setCategory(cat);
       });
     });
 
-    // Filtro de Categoria (Mobile Select Dropdown)
+    // Accordion Headers (Macro grupos)
+    const accordionHeaders = document.querySelectorAll('.accordion-header');
+    accordionHeaders.forEach(header => {
+      header.addEventListener('click', () => {
+        const groupDiv = header.closest('.accordion-group');
+        const groupId = groupDiv ? groupDiv.getAttribute('data-group-id') : null;
+        const body = groupDiv ? groupDiv.querySelector('.accordion-body') : null;
+        const chevron = header.querySelector('.accordion-chevron');
+        const isCurrentlyOpen = body && !body.classList.contains('hidden');
+
+        // Fecha todos os outros grupos (apenas 1 aberto por vez)
+        document.querySelectorAll('.accordion-group').forEach(otherGroup => {
+          if (otherGroup !== groupDiv) {
+            const otherBody = otherGroup.querySelector('.accordion-body');
+            const otherChevron = otherGroup.querySelector('.accordion-chevron');
+            if (otherBody) otherBody.classList.add('hidden');
+            if (otherChevron) otherChevron.classList.remove('rotate-180');
+            otherGroup.classList.remove('border-yellow-400', 'bg-yellow-50/20');
+          }
+        });
+
+        if (isCurrentlyOpen) {
+          if (body) body.classList.add('hidden');
+          if (chevron) chevron.classList.remove('rotate-180');
+          if (groupDiv) groupDiv.classList.remove('border-yellow-400', 'bg-yellow-50/20');
+        } else {
+          if (body) body.classList.remove('hidden');
+          if (chevron) chevron.classList.add('rotate-180');
+          if (groupDiv) groupDiv.classList.add('border-yellow-400', 'bg-yellow-50/20');
+        }
+
+        // Aplica o filtro macro do grupo
+        if (groupId) {
+          setCategory(groupId);
+        }
+      });
+    });
+
+    // Subcategorias dentro do accordion
+    const subcategoryBtns = document.querySelectorAll('.accordion-body .affiliate-category-btn');
+    subcategoryBtns.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const cat = btn.getAttribute('data-category');
+        setCategory(cat);
+      });
+    });
+
+    // Filtro de Categoria (Mobile Select Dropdown com Optgroups)
     const mobileSelect = document.getElementById('affiliateMobileCategorySelect');
     if (mobileSelect) {
       mobileSelect.addEventListener('change', (e) => {
@@ -44,8 +126,34 @@
     }
   }
 
+  function closeAllAccordions() {
+    document.querySelectorAll('.accordion-group').forEach(group => {
+      const body = group.querySelector('.accordion-body');
+      const chevron = group.querySelector('.accordion-chevron');
+      if (body) body.classList.add('hidden');
+      if (chevron) chevron.classList.remove('rotate-180');
+      group.classList.remove('border-yellow-400', 'bg-yellow-50/20');
+    });
+  }
+
   function setCategory(cat) {
     currentCategory = cat;
+
+    // Se for subcategoria, abre o accordion pai correspondente
+    if (!cat.startsWith('group_') && cat !== 'all' && cat !== 'fast_picks') {
+      for (const [groupId, groupData] of Object.entries(CATEGORY_GROUPS)) {
+        if (groupData.categories.includes(cat)) {
+          const groupEl = document.querySelector(`.accordion-group[data-group-id="${groupId}"]`);
+          if (groupEl) {
+            const body = groupEl.querySelector('.accordion-body');
+            const chevron = groupEl.querySelector('.accordion-chevron');
+            if (body) body.classList.remove('hidden');
+            if (chevron) chevron.classList.add('rotate-180');
+            groupEl.classList.add('border-yellow-400', 'bg-yellow-50/20');
+          }
+        }
+      }
+    }
 
     // Sincroniza botões da sidebar desktop
     const categoryButtons = document.querySelectorAll('.affiliate-category-btn');
@@ -53,16 +161,32 @@
       const bCat = b.getAttribute('data-category');
       if (bCat === cat) {
         if (cat === 'fast_picks') {
-          b.className = 'affiliate-category-btn text-left px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-pink-600 via-purple-600 to-pink-600 text-white font-black shadow-md transition flex items-center gap-2 text-sm w-full';
+          b.className = 'affiliate-category-btn text-left px-3 py-2 rounded-xl bg-gradient-to-r from-pink-600 via-purple-600 to-pink-600 text-white font-black shadow-md transition flex items-center justify-between text-xs w-full group';
+        } else if (cat === 'all') {
+          b.className = 'affiliate-category-btn text-left px-3 py-2 rounded-xl bg-yellow-400 text-gray-950 font-bold shadow-sm transition flex items-center justify-between text-xs w-full group';
         } else {
-          b.className = 'affiliate-category-btn text-left px-3.5 py-2.5 rounded-xl bg-yellow-400 text-gray-950 font-bold shadow-sm transition flex items-center gap-2 text-sm w-full';
+          // Subcategoria ativa
+          b.className = 'affiliate-category-btn text-left px-2.5 py-1.5 rounded-lg bg-yellow-400 text-gray-950 font-bold shadow-sm transition flex items-center justify-between text-xs w-full';
         }
       } else {
         if (bCat === 'fast_picks') {
-          b.className = 'affiliate-category-btn text-left px-3.5 py-2.5 rounded-xl text-pink-700 bg-pink-50 hover:bg-pink-100 border border-pink-200 font-bold transition flex items-center gap-2 text-sm w-full';
+          b.className = 'affiliate-category-btn text-left px-3 py-2 rounded-xl text-pink-700 bg-pink-50 hover:bg-pink-100 border border-pink-200 font-bold transition flex items-center justify-between text-xs w-full group';
+        } else if (bCat === 'all') {
+          b.className = 'affiliate-category-btn text-left px-3 py-2 rounded-xl text-gray-700 hover:bg-gray-100 transition flex items-center justify-between text-xs w-full group';
         } else {
-          b.className = 'affiliate-category-btn text-left px-3.5 py-2.5 rounded-xl text-gray-700 hover:bg-gray-100 transition flex items-center gap-2 text-sm w-full';
+          // Subcategoria inativa
+          b.className = 'affiliate-category-btn text-left px-2.5 py-1.5 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition flex items-center justify-between text-xs w-full';
         }
+      }
+    });
+
+    // Sincroniza estilo do Accordion Header quando o grupo macro está selecionado
+    document.querySelectorAll('.accordion-header').forEach(header => {
+      const hCat = header.getAttribute('data-category');
+      if (hCat === cat) {
+        header.classList.add('bg-yellow-200/90', 'text-gray-950');
+      } else {
+        header.classList.remove('bg-yellow-200/90', 'text-gray-950');
       }
     });
 
@@ -73,6 +197,33 @@
     }
 
     renderProducts();
+  }
+
+  function updateCategoryCounts() {
+    const counts = {
+      all: affiliateProducts.length,
+      fast_picks: affiliateProducts.filter(i => Boolean(i.is_fast_pick || i.badge_color === 'fast_seal')).length
+    };
+
+    // Subcategories count
+    affiliateProducts.forEach(item => {
+      if (item.category) {
+        counts[item.category] = (counts[item.category] || 0) + 1;
+      }
+    });
+
+    // Groups count (sum of subcategories)
+    Object.keys(CATEGORY_GROUPS).forEach(groupId => {
+      const cats = CATEGORY_GROUPS[groupId].categories;
+      counts[groupId] = cats.reduce((acc, cat) => acc + (counts[cat] || 0), 0);
+    });
+
+    // Update count badges
+    document.querySelectorAll('.category-count[data-count-for]').forEach(el => {
+      const key = el.getAttribute('data-count-for');
+      const val = counts[key] || 0;
+      el.textContent = val;
+    });
   }
 
   async function fetchAffiliateProducts() {
@@ -108,6 +259,7 @@
       affiliateProducts = window.DEFAULT_AFFILIATE_PRODUCTS || [];
     }
 
+    updateCategoryCounts();
     renderProducts();
   }
 
@@ -122,6 +274,9 @@
         matchCat = true;
       } else if (currentCategory === 'fast_picks') {
         matchCat = Boolean(item.is_fast_pick || item.badge_color === 'fast_seal');
+      } else if (currentCategory.startsWith('group_')) {
+        const group = CATEGORY_GROUPS[currentCategory];
+        matchCat = group ? group.categories.includes(item.category) : false;
       } else {
         matchCat = item.category === currentCategory;
       }
