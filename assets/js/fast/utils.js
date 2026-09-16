@@ -72,36 +72,33 @@ window.cartContainsBolo = function (cartItems = cart) {
  * Verifica se produto está bloqueado para pedidos no mesmo dia
  */
 window.hasBlockedProductsForSameDay = function () {
-    return cart.some(item => {
-        const product = products.find(p => p.id === item.id);
+    return (window.cart || []).some(item => {
+        const product = (window.products || []).find(p => p.id === item.id) || item;
 
         // Preferir flag do banco de dados
-        if (product && product.requires_preorder === true) {
+        if (product && (product.requires_preorder === true || product.is_encomenda === true || product.isEncomenda === true)) {
             return true;
         }
 
-        // Fallback para lógica legada
-        if (product && product.requires_preorder === false) {
-            return false;
-        }
-
-        const name = (item.name || '').toLowerCase();
+        const name = (product?.name || item.name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
         const category = (product?.category || '').toLowerCase();
+
+        // Empadão exige 1 dia de antecedência
+        if (name.includes('empadao')) return true;
 
         // Kits Festa bloqueados
         if (category === 'kits' || name.includes('kit festa') || name.includes('kit ')) return true;
 
-        // Vulcão Mini é PERMITIDO - verificar antes de bloquear bolos
-        if (name.includes('vulcão mini') || name.includes('vulcao mini') || 
-            name.includes('mini vulcão') || name.includes('mini vulcao')) {
-            return false; // Vulcão Mini NÃO bloqueia
+        // Vulcão Mini e Bolo no Pote são PERMITIDOS para o mesmo dia
+        if (name.includes('vulcao mini') || name.includes('mini vulcao') || name.includes('pote')) {
+            return false;
         }
 
-        // Bolos grandes bloqueados (exceto vulcão mini já tratado acima)
+        // Bolos grandes bloqueados (exceto vulcão mini e pote tratados acima)
         if (category === 'bolos' || name.includes('bolo')) return true;
 
-        // Vulcão comum bloqueado (Mini Vulcão já foi permitido acima)
-        if (name.includes('vulcão') || name.includes('vulcao')) return true;
+        // Vulcão comum bloqueado
+        if (name.includes('vulcao')) return true;
 
         return false;
     });

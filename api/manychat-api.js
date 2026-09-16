@@ -786,14 +786,20 @@ function buildBoloFactHint(history, currentMessage) {
     return boloHint;
 }
 
-// Guard para Kit Festa / bolo GRANDE (PP/P/G/Vulcão P): são APENAS RETIRADA e precisam de 1 dia de
+// Guard para Kit Festa / bolo GRANDE (PP/P/G/Vulcão P) / Empadão 1kg: precisam de no mínimo 1 dia de
 // antecedência (não podem ser para HOJE). Injeta fato verificado baseado no que o CLIENTE pediu.
 function buildKitFactHint(history, currentMessage) {
     const userTexts = (history || []).filter(m => m.role === 'user').map(m => m.text).join('\n') + '\n' + (currentMessage || '');
     const u = normalizeTxt(userTexts);
-    const hasKitOuBoloGrande = /(kit\s*festa|combo\s*festa|festa\s*(pp|p|g)\b|bolo\s*(pp|p|g)\b|vulcao\s*p\b|naked)/.test(u);
-    if (!hasKitOuBoloGrande) return '';
-    const kitHint = `\n[⛔ REGRA DE NEGÓCIO (Kit Festa / Bolo Grande): (1) Bolos grandes (PP, P, G, Vulcão P) e Kits Festa são APENAS RETIRADA na loja (Rua Palmeiras, 105, Novo Prado) e precisam de no mínimo 1 DIA de antecedência. (2) Se o cliente estiver apenas tirando dúvidas ou consultando (preços, se entrega, o que vem, localização da loja, etc.), responda APENAS a dúvida dele de forma objetiva e pergunte se ele gostaria de encomendar. NÃO inicie personalização (massa/recheio/sabores) nem assuma qual produto ele quer antes de o cliente confirmar explicitamente.]`;
+    const hasKitOuBoloGrandeOuEmpadao = /(kit\s*festa|combo\s*festa|festa\s*(pp|p|g)\b|bolo\s*(pp|p|g)\b|vulcao\s*p\b|naked|empadao)/.test(u);
+    if (!hasKitOuBoloGrandeOuEmpadao) return '';
+    const isEmpadao = /empadao/.test(u) && !/(kit\s*festa|bolo)/.test(u);
+    if (isEmpadao) {
+        const empadaoHint = `\n[⛔ REGRA DE NEGÓCIO (Empadão 1kg): (1) O Empadão 1kg (R$ 45,00) é preparado artesanalmente e precisa de no mínimo 1 DIA de antecedência (NÃO pode ser feito para HOJE). (2) Pedidos feitos hoje são para entrega/retirada a partir de amanhã ou data futura.]`;
+        console.log(`[empadao-hint] ${empadaoHint.replace(/\n/g, ' | ')}`);
+        return empadaoHint;
+    }
+    const kitHint = `\n[⛔ REGRA DE NEGÓCIO (Kit Festa / Bolo Grande / Empadão): (1) Bolos grandes (PP, P, G, Vulcão P) e Kits Festa são APENAS RETIRADA na loja (Rua Palmeiras, 105, Novo Prado) e precisam de no mínimo 1 DIA de antecedência. O Empadão 1kg também exige no mínimo 1 DIA de antecedência. (2) Se o cliente estiver apenas tirando dúvidas ou consultando (preços, se entrega, o que vem, localização da loja, etc.), responda APENAS a dúvida dele de forma objetiva e pergunte se ele gostaria de encomendar. NÃO inicie personalização (massa/recheio/sabores) nem assuma qual produto ele quer antes de o cliente confirmar explicitamente.]`;
     console.log(`[kit-hint] ${kitHint.replace(/\n/g, ' | ')}`);
     return kitHint;
 }
@@ -1198,9 +1204,9 @@ async function buildBusinessContext(intents, forceRefresh = false) {
 
         // ============ REGRAS DE PEDIDO / AGENDAMENTO ============
         ctx += '\n\nREGRAS DE PEDIDO E AGENDAMENTO:';
-        ctx += '\n  - Bolos (exceto Vulcão Mini) e Kits Festa: NÃO podem ser feitos para o mesmo dia. Se o cliente pedir para HOJE, recuse. Se já pediu para data futura, confirme normalmente SEM repetir regra de antecedência. Apenas RETIRADA na loja (Rua Palmeiras, 105, Novo Prado). NUNCA sugira entrega para eles.';
+        ctx += '\n  - Empadão 1kg, Bolos (exceto Vulcão Mini e Bolo no Pote) e Kits Festa: NÃO podem ser feitos para o mesmo dia (exigem no mínimo 1 dia de antecedência). Se o cliente pedir para HOJE, recuse com simpatia explicando a necessidade de 1 dia de antecedência. Se já pediu para data futura, confirme normalmente SEM repetir regra de antecedência. Bolos grandes e Kits Festa são apenas RETIRADA na loja (Rua Palmeiras, 105, Novo Prado).';
         ctx += '\n  - PEDIDO MISTO COM BOLO: Se o pedido incluir bolo grande OU kit festa junto com salgados/bebidas, o PEDIDO INTEIRO é apenas retirada. NÃO ofereça entrega separada para os salgados.';
-        ctx += '\n  - Bolo Vulcão Mini (R$ 15,00): exceção — NÃO precisa de antecedência, pode ser pedido para HOJE (verificar disponibilidade). Pode ser ENTREGUE junto com salgados/bebidas.';
+        ctx += '\n  - Bolo Vulcão Mini (R$ 15,00) e Bolo no Pote (R$ 10,00): exceção — NÃO precisam de antecedência, podem ser pedidos para HOJE (conforme disponibilidade). Podem ser ENTREGUES junto com salgados/bebidas.';
         ctx += '\n  - Salgados, mini salgados, bebidas, combos: podem ser pedidos para o MESMO DIA, com entrega/retirada SOMENTE das 14h às 18h (segunda a sábado).';
         ctx += '\n    • ENTREGA MESMO DIA (Mototáxi): das 14h às 18h, segunda a sábado, bairros listados, com taxa. ⛔ NÃO aceite entrega para hoje antes das 14h.';
         ctx += '\n    • RETIRADA MESMO DIA: 14h–18h na loja (Rua Palmeiras, 105, Novo Prado). ⛔ NÃO aceite retirada para hoje antes das 14h.';

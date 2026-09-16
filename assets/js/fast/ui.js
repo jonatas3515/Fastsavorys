@@ -27,6 +27,30 @@ function isProductAvailable(product) {
     return true;
 }
 
+// Verifica se o produto requer 1 dia de antecedência (Empadão, Bolos grandes/tradicionais, Kits Festa)
+function isProductPreorderRequired(product) {
+    if (!product) return false;
+    if (product.requires_preorder === true || product.is_encomenda === true || product.isEncomenda === true) {
+        return true;
+    }
+    const name = (product.name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const category = (product.category || '').toLowerCase();
+
+    // Empadão exige 1 dia de antecedência
+    if (name.includes('empadao')) return true;
+
+    // Kits Festa exigem 1 dia de antecedência
+    if (category === 'kits' || name.includes('kit festa') || name.includes('kit ')) return true;
+
+    // Exceções de bolos que NÃO exigem 1 dia (podem ser no mesmo dia)
+    if (name.includes('vulcao mini') || name.includes('mini vulcao') || name.includes('pote')) return false;
+
+    // Bolos e Vulcão grande
+    if (category === 'bolos' || name.includes('bolo') || name.includes('vulcao')) return true;
+
+    return false;
+}
+
 // Render a single product card HTML
 function createProductCard(product) {
     const isAdditional = product.category === 'adicionais';
@@ -36,15 +60,16 @@ function createProductCard(product) {
         : false;
     const heartIcon = isFav ? '❤️' : '🤍';
 
-    // Promotion Logic
-    // Promotions global loaded in data.js
+    // Preorder (1 dia de antecedência) & Promotion Logic
+    const isPreorder = isProductPreorderRequired(product);
     const promotion = (window.promotions || []).find(p => p.productId === product.id);
     let displayPrice = product.price;
     let priceHtml = '';
     let promoBadge = '';
-    let borderClass = ''; // Default border
+    let hasPromo = false;
 
     if (promotion) {
+        hasPromo = true;
         if (promotion.type === 'percentage') {
             displayPrice = product.price * (1 - promotion.value / 100);
             promoBadge = `<span class='absolute -top-2 -right-2 bg-yellow-400 text-yellow-900 text-xs font-bold px-2 py-1 rounded-full shadow'>-${promotion.value}%</span>`;
@@ -53,11 +78,10 @@ function createProductCard(product) {
             promoBadge = `<span class='absolute -top-2 -right-2 bg-yellow-400 text-yellow-900 text-xs font-bold px-2 py-1 rounded-full shadow'>-R$${promotion.value}</span>`;
         }
         priceHtml = `<span class='line-through text-gray-400 text-sm mr-1'>R$ ${product.price.toFixed(2).replace('.', ',')}</span><span class='text-rose-600 font-bold'>R$ ${displayPrice.toFixed(2).replace('.', ',')}</span>`;
-        borderClass = 'border-yellow-400 border-2';
     } else {
         priceHtml = `<span class='text-rose-600 ${isAdditional ? "text-sm" : "text-lg"} font-bold'>R$ ${product.price.toFixed(2).replace('.', ',')}</span>`;
         if (product.promo && product.promo.active) {
-            // Legacy promo field in product object
+            hasPromo = true;
             if (product.promo.type === 'percent') {
                 displayPrice = product.price * (1 - product.promo.value / 100);
                 promoBadge = `<span class='absolute -top-2 -right-2 bg-yellow-400 text-yellow-900 text-xs font-bold px-2 py-1 rounded-full shadow'>-${product.promo.value}%</span>`;
@@ -66,8 +90,18 @@ function createProductCard(product) {
                 promoBadge = `<span class='absolute -top-2 -right-2 bg-yellow-400 text-yellow-900 text-xs font-bold px-2 py-1 rounded-full shadow'>-R$${product.promo.value}</span>`;
             }
             priceHtml = `<span class='line-through text-gray-400 text-sm mr-1'>R$ ${product.price.toFixed(2).replace('.', ',')}</span><span class='text-rose-600 font-bold'>R$ ${displayPrice.toFixed(2).replace('.', ',')}</span>`;
-            borderClass = 'border-yellow-400 border-2';
         }
+    }
+
+    // Regra de bordas:
+    // - Produtos com 1 dia de antecedência (Empadão, Bolos, Kits) = borda rosa
+    // - Produtos em promoção = borda amarela
+    // - Se houver conflito (promoção + 1 dia de antecedência), a linha rosa PREVALECE!
+    let borderClass = 'border-gray-100';
+    if (isPreorder) {
+        borderClass = 'border-pink-500 border-2';
+    } else if (hasPromo) {
+        borderClass = 'border-yellow-400 border-2';
     }
 
     // Image logic

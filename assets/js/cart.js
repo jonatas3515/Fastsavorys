@@ -381,13 +381,18 @@ console.log('[Cart] Módulo carregado com sucesso');
 // ========================================
 
 window.cartContainsBolo = function () {
-    return window.cart.some(item => {
-        const product = window.products.find(p => p.id === item.id);
-        const name = (item.name || '').toLowerCase();
+    return (window.cart || []).some(item => {
+        const product = (window.products || []).find(p => p.id === item.id) || item;
+        if (product && (product.requires_preorder === true || product.is_encomenda === true || product.isEncomenda === true)) return true;
+        const name = (product?.name || item.name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
         const cat = (product?.category || '').toLowerCase();
+        // Empadão exige 1 dia de antecedência
+        if (name.includes('empadao')) return true;
+        // Kits Festa exigem 1 dia de antecedência
+        if (cat === 'kits' || name.includes('kit festa') || name.includes('kit ')) return true;
         // Vulcão Mini e Bolo no Pote são exceções (podem ser entregues, não exigem antecedência)
-        if (name.includes('vulcão mini') || name.includes('vulcao mini') || name.includes('pote')) return false;
-        return cat === 'bolos' || name.includes('bolo');
+        if (name.includes('vulcao mini') || name.includes('mini vulcao') || name.includes('pote')) return false;
+        return cat === 'bolos' || name.includes('bolo') || name.includes('vulcao');
     });
 };
 

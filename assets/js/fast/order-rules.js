@@ -23,10 +23,20 @@
 window.classifyProduct = function (product) {
     if (!product) return 'adicionais';
 
-    const name = (product.name || '').toLowerCase();
+    const name = (product.name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     const category = (product.category || '').toLowerCase();
 
-    // Kit Festa → sempre bolo_grande (apenas retirada)
+    // Produtos com flag explícito de encomenda / pré-reserva exigem 1 dia
+    if (product.requires_preorder === true || product.is_encomenda === true || product.isEncomenda === true) {
+        return 'bolo_grande';
+    }
+
+    // Empadão → exige 1 dia de antecedência (tratar ANTES de salgados comuns)
+    if (name.includes('empadao')) {
+        return 'bolo_grande';
+    }
+
+    // Kit Festa → sempre bolo_grande (apenas retirada e exige 1 dia de antecedência)
     if (category === 'kits' || name.includes('kit festa') || name.includes('kit ')) {
         return 'bolo_grande';
     }
@@ -34,7 +44,7 @@ window.classifyProduct = function (product) {
     // Combos → verificar se contém Vulcão Mini
     if (category === 'combo' || category === 'combos' || name.includes('combo')) {
         // Combo com Vulcão Mini → permite entrega (classificado como combo_vulcao)
-        if (name.includes('vulcão') || name.includes('vulcao') || name.includes('explosão') || name.includes('explosao')) {
+        if (name.includes('vulcao') || name.includes('explosao')) {
             return 'combo_vulcao';
         }
         // Outros combos → tratados como salgados (permite entrega)
@@ -44,20 +54,19 @@ window.classifyProduct = function (product) {
     // Bolos
     if (category === 'bolos' || name.includes('bolo')) {
         // Vulcão Mini → pode entrega
-        if (name.includes('vulcão mini') || name.includes('vulcao mini') ||
-            name.includes('mini vulcão') || name.includes('mini vulcao')) {
+        if (name.includes('vulcao mini') || name.includes('mini vulcao')) {
             return 'bolo_mini';
         }
         // Bolo no Pote → pode entrega (mesmo tratamento do Vulcão Mini)
-        if (name.includes('pote') || name.includes('no pote') || name.includes('de pote')) {
+        if (name.includes('pote')) {
             return 'bolo_mini';
         }
-        // Qualquer outro bolo (G, P, Vulcão normal) → apenas retirada
+        // Qualquer outro bolo (G, P, Vulcão normal) → apenas retirada e exige 1 dia
         return 'bolo_grande';
     }
 
     // Vulcão sem "bolo" no nome
-    if (name.includes('vulcão') || name.includes('vulcao')) {
+    if (name.includes('vulcao')) {
         if (name.includes('mini')) return 'bolo_mini';
         return 'bolo_grande';
     }
@@ -72,7 +81,7 @@ window.classifyProduct = function (product) {
 
     // Bebidas
     if (category === 'bebidas' || name.includes('refrigerante') || name.includes('coca') ||
-        name.includes('guaraná') || name.includes('suco') || name.includes('água') ||
+        name.includes('guarana') || name.includes('suco') || name.includes('agua') ||
         name.includes('fanta') || name.includes('sprite')) {
         return 'bebidas';
     }
