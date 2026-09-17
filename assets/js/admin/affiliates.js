@@ -477,6 +477,8 @@ window.AffiliatesModule = (function () {
       console.error('[Admin Affiliates] Erro ao deletar:', e);
       alert('Erro ao excluir produto.');
     }
+  }
+
   function parsePrice(str) {
     if (!str) return 0;
     let s = String(str).trim().replace(/[^\d,\.]/g, '');
