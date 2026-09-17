@@ -263,6 +263,38 @@
     renderProducts();
   }
 
+  function detectPlatform(url = '') {
+    const u = (url || '').toLowerCase();
+    if (u.includes('amazon.com.br') || u.includes('amzn.to') || u.includes('a.co') || u.includes('amazon.')) {
+      return { 
+        id: 'amazon', 
+        name: 'Amazon', 
+        btnText: 'Comprar na Amazon', 
+        btnClass: 'bg-gradient-to-r from-amber-500 via-amber-600 to-amber-500 hover:from-amber-600 hover:to-amber-700 text-white group-hover:ring-amber-400',
+        badge: 'bg-amber-100 text-amber-950 border-amber-300',
+        icon: '📦'
+      };
+    }
+    if (u.includes('shopee.com.br') || u.includes('s.shopee.com.br') || u.includes('shope.ee') || u.includes('shopee.')) {
+      return { 
+        id: 'shopee', 
+        name: 'Shopee', 
+        btnText: 'Comprar na Shopee', 
+        btnClass: 'bg-gradient-to-r from-orange-500 via-rose-500 to-orange-500 hover:from-orange-600 hover:to-rose-600 text-white group-hover:ring-orange-400',
+        badge: 'bg-orange-100 text-orange-950 border-orange-300',
+        icon: '🧡'
+      };
+    }
+    return { 
+      id: 'mercadolivre', 
+      name: 'Mercado Livre', 
+      btnText: 'Ver no Mercado Livre', 
+      btnClass: 'bg-gradient-to-r from-yellow-400 via-amber-400 to-yellow-500 hover:from-yellow-500 hover:to-amber-500 text-gray-900 group-hover:ring-yellow-400',
+      badge: 'bg-yellow-100 text-yellow-950 border-yellow-300',
+      icon: '💛'
+    };
+  }
+
   function renderProducts() {
     const grid = document.getElementById('affiliateProductsGrid');
     const emptyState = document.getElementById('affiliateEmptyState');
