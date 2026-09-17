@@ -298,6 +298,7 @@
 
     grid.innerHTML = filtered.map(item => {
       const isFastPick = Boolean(item.is_fast_pick || item.badge_color === 'fast_seal');
+      const platformInfo = detectPlatform(item.affiliate_url);
 
       // Cálculo automático de porcentagem de desconto (Verde)
       const pct = calcDiscountPercent(item.original_price, item.price_display);
@@ -328,6 +329,8 @@
         ? `<span class="inline-flex items-center px-2 py-0.5 text-xs rounded-full border ${badgeStyle} flex-shrink-0">${escapeHtml(rawTag)}</span>` 
         : '';
 
+      const platformBadgeHtml = `<span class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] rounded-full border ${platformInfo.badge} font-bold shadow-xs flex-shrink-0">${platformInfo.icon} ${platformInfo.name}</span>`;
+
       const originalPriceHtml = item.original_price 
         ? `<span class="text-xs text-gray-400 line-through mr-1.5">${escapeHtml(item.original_price)}</span>` 
         : '';
@@ -355,6 +358,7 @@
             <div class="absolute top-2 left-2 flex flex-row flex-wrap items-center gap-1.5 z-10 max-w-[70%]">
               ${discountBadgeHtml}
               ${tagHtml}
+              ${platformBadgeHtml}
             </div>
             <!-- Medalha Oficial FastSavory's no topo direito -->
             ${sealMedalHtml}
@@ -393,9 +397,9 @@
                   href="${escapeHtml(item.affiliate_url)}" 
                   target="_blank" 
                   rel="noopener noreferrer"
-                  class="flex-1 py-2.5 px-3 bg-gradient-to-r from-yellow-400 via-amber-400 to-yellow-500 hover:from-yellow-500 hover:to-amber-500 text-gray-900 font-extrabold text-xs sm:text-sm rounded-xl shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-1.5 text-center group-hover:ring-2 group-hover:ring-yellow-400 group-hover:ring-offset-1"
+                  class="flex-1 py-2.5 px-3 ${platformInfo.btnClass} font-extrabold text-xs sm:text-sm rounded-xl shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-1.5 text-center group-hover:ring-2 group-hover:ring-offset-1"
                 >
-                  <span>Ver no Mercado Livre</span>
+                  <span>${platformInfo.btnText}</span>
                   <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                   </svg>
@@ -429,8 +433,9 @@
     const descText = item.description ? `\n${item.description}\n` : '';
     const isFastPick = Boolean(item.is_fast_pick || item.badge_color === 'fast_seal');
     const sealHeader = isFastPick ? '👑 *PRODUTO TESTADO E RECOMENDADO PELA FASTSAVORY\'S* ✨\n' : '';
+    const platformInfo = detectPlatform(item.affiliate_url);
 
-    return `${sealHeader}🛍️ *ACHADINHO FASTSAVORY'S* ⭐\n🔥 *${item.title}*\n${descText}\n💰 *Preço:* ${origPriceText}*${item.price_display || 'Confira no link'}*${discountText}\n\n👉 *COMPRE COM DESCONTO AQUI:*\n${item.affiliate_url}\n\n✨ FastSavory's • Recomendações Mercado Livre\n🌐 https://fastsavorys.vercel.app/pages/achadinhos.html`;
+    return `${sealHeader}🛍️ *ACHADINHO ${platformInfo.name.toUpperCase()}* ⭐\n🔥 *${item.title}*\n${descText}\n💰 *Preço:* ${origPriceText}*${item.price_display || 'Confira no link'}*${discountText}\n\n👉 *COMPRE COM DESCONTO AQUI:*\n${item.affiliate_url}\n\n✨ FastSavory's • Recomendações ${platformInfo.name}\n🌐 https://fastsavorys.vercel.app/pages/achadinhos.html`;
   }
 
   window.openShareModal = function (id) {

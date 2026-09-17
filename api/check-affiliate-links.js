@@ -41,88 +41,204 @@ async function getMLAccessToken() {
   return null;
 }
 
-function extractProductPriceAndStatus(html) {
+function detectPlatform(url = '') {
+  const u = (url || '').toLowerCase();
+  if (u.includes('amazon.com.br') || u.includes('amzn.to') || u.includes('a.co') || u.includes('amazon.')) {
+    return 'amazon';
+  }
+  if (u.includes('shopee.com.br') || u.includes('s.shopee.com.br') || u.includes('shope.ee') || u.includes('shopee.')) {
+    return 'shopee';
+  }
+  if (u.includes('mercadolivre.com') || u.includes('mercadolibre.com') || u.includes('meli.la')) {
+    return 'mercadolivre';
+  }
+  return 'marketplace';
+}
+
+function cleanTitle(title = '', platform = '') {
+  if (!title) return '';
+  let clean = title.trim();
+  if (platform === 'mercadolivre' || !platform) {
+    clean = clean.replace(/\s*\|\s*Mercado\s*Livre.*$/i, '')
+                 .replace(/\s*-\s*Mercado\s*Livre.*$/i, '');
+  }
+  if (platform === 'amazon' || !platform) {
+    clean = clean.replace(/\s*:\s*Amazon\.com\.br:.*$/i, '')
+                 .replace(/\s*\|\s*Amazon.*$/i, '')
+                 .replace(/\s*-\s*Amazon.*$/i, '');
+  }
+  if (platform === 'shopee' || !platform) {
+    clean = clean.replace(/\s*\|\s*Shopee\s*Brasil.*$/i, '')
+                 .replace(/\s*-\s*Shopee.*$/i, '');
+  }
+  return clean.trim();
+}
+
+function formatBrlNumber(num) {
+  if (num === null || num === undefined || isNaN(num) || num <= 0) return '';
+  return `R$ ${Number(num).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
   let price = '';
   let originalPrice = '';
   let discountTag = '';
   let isPaused = false;
 
-  if (
-    html.includes('Anúncio pausado') ||
-    html.includes('Este anúncio foi pausado') ||
-    html.includes('Publicação finalizada') ||
-    html.includes('Produto esgotado')
-  ) {
-    isPaused = true;
-  }
+  if (platform === 'amazon') {
+    // 1. Check if Amazon product is unavailable
+    if (
+      html.includes('Atualmente indisponível') ||
+      html.includes('Currently unavailable') ||
+      html.includes('Não disponível') ||
+      html.includes('Não temos previsão de quando este produto') ||
+      html.includes('produto não foi encontrado')
+    ) {
+      isPaused = true;
+    }
 
-  // 1. Check embedded Mercado Livre Social / PDP JSON state
-  const currMatch = html.match(/"current_price":\s*\{\s*"value":\s*([0-9.]+)/i) || 
-                    html.match(/current_price.*?value.*?([0-9.]+)/i);
-  if (currMatch && currMatch[1]) {
-    price = `R$ ${Number(currMatch[1]).toFixed(2).replace('.', ',')}`;
-  }
+    // 2. Extract Amazon Price
+    // A) Offscreen price text (e.g. "R$ 1.453,50")
+    const amazonOffscreen = html.match(/class=["'][^"']*a-price[^"']*["'][\s\S]*?class=["'][^"']*a-offscreen[^"']*["']>([^<]+)</i);
+    if (amazonOffscreen && amazonOffscreen[1]) {
+      const clean = amazonOffscreen[1].replace(/&nbsp;/g, ' ').replace(/[^\d.,]/g, '').trim();
+      if (clean) {
+        price = `R$ ${clean}`;
+      }
+    }
 
-  const prevMatch = html.match(/"previous_price":\s*\{\s*"value":\s*([0-9.]+)/i) || 
-                    html.match(/previous_price.*?value.*?([0-9.]+)/i);
-  if (prevMatch && prevMatch[1]) {
-    originalPrice = `R$ ${Number(prevMatch[1]).toFixed(2).replace('.', ',')}`;
-  }
+    // B) Price whole + fraction
+    if (!price) {
+      const wholeMatch = html.match(/class=["'][^"']*a-price-whole[^"']*["']>([0-9.,]+)</i);
+      const fracMatch = html.match(/class=["'][^"']*a-price-fraction[^"']*["']>([0-9]{2})</i);
+      if (wholeMatch && wholeMatch[1]) {
+        const whole = wholeMatch[1].replace(/[^\d.]/g, '');
+        const frac = fracMatch ? fracMatch[1] : '00';
+        price = `R$ ${whole},${frac}`;
+      }
+    }
 
-  const discMatch = html.match(/"discount_label":\s*\{\s*"text":\s*"([^"]+)"/i) || 
-                    html.match(/discount_label.*?text.*?"([^"]+)"/i);
-  if (discMatch && discMatch[1]) {
-    discountTag = discMatch[1];
-  }
+    // C) Amazon Original / Basis Price (list price)
+    const amazonOriginal = html.match(/class=["'][^"']*a-text-price[^"']*["'][\s\S]*?class=["'][^"']*a-offscreen[^"']*["']>([^<]+)</i);
+    if (amazonOriginal && amazonOriginal[1]) {
+      const clean = amazonOriginal[1].replace(/&nbsp;/g, ' ').replace(/[^\d.,]/g, '').trim();
+      if (clean) {
+        originalPrice = `R$ ${clean}`;
+      }
+    }
+  } else if (platform === 'shopee') {
+    // 1. Check if Shopee product is paused or out of stock
+    if (
+      html.includes('Produto esgotado') ||
+      html.includes('Este anúncio foi pausado') ||
+      html.includes('item_deleted') ||
+      html.includes('Desculpe, a página não foi encontrada')
+    ) {
+      isPaused = true;
+    }
 
-  // 2. Check JSON-LD schema fallback
-  if (!price) {
-    const jsonLdRegex = /<script\s+type=["']application\/ld\+json["']>([\s\S]*?)<\/script>/gi;
-    let match;
-    while ((match = jsonLdRegex.exec(html)) !== null) {
-      try {
-        const schema = JSON.parse(match[1]);
-        if (schema) {
-          const offers = schema.offers;
-          if (offers) {
-            const offerPrice = offers.price || offers.lowPrice || (Array.isArray(offers) ? offers[0]?.price : null);
-            if (offerPrice) {
-              price = `R$ ${Number(offerPrice).toFixed(2).replace('.', ',')}`;
-              break;
+    // 2. Extract Shopee Price from Meta / JSON
+    const metaPrice = html.match(/<meta\s+(?:property|name)=["'](?:product:price:amount|og:price:amount|twitter:data1)["']\s+content=["']([0-9.,]+)["']/i);
+    if (metaPrice && metaPrice[1]) {
+      const val = parseFloat(metaPrice[1].replace(',', '.'));
+      if (!isNaN(val) && val > 0) {
+        price = formatBrlNumber(val);
+      }
+    }
+  } else {
+    // Mercado Livre
+    if (
+      html.includes('Anúncio pausado') ||
+      html.includes('Este anúncio foi pausado') ||
+      html.includes('Publicação finalizada') ||
+      html.includes('Produto esgotado')
+    ) {
+      isPaused = true;
+    }
+
+    // 1. Primary buybox price in HTML (ui-pdp-price__second-line / ui-pdp-price)
+    const mainPriceBlock = html.match(/class=["'][^"']*(?:ui-pdp-price__second-line|ui-pdp-price)[^"']*["'][\s\S]*?<\/div>/i);
+    if (mainPriceBlock) {
+      const fracMatch = mainPriceBlock[0].match(/class=["'][^"']*andes-money-amount__fraction[^"']*["']>([0-9.]+)</i);
+      const centsMatch = mainPriceBlock[0].match(/class=["'][^"']*andes-money-amount__cents[^"']*["']>([0-9]{2})</i);
+      if (fracMatch && fracMatch[1]) {
+        const frac = fracMatch[1];
+        const cents = centsMatch ? centsMatch[1] : '00';
+        price = `R$ ${frac},${cents}`;
+      }
+    }
+
+    // 2. Check JSON-LD schema fallback
+    if (!price) {
+      const jsonLdRegex = /<script\s+type=["']application\/ld\+json["']>([\s\S]*?)<\/script>/gi;
+      let match;
+      while ((match = jsonLdRegex.exec(html)) !== null) {
+        try {
+          const schema = JSON.parse(match[1]);
+          if (schema) {
+            const offers = schema.offers;
+            if (offers) {
+              const offerPrice = offers.price || offers.lowPrice || (Array.isArray(offers) ? offers[0]?.price : null);
+              if (offerPrice) {
+                price = formatBrlNumber(offerPrice);
+                break;
+              }
             }
           }
-        }
-      } catch (err) {}
+        } catch (err) {}
+      }
     }
-  }
 
-  // 3. Check Meta Tags for price
-  if (!price) {
-    const metaPrice = html.match(/<meta\s+(?:property|name|itemprop)=["'](?:product:price:amount|og:price:amount|price)["']\s+content=["']([0-9.]+)["']/i) ||
-                      html.match(/<meta\s+content=["']([0-9.]+)["']\s+(?:property|name|itemprop)=["'](?:product:price:amount|og:price:amount|price)["']/i);
-    if (metaPrice && metaPrice[1]) {
-      price = `R$ ${Number(metaPrice[1]).toFixed(2).replace('.', ',')}`;
+    // 3. Check Meta Tags for price
+    if (!price) {
+      const metaPrice = html.match(/<meta\s+(?:property|name|itemprop)=["'](?:product:price:amount|og:price:amount|price)["']\s+content=["']([0-9.]+)["']/i) ||
+                        html.match(/<meta\s+content=["']([0-9.]+)["']\s+(?:property|name|itemprop)=["'](?:product:price:amount|og:price:amount|price)["']/i);
+      if (metaPrice && metaPrice[1]) {
+        price = formatBrlNumber(metaPrice[1]);
+      }
     }
-  }
 
-  // 4. Fallback price regex from Andes money HTML structure
-  if (!price) {
-    const priceFractionMatch = html.match(/class=["'][^"']*andes-money-amount__fraction[^"']*["']>([0-9.]+)</i);
-    const priceCentsMatch = html.match(/class=["'][^"']*andes-money-amount__cents[^"']*["']>([0-9]{2})</i);
-    if (priceFractionMatch && priceFractionMatch[1]) {
-      const frac = priceFractionMatch[1];
-      const cents = priceCentsMatch ? priceCentsMatch[1] : '00';
-      price = `R$ ${frac},${cents}`;
+    // 4. Fallback from Andes money HTML structure anywhere
+    if (!price) {
+      const priceFractionMatch = html.match(/class=["'][^"']*andes-money-amount__fraction[^"']*["']>([0-9.]+)</i);
+      const priceCentsMatch = html.match(/class=["'][^"']*andes-money-amount__cents[^"']*["']>([0-9]{2})</i);
+      if (priceFractionMatch && priceFractionMatch[1]) {
+        const frac = priceFractionMatch[1];
+        const cents = priceCentsMatch ? priceCentsMatch[1] : '00';
+        price = `R$ ${frac},${cents}`;
+      }
     }
-  }
 
-  // 5. Previous price fallback from Andes HTML
-  if (!originalPrice) {
+    // 5. Previous price from Andes HTML
     const originalPriceMatch = html.match(
       /class=["'][^"']*andes-money-amount--previous[^"']*[\s\S]*?class=["'][^"']*andes-money-amount__fraction[^"']*["']>([0-9.]+)</i
     );
+    const originalCentsMatch = html.match(
+      /class=["'][^"']*andes-money-amount--previous[^"']*[\s\S]*?class=["'][^"']*andes-money-amount__cents[^"']*["']>([0-9]{2})</i
+    );
     if (originalPriceMatch && originalPriceMatch[1]) {
-      originalPrice = `R$ ${originalPriceMatch[1]},00`;
+      const frac = originalPriceMatch[1];
+      const cents = originalCentsMatch ? originalCentsMatch[1] : '00';
+      originalPrice = `R$ ${frac},${cents}`;
+    }
+
+    // 6. Discount label tag
+    const discMatch = html.match(/"discount_label":\s*\{\s*"text":\s*"([^"]+)"/i) || 
+                      html.match(/discount_label.*?text.*?"([^"]+)"/i) ||
+                      html.match(/class=["'][^"']*ui-pdp-price__discount[^"']*["']>([^<]+)</i);
+    if (discMatch && discMatch[1]) {
+      discountTag = discMatch[1].trim();
+    }
+  }
+
+  // Universal Fallbacks if price is still empty
+  if (!price) {
+    const metaPrice = html.match(/<meta\s+(?:property|name|itemprop)=["'](?:product:price:amount|og:price:amount|price)["']\s+content=["']([0-9.,]+)["']/i);
+    if (metaPrice && metaPrice[1]) {
+      const num = parseFloat(metaPrice[1].replace(',', '.'));
+      if (!isNaN(num) && num > 0) {
+        price = formatBrlNumber(num);
+      }
     }
   }
 
@@ -131,9 +247,17 @@ function extractProductPriceAndStatus(html) {
 
 async function fetchProductDetails(rawUrl) {
   let targetUrl = rawUrl.trim();
+  const platform = detectPlatform(targetUrl);
 
-  // 1. Follow redirect if shortened link (like meli.la/...)
-  if (targetUrl.includes('meli.la') || targetUrl.includes('mercadolivre.com/sec/')) {
+  // 1. Follow redirect if shortened link (like meli.la/..., amzn.to/..., s.shopee.com.br/...)
+  if (
+    targetUrl.includes('meli.la') ||
+    targetUrl.includes('mercadolivre.com/sec/') ||
+    targetUrl.includes('amzn.to') ||
+    targetUrl.includes('a.co') ||
+    targetUrl.includes('s.shopee.com.br') ||
+    targetUrl.includes('shope.ee')
+  ) {
     try {
       const headRes = await fetch(targetUrl, {
         method: 'GET',
@@ -147,7 +271,7 @@ async function fetchProductDetails(rawUrl) {
         targetUrl = headRes.url;
       }
     } catch (e) {
-      console.warn('[ML Auto-Fetch] Falha no redirect follow:', e);
+      console.warn('[Auto-Fetch] Falha no redirect follow:', e);
     }
   }
 
@@ -171,7 +295,7 @@ async function fetchProductDetails(rawUrl) {
     html.match(/<meta\s+property=["']og:title["']\s+content=["'](.*?)["']/i) ||
     html.match(/<title>(.*?)<\/title>/i);
   if (titleMatch && titleMatch[1]) {
-    title = titleMatch[1].replace(/\s*\|\s*Mercado\s*Livre.*$/i, '').trim();
+    title = cleanTitle(titleMatch[1], platform);
   }
 
   const imageMatch = html.match(/<meta\s+property=["']og:image["']\s+content=["'](.*?)["']/i);
@@ -179,7 +303,16 @@ async function fetchProductDetails(rawUrl) {
     imageUrl = imageMatch[1];
   }
 
-  const { price, originalPrice, discountTag, isPaused } = extractProductPriceAndStatus(html);
+  // Fallback for Amazon image
+  if (!imageUrl && platform === 'amazon') {
+    const amzImgMatch = html.match(/id=["']landingImage["'][\s\S]*?data-old-hires=["']([^"']+)["']/i) ||
+                        html.match(/data-a-dynamic-image=["']\{&quot;([^&]+)&quot;/i);
+    if (amzImgMatch && amzImgMatch[1]) {
+      imageUrl = amzImgMatch[1];
+    }
+  }
+
+  const { price, originalPrice, discountTag, isPaused } = extractProductPriceAndStatus(html, platform);
 
   let discountPercent = 0;
   if (price && originalPrice) {
@@ -190,7 +323,8 @@ async function fetchProductDetails(rawUrl) {
     }
   }
 
-  const finalTitle = title || 'Produto Mercado Livre';
+  const defaultPlatformName = platform === 'amazon' ? 'Amazon' : (platform === 'shopee' ? 'Shopee' : 'Mercado Livre');
+  const finalTitle = title || `Produto ${defaultPlatformName}`;
   const detectedCategory = detectCategory(finalTitle, '', targetUrl);
 
   return {
@@ -201,6 +335,7 @@ async function fetchProductDetails(rawUrl) {
     discount_percent: discountPercent,
     discount_tag: discountTag || (discountPercent > 0 ? `${discountPercent}% OFF` : ''),
     category: detectedCategory,
+    platform: platform,
     is_active: !isPaused,
     final_url: targetUrl
   };
@@ -399,27 +534,31 @@ export default async function handler(req, res) {
           }
 
           const text = await response.text();
+          const itemPlatform = detectPlatform(finalUrl || url);
 
-          const { price, originalPrice, discountTag, isPaused } = extractProductPriceAndStatus(text);
+          const { price, originalPrice, discountTag, isPaused } = extractProductPriceAndStatus(text, itemPlatform);
 
           let pageTitle = '';
           const titleMatch =
             text.match(/<meta\s+property=["']og:title["']\s+content=["'](.*?)["']/i) ||
             text.match(/<title>(.*?)<\/title>/i);
           if (titleMatch && titleMatch[1]) {
-            pageTitle = titleMatch[1].replace(/\s*\|\s*Mercado\s*Livre.*$/i, '').trim();
+            pageTitle = cleanTitle(titleMatch[1], itemPlatform);
           }
+
+          const platformName = itemPlatform === 'amazon' ? 'Amazon' : (itemPlatform === 'shopee' ? 'Shopee' : 'ML');
 
           if (isPaused) {
             return {
               id: item.id,
               url,
               finalUrl,
+              platform: itemPlatform,
               title: pageTitle,
               price: price || '',
               original_price: originalPrice || '',
               status: 'paused',
-              statusText: 'Anúncio Pausado / Esgotado no ML',
+              statusText: `Anúncio Pausado / Esgotado na ${platformName}`,
               statusCode: 200
             };
           }
@@ -428,12 +567,13 @@ export default async function handler(req, res) {
             id: item.id,
             url,
             finalUrl,
+            platform: itemPlatform,
             title: pageTitle,
             price: price || '',
             original_price: originalPrice || '',
             discount_tag: discountTag || '',
             status: 'active',
-            statusText: 'Online e Ativo',
+            statusText: `Online e Ativo (${platformName})`,
             statusCode: 200
           };
         } catch (err) {

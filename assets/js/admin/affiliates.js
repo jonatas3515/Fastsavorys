@@ -91,6 +91,17 @@ window.AffiliatesModule = (function () {
     });
   }
 
+  function detectPlatform(url = '') {
+    const u = (url || '').toLowerCase();
+    if (u.includes('amazon.com.br') || u.includes('amzn.to') || u.includes('a.co') || u.includes('amazon.')) {
+      return { id: 'amazon', name: 'Amazon', icon: '📦', badge: 'bg-amber-100 text-amber-900 border-amber-300' };
+    }
+    if (u.includes('shopee.com.br') || u.includes('s.shopee.com.br') || u.includes('shope.ee') || u.includes('shopee.')) {
+      return { id: 'shopee', name: 'Shopee', icon: '🧡', badge: 'bg-orange-100 text-orange-900 border-orange-300' };
+    }
+    return { id: 'mercadolivre', name: 'Mercado Livre', icon: '💛', badge: 'bg-yellow-100 text-yellow-900 border-yellow-300' };
+  }
+
   function renderTable() {
     const tbody = document.getElementById('affiliateAdminTableBody');
     if (!tbody) return;
@@ -153,6 +164,9 @@ window.AffiliatesModule = (function () {
         ? `<span class="inline-block text-[10px] bg-emerald-600 text-white font-extrabold px-1.5 py-0.2 rounded mt-0.5 shadow-sm">🔥 ${pct}% OFF</span>`
         : '';
 
+      const platformInfo = detectPlatform(item.affiliate_url);
+      const platformBadge = `<span class="inline-flex items-center gap-1 text-[10px] ${platformInfo.badge} font-bold px-1.5 py-0.2 rounded border">${platformInfo.icon} ${platformInfo.name}</span>`;
+
       const isFastPick = Boolean(item.is_fast_pick || item.badge_color === 'fast_seal');
       const fastPickBadge = isFastPick
         ? `<span class="inline-flex items-center gap-1 text-[10px] bg-gradient-to-r from-pink-600 via-purple-600 to-indigo-600 text-white font-black px-2 py-0.5 rounded-full shadow-xs">✨ Selo Fast</span>`
@@ -184,7 +198,8 @@ window.AffiliatesModule = (function () {
               <span>${escapeHtml(item.title)}</span>
               ${fastPickBadge}
             </div>
-            <div class="flex items-center gap-1 mt-0.5">
+            <div class="flex items-center gap-1.5 mt-1 flex-wrap">
+              ${platformBadge}
               ${discountBadge}
               ${customTagBadge}
             </div>
@@ -200,7 +215,7 @@ window.AffiliatesModule = (function () {
               <button onclick="AffiliatesModule.openShareModal(${item.id})" 
                       class="p-1.5 text-green-600 hover:bg-green-50 rounded-lg text-xs font-medium" title="Compartilhar Oferta">📤</button>
               <a href="${escapeHtml(item.affiliate_url)}" target="_blank" rel="noopener noreferrer" 
-                 class="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg text-xs" title="Testar link no ML">🔗</a>
+                 class="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg text-xs" title="Testar link na loja">🔗</a>
               <button onclick="AffiliatesModule.openEditModal(${item.id})" 
                        class="p-1.5 text-amber-600 hover:bg-amber-50 rounded-lg text-xs font-medium" title="Editar">✏️</button>
               <button onclick="AffiliatesModule.deleteProduct(${item.id})" 
@@ -216,7 +231,7 @@ window.AffiliatesModule = (function () {
     editingId = null;
     const form = document.getElementById('affiliateForm');
     if (form) form.reset();
-    document.getElementById('affiliateModalTitle').textContent = '➕ Novo Achadinho (Mercado Livre)';
+    document.getElementById('affiliateModalTitle').textContent = '➕ Novo Achadinho (ML, Amazon & Shopee)';
     document.getElementById('affiliateId').value = '';
     const discountEl = document.getElementById('affiliateDiscountInput');
     if (discountEl) discountEl.value = '';
@@ -717,7 +732,6 @@ window.AffiliatesModule = (function () {
         updatePayload.original_price = newOrigPrice;
       }
       if (discountPct > 0) {
-        updatePayload.discount_percent = discountPct;
         updatePayload.discount_tag = `${discountPct}% OFF`;
       }
 
@@ -764,7 +778,7 @@ window.AffiliatesModule = (function () {
     });
 
     if (pausedItemsToUpdate.length === 0) {
-      alert('Todos os itens pausados no ML já estão pausados no site.');
+      alert('Todos os itens pausados já estão pausados no site.');
       return;
     }
 
@@ -848,7 +862,7 @@ window.AffiliatesModule = (function () {
       return;
     }
 
-    if (!confirm(`Deseja sincronizar os preços de todos os ${itemsToUpdate.length} produtos com o Mercado Livre?`)) {
+    if (!confirm(`Deseja sincronizar os preços de todos os ${itemsToUpdate.length} produtos com a loja parceira?`)) {
       return;
     }
 
@@ -869,7 +883,6 @@ window.AffiliatesModule = (function () {
           updatePayload.original_price = item.newOrigPrice;
         }
         if (discountPct > 0) {
-          updatePayload.discount_percent = discountPct;
           updatePayload.discount_tag = `${discountPct}% OFF`;
         }
 
@@ -1011,8 +1024,9 @@ window.AffiliatesModule = (function () {
     const descText = item.description ? `\n${item.description}\n` : '';
     const isFastPick = Boolean(item.is_fast_pick || item.badge_color === 'fast_seal');
     const sealHeader = isFastPick ? '👑 *PRODUTO TESTADO E RECOMENDADO PELA FASTSAVORY\'S* ✨\n' : '';
+    const platformInfo = detectPlatform(item.affiliate_url);
 
-    return `${sealHeader}🛍️ *ACHADINHO FASTSAVORY'S* ⭐\n🔥 *${item.title}*\n${descText}\n💰 *Preço:* ${origPriceText}*${item.price_display || 'Confira no link'}*${discountText}\n\n👉 *COMPRE COM DESCONTO AQUI:*\n${item.affiliate_url}\n\n✨ FastSavory's • Recomendações Mercado Livre\n🌐 https://fastsavorys.vercel.app/pages/achadinhos.html`;
+    return `${sealHeader}🛍️ *ACHADINHO ${platformInfo.name.toUpperCase()}* ⭐\n🔥 *${item.title}*\n${descText}\n💰 *Preço:* ${origPriceText}*${item.price_display || 'Confira no link'}*${discountText}\n\n👉 *COMPRE COM DESCONTO AQUI:*\n${item.affiliate_url}\n\n✨ FastSavory's • Recomendações ${platformInfo.name}\n🌐 https://fastsavorys.vercel.app/pages/achadinhos.html`;
   }
 
   function openShareModal(id) {
