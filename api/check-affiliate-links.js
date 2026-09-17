@@ -79,6 +79,23 @@ function formatBrlNumber(num) {
   return `R$ ${Number(num).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+function parsePrice(str) {
+  if (!str) return 0;
+  let s = String(str).trim().replace(/[^\d,\.]/g, '');
+  if (s.includes('.') && s.includes(',')) {
+    s = s.replace(/\./g, '').replace(',', '.');
+  } else if (s.includes(',')) {
+    s = s.replace(',', '.');
+  } else if (s.includes('.')) {
+    const parts = s.split('.');
+    if (parts.length > 1 && parts[parts.length - 1].length === 3) {
+      s = s.replace(/\./g, '');
+    }
+  }
+  const num = parseFloat(s);
+  return isNaN(num) ? 0 : num;
+}
+
 function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
   let price = '';
   let originalPrice = '';
@@ -156,19 +173,68 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
       isPaused = true;
     }
 
-    // 1. Primary buybox price in HTML (ui-pdp-price__second-line / ui-pdp-price)
-    const mainPriceBlock = html.match(/class=["'][^"']*(?:ui-pdp-price__second-line|ui-pdp-price)[^"']*["'][\s\S]*?<\/div>/i);
-    if (mainPriceBlock) {
-      const fracMatch = mainPriceBlock[0].match(/class=["'][^"']*andes-money-amount__fraction[^"']*["']>([0-9.]+)</i);
-      const centsMatch = mainPriceBlock[0].match(/class=["'][^"']*andes-money-amount__cents[^"']*["']>([0-9]{2})</i);
+    // 1. Check Poly Card / Showcase layout (Affiliate recommendations & profile pages)
+    const polyCurrentMatch = html.match(/class=["'][^"']*poly-price__current[^"']*["'][\s\S]*?<\/div>/i);
+    if (polyCurrentMatch) {
+      const fracMatch = polyCurrentMatch[0].match(/class=["'][^"']*andes-money-amount__fraction[^"']*["']>([0-9.]+)</i);
+      const centsMatch = polyCurrentMatch[0].match(/class=["'][^"']*andes-money-amount__cents[^"']*["']>([0-9]{2})</i);
       if (fracMatch && fracMatch[1]) {
         const frac = fracMatch[1];
         const cents = centsMatch ? centsMatch[1] : '00';
         price = `R$ ${frac},${cents}`;
       }
+      const discMatch = polyCurrentMatch[0].match(/class=["'][^"']*(?:poly-price__disc_label|andes-money-amount__discount)[^"']*["']>([^<]+)</i);
+      if (discMatch && discMatch[1]) {
+        discountTag = discMatch[1].trim();
+      }
     }
 
-    // 2. Check JSON-LD schema fallback
+    // 2. Standard Product Page buybox (ui-pdp-price__second-line / ui-pdp-price)
+    if (!price) {
+      const mainPriceBlock = html.match(/class=["'][^"']*(?:ui-pdp-price__second-line|ui-pdp-price)[^"']*["'][\s\S]*?<\/div>/i);
+      if (mainPriceBlock) {
+        const fracMatch = mainPriceBlock[0].match(/class=["'][^"']*andes-money-amount__fraction[^"']*["']>([0-9.]+)</i);
+        const centsMatch = mainPriceBlock[0].match(/class=["'][^"']*andes-money-amount__cents[^"']*["']>([0-9]{2})</i);
+        if (fracMatch && fracMatch[1]) {
+          const frac = fracMatch[1];
+          const cents = centsMatch ? centsMatch[1] : '00';
+          price = `R$ ${frac},${cents}`;
+        }
+      }
+    }
+
+    // 3. Aria-label fallback for current price: aria-label="Agora: X reais"
+    if (!price) {
+      const agoraMatch = html.match(/aria-label=["']Agora:\s*([0-9.]+)\s*reais(?:\s*com\s*([0-9]{1,2})\s*centavos)?["']/i);
+      if (agoraMatch && agoraMatch[1]) {
+        const frac = agoraMatch[1];
+        const cents = agoraMatch[2] ? agoraMatch[2].padStart(2, '0') : '00';
+        price = `R$ ${frac},${cents}`;
+      }
+    }
+
+    // 4. Previous / Original price (andes-money-amount--previous or aria-label="Antes: X reais")
+    const previousMatch = html.match(/class=["'][^"']*andes-money-amount--previous[^"']*["'][\s\S]*?<\/(?:s|span|div)>/i);
+    if (previousMatch) {
+      const fracMatch = previousMatch[0].match(/class=["'][^"']*andes-money-amount__fraction[^"']*["']>([0-9.]+)</i);
+      const centsMatch = previousMatch[0].match(/class=["'][^"']*andes-money-amount__cents[^"']*["']>([0-9]{2})</i);
+      if (fracMatch && fracMatch[1]) {
+        const frac = fracMatch[1];
+        const cents = centsMatch ? centsMatch[1] : '00';
+        originalPrice = `R$ ${frac},${cents}`;
+      }
+    }
+
+    if (!originalPrice) {
+      const antesMatch = html.match(/aria-label=["']Antes:\s*([0-9.]+)\s*reais(?:\s*com\s*([0-9]{1,2})\s*centavos)?["']/i);
+      if (antesMatch && antesMatch[1]) {
+        const frac = antesMatch[1];
+        const cents = antesMatch[2] ? antesMatch[2].padStart(2, '0') : '00';
+        originalPrice = `R$ ${frac},${cents}`;
+      }
+    }
+
+    // 5. Check JSON-LD schema fallback
     if (!price) {
       const jsonLdRegex = /<script\s+type=["']application\/ld\+json["']>([\s\S]*?)<\/script>/gi;
       let match;
@@ -189,7 +255,7 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
       }
     }
 
-    // 3. Check Meta Tags for price
+    // 6. Check Meta Tags for price
     if (!price) {
       const metaPrice = html.match(/<meta\s+(?:property|name|itemprop)=["'](?:product:price:amount|og:price:amount|price)["']\s+content=["']([0-9.]+)["']/i) ||
                         html.match(/<meta\s+content=["']([0-9.]+)["']\s+(?:property|name|itemprop)=["'](?:product:price:amount|og:price:amount|price)["']/i);
@@ -198,36 +264,14 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
       }
     }
 
-    // 4. Fallback from Andes money HTML structure anywhere
-    if (!price) {
-      const priceFractionMatch = html.match(/class=["'][^"']*andes-money-amount__fraction[^"']*["']>([0-9.]+)</i);
-      const priceCentsMatch = html.match(/class=["'][^"']*andes-money-amount__cents[^"']*["']>([0-9]{2})</i);
-      if (priceFractionMatch && priceFractionMatch[1]) {
-        const frac = priceFractionMatch[1];
-        const cents = priceCentsMatch ? priceCentsMatch[1] : '00';
-        price = `R$ ${frac},${cents}`;
+    // 7. Discount label tag fallback
+    if (!discountTag) {
+      const discMatch = html.match(/"discount_label":\s*\{\s*"text":\s*"([^"]+)"/i) || 
+                        html.match(/discount_label.*?text.*?"([^"]+)"/i) ||
+                        html.match(/class=["'][^"']*ui-pdp-price__discount[^"']*["']>([^<]+)</i);
+      if (discMatch && discMatch[1]) {
+        discountTag = discMatch[1].trim();
       }
-    }
-
-    // 5. Previous price from Andes HTML
-    const originalPriceMatch = html.match(
-      /class=["'][^"']*andes-money-amount--previous[^"']*[\s\S]*?class=["'][^"']*andes-money-amount__fraction[^"']*["']>([0-9.]+)</i
-    );
-    const originalCentsMatch = html.match(
-      /class=["'][^"']*andes-money-amount--previous[^"']*[\s\S]*?class=["'][^"']*andes-money-amount__cents[^"']*["']>([0-9]{2})</i
-    );
-    if (originalPriceMatch && originalPriceMatch[1]) {
-      const frac = originalPriceMatch[1];
-      const cents = originalCentsMatch ? originalCentsMatch[1] : '00';
-      originalPrice = `R$ ${frac},${cents}`;
-    }
-
-    // 6. Discount label tag
-    const discMatch = html.match(/"discount_label":\s*\{\s*"text":\s*"([^"]+)"/i) || 
-                      html.match(/discount_label.*?text.*?"([^"]+)"/i) ||
-                      html.match(/class=["'][^"']*ui-pdp-price__discount[^"']*["']>([^<]+)</i);
-    if (discMatch && discMatch[1]) {
-      discountTag = discMatch[1].trim();
     }
   }
 
@@ -292,13 +336,19 @@ async function fetchProductDetails(rawUrl) {
   let imageUrl = '';
 
   const titleMatch =
+    html.match(/class=["'][^"']*poly-component__title[^"']*["'][^>]*><a[^>]*>([^<]+)<\/a>/i) ||
+    html.match(/class=["'][^"']*poly-component__title[^"']*["'][^>]*>([^<]+)<\//i) ||
+    html.match(/<h2[^>]*class=["'][^"']*poly-box[^"']*["'][^>]*><a[^>]*>([^<]+)<\/a>/i) ||
+    html.match(/<h1[^>]*class=["'][^"']*(?:ui-pdp-title|poly-component__title)[^"']*["'][^>]*>([^<]+)<\/h1>/i) ||
     html.match(/<meta\s+property=["']og:title["']\s+content=["'](.*?)["']/i) ||
     html.match(/<title>(.*?)<\/title>/i);
   if (titleMatch && titleMatch[1]) {
     title = cleanTitle(titleMatch[1], platform);
   }
 
-  const imageMatch = html.match(/<meta\s+property=["']og:image["']\s+content=["'](.*?)["']/i);
+  const imageMatch =
+    html.match(/<meta\s+property=["']og:image["']\s+content=["'](.*?)["']/i) ||
+    html.match(/class=["'][^"']*poly-component__picture[^"']*["'][\s\S]*?src=["']([^"']+)["']/i);
   if (imageMatch && imageMatch[1]) {
     imageUrl = imageMatch[1];
   }
@@ -316,8 +366,8 @@ async function fetchProductDetails(rawUrl) {
 
   let discountPercent = 0;
   if (price && originalPrice) {
-    const p1 = parseFloat(price.replace(/[^0-9,]/g, '').replace(',', '.'));
-    const p2 = parseFloat(originalPrice.replace(/[^0-9,]/g, '').replace(',', '.'));
+    const p1 = parsePrice(price);
+    const p2 = parsePrice(originalPrice);
     if (p2 > p1) {
       discountPercent = Math.round(((p2 - p1) / p2) * 100);
     }
@@ -540,6 +590,10 @@ export default async function handler(req, res) {
 
           let pageTitle = '';
           const titleMatch =
+            text.match(/class=["'][^"']*poly-component__title[^"']*["'][^>]*><a[^>]*>([^<]+)<\/a>/i) ||
+            text.match(/class=["'][^"']*poly-component__title[^"']*["'][^>]*>([^<]+)<\//i) ||
+            text.match(/<h2[^>]*class=["'][^"']*poly-box[^"']*["'][^>]*><a[^>]*>([^<]+)<\/a>/i) ||
+            text.match(/<h1[^>]*class=["'][^"']*(?:ui-pdp-title|poly-component__title)[^"']*["'][^>]*>([^<]+)<\/h1>/i) ||
             text.match(/<meta\s+property=["']og:title["']\s+content=["'](.*?)["']/i) ||
             text.match(/<title>(.*?)<\/title>/i);
           if (titleMatch && titleMatch[1]) {

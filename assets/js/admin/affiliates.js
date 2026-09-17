@@ -477,29 +477,33 @@ window.AffiliatesModule = (function () {
       console.error('[Admin Affiliates] Erro ao deletar:', e);
       alert('Erro ao excluir produto.');
     }
+  function parsePrice(str) {
+    if (!str) return 0;
+    let s = String(str).trim().replace(/[^\d,\.]/g, '');
+    if (s.includes('.') && s.includes(',')) {
+      s = s.replace(/\./g, '').replace(',', '.');
+    } else if (s.includes(',')) {
+      s = s.replace(',', '.');
+    } else if (s.includes('.')) {
+      const parts = s.split('.');
+      if (parts.length > 1 && parts[parts.length - 1].length === 3) {
+        s = s.replace(/\./g, '');
+      }
+    }
+    const num = parseFloat(s);
+    return isNaN(num) ? 0 : num;
   }
 
   function calcDiscountPercent(origStr, currStr) {
     if (!origStr || !currStr) return 0;
-    const parseNum = (str) => {
-      const clean = String(str).replace(/[^\d,\.]/g, '').replace(',', '.');
-      return parseFloat(clean);
-    };
-    const orig = parseNum(origStr);
-    const curr = parseNum(currStr);
+    const orig = parsePrice(origStr);
+    const curr = parsePrice(currStr);
     if (!orig || !curr || orig <= curr) return 0;
     const pct = Math.round(((orig - curr) / orig) * 100);
     return pct > 0 && pct < 100 ? pct : 0;
   }
 
   let lastHealthCheckResults = [];
-
-  function parsePrice(str) {
-    if (!str) return 0;
-    const clean = String(str).replace(/[^\d,\.]/g, '').replace(',', '.');
-    const num = parseFloat(clean);
-    return isNaN(num) ? 0 : num;
-  }
 
   async function checkAllLinksHealth() {
     const itemsToCheck = getFilteredProducts();
