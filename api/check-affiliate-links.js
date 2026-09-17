@@ -41,6 +41,94 @@ async function getMLAccessToken() {
   return null;
 }
 
+function extractProductPriceAndStatus(html) {
+  let price = '';
+  let originalPrice = '';
+  let discountTag = '';
+  let isPaused = false;
+
+  if (
+    html.includes('Anúncio pausado') ||
+    html.includes('Este anúncio foi pausado') ||
+    html.includes('Publicação finalizada') ||
+    html.includes('Produto esgotado')
+  ) {
+    isPaused = true;
+  }
+
+  // 1. Check embedded Mercado Livre Social / PDP JSON state
+  const currMatch = html.match(/"current_price":\s*\{\s*"value":\s*([0-9.]+)/i) || 
+                    html.match(/current_price.*?value.*?([0-9.]+)/i);
+  if (currMatch && currMatch[1]) {
+    price = `R$ ${Number(currMatch[1]).toFixed(2).replace('.', ',')}`;
+  }
+
+  const prevMatch = html.match(/"previous_price":\s*\{\s*"value":\s*([0-9.]+)/i) || 
+                    html.match(/previous_price.*?value.*?([0-9.]+)/i);
+  if (prevMatch && prevMatch[1]) {
+    originalPrice = `R$ ${Number(prevMatch[1]).toFixed(2).replace('.', ',')}`;
+  }
+
+  const discMatch = html.match(/"discount_label":\s*\{\s*"text":\s*"([^"]+)"/i) || 
+                    html.match(/discount_label.*?text.*?"([^"]+)"/i);
+  if (discMatch && discMatch[1]) {
+    discountTag = discMatch[1];
+  }
+
+  // 2. Check JSON-LD schema fallback
+  if (!price) {
+    const jsonLdRegex = /<script\s+type=["']application\/ld\+json["']>([\s\S]*?)<\/script>/gi;
+    let match;
+    while ((match = jsonLdRegex.exec(html)) !== null) {
+      try {
+        const schema = JSON.parse(match[1]);
+        if (schema) {
+          const offers = schema.offers;
+          if (offers) {
+            const offerPrice = offers.price || offers.lowPrice || (Array.isArray(offers) ? offers[0]?.price : null);
+            if (offerPrice) {
+              price = `R$ ${Number(offerPrice).toFixed(2).replace('.', ',')}`;
+              break;
+            }
+          }
+        }
+      } catch (err) {}
+    }
+  }
+
+  // 3. Check Meta Tags for price
+  if (!price) {
+    const metaPrice = html.match(/<meta\s+(?:property|name|itemprop)=["'](?:product:price:amount|og:price:amount|price)["']\s+content=["']([0-9.]+)["']/i) ||
+                      html.match(/<meta\s+content=["']([0-9.]+)["']\s+(?:property|name|itemprop)=["'](?:product:price:amount|og:price:amount|price)["']/i);
+    if (metaPrice && metaPrice[1]) {
+      price = `R$ ${Number(metaPrice[1]).toFixed(2).replace('.', ',')}`;
+    }
+  }
+
+  // 4. Fallback price regex from Andes money HTML structure
+  if (!price) {
+    const priceFractionMatch = html.match(/class=["'][^"']*andes-money-amount__fraction[^"']*["']>([0-9.]+)</i);
+    const priceCentsMatch = html.match(/class=["'][^"']*andes-money-amount__cents[^"']*["']>([0-9]{2})</i);
+    if (priceFractionMatch && priceFractionMatch[1]) {
+      const frac = priceFractionMatch[1];
+      const cents = priceCentsMatch ? priceCentsMatch[1] : '00';
+      price = `R$ ${frac},${cents}`;
+    }
+  }
+
+  // 5. Previous price fallback from Andes HTML
+  if (!originalPrice) {
+    const originalPriceMatch = html.match(
+      /class=["'][^"']*andes-money-amount--previous[^"']*[\s\S]*?class=["'][^"']*andes-money-amount__fraction[^"']*["']>([0-9.]+)</i
+    );
+    if (originalPriceMatch && originalPriceMatch[1]) {
+      originalPrice = `R$ ${originalPriceMatch[1]},00`;
+    }
+  }
+
+  return { price, originalPrice, discountTag, isPaused };
+}
+
 async function fetchProductDetails(rawUrl) {
   let targetUrl = rawUrl.trim();
 
@@ -78,10 +166,6 @@ async function fetchProductDetails(rawUrl) {
 
   let title = '';
   let imageUrl = '';
-  let price = '';
-  let originalPrice = '';
-  let discountTag = '';
-  let isPaused = false;
 
   const titleMatch =
     html.match(/<meta\s+property=["']og:title["']\s+content=["'](.*?)["']/i) ||
@@ -95,74 +179,7 @@ async function fetchProductDetails(rawUrl) {
     imageUrl = imageMatch[1];
   }
 
-  // 1. Check embedded Mercado Livre Social / PDP JSON state
-  const currMatch = html.match(/"current_price":\{"value":([0-9.]+)/i) || 
-                    html.match(/current_price.*?value.*?([0-9.]+)/i);
-  if (currMatch && currMatch[1]) {
-    price = `R$ ${Number(currMatch[1]).toFixed(2).replace('.', ',')}`;
-  }
-
-  const prevMatch = html.match(/"previous_price":\{"value":([0-9.]+)/i) || 
-                    html.match(/previous_price.*?value.*?([0-9.]+)/i);
-  if (prevMatch && prevMatch[1]) {
-    originalPrice = `R$ ${Number(prevMatch[1]).toFixed(2).replace('.', ',')}`;
-  }
-
-  const discMatch = html.match(/"discount_label":\{"text":"([^"]+)"/i) || 
-                    html.match(/discount_label.*?text.*?"([^"]+)"/i);
-  if (discMatch && discMatch[1]) {
-    discountTag = discMatch[1];
-  }
-
-  // 2. Check JSON-LD schema fallback
-  if (!price) {
-    const schemaMatch = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/i);
-    if (schemaMatch && schemaMatch[1]) {
-      try {
-        const schema = JSON.parse(schemaMatch[1]);
-        if (schema && schema.offers) {
-          const offerPrice = schema.offers.price || schema.offers.lowPrice || (Array.isArray(schema.offers) ? schema.offers[0]?.price : null);
-          if (offerPrice) {
-            price = `R$ ${Number(offerPrice).toFixed(2).replace('.', ',')}`;
-          }
-        }
-        if (!title && schema.name) title = schema.name;
-        if (!imageUrl && schema.image) {
-          imageUrl = Array.isArray(schema.image) ? schema.image[0] : schema.image;
-        }
-      } catch (err) {}
-    }
-  }
-
-  // 3. Fallback price regex from Andes money HTML structure
-  if (!price) {
-    const priceFractionMatch = html.match(/class=["'][^"']*andes-money-amount__fraction[^"']*["']>([0-9.]+)</i);
-    const priceCentsMatch = html.match(/class=["'][^"']*andes-money-amount__cents[^"']*["']>([0-9]{2})</i);
-    if (priceFractionMatch && priceFractionMatch[1]) {
-      const frac = priceFractionMatch[1];
-      const cents = priceCentsMatch ? priceCentsMatch[1] : '00';
-      price = `R$ ${frac},${cents}`;
-    }
-  }
-
-  // 4. Previous price fallback from Andes HTML
-  if (!originalPrice) {
-    const originalPriceMatch = html.match(
-      /class=["'][^"']*andes-money-amount--previous[^"']*[\s\S]*?class=["'][^"']*andes-money-amount__fraction[^"']*["']>([0-9.]+)</i
-    );
-    if (originalPriceMatch && originalPriceMatch[1]) {
-      originalPrice = `R$ ${originalPriceMatch[1]},00`;
-    }
-  }
-
-  if (
-    html.includes('Anúncio pausado') ||
-    html.includes('Este anúncio foi pausado') ||
-    html.includes('Publicação finalizada') ||
-    html.includes('Produto esgotado')
-  ) {
-    isPaused = true;
-  }
+  const { price, originalPrice, discountTag, isPaused } = extractProductPriceAndStatus(html);
 
   let discountPercent = 0;
   if (price && originalPrice) {
@@ -383,16 +400,14 @@ export default async function handler(req, res) {
 
           const text = await response.text();
 
-          const isPaused =
-            text.includes('Anúncio pausado') ||
-            text.includes('Este anúncio foi pausado') ||
-            text.includes('Publicação finalizada') ||
-            text.includes('Produto esgotado');
+          const { price, originalPrice, discountTag, isPaused } = extractProductPriceAndStatus(text);
 
           let pageTitle = '';
-          const titleMatch = text.match(/<meta\s+property=["']og:title["']\s+content=["'](.*?)["']/i);
+          const titleMatch =
+            text.match(/<meta\s+property=["']og:title["']\s+content=["'](.*?)["']/i) ||
+            text.match(/<title>(.*?)<\/title>/i);
           if (titleMatch && titleMatch[1]) {
-            pageTitle = titleMatch[1];
+            pageTitle = titleMatch[1].replace(/\s*\|\s*Mercado\s*Livre.*$/i, '').trim();
           }
 
           if (isPaused) {
@@ -401,8 +416,10 @@ export default async function handler(req, res) {
               url,
               finalUrl,
               title: pageTitle,
+              price: price || '',
+              original_price: originalPrice || '',
               status: 'paused',
-              statusText: 'Anúncio Pausado / Finalizado pelo vendedor',
+              statusText: 'Anúncio Pausado / Esgotado no ML',
               statusCode: 200
             };
           }
@@ -412,6 +429,9 @@ export default async function handler(req, res) {
             url,
             finalUrl,
             title: pageTitle,
+            price: price || '',
+            original_price: originalPrice || '',
+            discount_tag: discountTag || '',
             status: 'active',
             statusText: 'Online e Ativo',
             statusCode: 200

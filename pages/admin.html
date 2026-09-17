@@ -2166,14 +2166,14 @@
     </div>
 
     <!-- Affiliate Links Health Checker Modal -->
-    <div id="affiliateHealthModal" class="fixed inset-0 bg-black bg-opacity-50 z-[200] hidden flex items-center justify-center p-4"
+    <div id="affiliateHealthModal" class="fixed inset-0 bg-black/60 backdrop-blur-xs z-[200] hidden flex items-center justify-center p-3 sm:p-4"
         onclick="if(event.target===this) AffiliatesModule.closeHealthModal()">
-        <div class="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+        <div class="bg-white rounded-3xl shadow-2xl p-4 sm:p-6 w-full max-w-3xl max-h-[90vh] overflow-y-auto">
             <div class="flex items-center justify-between mb-4 pb-2 border-b">
-                <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
-                    <span>🩺</span> Verificador de Saúde dos Links
+                <h3 class="text-base sm:text-lg font-extrabold text-gray-900 flex items-center gap-2">
+                    <span>🩺</span> Verificador de Saúde & Preços dos Links
                 </h3>
-                <button onclick="AffiliatesModule.closeHealthModal()" class="text-gray-400 hover:text-gray-600 text-lg">✕</button>
+                <button onclick="AffiliatesModule.closeHealthModal()" class="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-600 text-sm font-bold transition">✕</button>
             </div>
 
             <!-- Loading State -->

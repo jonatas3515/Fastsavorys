@@ -477,6 +477,15 @@ window.AffiliatesModule = (function () {
     return pct > 0 && pct < 100 ? pct : 0;
   }
 
+  let lastHealthCheckResults = [];
+
+  function parsePrice(str) {
+    if (!str) return 0;
+    const clean = String(str).replace(/[^\d,\.]/g, '').replace(',', '.');
+    const num = parseFloat(clean);
+    return isNaN(num) ? 0 : num;
+  }
+
   async function checkAllLinksHealth() {
     const itemsToCheck = getFilteredProducts();
     if (!itemsToCheck || itemsToCheck.length === 0) {
@@ -506,6 +515,8 @@ window.AffiliatesModule = (function () {
       let okCount = 0;
       let pausedCount = 0;
       let errorCount = 0;
+      let priceChangedCount = 0;
+      let pausedToDeactivateCount = 0;
 
       for (let i = 0; i < itemsToCheck.length; i += chunkSize) {
         const chunk = itemsToCheck.slice(i, i + chunkSize);
@@ -527,47 +538,109 @@ window.AffiliatesModule = (function () {
         allResults = allResults.concat(results);
       }
 
-      resultsContainer.innerHTML = allResults.map(res => {
+      lastHealthCheckResults = allResults;
+
+      const itemsHtml = allResults.map(res => {
         const prod = itemsToCheck.find(p => p.id == res.id) || 
                      productsList.find(p => p.id == res.id) || 
-                     { title: res.title || 'Produto', image_url: '../assets/img/fast-logo.png' };
+                     { title: res.title || 'Produto', image_url: '../assets/img/fast-logo.png', price_display: '' };
         
-        let statusBadge = `<span class="px-2.5 py-1 text-xs font-bold rounded-full bg-green-100 text-green-800 flex items-center gap-1">🟢 Online</span>`;
+        let statusBadge = `<span class="px-2.5 py-1 text-xs font-bold rounded-full bg-green-100 text-green-800 flex items-center gap-1">🟢 Online no ML</span>`;
         if (res.status === 'paused') {
           pausedCount++;
-          statusBadge = `<span class="px-2.5 py-1 text-xs font-bold rounded-full bg-red-100 text-red-800 flex items-center gap-1">🔴 Pausado</span>`;
+          if (prod.is_active !== false) pausedToDeactivateCount++;
+          statusBadge = `<span class="px-2.5 py-1 text-xs font-bold rounded-full bg-red-100 text-red-800 flex items-center gap-1">🔴 Pausado no ML</span>`;
         } else if (res.status === 'error' || res.status === 'timeout' || res.status === 'warning') {
           errorCount++;
-          statusBadge = `<span class="px-2.5 py-1 text-xs font-bold rounded-full bg-amber-100 text-amber-800 flex items-center gap-1">⚠️ Atenção</span>`;
+          statusBadge = `<span class="px-2.5 py-1 text-xs font-bold rounded-full bg-amber-100 text-amber-800 flex items-center gap-1">⚠️ Instável</span>`;
         } else {
           okCount++;
         }
 
-        const pauseBtn = res.status === 'paused' && prod.is_active !== false
-          ? `<button onclick="AffiliatesModule.toggleProductActive(${prod.id}, false)" class="px-3 py-1 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-bold rounded-lg border border-red-200 transition">Pausar no Site</button>`
-          : '';
+        // Price comparison
+        const livePriceNum = parsePrice(res.price);
+        const storedPriceNum = parsePrice(prod.price_display);
+        const hasPriceDiff = livePriceNum > 0 && storedPriceNum > 0 && Math.abs(livePriceNum - storedPriceNum) >= 0.01;
+
+        let priceDiffHtml = '';
+        if (hasPriceDiff) {
+          priceChangedCount++;
+          const isLower = livePriceNum < storedPriceNum;
+          priceDiffHtml = `
+            <div class="mt-2 p-2.5 ${isLower ? 'bg-emerald-50 border-emerald-200 text-emerald-950' : 'bg-amber-50 border-amber-200 text-amber-950'} border rounded-xl flex flex-wrap items-center justify-between gap-2 text-xs">
+              <div class="font-medium flex items-center gap-1.5 flex-wrap">
+                <span>${isLower ? '📉' : '📈'}</span>
+                <span>Preço no ML:</span>
+                <span class="line-through text-gray-500">${escapeHtml(prod.price_display)}</span>
+                <span>➔</span>
+                <strong class="text-sm font-black ${isLower ? 'text-emerald-700' : 'text-amber-800'}">${escapeHtml(res.price)}</strong>
+              </div>
+              <button id="sync-price-btn-${prod.id}" onclick="AffiliatesModule.syncProductPrice(${prod.id}, '${escapeHtml(res.price)}', '${escapeHtml(res.original_price || '')}', this)" 
+                      class="px-2.5 py-1 ${isLower ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-amber-600 hover:bg-amber-700'} text-white font-bold rounded-lg shadow-sm transition text-xs flex items-center gap-1 active:scale-95">
+                🔄 Atualizar no Site
+              </button>
+            </div>
+          `;
+        }
+
+        // Action button for active/paused status
+        let actionBtn = '';
+        if (res.status === 'paused') {
+          if (prod.is_active !== false) {
+            actionBtn = `<button id="pause-btn-${prod.id}" onclick="AffiliatesModule.toggleProductActive(${prod.id}, false, this)" class="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg shadow-sm transition active:scale-95">Pausar no Site</button>`;
+          } else {
+            actionBtn = `<span class="px-2.5 py-1 bg-gray-100 text-gray-500 text-xs font-bold rounded-lg border border-gray-200">⏸️ Já Pausado</span>`;
+          }
+        } else if (res.status === 'active' && prod.is_active === false) {
+          actionBtn = `<button id="pause-btn-${prod.id}" onclick="AffiliatesModule.toggleProductActive(${prod.id}, true, this)" class="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-bold rounded-lg shadow-sm transition active:scale-95">Reativar no Site</button>`;
+        }
 
         return `
-          <div class="p-3 bg-white border border-gray-100 rounded-xl flex items-center justify-between gap-3 shadow-sm">
-            <div class="flex items-center gap-3 min-w-0">
-              <img src="${escapeHtml(prod.image_url)}" alt="" class="w-10 h-10 object-contain rounded-lg bg-gray-50 border p-0.5 flex-shrink-0" onerror="this.src='../assets/img/fast-logo.png'" />
-              <div class="min-w-0">
-                <div class="font-bold text-sm text-gray-900 truncate">${escapeHtml(prod.title || res.title)}</div>
-                <div class="text-xs text-gray-500 truncate">${escapeHtml(res.statusText || res.url)}</div>
+          <div class="p-3.5 bg-white border border-gray-100 hover:border-gray-200 rounded-2xl shadow-sm transition">
+            <div class="flex items-center justify-between gap-3">
+              <div class="flex items-center gap-3 min-w-0">
+                <img src="${escapeHtml(prod.image_url)}" alt="" class="w-11 h-11 object-contain rounded-xl bg-gray-50 border p-0.5 flex-shrink-0" onerror="this.src='../assets/img/fast-logo.png'" />
+                <div class="min-w-0">
+                  <div class="font-bold text-sm text-gray-900 truncate">${escapeHtml(prod.title || res.title)}</div>
+                  <div class="text-xs text-gray-500 truncate flex items-center gap-2 mt-0.5">
+                    <span>${escapeHtml(res.statusText || res.url)}</span>
+                    ${prod.price_display && !hasPriceDiff ? `<span class="text-gray-400">• Preço atual: <strong>${escapeHtml(prod.price_display)}</strong></span>` : ''}
+                  </div>
+                </div>
+              </div>
+              <div class="flex items-center gap-2 flex-shrink-0">
+                ${statusBadge}
+                ${actionBtn}
+                <a href="${escapeHtml(res.url)}" target="_blank" rel="noopener noreferrer" class="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg text-xs" title="Abrir link no Mercado Livre">🔗</a>
               </div>
             </div>
-            <div class="flex items-center gap-2 flex-shrink-0">
-              ${statusBadge}
-              ${pauseBtn}
-              <a href="${escapeHtml(res.url)}" target="_blank" rel="noopener noreferrer" class="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg text-xs" title="Abrir link no ML">🔗</a>
-            </div>
+            ${priceDiffHtml}
           </div>
         `;
       }).join('');
 
+      let batchActionsHeader = '';
+      if (pausedToDeactivateCount > 0 || priceChangedCount > 0) {
+        batchActionsHeader = `
+          <div class="p-3 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl flex flex-wrap items-center justify-between gap-2.5 mb-3 shadow-xs">
+            <div class="text-xs text-amber-950 font-medium">
+              ⚡ <strong>Ações Rápidas em Massa:</strong>
+              ${pausedToDeactivateCount > 0 ? `<span class="ml-1 font-bold text-red-700">• ${pausedToDeactivateCount} pausados no ML</span>` : ''}
+              ${priceChangedCount > 0 ? `<span class="ml-1 font-bold text-amber-800">• ${priceChangedCount} com preço alterado</span>` : ''}
+            </div>
+            <div class="flex items-center gap-2 flex-wrap">
+              ${pausedToDeactivateCount > 0 ? `<button onclick="AffiliatesModule.pauseAllInactiveProducts(this)" class="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-extrabold rounded-xl shadow-sm transition active:scale-95">⏸️ Pausar Todos (${pausedToDeactivateCount})</button>` : ''}
+              ${priceChangedCount > 0 ? `<button onclick="AffiliatesModule.syncAllChangedPrices(this)" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-extrabold rounded-xl shadow-sm transition active:scale-95">🔄 Atualizar Todos os Preços (${priceChangedCount})</button>` : ''}
+            </div>
+          </div>
+        `;
+      }
+
+      resultsContainer.innerHTML = batchActionsHeader + itemsHtml;
+
       if (progress) progress.classList.add('hidden');
       if (resultsContainer) resultsContainer.classList.remove('hidden');
-      if (summary) summary.textContent = `Resultado: ${okCount} online, ${pausedCount} pausados, ${errorCount} instáveis/aviso (${itemsToCheck.length} verificados).`;
+      if (summary) summary.textContent = `Resultado: ${okCount} online, ${pausedCount} pausados no ML, ${priceChangedCount} com preço diferente (${itemsToCheck.length} verificados).`;
 
     } catch (err) {
       console.error('[HealthCheck] Erro:', err);
@@ -583,8 +656,13 @@ window.AffiliatesModule = (function () {
     document.getElementById('affiliateHealthModal')?.classList.add('hidden');
   }
 
-  async function toggleProductActive(id, newStatus) {
+  async function toggleProductActive(id, newStatus, btnElement = null) {
     try {
+      if (btnElement) {
+        btnElement.disabled = true;
+        btnElement.textContent = 'Salvando...';
+      }
+
       if (window.supabaseClient) {
         const { error } = await window.supabaseClient
           .from('fast_affiliate_products')
@@ -594,12 +672,243 @@ window.AffiliatesModule = (function () {
         if (error) throw error;
       }
 
-      if (window.showToast) window.showToast(newStatus ? 'Produto ativado no site!' : 'Produto pausado no site!', 'info');
-      await loadProducts();
-      closeHealthModal();
+      const item = productsList.find(p => p.id == id);
+      if (item) {
+        item.is_active = newStatus;
+      }
+
+      renderTable();
+
+      if (btnElement) {
+        btnElement.className = newStatus
+          ? 'px-2.5 py-1 bg-green-100 text-green-800 text-xs font-bold rounded-lg border border-green-200 cursor-default'
+          : 'px-2.5 py-1 bg-gray-100 text-gray-600 text-xs font-bold rounded-lg border border-gray-200 cursor-default';
+        btnElement.innerHTML = newStatus ? '✅ Ativado no Site' : '⏸️ Pausado no Site';
+      }
+
+      if (window.showToast) {
+        window.showToast(newStatus ? 'Produto reativado no site!' : 'Produto pausado no site!', 'info');
+      }
     } catch (e) {
       console.error('[ToggleActive] Erro:', e);
-      alert('Erro ao alterar status do produto.');
+      if (btnElement) {
+        btnElement.disabled = false;
+        btnElement.textContent = 'Tentar novamente';
+      }
+      alert('Erro ao alterar status do produto: ' + (e.message || e));
+    }
+  }
+
+  async function syncProductPrice(id, newPrice, newOrigPrice, btnElement = null) {
+    try {
+      if (btnElement) {
+        btnElement.disabled = true;
+        btnElement.textContent = 'Salvando...';
+      }
+
+      const item = productsList.find(p => p.id == id);
+      const discountPct = calcDiscountPercent(newOrigPrice || (item?.original_price), newPrice);
+
+      const updatePayload = {
+        price_display: newPrice,
+        updated_at: new Date().toISOString()
+      };
+      if (newOrigPrice) {
+        updatePayload.original_price = newOrigPrice;
+      }
+      if (discountPct > 0) {
+        updatePayload.discount_percent = discountPct;
+        updatePayload.discount_tag = `${discountPct}% OFF`;
+      }
+
+      if (window.supabaseClient) {
+        const { error } = await window.supabaseClient
+          .from('fast_affiliate_products')
+          .update(updatePayload)
+          .eq('id', id);
+
+        if (error) throw error;
+      }
+
+      if (item) {
+        Object.assign(item, updatePayload);
+      }
+
+      renderTable();
+
+      if (btnElement) {
+        btnElement.className = 'px-2.5 py-1 bg-emerald-100 text-emerald-800 text-xs font-bold rounded-lg border border-emerald-200 cursor-default';
+        btnElement.innerHTML = '✅ Preço Atualizado!';
+      }
+
+      if (window.showToast) {
+        window.showToast(`Preço atualizado para ${newPrice}!`, 'success');
+      }
+    } catch (e) {
+      console.error('[SyncPrice] Erro:', e);
+      if (btnElement) {
+        btnElement.disabled = false;
+        btnElement.textContent = 'Tentar novamente';
+      }
+      alert('Erro ao atualizar preço do produto: ' + (e.message || e));
+    }
+  }
+
+  async function pauseAllInactiveProducts(btnElement = null) {
+    if (!lastHealthCheckResults || lastHealthCheckResults.length === 0) return;
+
+    const pausedItemsToUpdate = lastHealthCheckResults.filter(res => {
+      if (res.status !== 'paused') return false;
+      const prod = productsList.find(p => p.id == res.id);
+      return prod && prod.is_active !== false;
+    });
+
+    if (pausedItemsToUpdate.length === 0) {
+      alert('Todos os itens pausados no ML já estão pausados no site.');
+      return;
+    }
+
+    if (!confirm(`Deseja pausar todos os ${pausedItemsToUpdate.length} produtos no site?`)) {
+      return;
+    }
+
+    try {
+      if (btnElement) {
+        btnElement.disabled = true;
+        btnElement.textContent = 'Pausando todos...';
+      }
+
+      const ids = pausedItemsToUpdate.map(item => item.id);
+
+      if (window.supabaseClient) {
+        const { error } = await window.supabaseClient
+          .from('fast_affiliate_products')
+          .update({ is_active: false, updated_at: new Date().toISOString() })
+          .in('id', ids);
+
+        if (error) throw error;
+      }
+
+      ids.forEach(id => {
+        const prod = productsList.find(p => p.id == id);
+        if (prod) prod.is_active = false;
+      });
+
+      renderTable();
+
+      // Update individual buttons inside health checker
+      ids.forEach(id => {
+        const itemBtn = document.getElementById(`pause-btn-${id}`);
+        if (itemBtn) {
+          itemBtn.className = 'px-2.5 py-1 bg-gray-100 text-gray-600 text-xs font-bold rounded-lg border border-gray-200 cursor-default';
+          itemBtn.innerHTML = '⏸️ Pausado no Site';
+          itemBtn.disabled = true;
+        }
+      });
+
+      if (btnElement) {
+        btnElement.className = 'px-3 py-1.5 bg-gray-200 text-gray-700 text-xs font-bold rounded-lg cursor-default';
+        btnElement.innerHTML = `✅ ${ids.length} Pausados no Site!`;
+      }
+
+      if (window.showToast) {
+        window.showToast(`${ids.length} produtos foram pausados no site!`, 'success');
+      }
+    } catch (e) {
+      console.error('[PauseAll] Erro:', e);
+      if (btnElement) {
+        btnElement.disabled = false;
+        btnElement.textContent = 'Tentar novamente';
+      }
+      alert('Erro ao pausar produtos: ' + (e.message || e));
+    }
+  }
+
+  async function syncAllChangedPrices(btnElement = null) {
+    if (!lastHealthCheckResults || lastHealthCheckResults.length === 0) return;
+
+    const itemsToUpdate = [];
+    lastHealthCheckResults.forEach(res => {
+      if (!res.price) return;
+      const prod = productsList.find(p => p.id == res.id);
+      if (!prod) return;
+      const liveNumeric = parsePrice(res.price);
+      const currentNumeric = parsePrice(prod.price_display);
+      if (liveNumeric > 0 && currentNumeric > 0 && Math.abs(liveNumeric - currentNumeric) >= 0.01) {
+        itemsToUpdate.push({
+          id: prod.id,
+          newPrice: res.price,
+          newOrigPrice: res.original_price || prod.original_price || ''
+        });
+      }
+    });
+
+    if (itemsToUpdate.length === 0) {
+      alert('Nenhuma alteração de preço para sincronizar.');
+      return;
+    }
+
+    if (!confirm(`Deseja sincronizar os preços de todos os ${itemsToUpdate.length} produtos com o Mercado Livre?`)) {
+      return;
+    }
+
+    try {
+      if (btnElement) {
+        btnElement.disabled = true;
+        btnElement.textContent = 'Atualizando preços...';
+      }
+
+      for (const item of itemsToUpdate) {
+        const prod = productsList.find(p => p.id == item.id);
+        const discountPct = calcDiscountPercent(item.newOrigPrice, item.newPrice);
+        const updatePayload = {
+          price_display: item.newPrice,
+          updated_at: new Date().toISOString()
+        };
+        if (item.newOrigPrice) {
+          updatePayload.original_price = item.newOrigPrice;
+        }
+        if (discountPct > 0) {
+          updatePayload.discount_percent = discountPct;
+          updatePayload.discount_tag = `${discountPct}% OFF`;
+        }
+
+        if (window.supabaseClient) {
+          await window.supabaseClient
+            .from('fast_affiliate_products')
+            .update(updatePayload)
+            .eq('id', item.id);
+        }
+
+        if (prod) {
+          Object.assign(prod, updatePayload);
+        }
+
+        const itemBtn = document.getElementById(`sync-price-btn-${item.id}`);
+        if (itemBtn) {
+          itemBtn.className = 'px-2.5 py-1 bg-emerald-100 text-emerald-800 text-xs font-bold rounded-lg border border-emerald-200 cursor-default';
+          itemBtn.innerHTML = '✅ Preço Atualizado!';
+          itemBtn.disabled = true;
+        }
+      }
+
+      renderTable();
+
+      if (btnElement) {
+        btnElement.className = 'px-3 py-1.5 bg-emerald-200 text-emerald-900 text-xs font-bold rounded-lg cursor-default';
+        btnElement.innerHTML = `✅ ${itemsToUpdate.length} Preços Atualizados!`;
+      }
+
+      if (window.showToast) {
+        window.showToast(`${itemsToUpdate.length} preços atualizados com sucesso!`, 'success');
+      }
+    } catch (e) {
+      console.error('[SyncAllPrices] Erro:', e);
+      if (btnElement) {
+        btnElement.disabled = false;
+        btnElement.textContent = 'Tentar novamente';
+      }
+      alert('Erro ao sincronizar preços: ' + (e.message || e));
     }
   }
 
@@ -811,6 +1120,9 @@ window.AffiliatesModule = (function () {
     checkAllLinksHealth,
     closeHealthModal,
     toggleProductActive,
+    syncProductPrice,
+    pauseAllInactiveProducts,
+    syncAllChangedPrices,
     fetchProductDataFromML,
     insertBullet,
     pasteFromClipboard,
