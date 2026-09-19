@@ -697,6 +697,23 @@ function buildDeliveryFactHint(history, currentMessage, priceMap = null, feeMap 
             const totalComTaxa = total + bairroInfo.fee;
             hint += `\n  ✅ R$ ${total.toFixed(2)} ≥ R$ ${effectiveMin.toFixed(2)} → ENTREGA PERMITIDA.`;
             hint += ` Total com taxa: R$ ${total.toFixed(2)} + ${feeStr} = R$ ${totalComTaxa.toFixed(2)}`;
+
+            // Verifica se o usuário já informou rua e número
+            const hasStreetAndNumber = userMsgs.some(m => {
+                const txt = (m || '').toLowerCase();
+                const hasRuaWord = /\b(rua|av|avenida|travessa|tv|alameda|r\.)\b/i.test(txt);
+                const hasNum = /\b\d{1,5}\b/.test(txt);
+                const hasFullPattern = /(?:rua|av|avenida|travessa|tv|alameda|r\.)\s+[a-zA-Z\u00c0-\u00ff0-9\s.-]+?(?:,\s*|\s+(?:n[ºo°]?|numero|n)\s*[:.]?\s*)\d+/i.test(txt);
+                return hasFullPattern || (hasRuaWord && hasNum) || /\b(n[ºo°]?|n[uú]mero)\s*[:.]?\s*\d+/i.test(txt) || /creche\s+(?:do\s+)?novo\s+prado/i.test(txt);
+            });
+
+            if (!hasStreetAndNumber) {
+                hint += `\n  ⚠️ RUA E NÚMERO AINDA NÃO FORAM INFORMADOS: O cliente informou o bairro (${bairroInfo.name.toUpperCase()}), mas AINDA NÃO informou a rua e o número da casa.`;
+                hint += `\n  ⛔ REGRA OBRIGATÓRIA: Para prosseguir com entrega, você DEVE pedir a RUA e o NÚMERO (e ponto de referência) OBRIGATORIAMENTE. NUNCA pergunte a forma de pagamento e NUNCA gere PIX antes de ter a RUA e o NÚMERO da entrega!`;
+                hint += `\n  👉 Informe a taxa de entrega do bairro (${feeStr}) e PERGUNTE: "Qual é a sua rua e o número da casa/apto para realizarmos a entrega?"`;
+            } else {
+                hint += `\n  ✅ RUA E NÚMERO JÁ INFORMADOS. Pode prosseguir para orçamento e forma de pagamento.`;
+            }
         } else {
             const falta = (effectiveMin - total).toFixed(2).replace('.', ',');
             hint += `\n  ❌ R$ ${total.toFixed(2)} < R$ ${effectiveMin.toFixed(2)} → ABAIXO DO MÍNIMO. Faltam R$ ${falta}. ⛔ NÃO aceite entrega e NÃO peça endereço/rua/número. Diga com simpatia que o pedido mínimo para entrega é R$ ${effectiveMin.toFixed(2).replace('.', ',')} e sugira adicionar itens ou retirar na loja (Rua Palmeiras, 105, Novo Prado).`;
@@ -1565,7 +1582,22 @@ async function extractPdfText(pdfUrl, apiKey, multimodalModel) {
     const text = await callGeminiMultimodal(
         apiKey, multimodalModel,
         { base64: media.base64, mimeType: 'application/pdf' },
-        'Extraia todo o texto relevante deste documento PDF. Retorne o conteúdo em texto puro, em português, de forma organizada.',
+        `Analise este documento PDF com cuidado e atenção. Siga estas prioridades na ordem:
+
+1. COMPROVANTE DE PAGAMENTO: Se o documento contiver QUALQUER sinal de transação bancária, comprovante Pix, transferência bancária, recibo de pagamento, comprovante de depósito ou movimentação financeira (mesmo que parcialmente visível) — identifique como "COMPROVANTE DE PAGAMENTO" e extraia TODOS os dados disponíveis no seguinte formato:
+   COMPROVANTE DE PAGAMENTO
+   - Tipo: (Pix / Transferência / Depósito / TED / DOC / outro)
+   - Valor: R$ X,XX
+   - Data e hora: DD/MM/AAAA HH:MM
+   - Pagador (quem enviou): nome completo
+   - Recebedor (favorecido): nome completo
+   - Instituição: banco ou instituição financeira
+   - ID da transação / código: se visível
+   Sinais de comprovante: presença de valores monetários (R$), nomes de pessoas/empresas, datas, logos de bancos (Nubank, Itaú, Bradesco, Caixa, Inter, PicPay, PagBank, Mercado Pago, C6, etc.), palavras como "comprovante", "transferência", "Pix", "enviado", "recebido", "transação", "ID", interface de app bancário.
+
+2. TEXTO GERAL: Se for outro tipo de documento, cardápio ou lista, extraia todo o texto relevante em português de forma organizada.
+
+⛔ ATENÇÃO: Na dúvida entre comprovante e outro documento, PREFIRA classificar como comprovante se houver elementos financeiros visíveis.`,
         2048, 15000
     );
     if (text) console.log(`[media] 📄 ✅ PDF extraction OK: "${text.substring(0, 100)}"`);
@@ -1586,13 +1618,27 @@ function detectMediaInfo(reqBody, trimmedMessage) {
     const looksLikeAudio = /\[áudio\]|\[audio\]|\[voice\]|\[ptt\]/i.test(trimmedMessage);
     const hasAudio = !!(detectedAudioUrl || looksLikeAudio);
 
-    // Image detection
-    const detectedImageUrl = image_url || (mediaAttachment?.type === 'image' ? mediaAttachment?.url : null);
+    // Image detection (including image URLs in message body from ManyChat/S3/WhatsApp)
+    const imageUrlInMessage = trimmedMessage.match(/https?:\/\/[^\s]+\.(jpe?g|png|webp|gif|bmp)(\?[^\s]*)?/i);
+    const isManyChatImageUrl = !imageUrlInMessage && /https?:\/\/[^\s]*(?:manybot-files|manychat|amazonaws)[^\s]*(?:image|photo|wa|\.jpe?g|\.png|\.webp)/i.test(trimmedMessage)
+        ? trimmedMessage.match(/https?:\/\/[^\s]+/i)
+        : null;
+    const detectedImageUrl = image_url
+        || (mediaAttachment?.type === 'image' ? mediaAttachment?.url : null)
+        || (imageUrlInMessage ? imageUrlInMessage[0] : null)
+        || (isManyChatImageUrl ? isManyChatImageUrl[0] : null);
     const looksLikeImage = /\[foto\]|\[photo\]|\[image\]|\[imagem\]|\[sticker\]/i.test(trimmedMessage);
     const hasImage = !!(detectedImageUrl || looksLikeImage);
 
-    // File/PDF detection
-    const detectedFileUrl = file_url || (mediaAttachment?.type === 'file' ? mediaAttachment?.url : null);
+    // File/PDF detection (including PDF URLs in message body from ManyChat/S3/WhatsApp)
+    const fileUrlInMessage = trimmedMessage.match(/https?:\/\/[^\s]+\.(pdf|docx?|xlsx?)(\?[^\s]*)?/i);
+    const isManyChatPdfUrl = !fileUrlInMessage && /https?:\/\/[^\s]*(?:manybot-files|manychat|amazonaws)[^\s]*(?:pdf|document|\.pdf)/i.test(trimmedMessage)
+        ? trimmedMessage.match(/https?:\/\/[^\s]+/i)
+        : null;
+    const detectedFileUrl = file_url
+        || (mediaAttachment?.type === 'file' ? mediaAttachment?.url : null)
+        || (fileUrlInMessage ? fileUrlInMessage[0] : null)
+        || (isManyChatPdfUrl ? isManyChatPdfUrl[0] : null);
     const looksLikeFile = /\[arquivo\]|\[file\]|\[pdf\]|\[document\]/i.test(trimmedMessage);
     const hasFile = !!(detectedFileUrl || looksLikeFile);
 
@@ -1612,6 +1658,8 @@ async function convertMediaToText(reqBody, trimmedMessage, apiKey, multimodalMod
     if (!info.mediaType) return null; // No media detected
 
     console.log(`[media] Detected ${info.mediaType} (url: ${info.mediaUrl ? 'yes' : 'no'}, processing: ${mediaProcessingEnabled})`);
+
+    const extraText = (trimmedMessage || '').replace(/https?:\/\/[^\s]+/gi, '').replace(/\[(?:foto|photo|image|imagem|sticker|arquivo|file|pdf|document)\]/gi, '').trim();
 
     // Audio — always attempt transcription (already worked before Phase 2)
     if (info.mediaType === 'audio') {
@@ -1633,7 +1681,10 @@ async function convertMediaToText(reqBody, trimmedMessage, apiKey, multimodalMod
         if (mediaProcessingEnabled && info.mediaUrl) {
             const description = await describeImage(info.mediaUrl, apiKey, multimodalModel);
             if (description) {
-                return { text: `[O cliente enviou uma imagem. Conteúdo: ${description}]`, type: 'image', originalUrl: info.mediaUrl };
+                const combined = extraText 
+                    ? `[O cliente enviou uma imagem acompanhada do texto: "${extraText}". Conteúdo extraído da imagem: ${description}]`
+                    : `[O cliente enviou uma imagem. Conteúdo: ${description}]`;
+                return { text: combined, type: 'image', originalUrl: info.mediaUrl };
             }
         }
         return { text: null, type: 'image_failed' }; // Caller sends fallback
@@ -1643,17 +1694,23 @@ async function convertMediaToText(reqBody, trimmedMessage, apiKey, multimodalMod
     if (info.mediaType === 'file') {
         if (mediaProcessingEnabled && info.mediaUrl) {
             // Detect if it's a PDF by URL or mime type
-            const isPdf = /\.pdf(\?|$)/i.test(info.mediaUrl);
+            const isPdf = /\.pdf(\?|$)/i.test(info.mediaUrl) || /pdf/i.test(info.mediaUrl);
             if (isPdf) {
                 const pdfText = await extractPdfText(info.mediaUrl, apiKey, multimodalModel);
                 if (pdfText) {
-                    return { text: `[O cliente enviou um documento PDF. Conteúdo: ${pdfText}]`, type: 'pdf', originalUrl: info.mediaUrl };
+                    const combined = extraText
+                        ? `[O cliente enviou um documento PDF acompanhado do texto: "${extraText}". Conteúdo extraído do documento: ${pdfText}]`
+                        : `[O cliente enviou um documento PDF. Conteúdo: ${pdfText}]`;
+                    return { text: combined, type: 'pdf', originalUrl: info.mediaUrl };
                 }
             } else {
                 // Non-PDF file — try image processing as fallback (could be screenshot, etc.)
                 const description = await describeImage(info.mediaUrl, apiKey, multimodalModel);
                 if (description) {
-                    return { text: `[O cliente enviou um arquivo. Conteúdo: ${description}]`, type: 'file', originalUrl: info.mediaUrl };
+                    const combined = extraText
+                        ? `[O cliente enviou um arquivo acompanhado do texto: "${extraText}". Conteúdo extraído: ${description}]`
+                        : `[O cliente enviou um arquivo. Conteúdo: ${description}]`;
+                    return { text: combined, type: 'file', originalUrl: info.mediaUrl };
                 }
             }
         }
@@ -2324,6 +2381,11 @@ function getBrazilTime() {
     const scheduleFactHint = buildScheduleFactHint(session.history, effectiveMessage);
     if (scheduleFactHint) {
         intentHint += scheduleFactHint;
+    }
+
+    // --- Guard de "pegar agora" / retirada imediata / tempo de montagem na hora ---
+    if (/\b(pegar?\s*agora|buscar?\s*agora|passar?\s*a[ií]\s*agora|pronta\s*entrega|j[aá]\s*t[aá]\s*pronto|sair?\s*agora)\b/i.test(effectiveMessage)) {
+        intentHint += '\n[⚠️ ALERTA DE PREPARO (MONTAGEM NA HORA): O cliente quer "pegar agora" ou perguntou sobre pronta entrega. LEMBRE-SE: NENHUM produto fica pronto esperando na prateleira. Bolos Vulcão Mini e Bolo no Pote levam de 15 a 20 minutos para montagem após a confirmação, e salgados são fritos na hora. ⛔ NUNCA diga "pode vir pegar agora" nem "te espero aqui". Explique que é preparado/montado fresquinho na hora e leva cerca de 15 a 20 minutinhos para ficar pronto após a confirmação do pedido!]';
     }
 
     // --- Guard de fita/laço do bolo (perguntar cor após personalização completa) ---

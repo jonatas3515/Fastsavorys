@@ -84,7 +84,27 @@ function extractFactsFromConversation(history, existingMemories = null) {
         facts.bairro = botBairroMatch[1].trim().replace(/\s+/g, ' ');
     }
 
-    // 4. Produtos mencionados pelo usuário
+    // 4. Endereço e Pontos de Referência Conhecidos
+    if (/creche\s+(?:do\s+)?novo\s+prado/i.test(allUserText)) {
+        facts.bairro = 'Novo Prado';
+        facts.rua = 'Rua Fluminense';
+        facts.referencia = 'Creche do Novo Prado';
+        facts.endereco_completo = 'Rua Fluminense (Creche do Novo Prado), Novo Prado';
+    } else {
+        // Detecta padrões de rua e número
+        const addressMatch = allUserText.match(/(?:rua|av|avenida|travessa|tv|alameda|r\.)\s+([a-zA-Z\u00c0-\u00ff0-9\s.-]+?)(?:,\s*|\s+(?:n[ºo°]?|numero|n)\s*[:.]?\s*)(\d+[a-zA-Z]?)/i);
+        if (addressMatch) {
+            const ruaClean = addressMatch[1].trim().replace(/\s+/g, ' ');
+            const numClean = addressMatch[2].trim();
+            if (ruaClean.length >= 3) {
+                facts.rua = ruaClean.startsWith('Rua ') || ruaClean.startsWith('Av') ? ruaClean : `Rua ${ruaClean}`;
+                facts.numero = numClean;
+                facts.endereco_completo = `${facts.rua}, nº ${facts.numero}${facts.bairro ? ` - ${facts.bairro}` : ''}`;
+            }
+        }
+    }
+
+    // 5. Produtos mencionados pelo usuário
     const productsSet = new Set();
 
     // Salgados individuais
@@ -187,13 +207,18 @@ function formatMemoryForPrompt(memoryData) {
     let hint = '\n[📋 MEMÓRIA DO CLIENTE (informações de interações anteriores — use para personalizar o atendimento):';
     if (count > 0) hint += `\n  Interações anteriores: ${count}`;
     if (mem.bairro) hint += `\n  Bairro habitual: ${mem.bairro}`;
+    if (mem.endereco_completo) {
+        hint += `\n  Endereço anterior registrado: ${mem.endereco_completo}${mem.referencia ? ` (Ponto de Ref: ${mem.referencia})` : ''}`;
+    } else if (mem.rua) {
+        hint += `\n  Rua/Local anterior: ${mem.rua}${mem.numero ? `, nº ${mem.numero}` : ''}${mem.bairro ? ` - ${mem.bairro}` : ''}`;
+    }
     if (mem.preferencia_entrega) hint += `\n  Prefere: ${mem.preferencia_entrega}`;
     if (mem.preferencia_pagamento) hint += `\n  Pagamento preferido: ${mem.preferencia_pagamento}`;
     if (mem.produtos_frequentes?.length) {
         hint += `\n  Produtos frequentes: ${mem.produtos_frequentes.slice(0, 5).join(', ')}`;
     }
     if (mem.ultimo_pedido) hint += `\n  Último pedido: ${mem.ultimo_pedido}`;
-    hint += '\n  ⚠️ Use para personalizar (ex: "vi que você costuma pedir..."), mas SEMPRE confirme com o cliente. NÃO assuma que o pedido de hoje é igual ao anterior.]';
+    hint += '\n  ⚠️ DICA DE ATENDIMENTO: Se o cliente pedir ENTREGA e já tiver endereço anterior salvo na memória, você pode perguntar com simpatia: "Seria para entregar no mesmo endereço anterior (' + (mem.endereco_completo || (mem.rua ? `${mem.rua}, nº ${mem.numero || 's/n'} - ${mem.bairro}` : mem.bairro)) + ')?". Se o cliente confirmar ("sim", "no mesmo", "isso"), o endereço já é considerado completo e válido!]';
 
     return hint;
 }
