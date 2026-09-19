@@ -346,6 +346,7 @@
       if (item.badge_color === 'blue') badgeStyle = 'bg-blue-100 text-blue-950 border-blue-300 font-bold';
       if (item.badge_color === 'purple') badgeStyle = 'bg-purple-100 text-purple-950 border-purple-300 font-bold';
       if (item.badge_color === 'pink') badgeStyle = 'bg-pink-100 text-pink-950 border-pink-300 font-bold';
+      if (item.badge_color === 'black') badgeStyle = 'bg-gray-900 text-white border-gray-950 font-bold shadow-xs';
 
       // Evita duplicidade de badge se a tag for apenas a indicação do mesmo desconto
       let showTag = false;
