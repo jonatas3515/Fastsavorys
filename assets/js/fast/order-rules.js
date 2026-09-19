@@ -36,6 +36,11 @@ window.classifyProduct = function (product) {
         return 'bolo_grande';
     }
 
+    // Mini Pizza Festa → exige 1 dia de antecedência
+    if (name.includes('mini pizza festa') || name.includes('pizza festa')) {
+        return 'bolo_grande';
+    }
+
     // Kit Festa → sempre bolo_grande (apenas retirada e exige 1 dia de antecedência)
     if (category === 'kits' || name.includes('kit festa') || name.includes('kit ')) {
         return 'bolo_grande';

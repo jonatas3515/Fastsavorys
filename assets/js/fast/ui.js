@@ -39,6 +39,9 @@ function isProductPreorderRequired(product) {
     // Empadão exige 1 dia de antecedência
     if (name.includes('empadao')) return true;
 
+    // Mini Pizza Festa exige 1 dia de antecedência
+    if (name.includes('mini pizza festa') || name.includes('pizza festa')) return true;
+
     // Kits Festa exigem 1 dia de antecedência
     if (category === 'kits' || name.includes('kit festa') || name.includes('kit ')) return true;
 

@@ -388,6 +388,8 @@ window.cartContainsBolo = function () {
         const cat = (product?.category || '').toLowerCase();
         // Empadão exige 1 dia de antecedência
         if (name.includes('empadao')) return true;
+        // Mini Pizza Festa exige 1 dia de antecedência
+        if (name.includes('mini pizza festa') || name.includes('pizza festa')) return true;
         // Kits Festa exigem 1 dia de antecedência
         if (cat === 'kits' || name.includes('kit festa') || name.includes('kit ')) return true;
         // Vulcão Mini e Bolo no Pote são exceções (podem ser entregues, não exigem antecedência)
@@ -397,9 +399,9 @@ window.cartContainsBolo = function () {
 };
 
 window.canOrderTodayWithoutBolo = function (isRetirada, cartTotal, timeSlot) {
-    // Se contém bolo, não pode pedir para hoje (exceto se for pronta entrega, mas regra geral é 1 dia)
+    // Se contém produto sob encomenda (bolo, kit, empadão, mini pizza festa), não pode pedir para hoje
     if (window.cartContainsBolo()) {
-        return { allowed: false, reason: 'Pedidos com bolos exigem antecedência (encomenda).' };
+        return { allowed: false, reason: 'Pedidos com bolos, kits, empadão ou mini pizza festa exigem no mínimo 1 dia de antecedência (encomenda).' };
     }
 
     // Deve ser retirada

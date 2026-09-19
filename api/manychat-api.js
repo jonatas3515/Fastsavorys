@@ -786,20 +786,26 @@ function buildBoloFactHint(history, currentMessage) {
     return boloHint;
 }
 
-// Guard para Kit Festa / bolo GRANDE (PP/P/G/Vulcão P) / Empadão 1kg: precisam de no mínimo 1 dia de
+// Guard para Kit Festa / bolo GRANDE (PP/P/G/Vulcão P) / Empadão 1kg / Mini Pizza Festa: precisam de no mínimo 1 dia de
 // antecedência (não podem ser para HOJE). Injeta fato verificado baseado no que o CLIENTE pediu.
 function buildKitFactHint(history, currentMessage) {
     const userTexts = (history || []).filter(m => m.role === 'user').map(m => m.text).join('\n') + '\n' + (currentMessage || '');
     const u = normalizeTxt(userTexts);
-    const hasKitOuBoloGrandeOuEmpadao = /(kit\s*festa|combo\s*festa|festa\s*(pp|p|g)\b|bolo\s*(pp|p|g)\b|vulcao\s*p\b|naked|empadao)/.test(u);
-    if (!hasKitOuBoloGrandeOuEmpadao) return '';
+    const hasPreorderItem = /(kit\s*festa|combo\s*festa|festa\s*(pp|p|g)\b|bolo\s*(pp|p|g)\b|vulcao\s*p\b|naked|empadao|mini\s*pizza\s*festa|pizza\s*festa)/.test(u);
+    if (!hasPreorderItem) return '';
+    const isMiniPizzaFesta = /(mini\s*pizza\s*festa|pizza\s*festa)/.test(u);
+    if (isMiniPizzaFesta) {
+        const pizzaFestaHint = `\n[⛔ REGRA DE NEGÓCIO (Mini Pizza Festa): (1) A Mini Pizza Festa (R$ 65,00 - 50 unidades variadas) é feita artesanalmente sob encomenda e precisa de no mínimo 1 DIA de antecedência (NÃO pode ser feita para HOJE). (2) NÃO tem opção de escolha de sabores — são 50 unidades já montadas com sabores variados. (3) Pedidos feitos hoje são para entrega ou retirada a partir de amanhã ou data futura.]`;
+        console.log(`[minipizza-festa-hint] ${pizzaFestaHint.replace(/\n/g, ' | ')}`);
+        return pizzaFestaHint;
+    }
     const isEmpadao = /empadao/.test(u) && !/(kit\s*festa|bolo)/.test(u);
     if (isEmpadao) {
-        const empadaoHint = `\n[⛔ REGRA DE NEGÓCIO (Empadão 1kg): (1) O Empadão 1kg (R$ 45,00) é preparado artesanalmente e precisa de no mínimo 1 DIA de antecedência (NÃO pode ser feito para HOJE). (2) Pedidos feitos hoje são para entrega/retirada a partir de amanhã ou data futura.]`;
+        const empadaoHint = `\n[⛔ REGRA DE NEGÓCIO (Empadão 1kg): (1) O Empadão 1kg (R$ 50,00) é preparado artesanalmente e precisa de no mínimo 1 DIA de antecedência (NÃO pode ser feito para HOJE). (2) Pedidos feitos hoje são para entrega/retirada a partir de amanhã ou data futura.]`;
         console.log(`[empadao-hint] ${empadaoHint.replace(/\n/g, ' | ')}`);
         return empadaoHint;
     }
-    const kitHint = `\n[⛔ REGRA DE NEGÓCIO (Kit Festa / Bolo Grande / Empadão): (1) Bolos grandes (PP, P, G, Vulcão P) e Kits Festa são APENAS RETIRADA na loja (Rua Palmeiras, 105, Novo Prado) e precisam de no mínimo 1 DIA de antecedência. O Empadão 1kg também exige no mínimo 1 DIA de antecedência. (2) Se o cliente estiver apenas tirando dúvidas ou consultando (preços, se entrega, o que vem, localização da loja, etc.), responda APENAS a dúvida dele de forma objetiva e pergunte se ele gostaria de encomendar. NÃO inicie personalização (massa/recheio/sabores) nem assuma qual produto ele quer antes de o cliente confirmar explicitamente.]`;
+    const kitHint = `\n[⛔ REGRA DE NEGÓCIO (Kit Festa / Bolo Grande / Empadão / Mini Pizza Festa): (1) Bolos grandes (PP, P, G, Vulcão P) e Kits Festa são APENAS RETIRADA na loja (Rua Palmeiras, 105, Novo Prado) e precisam de no mínimo 1 DIA de antecedência. O Empadão 1kg e a Mini Pizza Festa (50 un variadas - R$ 65,00) também exigem no mínimo 1 DIA de antecedência. (2) Se o cliente estiver apenas tirando dúvidas ou consultando (preços, se entrega, o que vem, localização da loja, etc.), responda APENAS a dúvida dele de forma objetiva e pergunte se ele gostaria de encomendar. NÃO inicie personalização (massa/recheio/sabores) nem assuma qual produto ele quer antes de o cliente confirmar explicitamente.]`;
     console.log(`[kit-hint] ${kitHint.replace(/\n/g, ' | ')}`);
     return kitHint;
 }
@@ -2032,10 +2038,12 @@ async function handleGeminiCore(req, res) {
     const greetingInstruction = session.isNewSession ? GREETING_NEW_SESSION : GREETING_CONTINUE_SESSION;
     let ownerApprovalNoticeCount = session.ownerApprovalNoticeCount || 0;
 
-    // --- Guard de perguntas sobre pizzas e hambúrgueres (mini pizza é produto nosso, não interceptar) ---
-    const hasMiniPizza = /\b(mini\s*pizza|mini\s*pizzas|minipizza|minipizzas)\b/i.test(effectiveMessage);
-    const isPizzaOrBurger = !hasMiniPizza && /\b(pizza|pizzas|hamburguer|hamburguers|hambúrguer|hambúrgueres)\b/i.test(effectiveMessage);
-    if (isPizzaOrBurger) {
+    // --- Guard de perguntas sobre pizzas e hambúrgueres ---
+    const isOurPizza = /\b(mini\s*pizza|mini\s*pizzas|minipizza|minipizzas|pizza\s*festa|brot[io]|brotinho|pizza\s*broto)\b/i.test(effectiveMessage);
+    const isPartnerSpecific = /\b(hamburguer|hamburguers|hambúrguer|hambúrgueres|pizza\s*grande|pizzas\s*grandes|pizza\s*(p|m|g)\b|pizza\s*fam[ií]lia|pizza\s*tradicional)\b/i.test(effectiveMessage);
+    const isGenericPizza = !isOurPizza && !isPartnerSpecific && /\b(pizza|pizzas)\b/i.test(effectiveMessage);
+
+    if (isPartnerSpecific) {
         const partnerMsg = "A FastSavory's não trabalha com pizzas grandes nem hambúrgueres. 🍕🍔\n\nIndicamos nosso parceiro *Império Burguer e Massas*:\nhttps://ccmpedidoonline.com.br/pedidoimperioburguerepizzas/index.php\n\nPosso te ajudar com algo do nosso cardápio?";
         await saveSession(user_id, [
             ...session.history,
@@ -2045,6 +2053,22 @@ async function handleGeminiCore(req, res) {
         return res.status(200).json({
             version: 'v2',
             content: { messages: [{ type: 'text', text: partnerMsg }], actions: [], quick_replies: [] },
+            handover_to_human: 0,
+            order_ready: 0,
+            order_summary: DEFAULT_ORDER_SUMMARY
+        });
+    }
+
+    if (isGenericPizza) {
+        const clarifyMsg = "Qual o tamanho de pizza você prefere? 😊\n\nNós trabalhamos apenas com a *Mini Pizza Festa* (50 unidades variadas por R$ 65,00, sob encomenda com no mínimo 1 dia de antecedência) e *Pizza Broto (brotinho)*.\n\nPizzas normais/grandes (tamanhos P, M e G) e hambúrgueres é só com nosso parceiro *Império Burguer e Massas*:\nhttps://ccmpedidoonline.com.br/pedidoimperioburguerepizzas/index.php\n\nComo posso te ajudar?";
+        await saveSession(user_id, [
+            ...session.history,
+            { role: 'user', text: effectiveMessage },
+            { role: 'assistant', text: clarifyMsg }
+        ], session.unclearCount || 0, ownerApprovalNoticeCount);
+        return res.status(200).json({
+            version: 'v2',
+            content: { messages: [{ type: 'text', text: clarifyMsg }], actions: [], quick_replies: [] },
             handover_to_human: 0,
             order_ready: 0,
             order_summary: DEFAULT_ORDER_SUMMARY
