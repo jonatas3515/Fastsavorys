@@ -793,9 +793,9 @@ function buildKitFactHint(history, currentMessage) {
     const u = normalizeTxt(userTexts);
     const hasPreorderItem = /(kit\s*festa|combo\s*festa|festa\s*(pp|p|g)\b|bolo\s*(pp|p|g)\b|vulcao\s*p\b|naked|empadao|mini\s*pizza\s*festa|pizza\s*festa)/.test(u);
     if (!hasPreorderItem) return '';
-    const isMiniPizzaFesta = /(mini\s*pizza\s*festa|pizza\s*festa)/.test(u);
+    const isMiniPizzaFesta = /(mini\s*pizza|pizza\s*festa)/.test(u);
     if (isMiniPizzaFesta) {
-        const pizzaFestaHint = `\n[⛔ REGRA DE NEGÓCIO (Mini Pizza Festa): (1) A Mini Pizza Festa (R$ 65,00 - 50 unidades variadas) é feita artesanalmente sob encomenda e precisa de no mínimo 1 DIA de antecedência (NÃO pode ser feita para HOJE). (2) NÃO tem opção de escolha de sabores — são 50 unidades já montadas com sabores variados. (3) Pedidos feitos hoje são para entrega ou retirada a partir de amanhã ou data futura.]`;
+        const pizzaFestaHint = `\n[⛔ REGRA DE NEGÓCIO (Mini Pizza Festa): (1) As Mini Pizzas Festa são feitas artesanalmente sob encomenda e precisam de no mínimo 1 DIA de antecedência (NÃO podem ser feitas para HOJE). (2) OPÇÕES E PREÇOS: Bandeja 16 unidades = R$ 22,00 | Bandeja 50 unidades = R$ 65,00 | Cento com 100 unidades = R$ 125,00. ⛔ NÃO temos opção de 10 unidades. (3) NÃO tem escolha de sabores — todas as opções são montadas com sabores variados. (4) Pedidos feitos hoje são para entrega ou retirada a partir de amanhã ou data futura.]`;
         console.log(`[minipizza-festa-hint] ${pizzaFestaHint.replace(/\n/g, ' | ')}`);
         return pizzaFestaHint;
     }
@@ -805,7 +805,7 @@ function buildKitFactHint(history, currentMessage) {
         console.log(`[empadao-hint] ${empadaoHint.replace(/\n/g, ' | ')}`);
         return empadaoHint;
     }
-    const kitHint = `\n[⛔ REGRA DE NEGÓCIO (Kit Festa / Bolo Grande / Empadão / Mini Pizza Festa): (1) Bolos grandes (PP, P, G, Vulcão P) e Kits Festa são APENAS RETIRADA na loja (Rua Palmeiras, 105, Novo Prado) e precisam de no mínimo 1 DIA de antecedência. O Empadão 1kg e a Mini Pizza Festa (50 un variadas - R$ 65,00) também exigem no mínimo 1 DIA de antecedência. (2) Se o cliente estiver apenas tirando dúvidas ou consultando (preços, se entrega, o que vem, localização da loja, etc.), responda APENAS a dúvida dele de forma objetiva e pergunte se ele gostaria de encomendar. NÃO inicie personalização (massa/recheio/sabores) nem assuma qual produto ele quer antes de o cliente confirmar explicitamente.]`;
+    const kitHint = `\n[⛔ REGRA DE NEGÓCIO (Kit Festa / Bolo Grande / Empadão / Mini Pizza Festa): (1) Bolos grandes (PP, P, G, Vulcão P) e Kits Festa são APENAS RETIRADA na loja (Rua Palmeiras, 105, Novo Prado) e precisam de no mínimo 1 DIA de antecedência. O Empadão 1kg e as Mini Pizzas Festa (16 un R$ 22, 50 un R$ 65, 100 un R$ 125) também exigem no mínimo 1 DIA de antecedência. (2) Se o cliente estiver apenas tirando dúvidas ou consultando (preços, se entrega, o que vem, localização da loja, etc.), responda APENAS a dúvida dele de forma objetiva e pergunte se ele gostaria de encomendar. NÃO inicie personalização (massa/recheio/sabores) nem assuma qual produto ele quer antes de o cliente confirmar explicitamente.]`;
     console.log(`[kit-hint] ${kitHint.replace(/\n/g, ' | ')}`);
     return kitHint;
 }
@@ -2060,7 +2060,7 @@ async function handleGeminiCore(req, res) {
     }
 
     if (isGenericPizza) {
-        const clarifyMsg = "Qual o tamanho de pizza você prefere? 😊\n\nNós trabalhamos apenas com a *Mini Pizza Festa* (50 unidades variadas por R$ 65,00, sob encomenda com no mínimo 1 dia de antecedência) e *Pizza Broto (brotinho)*.\n\nPizzas normais/grandes (tamanhos P, M e G) e hambúrgueres é só com nosso parceiro *Império Burguer e Massas*:\nhttps://ccmpedidoonline.com.br/pedidoimperioburguerepizzas/index.php\n\nComo posso te ajudar?";
+        const clarifyMsg = "Qual o tamanho da pizza a senhora prefere? 😊\n\nTrabalhamos apenas com a *Mini Pizza Festa* (16 un por R$ 22,00 | 50 un por R$ 65,00 | Cento/100 un por R$ 125,00 — sob encomenda com 1 dia de antecedência) e *Pizza Broto (brotinho)*.\n\nPizzas normais/grandes (tamanhos P, M e G) e hambúrgueres é só com nosso parceiro *Império Burguer e Massas*:\nhttps://ccmpedidoonline.com.br/pedidoimperioburguerepizzas/index.php\n\nComo posso te ajudar?";
         await saveSession(user_id, [
             ...session.history,
             { role: 'user', text: effectiveMessage },
