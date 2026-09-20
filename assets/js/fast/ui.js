@@ -441,7 +441,21 @@ function buildFastProductShareText(product) {
     const descText = product.description ? `\n😋 *Detalhes:* ${product.description}\n` : '';
     const shareUrl = buildFastProductShareUrl(product);
 
-    return `🥟 *FASTSAVORY'S • CARDÁPIO & ENCOMENDAS* ✨\n🔥 *${product.name}*\n${descText}\n💰 *Preço:* ${origPriceText}*${priceText}*\n\n👉 *FAÇA SEU PEDIDO ONLINE AQUI:*\n${shareUrl}\n\n✨ FastSavory's • Salgados, Mini-Salgados, Bolos & Kits Festa\n📍 Rua Palmeiras, 105, Novo Prado, Itamaraju-BA\n🛵 Entregamos quentinho até você!`;
+    // Identificar categoria e se exige encomenda prévia / se é apenas retirada
+    const category = (typeof window.classifyProduct === 'function') 
+        ? window.classifyProduct(product) 
+        : (product.category || '').toLowerCase();
+    
+    const normName = (product.name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    const isDeliverableCake = normName.includes('vulcao mini') || normName.includes('mini vulcao') || normName.includes('pote');
+    const isPreorder = (category === 'bolo_grande' || product.category === 'kits' || product.category === 'bolos' || normName.includes('empadao') || normName.includes('pizza festa') || product.requires_preorder === true || product.is_encomenda === true) && !isDeliverableCake;
+
+    let deliveryNotice = '🛵 Entregamos quentinho até você!\n📍 Ou retire na loja: Rua Palmeiras, 105, Novo Prado, Itamaraju-BA';
+    if (isPreorder) {
+        deliveryNotice = '⚠️ *Atenção:* Produto sob encomenda (mínimo 1 dia de antecedência).\n📍 *Retirada na loja:* Rua Palmeiras, 105, Novo Prado, Itamaraju-BA (apenas retirada)';
+    }
+
+    return `🥟 *FASTSAVORY'S • CARDÁPIO & ENCOMENDAS* ✨\n🔥 *${product.name}*\n${descText}\n💰 *Preço:* ${origPriceText}*${priceText}*\n\n👉 *FAÇA SEU PEDIDO ONLINE AQUI:*\n${shareUrl}\n\n💬 *Participe do nosso grupo de ofertas e novidades no WhatsApp:*\nhttps://chat.whatsapp.com/C7dT0ZWaUZKHm7atI3eOLE\n\n✨ FastSavory's • Salgados, Mini-Salgados, Bolos & Kits Festa\n${deliveryNotice}`;
 }
 
 window.openFastProductShareModal = function (id) {
