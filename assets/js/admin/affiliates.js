@@ -182,17 +182,26 @@ window.AffiliatesModule = (function () {
         }
       }
 
-      let badgeStyle = 'bg-orange-100 text-orange-950 border-orange-200';
-      if (item.badge_color === 'amber') badgeStyle = 'bg-yellow-100 text-yellow-950 border-yellow-300';
-      if (item.badge_color === 'rose') badgeStyle = 'bg-rose-100 text-rose-950 border-rose-300';
-      if (item.badge_color === 'emerald') badgeStyle = 'bg-emerald-100 text-emerald-950 border-emerald-300';
-      if (item.badge_color === 'blue') badgeStyle = 'bg-blue-100 text-blue-950 border-blue-300';
-      if (item.badge_color === 'purple') badgeStyle = 'bg-purple-100 text-purple-950 border-purple-300';
-      if (item.badge_color === 'pink') badgeStyle = 'bg-pink-100 text-pink-950 border-pink-300';
-      if (item.badge_color === 'black') badgeStyle = 'bg-gray-900 text-white border-gray-950';
+      // Resolução inteligente de cor do selo (respeitando os presets oficiais)
+      let resolvedColor = item.badge_color || 'orange';
+      const normTag = customTagText.toLowerCase();
+      if (normTag.includes('imperd') || normTag.includes('oferta imperdivel')) resolvedColor = 'blue';
+      else if (normTag.includes('mais vendido')) resolvedColor = 'orange';
+      else if (normTag.includes('buscado')) resolvedColor = 'purple';
+      else if (normTag.includes('pratico') || normTag.includes('prático')) resolvedColor = 'amber';
+      else if (normTag.includes('loja oficial') || normTag.includes('oficial')) resolvedColor = 'black';
+
+      let badgeStyle = 'bg-orange-100 text-orange-950 border-orange-300 font-bold';
+      if (resolvedColor === 'amber' || resolvedColor === 'yellow') badgeStyle = 'bg-yellow-100 text-yellow-950 border-yellow-300 font-bold';
+      if (resolvedColor === 'rose' || resolvedColor === 'red') badgeStyle = 'bg-rose-100 text-rose-950 border-rose-300 font-bold';
+      if (resolvedColor === 'emerald' || resolvedColor === 'green') badgeStyle = 'bg-emerald-100 text-emerald-950 border-emerald-300 font-bold';
+      if (resolvedColor === 'blue') badgeStyle = 'bg-blue-100 text-blue-950 border-blue-300 font-bold';
+      if (resolvedColor === 'purple') badgeStyle = 'bg-purple-100 text-purple-950 border-purple-300 font-bold';
+      if (resolvedColor === 'pink') badgeStyle = 'bg-pink-100 text-pink-950 border-pink-300 font-bold';
+      if (resolvedColor === 'black') badgeStyle = 'bg-gray-900 text-white border-gray-950 font-bold';
 
       const customTagBadge = showCustomTag
-        ? `<span class="inline-block text-[10px] ${badgeStyle} font-bold px-1.5 py-0.2 rounded border">${escapeHtml(customTagText)}</span>`
+        ? `<span class="inline-block text-[10px] ${badgeStyle} px-1.5 py-0.2 rounded border">${escapeHtml(customTagText)}</span>`
         : '';
 
       return `
@@ -236,6 +245,36 @@ window.AffiliatesModule = (function () {
     }).join('');
   }
 
+  function detectBadgePreset(tag, color) {
+    if (!tag) return '';
+    const norm = tag.toLowerCase().trim();
+    if (norm.includes('imperd') || norm === '💥 oferta imperdível' || norm === 'oferta imperdível') return '💥 Oferta Imperdível|blue';
+    if (norm.includes('mais vendido') || norm === '🔥 mais vendido' || norm === 'mais vendido') return '🔥 Mais Vendido|orange';
+    if (norm.includes('buscado') || norm === '➕ buscado' || norm === '➕ mais buscado' || norm === 'mais buscado') return '➕ Buscado|purple';
+    if (norm.includes('pratico') || norm.includes('prático') || norm === '⭐ prático' || norm === 'prático') return '⭐ Prático|amber';
+    if (norm.includes('loja oficial') || norm.includes('oficial') || norm === '🛡️ loja oficial' || norm === 'loja oficial') return '🛡️ Loja Oficial|black';
+    return 'custom';
+  }
+
+  function handleTagPresetChange(val) {
+    const customBox = document.getElementById('affiliateCustomTagBox');
+    const tagInput = document.getElementById('affiliateTagInput');
+    const colorInput = document.getElementById('affiliateBadgeColorInput');
+
+    if (val === 'custom') {
+      if (customBox) customBox.classList.remove('hidden');
+    } else if (!val) {
+      if (customBox) customBox.classList.add('hidden');
+      if (tagInput) tagInput.value = '';
+      if (colorInput) colorInput.value = 'orange';
+    } else {
+      if (customBox) customBox.classList.add('hidden');
+      const [tag, color] = val.split('|');
+      if (tagInput) tagInput.value = tag;
+      if (colorInput) colorInput.value = color;
+    }
+  }
+
   function openNewModal() {
     editingId = null;
     const form = document.getElementById('affiliateForm');
@@ -244,8 +283,14 @@ window.AffiliatesModule = (function () {
     document.getElementById('affiliateId').value = '';
     const discountEl = document.getElementById('affiliateDiscountInput');
     if (discountEl) discountEl.value = '';
+
+    const presetSelect = document.getElementById('affiliateTagPresetSelect');
+    if (presetSelect) presetSelect.value = '';
+    const customBox = document.getElementById('affiliateCustomTagBox');
+    if (customBox) customBox.classList.add('hidden');
     document.getElementById('affiliateTagInput').value = '';
     document.getElementById('affiliateBadgeColorInput').value = 'orange';
+
     const isFastPickEl = document.getElementById('affiliateIsFastPickInput');
     if (isFastPickEl) isFastPickEl.checked = false;
     document.getElementById('affiliateDescriptionInput').value = '🔸 ';
@@ -276,13 +321,28 @@ window.AffiliatesModule = (function () {
 
     const tagVal = item.discount_tag || '';
     const isDiscountOnly = /^[⚡🔥\s]*\d+%\s*OFF/i.test(tagVal.trim());
-    document.getElementById('affiliateTagInput').value = isDiscountOnly ? '' : tagVal;
+    const actualTag = isDiscountOnly ? '' : tagVal;
+
+    const preset = detectBadgePreset(actualTag, item.badge_color);
+    const presetSelect = document.getElementById('affiliateTagPresetSelect');
+    const customBox = document.getElementById('affiliateCustomTagBox');
+    const tagInput = document.getElementById('affiliateTagInput');
+    const colorInput = document.getElementById('affiliateBadgeColorInput');
+
+    if (presetSelect) presetSelect.value = preset;
+    if (tagInput) tagInput.value = actualTag;
+    if (colorInput) colorInput.value = (item.badge_color && item.badge_color !== 'fast_seal') ? item.badge_color : 'orange';
+
+    if (preset === 'custom') {
+      if (customBox) customBox.classList.remove('hidden');
+    } else {
+      if (customBox) customBox.classList.add('hidden');
+    }
 
     const isFastPick = Boolean(item.is_fast_pick || item.badge_color === 'fast_seal');
     const isFastPickEl = document.getElementById('affiliateIsFastPickInput');
     if (isFastPickEl) isFastPickEl.checked = isFastPick;
 
-    document.getElementById('affiliateBadgeColorInput').value = (item.badge_color && item.badge_color !== 'fast_seal') ? item.badge_color : 'orange';
     document.getElementById('affiliateActiveInput').checked = item.is_active !== false;
 
     // Atualiza preview da imagem
@@ -405,7 +465,20 @@ window.AffiliatesModule = (function () {
     const assignedPosition = currentItem && currentItem.position ? currentItem.position : (productsList.length + 1);
 
     const isFastPick = document.getElementById('affiliateIsFastPickInput') ? document.getElementById('affiliateIsFastPickInput').checked : false;
-    const badgeColorVal = document.getElementById('affiliateBadgeColorInput') ? document.getElementById('affiliateBadgeColorInput').value : 'orange';
+
+    const presetSelect = document.getElementById('affiliateTagPresetSelect');
+    const presetVal = presetSelect ? presetSelect.value : '';
+    let finalTag = null;
+    let finalColor = 'orange';
+
+    if (presetVal === 'custom') {
+      finalTag = document.getElementById('affiliateTagInput')?.value?.trim() || null;
+      finalColor = document.getElementById('affiliateBadgeColorInput')?.value || 'orange';
+    } else if (presetVal) {
+      const [tag, color] = presetVal.split('|');
+      finalTag = tag || null;
+      finalColor = color || 'orange';
+    }
 
     const payload = {
       title,
@@ -415,8 +488,8 @@ window.AffiliatesModule = (function () {
       price_display: document.getElementById('affiliatePriceInput').value.trim() || null,
       original_price: document.getElementById('affiliateOriginalPriceInput').value.trim() || null,
       category: document.getElementById('affiliateCategoryInput').value,
-      discount_tag: document.getElementById('affiliateTagInput').value.trim() || null,
-      badge_color: badgeColorVal,
+      discount_tag: finalTag,
+      badge_color: finalColor,
       is_fast_pick: isFastPick,
       position: assignedPosition,
       is_active: document.getElementById('affiliateActiveInput').checked,
@@ -1155,6 +1228,7 @@ window.AffiliatesModule = (function () {
     detectCategoryClient,
     openShareModal,
     closeShareModal,
+    handleTagPresetChange,
     shareToWhatsApp,
     shareToTelegram,
     shareToFacebook,

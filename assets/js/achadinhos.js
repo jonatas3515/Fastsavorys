@@ -338,16 +338,6 @@
         ? `<span class="inline-flex items-center px-2 py-0.5 text-xs font-black rounded-full bg-gradient-to-r from-emerald-600 to-green-600 text-white shadow-sm tracking-wide flex-shrink-0 animate-pulse">🔥 ${pct}% OFF</span>`
         : '';
 
-      // Cores para as badges secundárias (Padrão: Laranja)
-      let badgeStyle = 'bg-orange-100 text-orange-950 border-orange-300 font-bold';
-      if (item.badge_color === 'amber') badgeStyle = 'bg-yellow-100 text-yellow-950 border-yellow-300 font-bold';
-      if (item.badge_color === 'rose') badgeStyle = 'bg-rose-100 text-rose-950 border-rose-300 font-bold';
-      if (item.badge_color === 'emerald') badgeStyle = 'bg-emerald-100 text-emerald-950 border-emerald-300 font-bold';
-      if (item.badge_color === 'blue') badgeStyle = 'bg-blue-100 text-blue-950 border-blue-300 font-bold';
-      if (item.badge_color === 'purple') badgeStyle = 'bg-purple-100 text-purple-950 border-purple-300 font-bold';
-      if (item.badge_color === 'pink') badgeStyle = 'bg-pink-100 text-pink-950 border-pink-300 font-bold';
-      if (item.badge_color === 'black') badgeStyle = 'bg-gray-900 text-white border-gray-950 font-bold shadow-xs';
-
       // Evita duplicidade de badge se a tag for apenas a indicação do mesmo desconto
       let showTag = false;
       const rawTag = item.discount_tag ? item.discount_tag.trim() : '';
@@ -358,11 +348,30 @@
         }
       }
 
+      // Resolução inteligente de cor do selo (respeitando os presets oficiais)
+      let resolvedColor = item.badge_color || 'orange';
+      const normTag = rawTag.toLowerCase();
+      if (normTag.includes('imperd') || normTag.includes('oferta imperdivel')) resolvedColor = 'blue';
+      else if (normTag.includes('mais vendido')) resolvedColor = 'orange';
+      else if (normTag.includes('buscado')) resolvedColor = 'purple';
+      else if (normTag.includes('pratico') || normTag.includes('prático')) resolvedColor = 'amber';
+      else if (normTag.includes('loja oficial') || normTag.includes('oficial')) resolvedColor = 'black';
+
+      // Cores para as badges secundárias
+      let badgeStyle = 'bg-orange-100 text-orange-950 border-orange-300 font-bold';
+      if (resolvedColor === 'amber' || resolvedColor === 'yellow') badgeStyle = 'bg-yellow-100 text-yellow-950 border-yellow-300 font-bold';
+      if (resolvedColor === 'rose' || resolvedColor === 'red') badgeStyle = 'bg-rose-100 text-rose-950 border-rose-300 font-bold';
+      if (resolvedColor === 'emerald' || resolvedColor === 'green') badgeStyle = 'bg-emerald-100 text-emerald-950 border-emerald-300 font-bold';
+      if (resolvedColor === 'blue') badgeStyle = 'bg-blue-100 text-blue-950 border-blue-300 font-bold';
+      if (resolvedColor === 'purple') badgeStyle = 'bg-purple-100 text-purple-950 border-purple-300 font-bold';
+      if (resolvedColor === 'pink') badgeStyle = 'bg-pink-100 text-pink-950 border-pink-300 font-bold';
+      if (resolvedColor === 'black') badgeStyle = 'bg-gray-900 text-white border-gray-950 font-bold shadow-xs';
+
       const tagHtml = showTag 
-        ? `<span class="inline-flex items-center px-2 py-0.5 text-xs rounded-full border ${badgeStyle} flex-shrink-0">${escapeHtml(rawTag)}</span>` 
+        ? `<span class="inline-flex items-center px-2 py-0.5 text-xs rounded-full border ${badgeStyle} flex-shrink-0 whitespace-nowrap">${escapeHtml(rawTag)}</span>` 
         : '';
 
-      const platformBadgeHtml = `<span class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] rounded-full border ${platformInfo.badge} font-bold shadow-xs flex-shrink-0">${platformInfo.icon} ${platformInfo.name}</span>`;
+      const platformBadgeHtml = `<span class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] rounded-full border ${platformInfo.badge} font-bold shadow-xs flex-shrink-0 whitespace-nowrap">${platformInfo.icon} ${platformInfo.name}</span>`;
 
       const originalPriceHtml = item.original_price 
         ? `<span class="text-xs text-gray-400 line-through mr-1.5">${escapeHtml(item.original_price)}</span>` 
@@ -388,7 +397,7 @@
               onerror="this.src='../assets/img/fast-logo.png'; this.className='absolute inset-0 w-full h-full object-contain p-8 opacity-40';"
             />
             <!-- Badges no topo esquerdo da imagem -->
-            <div class="absolute top-2 left-2 flex flex-row flex-wrap items-center gap-1.5 z-10 max-w-[70%]">
+            <div class="absolute top-2 left-2 flex flex-row flex-wrap items-center gap-1.5 z-10 ${isFastPick ? 'max-w-[calc(100%-54px)]' : 'max-w-[calc(100%-16px)]'}">
               ${discountBadgeHtml}
               ${tagHtml}
               ${platformBadgeHtml}
