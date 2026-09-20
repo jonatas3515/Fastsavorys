@@ -52,11 +52,11 @@ function showAdminPanel() {
     document.getElementById('loginModal')?.classList.add('hidden');
     document.getElementById('publicStore')?.classList.add('hidden');
 
-    // Show Admin Wrapper
+    // Show Admin Wrapper with flex
     const adminWrapper = document.getElementById('adminWrapper');
     if (adminWrapper) {
         adminWrapper.classList.remove('hidden');
-        adminWrapper.style.display = 'block';
+        adminWrapper.style.display = 'flex';
     }
 
     // Default to Dashboard
@@ -80,6 +80,11 @@ function setupTabNavigation() {
 }
 
 function switchAdminTab(targetId, btnElement) {
+    // Normalization for aliases (DOM panel IDs in admin.html)
+    if (targetId === 'rulesPanelFast') targetId = 'configPanelFast';
+    if (targetId === 'promotionPanelFast') targetId = 'promotionsPanelFast';
+    if (targetId === 'bannerPanelLegacy') targetId = 'bannerPanelFast';
+
     // Hide all panels
     document.querySelectorAll('.admin-panel').forEach(p => p.classList.add('hidden'));
 
@@ -87,23 +92,48 @@ function switchAdminTab(targetId, btnElement) {
     const target = document.getElementById(targetId);
     if (target) target.classList.remove('hidden');
 
-    // Update buttons
+    // Update active tab buttons (legacy and tab buttons)
     document.querySelectorAll('.admin-tab-btn').forEach(b => {
         b.classList.remove('bg-rose-600', 'text-white');
         b.classList.add('text-gray-600', 'hover:bg-gray-100');
     });
-    if (btnElement) {
+    if (btnElement && btnElement.classList.contains('admin-tab-btn')) {
         btnElement.classList.remove('text-gray-600', 'hover:bg-gray-100');
         btnElement.classList.add('bg-rose-600', 'text-white');
     }
+
+    // Update Sidebar Navigation Active Highlights
+    const navMap = {
+        'ordersPanelFast': 'nav-orders',
+        'productsPanelFast': 'nav-products',
+        'clientsPanelFast': 'nav-clients',
+        'reportsPanelFast': 'nav-reports',
+        'promotionsPanelFast': 'nav-promos',
+        'bannerPanelFast': 'nav-banner',
+        'ratingsPanelFast': 'nav-ratings',
+        'affiliatesPanelFast': 'nav-affiliates',
+        'configPanelFast': 'nav-config'
+    };
+
+    const activeNavId = navMap[targetId];
+    document.querySelectorAll('#sidebar nav button').forEach(b => {
+        if (activeNavId && b.id === activeNavId) {
+            b.classList.add('bg-gray-800', 'border-rose-500', 'text-white');
+            b.classList.remove('border-transparent');
+        } else {
+            b.classList.remove('bg-gray-800', 'border-rose-500', 'text-white');
+            b.classList.add('border-transparent');
+        }
+    });
 
     // Trigger Loaders
     if (targetId === 'productsPanelFast' && typeof loadProductsAdmin === 'function') loadProductsAdmin();
     if (targetId === 'clientsPanelFast' && typeof renderClients === 'function') renderClients();
     if (targetId === 'reportsPanelFast' && typeof renderReportsData === 'function') renderReportsData();
-    if (targetId === 'promotionPanelFast') {
-        if (typeof renderPromotions === 'function') renderPromotions();
+    if (targetId === 'promotionsPanelFast') {
+        if (typeof switchPromoTab === 'function') switchPromoTab('coupons');
         if (typeof renderCoupons === 'function') renderCoupons();
+        if (typeof renderPromotions === 'function') renderPromotions();
         if (typeof updatePromotionProductSelect === 'function') updatePromotionProductSelect();
     }
     if (targetId === 'ratingsPanelFast' && window.RatingsModule) {
@@ -117,9 +147,8 @@ function switchAdminTab(targetId, btnElement) {
         if (typeof loadStoreConfig === 'function') loadStoreConfig();
         // Load store closure status for today
         if (typeof loadStoreClosureStatus === 'function') loadStoreClosureStatus();
-    }
-    if (targetId === 'rulesPanelFast' && window.RulesModule) {
-        RulesModule.init();
+        // Load security & operational rules
+        if (window.RulesModule && typeof RulesModule.init === 'function') RulesModule.init();
     }
     if (targetId === 'affiliatesPanelFast' && window.AffiliatesModule) {
         AffiliatesModule.init();

@@ -1230,19 +1230,21 @@ async function buildBusinessContext(intents, forceRefresh = false) {
         ctx += '\n  - Empadão 1kg, Bolos (exceto Vulcão Mini e Bolo no Pote) e Kits Festa: NÃO podem ser feitos para o mesmo dia (exigem no mínimo 1 dia de antecedência). Se o cliente pedir para HOJE, recuse com simpatia explicando a necessidade de 1 dia de antecedência. Se já pediu para data futura, confirme normalmente SEM repetir regra de antecedência. Bolos grandes e Kits Festa são apenas RETIRADA na loja (Rua Palmeiras, 105, Novo Prado).';
         ctx += '\n  - PEDIDO MISTO COM BOLO: Se o pedido incluir bolo grande OU kit festa junto com salgados/bebidas, o PEDIDO INTEIRO é apenas retirada. NÃO ofereça entrega separada para os salgados.';
         ctx += '\n  - Bolo Vulcão Mini (R$ 15,00) e Bolo no Pote (R$ 10,00): exceção — NÃO precisam de antecedência, podem ser pedidos para HOJE (conforme disponibilidade). Podem ser ENTREGUES junto com salgados/bebidas.';
-        ctx += '\n  - Salgados, mini salgados, bebidas, combos: podem ser pedidos para o MESMO DIA, com entrega/retirada SOMENTE das 14h às 18h (segunda a sábado).';
-        ctx += '\n    • ENTREGA MESMO DIA (Mototáxi): das 14h às 18h, segunda a sábado, bairros listados, com taxa. ⛔ NÃO aceite entrega para hoje antes das 14h.';
-        ctx += '\n    • RETIRADA MESMO DIA: 14h–18h na loja (Rua Palmeiras, 105, Novo Prado). ⛔ NÃO aceite retirada para hoje antes das 14h.';
+        ctx += '\n  - Salgados, mini salgados, bebidas, combos: podem ser pedidos para o MESMO DIA, com retirada a partir das 12h e entregas das 14h às 18h (segunda a sábado).';
+        ctx += '\n    • ENTREGA MESMO DIA (Mototáxi): das 14h às 18h, segunda a sábado, bairros listados, com taxa. Mínimo para entrega = R$ 15,00 (ou mín. do bairro).';
+        ctx += '\n    • RETIRADA MESMO DIA: 12h–18h na loja (Rua Palmeiras, 105, Novo Prado). Horário exato é obrigatório.';
         ctx += '\n    • ENCOMENDAS (outro dia): ENTREGA e RETIRADA das 7h às 18h (seg-sáb) e 7h às 17h30 (dom/feriado, com aprovação da Jéssica).';
-        ctx += '\n\nVALOR MÍNIMO POR FAIXA DE HORÁRIO (retirada):';
+        ctx += '\n\nVALORES MÍNIMOS DE PEDIDO:';
         if (configRes.data) {
             const c = configRes.data;
-            const minNormal = c.min_order_pickup || 8;
-            const minOff = c.min_order_pickup_offhours || 15;
-            const minMorning = c.morning_rule_min_value || 25;
-            ctx += `\n  • Retirada 7h–11h (sem bolo): mínimo do carrinho = R$ ${Number(minMorning).toFixed(2)}`;
-            ctx += `\n  • Retirada 11h–14h: mínimo do carrinho = R$ ${Number(minOff).toFixed(2)}`;
-            ctx += `\n  • Retirada 14h–18h: mínimo do carrinho = R$ ${Number(minNormal).toFixed(2)}`;
+            const minDelivery = c.min_order_delivery || 15;
+            const minNormal = c.min_order_pickup || 9;
+            const minSameDay = c.same_day_min_value || 25;
+            const minMorning = c.morning_rule_min_value || 40;
+            ctx += `\n  • Entrega no horário normal (14h–18h): mínimo = R$ ${Number(minDelivery).toFixed(2)} (ou mín. do bairro)`;
+            ctx += `\n  • Retirada no horário normal (14h–18h): mínimo = R$ ${Number(minNormal).toFixed(2)}`;
+            ctx += `\n  • Pedido para hoje / retirada antecipada (12h–14h): mínimo = R$ ${Number(minSameDay).toFixed(2)} (ou R$ ${Number(minMorning).toFixed(2)} antes das 13h)`;
+            ctx += `\n  • ⚠️ No horário regular de atendimento (14h às 18h), a regra de R$ ${Number(minSameDay).toFixed(2)} NÃO bloqueia pedidos de entrega (mín. R$ ${Number(minDelivery).toFixed(2)}) nem retirada (mín. R$ ${Number(minNormal).toFixed(2)}).`;
         }
         ctx += '\n\n  - Pagamento Antecipado (Entrada) — SÓ PARA AGENDAMENTOS: Para ENCOMENDAS/AGENDAMENTOS com total acima de R$ 50,00, é OBRIGATÓRIA 50% de entrada para confirmar. Para pedidos do MESMO DIA (entrega/retirada hoje), NÃO peça entrada — cobre integral ou combine dinheiro na entrega. Se cliente recusar entrada em agendamento, passe para Jéssica.';
 

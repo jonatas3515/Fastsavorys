@@ -331,7 +331,7 @@ window.getMinOrderDate = function (cartItems = window.cart) {
     if (analysis.hasSalgados) {
         const cutoffSalgados = 8 * 60; // 08:00
         if (tempoAtual > cutoffSalgados) {
-            const sameDayStart = (window.storeConfig && window.storeConfig.same_day_pickup_start) || '11:00';
+            const sameDayStart = (window.storeConfig && window.storeConfig.same_day_pickup_start) || '12:00';
             return {
                 minDate: today, // Ainda pode pedir para hoje, mas com restrições de horário
                 reason: `🥟 Salgados: após as 8h, pedidos para entrega/retirada para hoje somente a partir das ${sameDayStart}.`,
@@ -365,7 +365,7 @@ window.getMinOrderDate = function (cartItems = window.cart) {
  */
 window.validateOrderTime = function (timeSlot, orderDate, cartItems = window.cart, cartTotal = window.cartTotal, isDelivery = false) {
     if (!timeSlot) {
-        return { allowed: false, reason: 'Selecione um horário para o pedido.' };
+        return { allowed: false, reason: 'Por favor, selecione o horário desejado para entrega ou retirada (das 12h às 18h).' };
     }
 
     const analysis = window.analyzeCart(cartItems);
@@ -422,7 +422,7 @@ window.validateOrderTime = function (timeSlot, orderDate, cartItems = window.car
             };
         }
 
-        const sameDayStart = (window.storeConfig && window.storeConfig.same_day_pickup_start) || '11:00';
+        const sameDayStart = (window.storeConfig && window.storeConfig.same_day_pickup_start) || '12:00';
         const sameDayEnd = (window.storeConfig && window.storeConfig.same_day_pickup_end) || windowEnd;
         const sameDayStartNum = parseInt(normalizeTime(sameDayStart), 10);
         const sameDayEndNum = parseInt(normalizeTime(sameDayEnd), 10);
@@ -434,15 +434,19 @@ window.validateOrderTime = function (timeSlot, orderDate, cartItems = window.car
             };
         }
 
-        const sameDayMinValue = (window.storeConfig && typeof window.storeConfig.same_day_min_value === 'number')
-            ? window.storeConfig.same_day_min_value
-            : 15;
-        if (cartTotal < sameDayMinValue) {
-            const faltando = (sameDayMinValue - cartTotal).toFixed(2).replace('.', ',');
-            return {
-                allowed: false,
-                reason: `💰 Para pedidos no mesmo dia, o pedido mínimo é de R$ ${sameDayMinValue.toFixed(2).replace('.', ',')}. Faltam R$ ${faltando}.`
-            };
+        // Valor mínimo para o mesmo dia antes do expediente normal (12h às 14h)
+        // No horário de funcionamento normal (14h às 18h), aplicam-se os mínimos padrão (Entrega R$ 15,00 / Retirada R$ 9,00)
+        if (timeNum < 1400) {
+            const sameDayMinValue = (window.storeConfig && typeof window.storeConfig.same_day_min_value === 'number')
+                ? window.storeConfig.same_day_min_value
+                : 25;
+            if (cartTotal < sameDayMinValue) {
+                const faltando = (sameDayMinValue - cartTotal).toFixed(2).replace('.', ',');
+                return {
+                    allowed: false,
+                    reason: `💰 Para pedidos no mesmo dia antes das 14h, o pedido mínimo é de R$ ${sameDayMinValue.toFixed(2).replace('.', ',')}. Faltam R$ ${faltando}.`
+                };
+            }
         }
     }
 
@@ -613,7 +617,9 @@ window.validateOrder = function (params = {}) {
 
     // 2.5. Validar valor mínimo global para retirada
     if (!isDelivery) {
-        const minPickup = (window.storeConfig && window.storeConfig.min_order_pickup) || 8;
+        const minPickup = (window.storeConfig && window.storeConfig.min_order_pickup != null)
+            ? (parseFloat(window.storeConfig.min_order_pickup) || 9)
+            : 9;
         if (cartTotal < minPickup) {
             const faltando = (minPickup - cartTotal).toFixed(2).replace('.', ',');
             errors.push(`💰 Pedido mínimo para retirada é de R$ ${minPickup.toFixed(2).replace('.', ',')}. Faltam R$ ${faltando}.`);
@@ -644,8 +650,12 @@ window.validateOrder = function (params = {}) {
         errors.push(minDateInfo.reason);
     }
 
-    // 5. Validar horário
-    if (timeSlot && orderDate) {
+    // 5. Validar horário (obrigatório selecionar horário)
+    if (!timeSlot) {
+        const sameDayStart = (window.storeConfig && window.storeConfig.same_day_pickup_start) || '12:00';
+        const sameDayEnd = (window.storeConfig && window.storeConfig.same_day_pickup_end) || (window.storeConfig && window.storeConfig.order_window_end) || '18:00';
+        errors.push(`⏰ Por favor, selecione o horário desejado para ${isDelivery ? 'entrega' : 'retirada'} (das ${sameDayStart} às ${sameDayEnd}).`);
+    } else if (orderDate) {
         const timeValidation = window.validateOrderTime(timeSlot, orderDate, cartItems, cartTotal, isDelivery);
         if (!timeValidation.allowed) {
             errors.push(timeValidation.reason);
@@ -746,10 +756,10 @@ window.updateOrderRulesUI = function () {
         const morningMinValue = (window.storeConfig && typeof window.storeConfig.morning_rule_min_value === 'number')
             ? window.storeConfig.morning_rule_min_value
             : 40.00;
-        const sameDayStart = (window.storeConfig && window.storeConfig.same_day_pickup_start) || '11:00';
+        const sameDayStart = (window.storeConfig && window.storeConfig.same_day_pickup_start) || '12:00';
         const sameDayMinValue = (window.storeConfig && typeof window.storeConfig.same_day_min_value === 'number')
             ? window.storeConfig.same_day_min_value
-            : 15.00;
+            : 25.00;
 
         let rulesHtml = '';
 
