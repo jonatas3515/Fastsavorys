@@ -515,44 +515,79 @@ window.AffiliatesModule = (function () {
       image_url,
       price_display: document.getElementById('affiliatePriceInput').value.trim() || null,
       original_price: document.getElementById('affiliateOriginalPriceInput').value.trim() || null,
-      category: document.getElementById('affiliateCategoryInput').value,
+      category: document.getElementById('affiliateCategoryInput').value || 'cozinha',
       discount_tag: finalTag,
-      badge_color: finalColor,
+      badge_color: finalColor || 'orange',
       is_fast_pick: isFastPick,
-      position: assignedPosition,
+      position: Number(assignedPosition) || 1,
       is_active: document.getElementById('affiliateActiveInput').checked,
       updated_at: new Date().toISOString()
     };
 
     try {
       if (window.supabaseClient) {
-        if (editingId) {
-          let res = await window.supabaseClient
-            .from('fast_affiliate_products')
-            .update(payload)
-            .eq('id', editingId);
+        let currentPayload = { ...payload };
+        if (!editingId) {
+          currentPayload.created_at = new Date().toISOString();
+        }
 
-          if (res.error && res.error.message && res.error.message.includes('is_fast_pick')) {
-            delete payload.is_fast_pick;
-            res = await window.supabaseClient
+        let maxAttempts = 5;
+        let lastError = null;
+
+        while (maxAttempts > 0) {
+          maxAttempts--;
+          let query;
+          if (editingId) {
+            query = window.supabaseClient
               .from('fast_affiliate_products')
-              .update(payload)
+              .update(currentPayload)
               .eq('id', editingId);
-          }
-          if (res.error) throw res.error;
-        } else {
-          payload.created_at = new Date().toISOString();
-          let res = await window.supabaseClient
-            .from('fast_affiliate_products')
-            .insert([payload]);
-
-          if (res.error && res.error.message && res.error.message.includes('is_fast_pick')) {
-            delete payload.is_fast_pick;
-            res = await window.supabaseClient
+          } else {
+            query = window.supabaseClient
               .from('fast_affiliate_products')
-              .insert([payload]);
+              .insert([currentPayload]);
           }
-          if (res.error) throw res.error;
+
+          const res = await query;
+          if (!res.error) {
+            lastError = null;
+            break;
+          }
+
+          lastError = res.error;
+          console.warn(`[Admin Affiliates] Tentativa com erro (tentativas restantes: ${maxAttempts}):`, res.error);
+
+          const errMsg = (res.error.message || '') + ' ' + (res.error.details || '');
+          // Detecta qualquer coluna que não exista no banco e a remove do payload para tentar novamente
+          const colMatch = errMsg.match(/'([^']+)' column/i) || errMsg.match(/column\s+"?([^"\s]+)"?\s+does not exist/i);
+          if (colMatch && colMatch[1] && currentPayload.hasOwnProperty(colMatch[1])) {
+            delete currentPayload[colMatch[1]];
+            continue;
+          }
+
+          if (errMsg.includes('is_fast_pick') && currentPayload.hasOwnProperty('is_fast_pick')) {
+            delete currentPayload.is_fast_pick;
+            continue;
+          }
+          if (errMsg.includes('badge_color') && currentPayload.hasOwnProperty('badge_color')) {
+            delete currentPayload.badge_color;
+            continue;
+          }
+          if (errMsg.includes('discount_tag') && currentPayload.hasOwnProperty('discount_tag')) {
+            delete currentPayload.discount_tag;
+            continue;
+          }
+          if (errMsg.includes('original_price') && currentPayload.hasOwnProperty('original_price')) {
+            delete currentPayload.original_price;
+            continue;
+          }
+
+          // Se for erro diferente de coluna desconhecida, sai do loop
+          break;
+        }
+
+        if (lastError) {
+          throw lastError;
         }
       }
 
@@ -561,7 +596,8 @@ window.AffiliatesModule = (function () {
       await loadProducts();
     } catch (err) {
       console.error('[Admin Affiliates] Erro ao salvar:', err);
-      alert('Erro ao salvar no banco de dados. Verifique sua conexão.');
+      const msg = err.message || err.details || (typeof err === 'string' ? err : 'Verifique sua conexão');
+      alert(`Erro ao salvar no banco de dados: ${msg}`);
     }
   }
 
