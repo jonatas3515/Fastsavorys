@@ -88,47 +88,60 @@
           <option value="all">🏷️ Todas as Ofertas</option>
           <option value="fast_picks">✨ Testados Fast</option>
           
-          <optgroup label="🏠 Casa & Cozinha">
-            <option value="group_casa">🏠 Ver Tudo de Casa & Cozinha</option>
-            <option value="cozinha">🍳 Cozinha & Eletro</option>
-            <option value="utilidades">🏠 Casa & Utilidades</option>
-            <option value="banho">🚿 Cama, Mesa & Banho</option>
+          <optgroup label="🏠 Casa & Utilidades">
+            <option value="group_casa">🏠 Ver Tudo de Casa & Utilidades</option>
+            <option value="cozinha">🍳 Cozinha & Eletroportáteis</option>
+            <option value="organizacao">🧹 Organização & Limpeza</option>
+            <option value="cama_mesa_banho">🛏️ Cama, Mesa & Banho</option>
           </optgroup>
 
-          <optgroup label="🎂 Confeitaria & Festas">
-            <option value="group_festas">🎂 Ver Tudo de Confeitaria & Festas</option>
-            <option value="confeitaria">🍰 Confeitaria & Formas</option>
-            <option value="embalagens">📦 Embalagens & Festas</option>
-            <option value="presentes">🎁 Presentes & Lembranças</option>
+          <optgroup label="📺 Eletros, TV & Games">
+            <option value="group_eletros">📺 Ver Tudo de Eletros, TV & Games</option>
+            <option value="eletrodomesticos">🧊 Grandes Eletrodomésticos</option>
+            <option value="tv_audio_video">📺 TVs, Áudio & Vídeo</option>
+            <option value="games">🎮 Games & Consoles</option>
           </optgroup>
 
           <optgroup label="⚡ Tecnologia & Celulares">
             <option value="group_tech">⚡ Ver Tudo de Tecnologia</option>
-            <option value="eletronicos">⚡ Eletrônicos & Áudio</option>
-            <option value="celulares">📱 Celulares & Telefonia</option>
-            <option value="informatica">💻 Informática & Acessórios</option>
+            <option value="celulares">📱 Celulares & Acessórios</option>
+            <option value="informatica">💻 Informática & Periféricos</option>
+            <option value="audio_gadgets">🎧 Áudio Portátil & Gadgets</option>
+          </optgroup>
+
+          <optgroup label="🎂 Confeitaria & Festas">
+            <option value="group_festas">🎂 Ver Tudo de Confeitaria & Festas</option>
+            <option value="confeitaria">🍰 Formas & Utensílios</option>
+            <option value="embalagens">📦 Embalagens & Descartáveis</option>
+            <option value="festas">🎉 Artigos de Festa & Decoração</option>
           </optgroup>
 
           <optgroup label="👗 Moda & Beleza">
             <option value="group_moda">👗 Ver Tudo de Moda & Beleza</option>
-            <option value="moda">👗 Moda & Calçados</option>
-            <option value="perfumaria">🧴 Perfumaria & Cuidados</option>
-            <option value="joias">⌚ Joias & Relógios</option>
+            <option value="moda">👗 Roupas & Calçados</option>
+            <option value="acessorios">👜 Bolsas, Relógios & Acessórios</option>
+            <option value="beleza">💄 Beleza, Cuidados & Perfumaria</option>
+          </optgroup>
+
+          <optgroup label="💊 Saúde & Fitness">
+            <option value="group_saude">💊 Ver Tudo de Saúde & Fitness</option>
+            <option value="fitness">🏋️ Fitness & Treino</option>
+            <option value="saude">🩺 Saúde & Cuidados Pessoais</option>
+            <option value="suplementos">💊 Suplementos & Nutrição</option>
           </optgroup>
 
           <optgroup label="🧸 Infantil & Papelaria">
-            <option value="group_infantil">🧸 Ver Tudo de Infantil</option>
+            <option value="group_infantil">🧸 Ver Tudo de Infantil & Papelaria</option>
             <option value="brinquedos">🧸 Brinquedos & Jogos</option>
-            <option value="bebes">🍼 Bebês & Maternidade</option>
-            <option value="livros">📚 Livros & Papelaria</option>
+            <option value="bebes">🍼 Bebês & Cuidados</option>
+            <option value="papelaria">📚 Papelaria & Escritório</option>
           </optgroup>
 
-          <optgroup label="🐶 Pet, Auto & Outros">
-            <option value="group_outros">🐶 Ver Tudo de Pet & Auto</option>
+          <optgroup label="🛠️ Ferramentas, Auto & Pet">
+            <option value="group_outros">🛠️ Ver Tudo de Ferramentas, Auto & Pet</option>
+            <option value="construcao">🔨 Ferramentas & Construção</option>
+            <option value="veiculos">🚗 Automotivo</option>
             <option value="petshop">🐶 Pet Shop</option>
-            <option value="veiculos">🚗 Veículos & Acessórios</option>
-            <option value="construcao">🔨 Ferramentas & Obras</option>
-            <option value="supermercado">🛒 Supermercado & Alimentos</option>
           </optgroup>
         </select>
         <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-gray-700">
@@ -173,12 +186,12 @@
             <!-- Divisor de Grupos -->
             <div class="pt-1 border-t border-gray-100"></div>
 
-            <!-- Group 1: Casa & Cozinha -->
+            <!-- Group 1: Casa & Utilidades -->
             <div class="accordion-group rounded-xl border border-gray-200/80 overflow-hidden bg-gray-50/50 transition-all duration-200" data-group-id="group_casa">
               <button type="button" class="accordion-header w-full px-3 py-2 text-left flex items-center justify-between hover:bg-yellow-50/80 transition text-xs font-bold text-gray-800" data-category="group_casa">
                 <div class="flex items-center gap-2 truncate">
                   <span>🏠</span>
-                  <span class="truncate">Casa & Cozinha</span>
+                  <span class="truncate">Casa & Utilidades</span>
                 </div>
                 <div class="flex items-center gap-1.5 flex-shrink-0">
                   <span class="category-count text-[10px] bg-gray-200 text-gray-700 font-bold px-1.5 py-0.5 rounded-full" data-count-for="group_casa">0</span>
@@ -189,46 +202,46 @@
               </button>
               <div class="accordion-body hidden transition-all duration-300 bg-white px-2 py-1.5 space-y-1 border-t border-gray-100">
                 <button class="affiliate-category-btn text-left px-2.5 py-1.5 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition flex items-center justify-between text-xs w-full" data-category="cozinha">
-                  <span class="truncate">🍳 Cozinha & Eletro</span>
+                  <span class="truncate">🍳 Cozinha & Eletroportáteis</span>
                   <span class="category-count text-[9px] text-gray-400 font-semibold" data-count-for="cozinha">0</span>
                 </button>
-                <button class="affiliate-category-btn text-left px-2.5 py-1.5 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition flex items-center justify-between text-xs w-full" data-category="utilidades">
-                  <span class="truncate">🏠 Casa & Utilidades</span>
-                  <span class="category-count text-[9px] text-gray-400 font-semibold" data-count-for="utilidades">0</span>
+                <button class="affiliate-category-btn text-left px-2.5 py-1.5 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition flex items-center justify-between text-xs w-full" data-category="organizacao">
+                  <span class="truncate">🧹 Organização & Limpeza</span>
+                  <span class="category-count text-[9px] text-gray-400 font-semibold" data-count-for="organizacao">0</span>
                 </button>
-                <button class="affiliate-category-btn text-left px-2.5 py-1.5 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition flex items-center justify-between text-xs w-full" data-category="banho">
-                  <span class="truncate">🚿 Cama, Mesa & Banho</span>
-                  <span class="category-count text-[9px] text-gray-400 font-semibold" data-count-for="banho">0</span>
+                <button class="affiliate-category-btn text-left px-2.5 py-1.5 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition flex items-center justify-between text-xs w-full" data-category="cama_mesa_banho">
+                  <span class="truncate">🛏️ Cama, Mesa & Banho</span>
+                  <span class="category-count text-[9px] text-gray-400 font-semibold" data-count-for="cama_mesa_banho">0</span>
                 </button>
               </div>
             </div>
 
-            <!-- Group 2: Confeitaria & Festas -->
-            <div class="accordion-group rounded-xl border border-gray-200/80 overflow-hidden bg-gray-50/50 transition-all duration-200" data-group-id="group_festas">
-              <button type="button" class="accordion-header w-full px-3 py-2 text-left flex items-center justify-between hover:bg-yellow-50/80 transition text-xs font-bold text-gray-800" data-category="group_festas">
+            <!-- Group 2: Eletros, TV & Games -->
+            <div class="accordion-group rounded-xl border border-gray-200/80 overflow-hidden bg-gray-50/50 transition-all duration-200" data-group-id="group_eletros">
+              <button type="button" class="accordion-header w-full px-3 py-2 text-left flex items-center justify-between hover:bg-yellow-50/80 transition text-xs font-bold text-gray-800" data-category="group_eletros">
                 <div class="flex items-center gap-2 truncate">
-                  <span>🎂</span>
-                  <span class="truncate">Confeitaria & Festas</span>
+                  <span>📺</span>
+                  <span class="truncate">Eletros, TV & Games</span>
                 </div>
                 <div class="flex items-center gap-1.5 flex-shrink-0">
-                  <span class="category-count text-[10px] bg-gray-200 text-gray-700 font-bold px-1.5 py-0.5 rounded-full" data-count-for="group_festas">0</span>
+                  <span class="category-count text-[10px] bg-gray-200 text-gray-700 font-bold px-1.5 py-0.5 rounded-full" data-count-for="group_eletros">0</span>
                   <svg class="w-3.5 h-3.5 text-gray-400 transform transition-transform duration-300 accordion-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                   </svg>
                 </div>
               </button>
               <div class="accordion-body hidden transition-all duration-300 bg-white px-2 py-1.5 space-y-1 border-t border-gray-100">
-                <button class="affiliate-category-btn text-left px-2.5 py-1.5 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition flex items-center justify-between text-xs w-full" data-category="confeitaria">
-                  <span class="truncate">🍰 Confeitaria & Formas</span>
-                  <span class="category-count text-[9px] text-gray-400 font-semibold" data-count-for="confeitaria">0</span>
+                <button class="affiliate-category-btn text-left px-2.5 py-1.5 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition flex items-center justify-between text-xs w-full" data-category="eletrodomesticos">
+                  <span class="truncate">🧊 Grandes Eletrodomésticos</span>
+                  <span class="category-count text-[9px] text-gray-400 font-semibold" data-count-for="eletrodomesticos">0</span>
                 </button>
-                <button class="affiliate-category-btn text-left px-2.5 py-1.5 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition flex items-center justify-between text-xs w-full" data-category="embalagens">
-                  <span class="truncate">📦 Embalagens & Festas</span>
-                  <span class="category-count text-[9px] text-gray-400 font-semibold" data-count-for="embalagens">0</span>
+                <button class="affiliate-category-btn text-left px-2.5 py-1.5 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition flex items-center justify-between text-xs w-full" data-category="tv_audio_video">
+                  <span class="truncate">📺 TVs, Áudio & Vídeo</span>
+                  <span class="category-count text-[9px] text-gray-400 font-semibold" data-count-for="tv_audio_video">0</span>
                 </button>
-                <button class="affiliate-category-btn text-left px-2.5 py-1.5 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition flex items-center justify-between text-xs w-full" data-category="presentes">
-                  <span class="truncate">🎁 Presentes & Lembranças</span>
-                  <span class="category-count text-[9px] text-gray-400 font-semibold" data-count-for="presentes">0</span>
+                <button class="affiliate-category-btn text-left px-2.5 py-1.5 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition flex items-center justify-between text-xs w-full" data-category="games">
+                  <span class="truncate">🎮 Games & Consoles</span>
+                  <span class="category-count text-[9px] text-gray-400 font-semibold" data-count-for="games">0</span>
                 </button>
               </div>
             </div>
@@ -248,22 +261,52 @@
                 </div>
               </button>
               <div class="accordion-body hidden transition-all duration-300 bg-white px-2 py-1.5 space-y-1 border-t border-gray-100">
-                <button class="affiliate-category-btn text-left px-2.5 py-1.5 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition flex items-center justify-between text-xs w-full" data-category="eletronicos">
-                  <span class="truncate">⚡ Eletrônicos & Áudio</span>
-                  <span class="category-count text-[9px] text-gray-400 font-semibold" data-count-for="eletronicos">0</span>
-                </button>
                 <button class="affiliate-category-btn text-left px-2.5 py-1.5 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition flex items-center justify-between text-xs w-full" data-category="celulares">
-                  <span class="truncate">📱 Celulares & Telefonia</span>
+                  <span class="truncate">📱 Celulares & Acessórios</span>
                   <span class="category-count text-[9px] text-gray-400 font-semibold" data-count-for="celulares">0</span>
                 </button>
                 <button class="affiliate-category-btn text-left px-2.5 py-1.5 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition flex items-center justify-between text-xs w-full" data-category="informatica">
-                  <span class="truncate">💻 Informática & Acessórios</span>
+                  <span class="truncate">💻 Informática & Periféricos</span>
                   <span class="category-count text-[9px] text-gray-400 font-semibold" data-count-for="informatica">0</span>
+                </button>
+                <button class="affiliate-category-btn text-left px-2.5 py-1.5 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition flex items-center justify-between text-xs w-full" data-category="audio_gadgets">
+                  <span class="truncate">🎧 Áudio Portátil & Gadgets</span>
+                  <span class="category-count text-[9px] text-gray-400 font-semibold" data-count-for="audio_gadgets">0</span>
                 </button>
               </div>
             </div>
 
-            <!-- Group 4: Moda & Beleza -->
+            <!-- Group 4: Confeitaria & Festas -->
+            <div class="accordion-group rounded-xl border border-gray-200/80 overflow-hidden bg-gray-50/50 transition-all duration-200" data-group-id="group_festas">
+              <button type="button" class="accordion-header w-full px-3 py-2 text-left flex items-center justify-between hover:bg-yellow-50/80 transition text-xs font-bold text-gray-800" data-category="group_festas">
+                <div class="flex items-center gap-2 truncate">
+                  <span>🎂</span>
+                  <span class="truncate">Confeitaria & Festas</span>
+                </div>
+                <div class="flex items-center gap-1.5 flex-shrink-0">
+                  <span class="category-count text-[10px] bg-gray-200 text-gray-700 font-bold px-1.5 py-0.5 rounded-full" data-count-for="group_festas">0</span>
+                  <svg class="w-3.5 h-3.5 text-gray-400 transform transition-transform duration-300 accordion-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </button>
+              <div class="accordion-body hidden transition-all duration-300 bg-white px-2 py-1.5 space-y-1 border-t border-gray-100">
+                <button class="affiliate-category-btn text-left px-2.5 py-1.5 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition flex items-center justify-between text-xs w-full" data-category="confeitaria">
+                  <span class="truncate">🍰 Formas & Utensílios</span>
+                  <span class="category-count text-[9px] text-gray-400 font-semibold" data-count-for="confeitaria">0</span>
+                </button>
+                <button class="affiliate-category-btn text-left px-2.5 py-1.5 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition flex items-center justify-between text-xs w-full" data-category="embalagens">
+                  <span class="truncate">📦 Embalagens & Descartáveis</span>
+                  <span class="category-count text-[9px] text-gray-400 font-semibold" data-count-for="embalagens">0</span>
+                </button>
+                <button class="affiliate-category-btn text-left px-2.5 py-1.5 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition flex items-center justify-between text-xs w-full" data-category="festas">
+                  <span class="truncate">🎉 Artigos de Festa & Decoração</span>
+                  <span class="category-count text-[9px] text-gray-400 font-semibold" data-count-for="festas">0</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Group 5: Moda & Beleza -->
             <div class="accordion-group rounded-xl border border-gray-200/80 overflow-hidden bg-gray-50/50 transition-all duration-200" data-group-id="group_moda">
               <button type="button" class="accordion-header w-full px-3 py-2 text-left flex items-center justify-between hover:bg-yellow-50/80 transition text-xs font-bold text-gray-800" data-category="group_moda">
                 <div class="flex items-center gap-2 truncate">
@@ -279,21 +322,51 @@
               </button>
               <div class="accordion-body hidden transition-all duration-300 bg-white px-2 py-1.5 space-y-1 border-t border-gray-100">
                 <button class="affiliate-category-btn text-left px-2.5 py-1.5 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition flex items-center justify-between text-xs w-full" data-category="moda">
-                  <span class="truncate">👗 Moda & Calçados</span>
+                  <span class="truncate">👗 Roupas & Calçados</span>
                   <span class="category-count text-[9px] text-gray-400 font-semibold" data-count-for="moda">0</span>
                 </button>
-                <button class="affiliate-category-btn text-left px-2.5 py-1.5 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition flex items-center justify-between text-xs w-full" data-category="perfumaria">
-                  <span class="truncate">🧴 Perfumaria & Cuidados</span>
-                  <span class="category-count text-[9px] text-gray-400 font-semibold" data-count-for="perfumaria">0</span>
+                <button class="affiliate-category-btn text-left px-2.5 py-1.5 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition flex items-center justify-between text-xs w-full" data-category="acessorios">
+                  <span class="truncate">👜 Bolsas, Relógios & Acessórios</span>
+                  <span class="category-count text-[9px] text-gray-400 font-semibold" data-count-for="acessorios">0</span>
                 </button>
-                <button class="affiliate-category-btn text-left px-2.5 py-1.5 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition flex items-center justify-between text-xs w-full" data-category="joias">
-                  <span class="truncate">⌚ Joias & Relógios</span>
-                  <span class="category-count text-[9px] text-gray-400 font-semibold" data-count-for="joias">0</span>
+                <button class="affiliate-category-btn text-left px-2.5 py-1.5 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition flex items-center justify-between text-xs w-full" data-category="beleza">
+                  <span class="truncate">💄 Beleza, Cuidados & Perfumaria</span>
+                  <span class="category-count text-[9px] text-gray-400 font-semibold" data-count-for="beleza">0</span>
                 </button>
               </div>
             </div>
 
-            <!-- Group 5: Infantil & Papelaria -->
+            <!-- Group 6: Saúde & Fitness -->
+            <div class="accordion-group rounded-xl border border-gray-200/80 overflow-hidden bg-gray-50/50 transition-all duration-200" data-group-id="group_saude">
+              <button type="button" class="accordion-header w-full px-3 py-2 text-left flex items-center justify-between hover:bg-yellow-50/80 transition text-xs font-bold text-gray-800" data-category="group_saude">
+                <div class="flex items-center gap-2 truncate">
+                  <span>💊</span>
+                  <span class="truncate">Saúde & Fitness</span>
+                </div>
+                <div class="flex items-center gap-1.5 flex-shrink-0">
+                  <span class="category-count text-[10px] bg-gray-200 text-gray-700 font-bold px-1.5 py-0.5 rounded-full" data-count-for="group_saude">0</span>
+                  <svg class="w-3.5 h-3.5 text-gray-400 transform transition-transform duration-300 accordion-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </div>
+              </button>
+              <div class="accordion-body hidden transition-all duration-300 bg-white px-2 py-1.5 space-y-1 border-t border-gray-100">
+                <button class="affiliate-category-btn text-left px-2.5 py-1.5 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition flex items-center justify-between text-xs w-full" data-category="fitness">
+                  <span class="truncate">🏋️ Fitness & Treino</span>
+                  <span class="category-count text-[9px] text-gray-400 font-semibold" data-count-for="fitness">0</span>
+                </button>
+                <button class="affiliate-category-btn text-left px-2.5 py-1.5 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition flex items-center justify-between text-xs w-full" data-category="saude">
+                  <span class="truncate">🩺 Saúde & Cuidados Pessoais</span>
+                  <span class="category-count text-[9px] text-gray-400 font-semibold" data-count-for="saude">0</span>
+                </button>
+                <button class="affiliate-category-btn text-left px-2.5 py-1.5 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition flex items-center justify-between text-xs w-full" data-category="suplementos">
+                  <span class="truncate">💊 Suplementos & Nutrição</span>
+                  <span class="category-count text-[9px] text-gray-400 font-semibold" data-count-for="suplementos">0</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Group 7: Infantil & Papelaria -->
             <div class="accordion-group rounded-xl border border-gray-200/80 overflow-hidden bg-gray-50/50 transition-all duration-200" data-group-id="group_infantil">
               <button type="button" class="accordion-header w-full px-3 py-2 text-left flex items-center justify-between hover:bg-yellow-50/80 transition text-xs font-bold text-gray-800" data-category="group_infantil">
                 <div class="flex items-center gap-2 truncate">
@@ -313,22 +386,22 @@
                   <span class="category-count text-[9px] text-gray-400 font-semibold" data-count-for="brinquedos">0</span>
                 </button>
                 <button class="affiliate-category-btn text-left px-2.5 py-1.5 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition flex items-center justify-between text-xs w-full" data-category="bebes">
-                  <span class="truncate">🍼 Bebês & Maternidade</span>
+                  <span class="truncate">🍼 Bebês & Cuidados</span>
                   <span class="category-count text-[9px] text-gray-400 font-semibold" data-count-for="bebes">0</span>
                 </button>
-                <button class="affiliate-category-btn text-left px-2.5 py-1.5 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition flex items-center justify-between text-xs w-full" data-category="livros">
-                  <span class="truncate">📚 Livros & Papelaria</span>
-                  <span class="category-count text-[9px] text-gray-400 font-semibold" data-count-for="livros">0</span>
+                <button class="affiliate-category-btn text-left px-2.5 py-1.5 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition flex items-center justify-between text-xs w-full" data-category="papelaria">
+                  <span class="truncate">📚 Papelaria & Escritório</span>
+                  <span class="category-count text-[9px] text-gray-400 font-semibold" data-count-for="papelaria">0</span>
                 </button>
               </div>
             </div>
 
-            <!-- Group 6: Pet, Auto & Outros -->
+            <!-- Group 8: Ferramentas, Auto & Pet -->
             <div class="accordion-group rounded-xl border border-gray-200/80 overflow-hidden bg-gray-50/50 transition-all duration-200" data-group-id="group_outros">
               <button type="button" class="accordion-header w-full px-3 py-2 text-left flex items-center justify-between hover:bg-yellow-50/80 transition text-xs font-bold text-gray-800" data-category="group_outros">
                 <div class="flex items-center gap-2 truncate">
-                  <span>🐶</span>
-                  <span class="truncate">Pet, Auto & Outros</span>
+                  <span>🛠️</span>
+                  <span class="truncate">Ferramentas, Auto & Pet</span>
                 </div>
                 <div class="flex items-center gap-1.5 flex-shrink-0">
                   <span class="category-count text-[10px] bg-gray-200 text-gray-700 font-bold px-1.5 py-0.5 rounded-full" data-count-for="group_outros">0</span>
@@ -338,21 +411,17 @@
                 </div>
               </button>
               <div class="accordion-body hidden transition-all duration-300 bg-white px-2 py-1.5 space-y-1 border-t border-gray-100">
+                <button class="affiliate-category-btn text-left px-2.5 py-1.5 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition flex items-center justify-between text-xs w-full" data-category="construcao">
+                  <span class="truncate">🔨 Ferramentas & Construção</span>
+                  <span class="category-count text-[9px] text-gray-400 font-semibold" data-count-for="construcao">0</span>
+                </button>
+                <button class="affiliate-category-btn text-left px-2.5 py-1.5 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition flex items-center justify-between text-xs w-full" data-category="veiculos">
+                  <span class="truncate">🚗 Automotivo</span>
+                  <span class="category-count text-[9px] text-gray-400 font-semibold" data-count-for="veiculos">0</span>
+                </button>
                 <button class="affiliate-category-btn text-left px-2.5 py-1.5 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition flex items-center justify-between text-xs w-full" data-category="petshop">
                   <span class="truncate">🐶 Pet Shop</span>
                   <span class="category-count text-[9px] text-gray-400 font-semibold" data-count-for="petshop">0</span>
-                </button>
-                <button class="affiliate-category-btn text-left px-2.5 py-1.5 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition flex items-center justify-between text-xs w-full" data-category="veiculos">
-                  <span class="truncate">🚗 Veículos & Acessórios</span>
-                  <span class="category-count text-[9px] text-gray-400 font-semibold" data-count-for="veiculos">0</span>
-                </button>
-                <button class="affiliate-category-btn text-left px-2.5 py-1.5 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition flex items-center justify-between text-xs w-full" data-category="construcao">
-                  <span class="truncate">🔨 Ferramentas & Obras</span>
-                  <span class="category-count text-[9px] text-gray-400 font-semibold" data-count-for="construcao">0</span>
-                </button>
-                <button class="affiliate-category-btn text-left px-2.5 py-1.5 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition flex items-center justify-between text-xs w-full" data-category="supermercado">
-                  <span class="truncate">🛒 Supermercado & Alimentos</span>
-                  <span class="category-count text-[9px] text-gray-400 font-semibold" data-count-for="supermercado">0</span>
                 </button>
               </div>
             </div>

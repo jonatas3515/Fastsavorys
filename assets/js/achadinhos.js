@@ -9,34 +9,44 @@
 
   const CATEGORY_GROUPS = {
     group_casa: {
-      label: 'Casa & Cozinha',
+      label: 'Casa & Utilidades',
       icon: '🏠',
-      categories: ['cozinha', 'utilidades', 'banho']
+      categories: ['cozinha', 'organizacao', 'cama_mesa_banho', 'utilidades', 'banho']
     },
-    group_festas: {
-      label: 'Confeitaria & Festas',
-      icon: '🎂',
-      categories: ['confeitaria', 'embalagens', 'presentes']
+    group_eletros: {
+      label: 'Eletros, TV & Games',
+      icon: '📺',
+      categories: ['eletrodomesticos', 'tv_audio_video', 'games']
     },
     group_tech: {
       label: 'Tecnologia & Celulares',
       icon: '⚡',
-      categories: ['eletronicos', 'celulares', 'informatica']
+      categories: ['celulares', 'informatica', 'audio_gadgets', 'eletronicos']
+    },
+    group_festas: {
+      label: 'Confeitaria & Festas',
+      icon: '🎂',
+      categories: ['confeitaria', 'embalagens', 'festas', 'presentes']
     },
     group_moda: {
       label: 'Moda & Beleza',
       icon: '👗',
-      categories: ['moda', 'perfumaria', 'joias']
+      categories: ['moda', 'acessorios', 'beleza', 'joias', 'perfumaria']
+    },
+    group_saude: {
+      label: 'Saúde & Fitness',
+      icon: '💊',
+      categories: ['fitness', 'saude', 'suplementos']
     },
     group_infantil: {
       label: 'Infantil & Papelaria',
       icon: '🧸',
-      categories: ['brinquedos', 'bebes', 'livros']
+      categories: ['brinquedos', 'bebes', 'papelaria', 'livros']
     },
     group_outros: {
-      label: 'Pet, Auto & Outros',
-      icon: '🐶',
-      categories: ['petshop', 'veiculos', 'construcao', 'supermercado']
+      label: 'Ferramentas, Auto & Pet',
+      icon: '🛠️',
+      categories: ['construcao', 'veiculos', 'petshop', 'supermercado']
     }
   };
 
