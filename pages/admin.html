@@ -1799,6 +1799,10 @@
                                 class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-1.5 text-xs sm:text-sm shadow-md transition">
                                 <span>🩺</span> Verificar Links
                             </button>
+                            <button onclick="AffiliatesModule.openCategoriesModal()"
+                                class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-1.5 text-xs sm:text-sm shadow-md transition">
+                                <span>🗂️</span> Gerenciar Categorias
+                            </button>
                             <button onclick="AffiliatesModule.openNewModal()"
                                 class="bg-yellow-500 hover:bg-yellow-600 text-gray-950 px-4 py-2 rounded-lg font-bold flex items-center gap-2 text-xs sm:text-sm shadow-md transition">
                                 <span>➕</span> Novo Achadinho
@@ -2262,6 +2266,63 @@
         </div>
     </div>
 
+    <!-- Affiliate Categories Manager Modal -->
+    <div id="affiliateCategoriesManageModal" class="fixed inset-0 bg-black/60 backdrop-blur-xs z-[200] hidden flex items-center justify-center p-3 sm:p-4"
+        onclick="if(event.target===this) AffiliatesModule.closeCategoriesModal()">
+        <div class="bg-white rounded-3xl shadow-2xl p-4 sm:p-6 w-full max-w-4xl max-h-[92vh] overflow-y-auto flex flex-col">
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between pb-3 border-b border-gray-100 mb-4 flex-shrink-0">
+                <div>
+                    <h3 class="text-base sm:text-lg font-extrabold text-gray-900 flex items-center gap-2">
+                        <span>🗂️</span> Gerenciador de Categorias & Árvore da Vitrine
+                    </h3>
+                    <p class="text-xs text-gray-500 mt-0.5">
+                        Edite nomes, ícones, crie ou remova grupos e subcategorias sem precisar mexer em código.
+                    </p>
+                </div>
+                <button onclick="AffiliatesModule.closeCategoriesModal()" class="text-gray-400 hover:text-gray-600 text-xl font-bold p-1">✕</button>
+            </div>
+
+            <!-- Top Action Toolbar -->
+            <div class="flex flex-wrap items-center justify-between gap-2 p-3 bg-gray-50 rounded-2xl border border-gray-100 mb-4 flex-shrink-0">
+                <div class="flex items-center gap-2">
+                    <button type="button" onclick="AffiliatesModule.promptAddCategoryGroup()"
+                        class="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-sm transition flex items-center gap-1.5 active:scale-95">
+                        <span>➕</span> Novo Grupo Principal
+                    </button>
+                    <button type="button" onclick="AffiliatesModule.resetCategoriesToDefault()"
+                        class="px-3 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold text-xs rounded-xl transition flex items-center gap-1 active:scale-95"
+                        title="Restaura os 12 macro grupos e 46 subcategorias padrão da FastSavory's">
+                        <span>🔄</span> Restaurar Padrão Oficial
+                    </button>
+                </div>
+                <div class="text-[11px] text-gray-500 font-medium">
+                    💡 As alterações afetam imediatamente a Vitrine e os formulários de cadastro.
+                </div>
+            </div>
+
+            <!-- Dynamic Category Tree Container -->
+            <div id="affiliateCategoriesTreeContainer" class="flex-1 overflow-y-auto space-y-3 pr-1 min-h-[300px]">
+                <div class="py-12 text-center text-gray-400">
+                    <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-indigo-500 border-t-transparent"></div>
+                    <p class="mt-2 text-xs font-semibold">Carregando árvore de categorias...</p>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="flex items-center justify-between pt-4 border-t border-gray-100 mt-4 flex-shrink-0">
+                <button type="button" onclick="AffiliatesModule.closeCategoriesModal()"
+                    class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl transition">
+                    Fechar
+                </button>
+                <button type="button" onclick="AffiliatesModule.saveCategoriesTree()"
+                    class="px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-extrabold text-xs sm:text-sm rounded-xl shadow-md transition flex items-center gap-2 active:scale-95">
+                    <span>💾</span> Salvar Todas as Categorias
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Affiliate Links Health Checker Modal -->
     <div id="affiliateHealthModal" class="fixed inset-0 bg-black/60 backdrop-blur-xs z-[200] hidden flex items-center justify-center p-3 sm:p-4"
         onclick="if(event.target===this) AffiliatesModule.closeHealthModal()">
@@ -2613,6 +2674,7 @@
     <script src="../assets/js/admin/ratings.js"></script>
     <script src="../assets/js/admin/stripe.js"></script>
     <script src="../assets/js/achadinhos-data.js"></script>
+    <script src="../assets/js/achadinhos-categories.js"></script>
     <script src="../assets/js/admin/affiliates.js"></script>
     <script src="../assets/js/admin/orders.js"></script>
     <script src="../assets/js/admin/core.js"></script>

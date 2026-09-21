@@ -7,61 +7,67 @@
   let currentCategory = 'all';
   let currentSearch = '';
 
-  const CATEGORY_GROUPS = {
-    group_casa: {
-      label: 'Casa & Utilidades',
-      icon: '🏠',
-      categories: ['cozinha', 'organizacao', 'cama_mesa_banho', 'utilidades', 'banho']
-    },
-    group_eletros: {
-      label: 'Eletros, TV & Games',
-      icon: '📺',
-      categories: ['eletrodomesticos', 'tv_audio_video', 'games']
-    },
-    group_tech: {
-      label: 'Tecnologia & Celulares',
-      icon: '⚡',
-      categories: ['celulares', 'informatica', 'audio_gadgets', 'eletronicos']
-    },
-    group_festas: {
-      label: 'Confeitaria & Festas',
-      icon: '🎂',
-      categories: ['confeitaria', 'embalagens', 'festas', 'presentes']
-    },
-    group_moda: {
-      label: 'Moda & Beleza',
-      icon: '👗',
-      categories: ['moda', 'acessorios', 'beleza', 'joias', 'perfumaria']
-    },
-    group_saude: {
-      label: 'Saúde & Fitness',
-      icon: '💊',
-      categories: ['fitness', 'saude', 'suplementos']
-    },
-    group_infantil: {
-      label: 'Infantil & Papelaria',
-      icon: '🧸',
-      categories: ['brinquedos', 'bebes', 'papelaria', 'livros']
-    },
-    group_supermercado: {
-      label: 'Supermercado & Mercearia',
-      icon: '🛒',
-      categories: ['mercearia_doce', 'mercearia_salgada', 'bebidas_snacks', 'supermercado']
-    },
-    group_outros: {
-      label: 'Ferramentas, Auto & Pet',
-      icon: '🛠️',
-      categories: ['construcao', 'veiculos', 'petshop']
-    }
-  };
-
   document.addEventListener('DOMContentLoaded', async () => {
     initAffiliateShowcase();
   });
 
   async function initAffiliateShowcase() {
+    // 1. Carrega categorias dinâmicas (stale-while-revalidate)
+    if (window.AchadinhosCategories) {
+      await window.AchadinhosCategories.loadCategories();
+    }
+
+    renderCategoryNav();
     setupEventListeners();
     await fetchAffiliateProducts();
+  }
+
+  function renderCategoryNav() {
+    if (!window.AchadinhosCategories) return;
+    const tree = window.AchadinhosCategories.getTree();
+
+    // 1. Renderiza Sidebar Accordion Desktop
+    const container = document.getElementById('affiliateDynamicAccordionGroups');
+    if (container) {
+      container.innerHTML = tree.map(group => {
+        const subButtons = (group.subcategories || []).map(sub => `
+          <button class="affiliate-category-btn text-left px-2.5 py-1.5 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition flex items-center justify-between text-xs w-full" data-category="${window.AchadinhosCategories.escapeHtml(sub.slug)}">
+            <span class="truncate">${window.AchadinhosCategories.escapeHtml(sub.label)}</span>
+            <span class="category-count text-[9px] text-gray-400 font-semibold" data-count-for="${window.AchadinhosCategories.escapeHtml(sub.slug)}">0</span>
+          </button>
+        `).join('');
+
+        return `
+          <div class="accordion-group rounded-xl border border-gray-200/80 overflow-hidden bg-gray-50/50 transition-all duration-200" data-group-id="${window.AchadinhosCategories.escapeHtml(group.id)}">
+            <button type="button" class="accordion-header w-full px-3 py-2 text-left flex items-center justify-between hover:bg-yellow-50/80 transition text-xs font-bold text-gray-800" data-category="${window.AchadinhosCategories.escapeHtml(group.id)}">
+              <div class="flex items-center gap-2 truncate">
+                <span>${window.AchadinhosCategories.escapeHtml(group.icon || '📂')}</span>
+                <span class="truncate">${window.AchadinhosCategories.escapeHtml(group.label)}</span>
+              </div>
+              <div class="flex items-center gap-1.5 flex-shrink-0">
+                <span class="category-count text-[10px] bg-gray-200 text-gray-700 font-bold px-1.5 py-0.5 rounded-full" data-count-for="${window.AchadinhosCategories.escapeHtml(group.id)}">0</span>
+                <svg class="w-3.5 h-3.5 text-gray-400 transform transition-transform duration-300 accordion-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                </svg>
+              </div>
+            </button>
+            <div class="accordion-body hidden transition-all duration-300 bg-white px-2 py-1.5 space-y-1 border-t border-gray-100">
+              ${subButtons}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // 2. Popula Mobile Select Dropdown
+    const mobileSelect = document.getElementById('affiliateMobileCategorySelect');
+    if (mobileSelect) {
+      window.AchadinhosCategories.populateSelect(mobileSelect, currentCategory, {
+        includeAll: true,
+        includeFastPicks: true,
+        includeGroupMacroOption: true
+      });
+    }
   }
 
   function setupEventListeners() {
@@ -84,53 +90,54 @@
       });
     });
 
-    // Accordion Headers (Macro grupos)
-    const accordionHeaders = document.querySelectorAll('.accordion-header');
-    accordionHeaders.forEach(header => {
-      header.addEventListener('click', () => {
-        const groupDiv = header.closest('.accordion-group');
-        const groupId = groupDiv ? groupDiv.getAttribute('data-group-id') : null;
-        const body = groupDiv ? groupDiv.querySelector('.accordion-body') : null;
-        const chevron = header.querySelector('.accordion-chevron');
-        const isCurrentlyOpen = body && !body.classList.contains('hidden');
+    // Event Delegation para Accordion Headers e Subcategorias (Desktop)
+    const desktopNav = document.getElementById('affiliateDesktopNav');
+    if (desktopNav) {
+      desktopNav.addEventListener('click', (e) => {
+        const header = e.target.closest('.accordion-header');
+        if (header) {
+          const groupDiv = header.closest('.accordion-group');
+          const groupId = groupDiv ? groupDiv.getAttribute('data-group-id') : null;
+          const body = groupDiv ? groupDiv.querySelector('.accordion-body') : null;
+          const chevron = header.querySelector('.accordion-chevron');
+          const isCurrentlyOpen = body && !body.classList.contains('hidden');
 
-        // Fecha todos os outros grupos (apenas 1 aberto por vez)
-        document.querySelectorAll('.accordion-group').forEach(otherGroup => {
-          if (otherGroup !== groupDiv) {
-            const otherBody = otherGroup.querySelector('.accordion-body');
-            const otherChevron = otherGroup.querySelector('.accordion-chevron');
-            if (otherBody) otherBody.classList.add('hidden');
-            if (otherChevron) otherChevron.classList.remove('rotate-180');
-            otherGroup.classList.remove('border-yellow-400', 'bg-yellow-50/20');
+          // Fecha todos os outros grupos (apenas 1 aberto por vez)
+          document.querySelectorAll('.accordion-group').forEach(otherGroup => {
+            if (otherGroup !== groupDiv) {
+              const otherBody = otherGroup.querySelector('.accordion-body');
+              const otherChevron = otherGroup.querySelector('.accordion-chevron');
+              if (otherBody) otherBody.classList.add('hidden');
+              if (otherChevron) otherChevron.classList.remove('rotate-180');
+              otherGroup.classList.remove('border-yellow-400', 'bg-yellow-50/20');
+            }
+          });
+
+          if (isCurrentlyOpen) {
+            if (body) body.classList.add('hidden');
+            if (chevron) chevron.classList.remove('rotate-180');
+            if (groupDiv) groupDiv.classList.remove('border-yellow-400', 'bg-yellow-50/20');
+          } else {
+            if (body) body.classList.remove('hidden');
+            if (chevron) chevron.classList.add('rotate-180');
+            if (groupDiv) groupDiv.classList.add('border-yellow-400', 'bg-yellow-50/20');
           }
-        });
 
-        if (isCurrentlyOpen) {
-          if (body) body.classList.add('hidden');
-          if (chevron) chevron.classList.remove('rotate-180');
-          if (groupDiv) groupDiv.classList.remove('border-yellow-400', 'bg-yellow-50/20');
-        } else {
-          if (body) body.classList.remove('hidden');
-          if (chevron) chevron.classList.add('rotate-180');
-          if (groupDiv) groupDiv.classList.add('border-yellow-400', 'bg-yellow-50/20');
+          // Aplica o filtro macro do grupo
+          if (groupId) {
+            setCategory(groupId);
+          }
+          return;
         }
 
-        // Aplica o filtro macro do grupo
-        if (groupId) {
-          setCategory(groupId);
+        const subBtn = e.target.closest('.accordion-body .affiliate-category-btn');
+        if (subBtn) {
+          e.stopPropagation();
+          const cat = subBtn.getAttribute('data-category');
+          setCategory(cat);
         }
       });
-    });
-
-    // Subcategorias dentro do accordion
-    const subcategoryBtns = document.querySelectorAll('.accordion-body .affiliate-category-btn');
-    subcategoryBtns.forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        const cat = btn.getAttribute('data-category');
-        setCategory(cat);
-      });
-    });
+    }
 
     // Filtro de Categoria (Mobile Select Dropdown com Optgroups)
     const mobileSelect = document.getElementById('affiliateMobileCategorySelect');
@@ -154,10 +161,12 @@
   function setCategory(cat) {
     currentCategory = cat;
 
+    const macroGroups = window.AchadinhosCategories ? window.AchadinhosCategories.getMacroGroups() : {};
+
     // Se for subcategoria, abre o accordion pai correspondente
     if (!cat.startsWith('group_') && cat !== 'all' && cat !== 'fast_picks') {
-      for (const [groupId, groupData] of Object.entries(CATEGORY_GROUPS)) {
-        if (groupData.categories.includes(cat)) {
+      for (const [groupId, groupData] of Object.entries(macroGroups)) {
+        if (groupData.categories && groupData.categories.includes(cat)) {
           const groupEl = document.querySelector(`.accordion-group[data-group-id="${groupId}"]`);
           if (groupEl) {
             const body = groupEl.querySelector('.accordion-body');
@@ -220,17 +229,23 @@
       fast_picks: affiliateProducts.filter(i => Boolean(i.is_fast_pick || i.badge_color === 'fast_seal')).length
     };
 
-    // Subcategories count
-    affiliateProducts.forEach(item => {
-      if (item.category) {
-        counts[item.category] = (counts[item.category] || 0) + 1;
-      }
+    const tree = window.AchadinhosCategories ? window.AchadinhosCategories.getTree() : [];
+    const macroGroups = window.AchadinhosCategories ? window.AchadinhosCategories.getMacroGroups() : {};
+
+    // 1. Subcategories count (including alias matching)
+    tree.forEach(group => {
+      (group.subcategories || []).forEach(sub => {
+        const allSlugs = [sub.slug, ...(sub.aliases || [])];
+        const matchCount = affiliateProducts.filter(p => p.category && allSlugs.includes(p.category)).length;
+        counts[sub.slug] = matchCount;
+      });
     });
 
-    // Groups count (sum of subcategories)
-    Object.keys(CATEGORY_GROUPS).forEach(groupId => {
-      const cats = CATEGORY_GROUPS[groupId].categories;
-      counts[groupId] = cats.reduce((acc, cat) => acc + (counts[cat] || 0), 0);
+    // 2. Groups count (sum of subcategories in that group)
+    Object.keys(macroGroups).forEach(groupId => {
+      const cats = macroGroups[groupId].categories || [];
+      const groupCount = affiliateProducts.filter(p => p.category && cats.includes(p.category)).length;
+      counts[groupId] = groupCount;
     });
 
     // Update count badges
@@ -322,10 +337,23 @@
       } else if (currentCategory === 'fast_picks') {
         matchCat = Boolean(item.is_fast_pick || item.badge_color === 'fast_seal');
       } else if (currentCategory.startsWith('group_')) {
-        const group = CATEGORY_GROUPS[currentCategory];
-        matchCat = group ? group.categories.includes(item.category) : false;
+        const macroGroups = window.AchadinhosCategories ? window.AchadinhosCategories.getMacroGroups() : {};
+        const group = macroGroups[currentCategory];
+        matchCat = group ? (group.categories || []).includes(item.category) : false;
       } else {
-        matchCat = item.category === currentCategory;
+        // Match specific subcategory or its aliases
+        const tree = window.AchadinhosCategories ? window.AchadinhosCategories.getTree() : [];
+        let matched = item.category === currentCategory;
+        if (!matched) {
+          for (const g of tree) {
+            const sub = (g.subcategories || []).find(s => s.slug === currentCategory);
+            if (sub && Array.isArray(sub.aliases) && sub.aliases.includes(item.category)) {
+              matched = true;
+              break;
+            }
+          }
+        }
+        matchCat = matched;
       }
 
       const matchSearch = !currentSearch || 

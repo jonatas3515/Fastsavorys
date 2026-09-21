@@ -15,6 +15,11 @@ window.AffiliatesModule = (function () {
       tbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-gray-500">Carregando achadinhos...</td></tr>`;
     }
 
+    if (window.AchadinhosCategories) {
+      await window.AchadinhosCategories.loadCategories();
+      populateCategorySelects();
+    }
+
     try {
       if (window.supabaseClient) {
         const { data, error } = await window.supabaseClient
@@ -37,6 +42,24 @@ window.AffiliatesModule = (function () {
     }
 
     renderTable();
+  }
+
+  function populateCategorySelects() {
+    if (!window.AchadinhosCategories) return;
+    const catInput = document.getElementById('affiliateCategoryInput');
+    if (catInput) {
+      const cur = catInput.value || '';
+      window.AchadinhosCategories.populateSelect(catInput, cur);
+    }
+    const filterSelect = document.getElementById('affiliateAdminCategoryFilter');
+    if (filterSelect) {
+      const curFilter = filterSelect.value || 'all';
+      window.AchadinhosCategories.populateSelect(filterSelect, curFilter, {
+        includeAll: true,
+        includeUncategorized: true,
+        includeFastPicks: true
+      });
+    }
   }
 
   function handleSearch(val) {
@@ -155,60 +178,7 @@ window.AffiliatesModule = (function () {
         ? `<span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-green-100 text-green-800">Ativo</span>`
         : `<span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-gray-100 text-gray-600">Pausado</span>`;
 
-      const categoryMap = {
-        // 🏠 Casa & Utilidades
-        cozinha: '🍳 Cozinha & Eletroportáteis',
-        organizacao: '🧹 Organização & Limpeza',
-        cama_mesa_banho: '🛏️ Cama, Mesa & Banho',
-        utilidades: '🧹 Organização & Limpeza',
-        banho: '🛏️ Cama, Mesa & Banho',
-
-        // 📺 Eletros, TV & Games
-        eletrodomesticos: '🧊 Grandes Eletrodomésticos',
-        tv_audio_video: '📺 TVs, Áudio & Vídeo',
-        games: '🎮 Games & Consoles',
-
-        // ⚡ Tecnologia & Celulares
-        celulares: '📱 Celulares & Acessórios',
-        informatica: '💻 Informática & Periféricos',
-        audio_gadgets: '🎧 Áudio Portátil & Gadgets',
-        eletronicos: '🎧 Áudio Portátil & Gadgets',
-
-        // 🎂 Confeitaria & Festas
-        confeitaria: '🍰 Formas & Utensílios',
-        embalagens: '📦 Embalagens & Descartáveis',
-        festas: '🎉 Artigos de Festa & Decoração',
-        presentes: '🎉 Artigos de Festa & Decoração',
-
-        // 👗 Moda & Beleza
-        moda: '👗 Roupas & Calçados',
-        acessorios: '👜 Bolsas, Relógios & Acessórios',
-        beleza: '💄 Beleza, Cuidados & Perfumaria',
-        joias: '👜 Bolsas, Relógios & Acessórios',
-        perfumaria: '💄 Beleza, Cuidados & Perfumaria',
-
-        // 💊 Saúde & Fitness
-        fitness: '🏋️ Fitness & Treino',
-        saude: '🩺 Saúde & Cuidados Pessoais',
-        suplementos: '💊 Suplementos & Nutrição',
-
-        // 🧸 Infantil & Papelaria
-        brinquedos: '🧸 Brinquedos & Jogos',
-        bebes: '🍼 Bebês & Cuidados',
-        papelaria: '📚 Papelaria & Escritório',
-        livros: '📚 Papelaria & Escritório',
-
-        // 🛒 Supermercado & Mercearia
-        mercearia_doce: '🍫 Mercearia Doce & Confeitaria',
-        mercearia_salgada: '🥫 Mercearia Salgada & Básicos',
-        bebidas_snacks: '🥤 Bebidas & Snacks',
-        supermercado: '🥤 Bebidas & Snacks',
-
-        // 🛠️ Ferramentas, Auto & Pet
-        construcao: '🔨 Ferramentas & Construção',
-        veiculos: '🚗 Automotivo',
-        petshop: '🐶 Pet Shop'
-      };
+      const categoryMap = window.AchadinhosCategories ? window.AchadinhosCategories.getCategoryMap() : {};
       
       const isUncategorized = !item.category || item.category === 'sem_categoria';
       const catLabel = isUncategorized 
@@ -1320,9 +1290,293 @@ window.AffiliatesModule = (function () {
     }
   }
 
+  // --- CATEGORY MANAGER MODAL & ACTIONS ---
+  let manageTreeCopy = null;
+
+  async function openCategoriesModal() {
+    const modal = document.getElementById('affiliateCategoriesManageModal');
+    if (!modal) return;
+
+    if (window.AchadinhosCategories) {
+      await window.AchadinhosCategories.loadCategories();
+      manageTreeCopy = JSON.parse(JSON.stringify(window.AchadinhosCategories.getTree()));
+    } else {
+      manageTreeCopy = [];
+    }
+
+    renderCategoriesManagerTree();
+    modal.classList.remove('hidden');
+  }
+
+  function closeCategoriesModal() {
+    const modal = document.getElementById('affiliateCategoriesManageModal');
+    if (modal) modal.classList.add('hidden');
+  }
+
+  function renderCategoriesManagerTree() {
+    const container = document.getElementById('affiliateCategoriesTreeContainer');
+    if (!container) return;
+
+    if (!manageTreeCopy || manageTreeCopy.length === 0) {
+      container.innerHTML = `
+        <div class="p-8 text-center text-gray-400 bg-gray-50 rounded-2xl border border-gray-100">
+          Nenhum grupo de categorias cadastrado. Clique em "➕ Novo Grupo Principal" para criar.
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = manageTreeCopy.map((group, groupIdx) => {
+      const subListHtml = (group.subcategories || []).map((sub, subIdx) => {
+        // Count products assigned to this subcategory slug or its aliases
+        const allSlugs = [sub.slug, ...(sub.aliases || [])];
+        const assignedCount = productsList.filter(p => p.category && allSlugs.includes(p.category)).length;
+        const countBadge = assignedCount > 0
+          ? `<span class="text-[10px] bg-indigo-100 text-indigo-900 font-extrabold px-2 py-0.5 rounded-full" title="${assignedCount} produtos vinculados">${assignedCount} prod.</span>`
+          : `<span class="text-[10px] bg-gray-100 text-gray-400 font-semibold px-2 py-0.5 rounded-full">0 prod.</span>`;
+
+        return `
+          <div class="flex items-center justify-between p-2.5 bg-white rounded-xl border border-gray-100 hover:border-gray-200 transition group/sub">
+            <div class="flex items-center gap-2 min-w-0">
+              <span class="text-xs font-bold text-gray-800 truncate">${escapeHtml(sub.label)}</span>
+              <span class="text-[10px] font-mono text-gray-400">(${escapeHtml(sub.slug)})</span>
+              ${countBadge}
+            </div>
+            <div class="flex items-center gap-1">
+              <button type="button" onclick="AffiliatesModule.promptEditSubcategory(${groupIdx}, ${subIdx})"
+                title="Renomear Subcategoria"
+                class="p-1 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition">
+                ✏️
+              </button>
+              <button type="button" onclick="AffiliatesModule.deleteSubcategory(${groupIdx}, ${subIdx})"
+                title="Excluir Subcategoria"
+                class="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition">
+                🗑️
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      return `
+        <div class="bg-gray-50 rounded-2xl p-4 border border-gray-200/80 shadow-2xs">
+          <div class="flex items-center justify-between pb-3 border-b border-gray-200/60 mb-3">
+            <div class="flex items-center gap-2 min-w-0">
+              <span class="text-xl">${escapeHtml(group.icon || '📂')}</span>
+              <div>
+                <h4 class="font-extrabold text-gray-900 text-sm">${escapeHtml(group.label)}</h4>
+                <span class="text-[10px] font-mono text-gray-400">${(group.subcategories || []).length} subcategorias</span>
+              </div>
+            </div>
+            <div class="flex items-center gap-1.5">
+              <button type="button" onclick="AffiliatesModule.promptAddSubcategory(${groupIdx})"
+                class="px-2.5 py-1 bg-white hover:bg-indigo-50 text-indigo-700 font-bold text-xs rounded-lg border border-indigo-200 transition flex items-center gap-1 shadow-2xs">
+                <span>➕</span> <span>Subcategoria</span>
+              </button>
+              <button type="button" onclick="AffiliatesModule.promptEditCategoryGroup(${groupIdx})"
+                title="Editar Nome / Ícone do Grupo"
+                class="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-white rounded-lg border border-transparent hover:border-gray-200 transition">
+                ✏️
+              </button>
+              <button type="button" onclick="AffiliatesModule.deleteCategoryGroup(${groupIdx})"
+                title="Excluir Grupo Inteiro"
+                class="p-1.5 text-gray-400 hover:text-red-600 hover:bg-white rounded-lg border border-transparent hover:border-gray-200 transition">
+                🗑️
+              </button>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            ${subListHtml || '<div class="col-span-full text-xs text-gray-400 italic p-2">Nenhuma subcategoria neste grupo.</div>'}
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function promptAddCategoryGroup() {
+    const icon = prompt('Digite o Emoji / Ícone do novo grupo (ex: 🛋️, 🎮, 🏡):', '📂');
+    if (icon === null) return;
+    const label = prompt('Digite o Nome do Grupo Principal (ex: Móveis & Decoração):', '');
+    if (!label || !label.trim()) return;
+
+    const slug = window.AchadinhosCategories ? window.AchadinhosCategories.generateSlug(label) : 'grupo';
+    const groupId = `group_${slug}`;
+
+    if (!Array.isArray(manageTreeCopy)) manageTreeCopy = [];
+
+    manageTreeCopy.push({
+      id: groupId,
+      label: label.trim(),
+      icon: icon.trim() || '📂',
+      subcategories: []
+    });
+
+    renderCategoriesManagerTree();
+  }
+
+  function promptEditCategoryGroup(groupIdx) {
+    const group = manageTreeCopy[groupIdx];
+    if (!group) return;
+
+    const newIcon = prompt('Editar Ícone/Emoji:', group.icon || '📂');
+    if (newIcon === null) return;
+    const newLabel = prompt('Editar Nome do Grupo:', group.label);
+    if (!newLabel || !newLabel.trim()) return;
+
+    group.icon = newIcon.trim() || '📂';
+    group.label = newLabel.trim();
+    renderCategoriesManagerTree();
+  }
+
+  function deleteCategoryGroup(groupIdx) {
+    const group = manageTreeCopy[groupIdx];
+    if (!group) return;
+
+    const subCount = (group.subcategories || []).length;
+    if (subCount > 0) {
+      if (!confirm(`⚠️ Este grupo contém ${subCount} subcategoria(s). Deseja realmente excluir o grupo "${group.label}" e todas as suas subcategorias?`)) {
+        return;
+      }
+    } else {
+      if (!confirm(`Deseja excluir o grupo "${group.label}"?`)) {
+        return;
+      }
+    }
+
+    manageTreeCopy.splice(groupIdx, 1);
+    renderCategoriesManagerTree();
+  }
+
+  function promptAddSubcategory(groupIdx) {
+    const group = manageTreeCopy[groupIdx];
+    if (!group) return;
+
+    const label = prompt(`Adicionar nova subcategoria em "${group.label}":`, '');
+    if (!label || !label.trim()) return;
+
+    const slug = window.AchadinhosCategories ? window.AchadinhosCategories.generateSlug(label) : 'nova_sub';
+
+    if (!Array.isArray(group.subcategories)) {
+      group.subcategories = [];
+    }
+
+    group.subcategories.push({
+      slug,
+      label: label.trim(),
+      aliases: []
+    });
+
+    renderCategoriesManagerTree();
+  }
+
+  function promptEditSubcategory(groupIdx, subIdx) {
+    const group = manageTreeCopy[groupIdx];
+    if (!group || !group.subcategories || !group.subcategories[subIdx]) return;
+    const sub = group.subcategories[subIdx];
+
+    const newLabel = prompt('Editar Nome da Subcategoria:', sub.label);
+    if (!newLabel || !newLabel.trim()) return;
+
+    sub.label = newLabel.trim();
+    renderCategoriesManagerTree();
+  }
+
+  function deleteSubcategory(groupIdx, subIdx) {
+    const group = manageTreeCopy[groupIdx];
+    if (!group || !group.subcategories || !group.subcategories[subIdx]) return;
+    const sub = group.subcategories[subIdx];
+
+    const allSlugs = [sub.slug, ...(sub.aliases || [])];
+    const assignedCount = productsList.filter(p => p.category && allSlugs.includes(p.category)).length;
+
+    if (assignedCount > 0) {
+      const ok = confirm(
+        `⚠️ ATENÇÃO: Existem ${assignedCount} produto(s) vinculados à subcategoria "${sub.label}".\n\n` +
+        `Se você excluí-la, esses produtos permanecerão salvos no banco, porém ficarão como "Sem Categoria" no topo da lista do Admin para você reclassificá-los quando quiser.\n\n` +
+        `Deseja continuar com a exclusão?`
+      );
+      if (!ok) return;
+    } else {
+      if (!confirm(`Deseja excluir a subcategoria "${sub.label}"?`)) {
+        return;
+      }
+    }
+
+    group.subcategories.splice(subIdx, 1);
+    renderCategoriesManagerTree();
+  }
+
+  function resetCategoriesToDefault() {
+    if (!confirm('⚠️ Deseja restaurar a árvore oficial padrão com os 12 Macro Grupos e 46 Subcategorias da FastSavory\'s?\n\nSuas personalizações locais serão substituídas pela estrutura padrão.')) {
+      return;
+    }
+
+    if (window.AchadinhosCategories) {
+      manageTreeCopy = window.AchadinhosCategories.getDefaultTree();
+    }
+    renderCategoriesManagerTree();
+  }
+
+  async function saveCategoriesTree() {
+    if (!manageTreeCopy || manageTreeCopy.length === 0) {
+      alert('A árvore não pode estar vazia.');
+      return;
+    }
+
+    try {
+      if (window.AchadinhosCategories) {
+        await window.AchadinhosCategories.saveTree(manageTreeCopy);
+      }
+
+      populateCategorySelects();
+      renderTable();
+
+      alert('✅ Categorias salvas e sincronizadas com sucesso com a Vitrine e o Banco!');
+      closeCategoriesModal();
+    } catch (err) {
+      console.error('[Admin Affiliates] Erro ao salvar categorias:', err);
+      alert('Erro ao salvar categorias: ' + (err.message || err));
+    }
+  }
+
+  function detectCategoryClient(text = '') {
+    const t = (text || '').toLowerCase();
+    if (t.includes('bolo') || t.includes('doce') || t.includes('chocolate') || t.includes('confeitaria') || t.includes('forma')) {
+      return 'confeitaria_sobremesas';
+    }
+    if (t.includes('air fryer') || t.includes('panela') || t.includes('liquidificador') || t.includes('cozinha')) {
+      return 'cozinha';
+    }
+    if (t.includes('celular') || t.includes('smartphone') || t.includes('iphone') || t.includes('xiaomi')) {
+      return 'celulares';
+    }
+    if (t.includes('relogio') || t.includes('bolsa') || t.includes('mochila') || t.includes('oculos')) {
+      return 'bolsas_malas';
+    }
+    if (t.includes('suplemento') || t.includes('whey') || t.includes('creatina')) {
+      return 'suplementos';
+    }
+    if (t.includes('lavagem') || t.includes('automotivo') || t.includes('carro') || t.includes('vonixx')) {
+      return 'automotivo';
+    }
+    return 'confeitaria_sobremesas';
+  }
+
   return {
     init: loadProducts,
     loadProducts,
+    populateCategorySelects,
+    openCategoriesModal,
+    closeCategoriesModal,
+    renderCategoriesManagerTree,
+    promptAddCategoryGroup,
+    promptEditCategoryGroup,
+    deleteCategoryGroup,
+    promptAddSubcategory,
+    promptEditSubcategory,
+    deleteSubcategory,
+    resetCategoriesToDefault,
+    saveCategoriesTree,
     openNewModal,
     openEditModal,
     closeModal,
