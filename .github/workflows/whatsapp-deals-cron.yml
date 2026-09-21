@@ -1,0 +1,39 @@
+name: Disparo Automático de Ofertas no WhatsApp (FastSavory's)
+
+on:
+  schedule:
+    # Horário de Brasília (UTC-3):
+    # 09:00 BRT -> 12:00 UTC
+    # 12:00 BRT -> 15:00 UTC
+    # 15:00 BRT -> 18:00 UTC
+    - cron: '0 12 * * *'
+    - cron: '0 15 * * *'
+    - cron: '0 18 * * *'
+  
+  # Permite disparar manualmente a qualquer momento pelo botão "Run workflow" no GitHub
+  workflow_dispatch:
+
+jobs:
+  send-deal:
+    name: Enviar Oferta para o Grupo do WhatsApp
+    runs-on: ubuntu-latest
+    steps:
+      - name: Executar Endpoint de Disparo
+        run: |
+          echo "🚀 Disparando rotina de envio de oferta..."
+          RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST "https://fastsavorys.vercel.app/api/cron/send-whatsapp-deal" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json")
+          
+          BODY=$(echo "$RESPONSE" | sed -e '$d')
+          STATUS=$(echo "$RESPONSE" | tail -n1 | cut -d':' -f2)
+
+          echo "Status Code: $STATUS"
+          echo "Resposta: $BODY"
+
+          if [ "$STATUS" -ne 200 ]; then
+            echo "❌ Erro ao disparar oferta!"
+            exit 1
+          fi
+
+          echo "✅ Oferta enviada com sucesso!"
