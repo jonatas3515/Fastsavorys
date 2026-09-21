@@ -68,12 +68,14 @@ window.AffiliatesModule = (function () {
   }
 
   function getFilteredProducts() {
-    return productsList.filter(item => {
+    const result = productsList.filter(item => {
       let matchCat = false;
       if (categoryFilter === 'all') {
         matchCat = true;
       } else if (categoryFilter === 'fast_picks') {
         matchCat = Boolean(item.is_fast_pick || item.badge_color === 'fast_seal');
+      } else if (categoryFilter === 'sem_categoria') {
+        matchCat = !item.category || item.category === '' || item.category === 'sem_categoria';
       } else {
         matchCat = item.category === categoryFilter;
       }
@@ -88,6 +90,23 @@ window.AffiliatesModule = (function () {
         (item.discount_tag && item.discount_tag.toLowerCase().includes(searchQuery));
 
       return matchCat && matchStatus && matchSearch;
+    });
+
+    // Ordenação: Itens SEM CATEGORIA no início (topo), e os demais agrupados por categoria
+    return result.sort((a, b) => {
+      const catA = (a.category || '').trim().toLowerCase();
+      const catB = (b.category || '').trim().toLowerCase();
+      const isUncatA = !catA || catA === 'sem_categoria';
+      const isUncatB = !catB || catB === 'sem_categoria';
+
+      if (isUncatA && !isUncatB) return -1;
+      if (!isUncatA && isUncatB) return 1;
+
+      if (catA !== catB) {
+        return catA.localeCompare(catB);
+      }
+
+      return (Number(a.position) || 0) - (Number(b.position) || 0) || (Number(a.id) || 0) - (Number(b.id) || 0);
     });
   }
 
@@ -179,13 +198,22 @@ window.AffiliatesModule = (function () {
         papelaria: '📚 Papelaria & Escritório',
         livros: '📚 Papelaria & Escritório',
 
+        // 🛒 Supermercado & Mercearia
+        mercearia_doce: '🍫 Mercearia Doce & Confeitaria',
+        mercearia_salgada: '🥫 Mercearia Salgada & Básicos',
+        bebidas_snacks: '🥤 Bebidas & Snacks',
+        supermercado: '🥤 Bebidas & Snacks',
+
         // 🛠️ Ferramentas, Auto & Pet
         construcao: '🔨 Ferramentas & Construção',
         veiculos: '🚗 Automotivo',
-        petshop: '🐶 Pet Shop',
-        supermercado: '🛒 Supermercado & Alimentos'
+        petshop: '🐶 Pet Shop'
       };
-      const catLabel = categoryMap[item.category] || item.category || 'Geral';
+      
+      const isUncategorized = !item.category || item.category === 'sem_categoria';
+      const catLabel = isUncategorized 
+        ? `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-900 border border-amber-300 animate-pulse">⚠️ Sem Categoria</span>`
+        : (categoryMap[item.category] || item.category || 'Geral');
 
       const pct = calcDiscountPercent(item.original_price, item.price_display);
       const discountBadge = pct > 0 
@@ -1148,6 +1176,11 @@ window.AffiliatesModule = (function () {
       { category: 'bebes', keywords: ['bebe', 'bebê', 'fralda', 'pampers', 'huggies', 'mamadeira', 'chupeta', 'carrinho de bebe', 'berco', 'berço', 'body bebe', 'macacao bebe', 'mordedor', 'babador', 'lenço umedecido', 'cadeirinha carro'] },
       { category: 'brinquedos', keywords: ['brinquedo', 'brinquedos', 'boneca', 'boneco', 'carrinho', 'lego', 'jogo de tabuleiro', 'quebra cabeca', 'quebra-cabeça', 'pelucia', 'pelúcia', 'nerf', 'patinete', 'barbie', 'hot wheels', 'massinha', 'slime'] },
       { category: 'papelaria', keywords: ['livro', 'gibi', 'manga', 'mangá', 'quadrinhos', 'caderno', 'caneta', 'lapis de cor', 'estojo', 'papelaria', 'planner', 'agenda', 'marca texto', 'resma papel', 'mochila escolar'] },
+
+      // 🛒 Supermercado & Mercearia
+      { category: 'mercearia_doce', keywords: ['chocolate', 'bombom', 'biscoito', 'bolacha', 'doce de leite', 'nutella', 'pasta de amendoim', 'leite condensado', 'creme de leite', 'barra de chocolate', 'cacau em po', 'cacau em pó', 'granulado', 'cobertura chocolate', 'achocolatado', 'nescau', 'toddy'] },
+      { category: 'mercearia_salgada', keywords: ['arroz', 'feijao', 'feijão', 'azeite', 'oleo de soja', 'óleo de soja', 'macarrao', 'macarrão', 'massa', 'molho de tomate', 'extrato de tomate', 'sal refinado', 'tempero', 'molho shoyu', 'maionese', 'ketchup', 'mostarda', 'atum', 'sardinha', 'conserva', 'farinha de trigo'] },
+      { category: 'bebidas_snacks', keywords: ['whisky', 'gin', 'vodka', 'cerveja', 'vinho', 'espumante', 'refrigerante', 'coca cola', 'suco', 'cafe em graos', 'café', 'capsula cafe', 'cha', 'chá', 'snack', 'salgadinho', 'doritos', 'batata frita', 'amendoim', 'energetico', 'energético', 'red bull', 'monster'] },
 
       // 🛠️ Ferramentas, Auto & Pet
       { category: 'petshop', keywords: ['racao', 'ração', 'cachorro', 'gato', 'pet', 'coleira', 'guia cachorro', 'arranhador', 'caminha pet', 'cama pet', 'petisco', 'comedouro', 'bebedouro pet', 'areia gato', 'tapete higienico', 'shampoo pet'] },

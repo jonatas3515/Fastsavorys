@@ -43,10 +43,15 @@
       icon: '🧸',
       categories: ['brinquedos', 'bebes', 'papelaria', 'livros']
     },
+    group_supermercado: {
+      label: 'Supermercado & Mercearia',
+      icon: '🛒',
+      categories: ['mercearia_doce', 'mercearia_salgada', 'bebidas_snacks', 'supermercado']
+    },
     group_outros: {
       label: 'Ferramentas, Auto & Pet',
       icon: '🛠️',
-      categories: ['construcao', 'veiculos', 'petshop', 'supermercado']
+      categories: ['construcao', 'veiculos', 'petshop']
     }
   };
 
@@ -335,6 +340,23 @@
       if (emptyState) emptyState.classList.remove('hidden');
       return;
     }
+
+    // Ordenação inteligente: Itens sem categoria no início, e demais agrupados por categoria
+    filtered.sort((a, b) => {
+      const catA = (a.category || '').trim().toLowerCase();
+      const catB = (b.category || '').trim().toLowerCase();
+      const isUncatA = !catA || catA === 'sem_categoria';
+      const isUncatB = !catB || catB === 'sem_categoria';
+
+      if (isUncatA && !isUncatB) return -1;
+      if (!isUncatA && isUncatB) return 1;
+
+      if (catA !== catB) {
+        return catA.localeCompare(catB);
+      }
+
+      return (Number(a.position) || 0) - (Number(b.position) || 0) || (Number(a.id) || 0) - (Number(b.id) || 0);
+    });
 
     if (emptyState) emptyState.classList.add('hidden');
 
