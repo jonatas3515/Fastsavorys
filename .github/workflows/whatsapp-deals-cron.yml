@@ -3,15 +3,26 @@ name: Disparo Automático de Ofertas no WhatsApp (FastSavory's)
 on:
   schedule:
     # Horário de Brasília (UTC-3):
-    # 09:00 BRT -> 12:00 UTC
-    # 12:00 BRT -> 15:00 UTC
-    # 15:00 BRT -> 18:00 UTC
+    # 09:00 BRT -> 12:00 UTC (Achadinhos)
+    # 11:00 BRT -> 14:00 UTC (Cardápio FastSavory's - Salgados)
+    # 13:00 BRT -> 16:00 UTC (Achadinhos)
+    # 15:00 BRT -> 18:00 UTC (Cardápio FastSavory's - Salgados)
+    # 17:00 BRT -> 20:00 UTC (Achadinhos)
+    # 19:00 BRT -> 22:00 UTC (Achadinhos)
     - cron: '0 12 * * *'
-    - cron: '0 15 * * *'
+    - cron: '0 14 * * *'
+    - cron: '0 16 * * *'
     - cron: '0 18 * * *'
+    - cron: '0 20 * * *'
+    - cron: '0 22 * * *'
   
   # Permite disparar manualmente a qualquer momento pelo botão "Run workflow" no GitHub
   workflow_dispatch:
+    inputs:
+      mode:
+        description: 'Tipo de produto a disparar (auto, affiliate, fastsavorys)'
+        required: false
+        default: 'auto'
 
 jobs:
   send-deal:
@@ -33,8 +44,10 @@ jobs:
 
       - name: 🚀 Executar Endpoint de Disparo
         run: |
-          echo "🚀 Disparando rotina de envio de oferta..."
-          RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST "https://fastsavorys.vercel.app/api/cron/send-whatsapp-deal" \
+          MODE="${{ github.event.inputs.mode || 'auto' }}"
+          echo "🚀 Disparando rotina de envio de oferta (Modo: $MODE)..."
+          
+          RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST "https://fastsavorys.vercel.app/api/cron/send-whatsapp-deal?mode=$MODE" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
             -H "Content-Type: application/json")
           
@@ -50,4 +63,3 @@ jobs:
           fi
 
           echo "✅ Oferta enviada com sucesso!"
-

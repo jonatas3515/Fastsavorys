@@ -1,5 +1,8 @@
 /**
  * FastSavory's - Sub-módulo: Disparo de Ofertas no WhatsApp
+ * Suporta:
+ * 1. Produtos de Afiliados (Achadinhos: Amazon, Shopee, Mercado Livre)
+ * 2. Produtos Próprios da FastSavory's (Salgados, Kits Festa, Bolos, etc.)
  */
 
 const { createClient } = require('@supabase/supabase-js');
@@ -69,33 +72,24 @@ function buildWhatsAppDealText(product) {
   return `${sealHeader}🛍️ *ACHADINHO ${platform}* ⭐\n🔥 *${product.title}*\n${descText}\n💰 *Preço:* ${origPriceText}*${product.price_display || 'Confira no link'}*${discountText}\n\n👉 *COMPRE COM DESCONTO AQUI:*\n${product.affiliate_url}\n\n💬 *Entre no canal de avisos Achadinhos Fast no WhatsApp:*\nhttps://chat.whatsapp.com/C7dT0ZWaUZKHm7atI3eOLE`;
 }
 
-async function fetchImageAsBase64(imageUrl) {
-  if (!imageUrl || !imageUrl.startsWith('http')) return null;
+function buildFastSavorysProductText(product) {
+  const categoryEmoji = {
+    'salgados': '🥟',
+    'mini': '✨',
+    'kits': '🎉',
+    'bolos': '🎂',
+    'bebidas': '🥤',
+    'adicionais': '🍟'
+  }[(product.category || '').toLowerCase()] || '🥟';
 
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000);
+  const categoryName = (product.category || 'Salgados').toUpperCase();
+  const descText = product.description && product.description.trim() ? `\n${product.description.trim()}\n` : '';
+  const numPrice = typeof product.price === 'number' ? product.price : parseFloat(product.price);
+  const priceFormatted = !isNaN(numPrice) && numPrice > 0
+    ? numPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
+    : (product.price ? `R$ ${product.price}` : 'Consulte no site');
 
-    const res = await fetch(imageUrl, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8'
-      },
-      signal: controller.signal
-    });
-
-    clearTimeout(timeout);
-
-    if (res.ok) {
-      const buffer = await res.arrayBuffer();
-      const base64 = Buffer.from(buffer).toString('base64');
-      const contentType = res.headers.get('content-type') || 'image/jpeg';
-      return `data:${contentType};base64,${base64}`;
-    }
-  } catch (err) {
-    console.warn('[WhatsApp Deal] Falha ao converter imagem para base64:', err.message);
-  }
-  return null;
+  return `😋 *FASTSAVORY'S - ${categoryName}* ${categoryEmoji}\n🔥 *${product.name}*\n${descText}\n💰 *Preço:* *${priceFormatted}*\n\n🛒 *FAÇA SEU PEDIDO AGORA NO SITE:*\nhttps://fastsavorys.vercel.app\n\n💬 *Entre no canal de avisos Achadinhos Fast no WhatsApp:*\nhttps://chat.whatsapp.com/C7dT0ZWaUZKHm7atI3eOLE`;
 }
 
 async function handleSendWhatsAppDeal(req, res) {
@@ -115,35 +109,79 @@ async function handleSendWhatsAppDeal(req, res) {
     });
   }
 
+  // Identificação do modo (auto, fastsavorys, affiliate)
+  const mode = req.query.mode || (req.body && req.body.mode) || 'auto';
+  let targetType = mode;
+
+  if (mode === 'auto') {
+    // Horário de Brasília (UTC-3)
+    const now = new Date();
+    const utcHours = now.getUTCHours();
+    const brtHours = (utcHours - 3 + 24) % 24;
+    // Às 11:00 (almoço) e 15:00 (lanche da tarde), envia produtos próprios da FastSavory's
+    targetType = (brtHours === 11 || brtHours === 15) ? 'fastsavorys' : 'affiliate';
+  }
+
   try {
-    const { data: products, error: dbError } = await supabaseAdmin
-      .from('fast_affiliate_products')
-      .select('*')
-      .eq('is_active', true)
-      .order('last_posted_at', { ascending: true, nullsFirst: true })
-      .order('position', { ascending: true })
-      .limit(1);
+    let product = null;
+    let isFastSavorysStore = false;
+    let messageCaption = '';
+    let mediaUrl = null;
 
-    if (dbError) {
-      throw new Error(`Erro no banco Supabase: ${dbError.message}`);
+    if (targetType === 'fastsavorys') {
+      // 1. Busca produto do cardápio FastSavory's
+      const { data: storeProducts, error: storeErr } = await supabaseAdmin
+        .from('fast_products')
+        .select('*')
+        .order('last_posted_at', { ascending: true, nullsFirst: true })
+        .order('id', { ascending: true })
+        .limit(1);
+
+      if (!storeErr && storeProducts && storeProducts.length > 0) {
+        product = storeProducts[0];
+        isFastSavorysStore = true;
+        messageCaption = buildFastSavorysProductText(product);
+        mediaUrl = product.image || product.image_url;
+      }
     }
 
-    if (!products || products.length === 0) {
-      return res.status(200).json({
-        success: false,
-        message: 'Nenhum produto ativo encontrado para disparo.'
-      });
+    // 2. Se for modo afiliado ou se não encontrou produto de loja, busca nos achadinhos
+    if (!product) {
+      const { data: affiliateProducts, error: affErr } = await supabaseAdmin
+        .from('fast_affiliate_products')
+        .select('*')
+        .eq('is_active', true)
+        .order('last_posted_at', { ascending: true, nullsFirst: true })
+        .order('position', { ascending: true })
+        .limit(1);
+
+      if (affErr) {
+        throw new Error(`Erro no banco Supabase: ${affErr.message}`);
+      }
+
+      if (!affiliateProducts || affiliateProducts.length === 0) {
+        return res.status(200).json({
+          success: false,
+          message: 'Nenhum produto ativo encontrado para disparo.'
+        });
+      }
+
+      product = affiliateProducts[0];
+      isFastSavorysStore = false;
+      messageCaption = buildWhatsAppDealText(product);
+      mediaUrl = product.image_url || product.image;
     }
 
-    const product = products[0];
-    const messageCaption = buildWhatsAppDealText(product);
-    const base64Image = await fetchImageAsBase64(product.image_url);
-    const mediaPayload = base64Image || product.image_url;
+    // Normaliza URL da imagem
+    if (mediaUrl && !mediaUrl.startsWith('http')) {
+      mediaUrl = `https://fastsavorys.vercel.app${mediaUrl.startsWith('/') ? '' : '/'}${mediaUrl}`;
+    }
 
     let sendSuccess = false;
     let sendResponse = null;
 
-    if (mediaPayload) {
+    // Disparo com imagem via sendMedia
+    if (mediaUrl && mediaUrl.startsWith('http')) {
       try {
         const mediaEndpoint = `${evolutionApiUrl}/message/sendMedia/${evolutionInstance}`;
         const response = await fetch(mediaEndpoint, {
@@ -154,11 +192,11 @@ async function handleSendWhatsAppDeal(req, res) {
           },
           body: JSON.stringify({
             number: targetGroupJid,
-            media: mediaPayload,
+            media: mediaUrl,
             mediatype: 'image',
             mimetype: 'image/jpeg',
             caption: messageCaption,
-            fileName: 'achadinho.jpg'
+            fileName: 'produto.jpg'
           })
         });
 
@@ -174,6 +212,7 @@ async function handleSendWhatsAppDeal(req, res) {
       }
     }
 
+    // Fallback: Disparo de Texto simples se mídia falhar
     if (!sendSuccess) {
       const textEndpoint = `${evolutionApiUrl}/message/sendText/${evolutionInstance}`;
       const response = await fetch(textEndpoint, {
@@ -198,17 +237,25 @@ async function handleSendWhatsAppDeal(req, res) {
       sendResponse = await response.json();
     }
 
+    // Atualiza data do último envio (last_posted_at) na tabela correspondente
     const nowIso = new Date().toISOString();
-    await supabaseAdmin
-      .from('fast_affiliate_products')
-      .update({ last_posted_at: nowIso, updated_at: nowIso })
-      .eq('id', product.id);
+    const targetTable = isFastSavorysStore ? 'fast_products' : 'fast_affiliate_products';
+
+    try {
+      await supabaseAdmin
+        .from(targetTable)
+        .update({ last_posted_at: nowIso, updated_at: nowIso })
+        .eq('id', product.id);
+    } catch (updateErr) {
+      console.warn(`[WhatsApp Deal] Aviso ao atualizar last_posted_at em ${targetTable}:`, updateErr.message);
+    }
 
     return res.status(200).json({
       success: true,
-      message: `Oferta enviada com sucesso para o grupo (${product.title})`,
+      message: `Oferta enviada com sucesso para o grupo (${product.title || product.name})`,
+      type: isFastSavorysStore ? 'fastsavorys_store' : 'affiliate_deal',
       productId: product.id,
-      productTitle: product.title,
+      productTitle: product.title || product.name,
       postedAt: nowIso,
       evolutionResponse: sendResponse
     });
