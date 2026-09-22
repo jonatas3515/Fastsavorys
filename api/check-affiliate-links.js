@@ -136,101 +136,97 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
       isPaused = true;
     }
 
-    // Isolate primary product scope to prevent reading from recommendation carousels or tabs
-    const primaryScope = html.split(/class=["'](?:rl-tabs|andes-tabs|poly-carousel|ui-recommendations|poly-recommendations)/i)[0] || html;
-
-    // LAYER 1: Extract from Official Structured JSON-LD Schema (100% accurate catalog data)
-    const jsonLdRegex = /<script\s+type=["']application\/ld\+json["']>([\s\S]*?)<\/script>/gi;
-    let jsonMatch;
-    while ((jsonMatch = jsonLdRegex.exec(primaryScope)) !== null) {
-      try {
-        const schema = JSON.parse(jsonMatch[1]);
-        if (schema) {
-          const item = Array.isArray(schema) ? schema[0] : schema;
-          if (item && (item['@type'] === 'Product' || item['@type'] === 'ItemPage' || item.offers)) {
-            const offers = item.offers;
-            if (offers) {
-              const offerObj = Array.isArray(offers) ? offers[0] : offers;
-              const offerPrice = offerObj?.price || offerObj?.lowPrice;
-              if (offerPrice && Number(offerPrice) > 0) {
-                price = formatBrlNumber(Number(offerPrice));
-                if (offerObj?.availability && offerObj.availability.includes('OutOfStock')) {
-                  isPaused = true;
-                }
-                break;
-              }
-            }
-          }
-        }
-      } catch (e) {}
+    // LAYER 1: Authoritative Nordic / Initial State JSON (100% precise catalog price)
+    const currentPriceMatch = html.match(/"current_price"\s*:\s*\{\s*"value"\s*:\s*([0-9.]+)\s*,\s*"currency"\s*:\s*"BRL"/i);
+    if (currentPriceMatch && currentPriceMatch[1]) {
+      const num = parseFloat(currentPriceMatch[1]);
+      if (!isNaN(num) && num > 0) price = formatBrlNumber(num);
     }
 
-    // LAYER 2: Extract from Preloaded State / Initial State JSON
+    const previousPriceMatch = html.match(/"previous_price"\s*:\s*\{\s*"value"\s*:\s*([0-9.]+)\s*,\s*"currency"\s*:\s*"BRL"/i);
+    if (previousPriceMatch && previousPriceMatch[1]) {
+      const num = parseFloat(previousPriceMatch[1]);
+      if (!isNaN(num) && num > 0) originalPrice = formatBrlNumber(num);
+    }
+
+    const discLabelMatch = html.match(/"discount_label"\s*:\s*\{\s*"text"\s*:\s*"([^"]+)"/i);
+    if (discLabelMatch && discLabelMatch[1]) {
+      discountTag = discLabelMatch[1].trim();
+    }
+
+    // LAYER 2: Structured JSON-LD Schema (Fallback)
     if (!price) {
-      const stateMatch = primaryScope.match(/window\.__PRELOADED_STATE__\s*=\s*(\{[\s\S]*?\});<\/script>/i) ||
-                         primaryScope.match(/window\.__INITIAL_STATE__\s*=\s*(\{[\s\S]*?\});<\/script>/i);
-      if (stateMatch && stateMatch[1]) {
+      const jsonLdRegex = /<script\s+type=["']application\/ld\+json["']>([\s\S]*?)<\/script>/gi;
+      let jsonMatch;
+      while ((jsonMatch = jsonLdRegex.exec(html)) !== null) {
         try {
-          const stateData = JSON.parse(stateMatch[1]);
-          const components = stateData?.initialState?.components || stateData?.components;
-          if (components?.price) {
-            const currentVal = components.price.current?.value || components.price.value;
-            if (currentVal && Number(currentVal) > 0) {
-              price = formatBrlNumber(Number(currentVal));
-            }
-            const origVal = components.price.original?.value || components.price.previous_price?.value;
-            if (origVal && Number(origVal) > 0) {
-              originalPrice = formatBrlNumber(Number(origVal));
+          const schema = JSON.parse(jsonMatch[1]);
+          if (schema) {
+            const item = Array.isArray(schema) ? schema[0] : schema;
+            if (item && (item['@type'] === 'Product' || item['@type'] === 'ItemPage' || item.offers)) {
+              const offers = item.offers;
+              if (offers) {
+                const offerObj = Array.isArray(offers) ? offers[0] : offers;
+                const offerPrice = offerObj?.price || offerObj?.lowPrice;
+                if (offerPrice && Number(offerPrice) > 0) {
+                  price = formatBrlNumber(Number(offerPrice));
+                  if (offerObj?.availability && offerObj.availability.includes('OutOfStock')) {
+                    isPaused = true;
+                  }
+                  break;
+                }
+              }
             }
           }
         } catch (e) {}
       }
     }
 
-    // LAYER 3: Strict BuyBox DOM Scoping (Primary Product Page)
+    // LAYER 3: Strict BuyBox DOM Scoping & Affiliate Showcase Card (Scoped before bottom recommendation tabs)
     if (!price) {
+      const primaryScope = html.split(/class=["'](?:rl-tabs|andes-tabs)/i)[0] || html;
+
+      // Check BuyBox PDP
       const buyboxMatch = primaryScope.match(/class=["'][^"']*(?:ui-pdp-price__second-line|ui-pdp-price)[^"']*["'][\s\S]*?<\/div>/i) ||
                           primaryScope.match(/class=["'][^"']*ui-pdp-container__row--price[^"']*["'][\s\S]*?<\/div>/i);
-      
-      const targetScope = buyboxMatch ? buyboxMatch[0] : null;
-
-      if (targetScope) {
-        const fracMatch = targetScope.match(/class=["'][^"']*andes-money-amount__fraction[^"']*["']>([0-9.]+)</i);
-        const centsMatch = targetScope.match(/class=["'][^"']*andes-money-amount__cents[^"']*["']>([0-9]{2})</i);
+      if (buyboxMatch) {
+        const fracMatch = buyboxMatch[0].match(/class=["'][^"']*andes-money-amount__fraction[^"']*["']>([0-9.]+)</i);
+        const centsMatch = buyboxMatch[0].match(/class=["'][^"']*andes-money-amount__cents[^"']*["']>([0-9]{2})</i);
         if (fracMatch && fracMatch[1]) {
           const frac = fracMatch[1];
           const cents = centsMatch ? centsMatch[1] : '00';
           price = `R$ ${frac},${cents}`;
         }
       }
-    }
 
-    // LAYER 4: Affiliate Showcase Main Card (poly-price__current in primaryScope)
-    if (!price) {
-      const polyCurrentMatch = primaryScope.match(/class=["'][^"']*poly-price__current[^"']*["'][\s\S]*?<\/div>/i);
-      if (polyCurrentMatch) {
-        const fracMatch = polyCurrentMatch[0].match(/class=["'][^"']*andes-money-amount__fraction[^"']*["']>([0-9.]+)</i);
-        const centsMatch = polyCurrentMatch[0].match(/class=["'][^"']*andes-money-amount__cents[^"']*["']>([0-9]{2})</i);
-        if (fracMatch && fracMatch[1]) {
-          const frac = fracMatch[1];
-          const cents = centsMatch ? centsMatch[1] : '00';
+      // Check Showcase Card poly-price__current
+      if (!price) {
+        const polyCurrentMatch = primaryScope.match(/class=["'][^"']*poly-price__current[^"']*["'][\s\S]*?<\/div>/i);
+        if (polyCurrentMatch) {
+          const fracMatch = polyCurrentMatch[0].match(/class=["'][^"']*andes-money-amount__fraction[^"']*["']>([0-9.]+)</i);
+          const centsMatch = polyCurrentMatch[0].match(/class=["'][^"']*andes-money-amount__cents[^"']*["']>([0-9]{2})</i);
+          if (fracMatch && fracMatch[1]) {
+            const frac = fracMatch[1];
+            const cents = centsMatch ? centsMatch[1] : '00';
+            price = `R$ ${frac},${cents}`;
+          }
+        }
+      }
+
+      // Check Aria-label for Exact Price
+      if (!price) {
+        const agoraMatch = primaryScope.match(/aria-label=["'](?:Agora:\s*)?([0-9.]+)\s*reais(?:\s*com\s*([0-9]{1,2})\s*centavos)?["']/i);
+        if (agoraMatch && agoraMatch[1]) {
+          const frac = agoraMatch[1];
+          const cents = agoraMatch[2] ? agoraMatch[2].padStart(2, '0') : '00';
           price = `R$ ${frac},${cents}`;
         }
       }
     }
 
-    // LAYER 5: Aria-label for Exact Price ("Agora: X reais com Y centavos" or "X reais com Y centavos") in primaryScope
-    if (!price) {
-      const agoraMatch = primaryScope.match(/aria-label=["'](?:Agora:\s*)?([0-9.]+)\s*reais(?:\s*com\s*([0-9]{1,2})\s*centavos)?["']/i);
-      if (agoraMatch && agoraMatch[1]) {
-        const frac = agoraMatch[1];
-        const cents = agoraMatch[2] ? agoraMatch[2].padStart(2, '0') : '00';
-        price = `R$ ${frac},${cents}`;
-      }
-    }
-
-    // LAYER 6: Previous Original Price (Struck-through) in primaryScope
+    // Previous Original Price Fallback
     if (!originalPrice) {
+      const primaryScope = html.split(/class=["'](?:rl-tabs|andes-tabs)/i)[0] || html;
       const previousMatch = primaryScope.match(/class=["'][^"']*andes-money-amount--previous[^"']*["'][\s\S]*?<\/(?:s|span|div)>/i);
       if (previousMatch) {
         const fracMatch = previousMatch[0].match(/class=["'][^"']*andes-money-amount__fraction[^"']*["']>([0-9.]+)</i);
@@ -241,21 +237,24 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
           originalPrice = `R$ ${frac},${cents}`;
         }
       }
-    }
 
-    if (!originalPrice) {
-      const antesMatch = primaryScope.match(/aria-label=["']Antes:\s*([0-9.]+)\s*reais(?:\s*com\s*([0-9]{1,2})\s*centavos)?["']/i);
-      if (antesMatch && antesMatch[1]) {
-        const frac = antesMatch[1];
-        const cents = antesMatch[2] ? antesMatch[2].padStart(2, '0') : '00';
-        originalPrice = `R$ ${frac},${cents}`;
+      if (!originalPrice) {
+        const antesMatch = primaryScope.match(/aria-label=["']Antes:\s*([0-9.]+)\s*reais(?:\s*com\s*([0-9]{1,2})\s*centavos)?["']/i);
+        if (antesMatch && antesMatch[1]) {
+          const frac = antesMatch[1];
+          const cents = antesMatch[2] ? antesMatch[2].padStart(2, '0') : '00';
+          originalPrice = `R$ ${frac},${cents}`;
+        }
       }
     }
 
-    // Discount percentage tag
-    const discMatch = primaryScope.match(/class=["'][^"']*(?:ui-pdp-price__discount|andes-money-amount__discount|poly-price__disc_label)[^"']*["']>([^<]+)</i);
-    if (discMatch && discMatch[1]) {
-      discountTag = discMatch[1].trim();
+    // Discount percentage tag fallback
+    if (!discountTag) {
+      const primaryScope = html.split(/class=["'](?:rl-tabs|andes-tabs)/i)[0] || html;
+      const discMatch = primaryScope.match(/class=["'][^"']*(?:ui-pdp-price__discount|andes-money-amount__discount|poly-price__disc_label)[^"']*["']>([^<]+)</i);
+      if (discMatch && discMatch[1]) {
+        discountTag = discMatch[1].trim();
+      }
     }
   }
 
