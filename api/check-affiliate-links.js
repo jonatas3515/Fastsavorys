@@ -136,10 +136,13 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
       isPaused = true;
     }
 
+    // Isolate primary product scope to prevent reading from recommendation carousels or tabs
+    const primaryScope = html.split(/class=["'](?:rl-tabs|andes-tabs|poly-carousel|ui-recommendations|poly-recommendations)/i)[0] || html;
+
     // LAYER 1: Extract from Official Structured JSON-LD Schema (100% accurate catalog data)
     const jsonLdRegex = /<script\s+type=["']application\/ld\+json["']>([\s\S]*?)<\/script>/gi;
     let jsonMatch;
-    while ((jsonMatch = jsonLdRegex.exec(html)) !== null) {
+    while ((jsonMatch = jsonLdRegex.exec(primaryScope)) !== null) {
       try {
         const schema = JSON.parse(jsonMatch[1]);
         if (schema) {
@@ -164,8 +167,8 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
 
     // LAYER 2: Extract from Preloaded State / Initial State JSON
     if (!price) {
-      const stateMatch = html.match(/window\.__PRELOADED_STATE__\s*=\s*(\{[\s\S]*?\});<\/script>/i) ||
-                         html.match(/window\.__INITIAL_STATE__\s*=\s*(\{[\s\S]*?\});<\/script>/i);
+      const stateMatch = primaryScope.match(/window\.__PRELOADED_STATE__\s*=\s*(\{[\s\S]*?\});<\/script>/i) ||
+                         primaryScope.match(/window\.__INITIAL_STATE__\s*=\s*(\{[\s\S]*?\});<\/script>/i);
       if (stateMatch && stateMatch[1]) {
         try {
           const stateData = JSON.parse(stateMatch[1]);
@@ -184,10 +187,10 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
       }
     }
 
-    // LAYER 3: Strict BuyBox DOM Scoping (ignores recommendations & sidebars)
+    // LAYER 3: Strict BuyBox DOM Scoping (Primary Product Page)
     if (!price) {
-      const buyboxMatch = html.match(/class=["'][^"']*(?:ui-pdp-price__second-line|ui-pdp-price)[^"']*["'][\s\S]*?<\/div>/i) ||
-                          html.match(/class=["'][^"']*ui-pdp-container__row--price[^"']*["'][\s\S]*?<\/div>/i);
+      const buyboxMatch = primaryScope.match(/class=["'][^"']*(?:ui-pdp-price__second-line|ui-pdp-price)[^"']*["'][\s\S]*?<\/div>/i) ||
+                          primaryScope.match(/class=["'][^"']*ui-pdp-container__row--price[^"']*["'][\s\S]*?<\/div>/i);
       
       const targetScope = buyboxMatch ? buyboxMatch[0] : null;
 
@@ -202,9 +205,23 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
       }
     }
 
-    // LAYER 4: Aria-label for Exact Price ("Agora: X reais com Y centavos")
+    // LAYER 4: Affiliate Showcase Main Card (poly-price__current in primaryScope)
     if (!price) {
-      const agoraMatch = html.match(/aria-label=["']Agora:\s*([0-9.]+)\s*reais(?:\s*com\s*([0-9]{1,2})\s*centavos)?["']/i);
+      const polyCurrentMatch = primaryScope.match(/class=["'][^"']*poly-price__current[^"']*["'][\s\S]*?<\/div>/i);
+      if (polyCurrentMatch) {
+        const fracMatch = polyCurrentMatch[0].match(/class=["'][^"']*andes-money-amount__fraction[^"']*["']>([0-9.]+)</i);
+        const centsMatch = polyCurrentMatch[0].match(/class=["'][^"']*andes-money-amount__cents[^"']*["']>([0-9]{2})</i);
+        if (fracMatch && fracMatch[1]) {
+          const frac = fracMatch[1];
+          const cents = centsMatch ? centsMatch[1] : '00';
+          price = `R$ ${frac},${cents}`;
+        }
+      }
+    }
+
+    // LAYER 5: Aria-label for Exact Price ("Agora: X reais com Y centavos" or "X reais com Y centavos") in primaryScope
+    if (!price) {
+      const agoraMatch = primaryScope.match(/aria-label=["'](?:Agora:\s*)?([0-9.]+)\s*reais(?:\s*com\s*([0-9]{1,2})\s*centavos)?["']/i);
       if (agoraMatch && agoraMatch[1]) {
         const frac = agoraMatch[1];
         const cents = agoraMatch[2] ? agoraMatch[2].padStart(2, '0') : '00';
@@ -212,9 +229,9 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
       }
     }
 
-    // LAYER 5: Previous Original Price (Struck-through)
+    // LAYER 6: Previous Original Price (Struck-through) in primaryScope
     if (!originalPrice) {
-      const previousMatch = html.match(/class=["'][^"']*andes-money-amount--previous[^"']*["'][\s\S]*?<\/(?:s|span|div)>/i);
+      const previousMatch = primaryScope.match(/class=["'][^"']*andes-money-amount--previous[^"']*["'][\s\S]*?<\/(?:s|span|div)>/i);
       if (previousMatch) {
         const fracMatch = previousMatch[0].match(/class=["'][^"']*andes-money-amount__fraction[^"']*["']>([0-9.]+)</i);
         const centsMatch = previousMatch[0].match(/class=["'][^"']*andes-money-amount__cents[^"']*["']>([0-9]{2})</i);
@@ -227,7 +244,7 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
     }
 
     if (!originalPrice) {
-      const antesMatch = html.match(/aria-label=["']Antes:\s*([0-9.]+)\s*reais(?:\s*com\s*([0-9]{1,2})\s*centavos)?["']/i);
+      const antesMatch = primaryScope.match(/aria-label=["']Antes:\s*([0-9.]+)\s*reais(?:\s*com\s*([0-9]{1,2})\s*centavos)?["']/i);
       if (antesMatch && antesMatch[1]) {
         const frac = antesMatch[1];
         const cents = antesMatch[2] ? antesMatch[2].padStart(2, '0') : '00';
@@ -235,22 +252,8 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
       }
     }
 
-    // LAYER 6: Fallback for Affiliate Showcase Cards (only if no PDP buybox exists)
-    if (!price) {
-      const polyCurrentMatch = html.match(/class=["'][^"']*poly-price__current[^"']*["'][\s\S]*?<\/div>/i);
-      if (polyCurrentMatch) {
-        const fracMatch = polyCurrentMatch[0].match(/class=["'][^"']*andes-money-amount__fraction[^"']*["']>([0-9.]+)</i);
-        const centsMatch = polyCurrentMatch[0].match(/class=["'][^"']*andes-money-amount__cents[^"']*["']>([0-9]{2})</i);
-        if (fracMatch && fracMatch[1]) {
-          const frac = fracMatch[1];
-          const cents = centsMatch ? centsMatch[1] : '00';
-          price = `R$ ${frac},${cents}`;
-        }
-      }
-    }
-
     // Discount percentage tag
-    const discMatch = html.match(/class=["'][^"']*(?:ui-pdp-price__discount|andes-money-amount__discount)[^"']*["']>([^<]+)</i);
+    const discMatch = primaryScope.match(/class=["'][^"']*(?:ui-pdp-price__discount|andes-money-amount__discount|poly-price__disc_label)[^"']*["']>([^<]+)</i);
     if (discMatch && discMatch[1]) {
       discountTag = discMatch[1].trim();
     }
