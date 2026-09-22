@@ -118,8 +118,9 @@ async function handleSendWhatsAppDeal(req, res) {
     const now = new Date();
     const utcHours = now.getUTCHours();
     const brtHours = (utcHours - 3 + 24) % 24;
-    // Às 11:00 (almoço) e 15:00 (lanche da tarde), envia produtos próprios da FastSavory's
-    targetType = (brtHours === 11 || brtHours === 15) ? 'fastsavorys' : 'affiliate';
+    // Às 11h, 13h, 15h e 17h envia produtos próprios da FastSavory's
+    const isFastSavorysHour = [11, 13, 15, 17].includes(brtHours);
+    targetType = isFastSavorysHour ? 'fastsavorys' : 'affiliate';
   }
 
   try {
