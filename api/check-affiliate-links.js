@@ -1,45 +1,9 @@
 /**
- * Vercel Serverless Function: FastSavory's Affiliate & Mercado Livre Suite
- * Handles both:
- * 1. Auto-fetch of product details (Title, Image, Price, Discount) with ML API + Scraping
- * 2. Health check of affiliate links (Active vs Paused vs Broken)
+ * Vercel Serverless Function: FastSavory's Affiliate & Mercado Livre Suite (High-Precision Scraper)
+ * Handles:
+ * 1. Auto-fetch of product details (Title, Image, Genuine BuyBox Price, Discount)
+ * 2. High-precision Health & Price Check of affiliate links (detects exact price drops and increases)
  */
-
-const ML_CLIENT_ID = process.env.ML_CLIENT_ID || '3591474885653129';
-const ML_CLIENT_SECRET = process.env.ML_CLIENT_SECRET || 'Pjf7vFsZUg6clNq7qwAz7dkfjvIEkf5V';
-
-let cachedToken = null;
-let tokenExpiresAt = 0;
-
-async function getMLAccessToken() {
-  const now = Date.now();
-  if (cachedToken && tokenExpiresAt > now + 60000) {
-    return cachedToken;
-  }
-
-  try {
-    const params = new URLSearchParams();
-    params.append('grant_type', 'client_credentials');
-    params.append('client_id', ML_CLIENT_ID);
-    params.append('client_secret', ML_CLIENT_SECRET);
-
-    const res = await fetch('https://api.mercadolibre.com/oauth/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: params.toString()
-    });
-
-    if (res.ok) {
-      const data = await res.json();
-      cachedToken = data.access_token;
-      tokenExpiresAt = now + (data.expires_in || 21600) * 1000;
-      return cachedToken;
-    }
-  } catch (err) {
-    console.warn('[ML API] Erro ao obter access token:', err);
-  }
-  return null;
-}
 
 function detectPlatform(url = '') {
   const u = (url || '').toLowerCase();
@@ -96,6 +60,10 @@ function parsePrice(str) {
   return isNaN(num) ? 0 : num;
 }
 
+/**
+ * High-Precision Price & Status Extractor
+ * Strictly isolates the main BuyBox and official JSON schemas to avoid recommended cards/footer noise.
+ */
 function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
   let price = '';
   let originalPrice = '';
@@ -103,7 +71,7 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
   let isPaused = false;
 
   if (platform === 'amazon') {
-    // 1. Check if Amazon product is unavailable
+    // 1. Availability check
     if (
       html.includes('Atualmente indisponível') ||
       html.includes('Currently unavailable') ||
@@ -114,20 +82,20 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
       isPaused = true;
     }
 
-    // 2. Extract Amazon Price
-    // A) Offscreen price text (e.g. "R$ 1.453,50")
-    const amazonOffscreen = html.match(/class=["'][^"']*a-price[^"']*["'][\s\S]*?class=["'][^"']*a-offscreen[^"']*["']>([^<]+)</i);
+    // 2. High-precision Amazon BuyBox Scoping
+    const buyboxScope = html.match(/id=["'](?:corePrice_feature_div|corePriceDisplay_desktop_feature_div|apex_desktop|desktop_unifiedPrice)[^"']*["'][\s\S]*?<\/div>/i) ||
+                        html.match(/class=["'][^"']*a-box-group[^"']*["'][\s\S]*?class=["'][^"']*a-price[^"']*["'][\s\S]*?<\/div>/i);
+    const searchHtml = buyboxScope ? buyboxScope[0] : html;
+
+    const amazonOffscreen = searchHtml.match(/class=["'][^"']*a-price[^"']*["'][\s\S]*?class=["'][^"']*a-offscreen[^"']*["']>([^<]+)</i);
     if (amazonOffscreen && amazonOffscreen[1]) {
       const clean = amazonOffscreen[1].replace(/&nbsp;/g, ' ').replace(/[^\d.,]/g, '').trim();
-      if (clean) {
-        price = `R$ ${clean}`;
-      }
+      if (clean) price = `R$ ${clean}`;
     }
 
-    // B) Price whole + fraction
     if (!price) {
-      const wholeMatch = html.match(/class=["'][^"']*a-price-whole[^"']*["']>([0-9.,]+)</i);
-      const fracMatch = html.match(/class=["'][^"']*a-price-fraction[^"']*["']>([0-9]{2})</i);
+      const wholeMatch = searchHtml.match(/class=["'][^"']*a-price-whole[^"']*["']>([0-9.,]+)</i);
+      const fracMatch = searchHtml.match(/class=["'][^"']*a-price-fraction[^"']*["']>([0-9]{2})</i);
       if (wholeMatch && wholeMatch[1]) {
         const whole = wholeMatch[1].replace(/[^\d.]/g, '');
         const frac = fracMatch ? fracMatch[1] : '00';
@@ -135,16 +103,13 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
       }
     }
 
-    // C) Amazon Original / Basis Price (list price)
-    const amazonOriginal = html.match(/class=["'][^"']*a-text-price[^"']*["'][\s\S]*?class=["'][^"']*a-offscreen[^"']*["']>([^<]+)</i);
+    const amazonOriginal = searchHtml.match(/class=["'][^"']*a-text-price[^"']*["'][\s\S]*?class=["'][^"']*a-offscreen[^"']*["']>([^<]+)</i);
     if (amazonOriginal && amazonOriginal[1]) {
       const clean = amazonOriginal[1].replace(/&nbsp;/g, ' ').replace(/[^\d.,]/g, '').trim();
-      if (clean) {
-        originalPrice = `R$ ${clean}`;
-      }
+      if (clean) originalPrice = `R$ ${clean}`;
     }
+
   } else if (platform === 'shopee') {
-    // 1. Check if Shopee product is paused or out of stock
     if (
       html.includes('Produto esgotado') ||
       html.includes('Este anúncio foi pausado') ||
@@ -154,16 +119,14 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
       isPaused = true;
     }
 
-    // 2. Extract Shopee Price from Meta / JSON
     const metaPrice = html.match(/<meta\s+(?:property|name)=["'](?:product:price:amount|og:price:amount|twitter:data1)["']\s+content=["']([0-9.,]+)["']/i);
     if (metaPrice && metaPrice[1]) {
       const val = parseFloat(metaPrice[1].replace(',', '.'));
-      if (!isNaN(val) && val > 0) {
-        price = formatBrlNumber(val);
-      }
+      if (!isNaN(val) && val > 0) price = formatBrlNumber(val);
     }
+
   } else {
-    // Mercado Livre
+    // Mercado Livre - Multi-layer High Precision Engine
     if (
       html.includes('Anúncio pausado') ||
       html.includes('Este anúncio foi pausado') ||
@@ -173,28 +136,64 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
       isPaused = true;
     }
 
-    // 1. Check Poly Card / Showcase layout (Affiliate recommendations & profile pages)
-    const polyCurrentMatch = html.match(/class=["'][^"']*poly-price__current[^"']*["'][\s\S]*?<\/div>/i);
-    if (polyCurrentMatch) {
-      const fracMatch = polyCurrentMatch[0].match(/class=["'][^"']*andes-money-amount__fraction[^"']*["']>([0-9.]+)</i);
-      const centsMatch = polyCurrentMatch[0].match(/class=["'][^"']*andes-money-amount__cents[^"']*["']>([0-9]{2})</i);
-      if (fracMatch && fracMatch[1]) {
-        const frac = fracMatch[1];
-        const cents = centsMatch ? centsMatch[1] : '00';
-        price = `R$ ${frac},${cents}`;
-      }
-      const discMatch = polyCurrentMatch[0].match(/class=["'][^"']*(?:poly-price__disc_label|andes-money-amount__discount)[^"']*["']>([^<]+)</i);
-      if (discMatch && discMatch[1]) {
-        discountTag = discMatch[1].trim();
+    // LAYER 1: Extract from Official Structured JSON-LD Schema (100% accurate catalog data)
+    const jsonLdRegex = /<script\s+type=["']application\/ld\+json["']>([\s\S]*?)<\/script>/gi;
+    let jsonMatch;
+    while ((jsonMatch = jsonLdRegex.exec(html)) !== null) {
+      try {
+        const schema = JSON.parse(jsonMatch[1]);
+        if (schema) {
+          const item = Array.isArray(schema) ? schema[0] : schema;
+          if (item && (item['@type'] === 'Product' || item['@type'] === 'ItemPage' || item.offers)) {
+            const offers = item.offers;
+            if (offers) {
+              const offerObj = Array.isArray(offers) ? offers[0] : offers;
+              const offerPrice = offerObj?.price || offerObj?.lowPrice;
+              if (offerPrice && Number(offerPrice) > 0) {
+                price = formatBrlNumber(Number(offerPrice));
+                if (offerObj?.availability && offerObj.availability.includes('OutOfStock')) {
+                  isPaused = true;
+                }
+                break;
+              }
+            }
+          }
+        }
+      } catch (e) {}
+    }
+
+    // LAYER 2: Extract from Preloaded State / Initial State JSON
+    if (!price) {
+      const stateMatch = html.match(/window\.__PRELOADED_STATE__\s*=\s*(\{[\s\S]*?\});<\/script>/i) ||
+                         html.match(/window\.__INITIAL_STATE__\s*=\s*(\{[\s\S]*?\});<\/script>/i);
+      if (stateMatch && stateMatch[1]) {
+        try {
+          const stateData = JSON.parse(stateMatch[1]);
+          const components = stateData?.initialState?.components || stateData?.components;
+          if (components?.price) {
+            const currentVal = components.price.current?.value || components.price.value;
+            if (currentVal && Number(currentVal) > 0) {
+              price = formatBrlNumber(Number(currentVal));
+            }
+            const origVal = components.price.original?.value || components.price.previous_price?.value;
+            if (origVal && Number(origVal) > 0) {
+              originalPrice = formatBrlNumber(Number(origVal));
+            }
+          }
+        } catch (e) {}
       }
     }
 
-    // 2. Standard Product Page buybox (ui-pdp-price__second-line / ui-pdp-price)
+    // LAYER 3: Strict BuyBox DOM Scoping (ignores recommendations & sidebars)
     if (!price) {
-      const mainPriceBlock = html.match(/class=["'][^"']*(?:ui-pdp-price__second-line|ui-pdp-price)[^"']*["'][\s\S]*?<\/div>/i);
-      if (mainPriceBlock) {
-        const fracMatch = mainPriceBlock[0].match(/class=["'][^"']*andes-money-amount__fraction[^"']*["']>([0-9.]+)</i);
-        const centsMatch = mainPriceBlock[0].match(/class=["'][^"']*andes-money-amount__cents[^"']*["']>([0-9]{2})</i);
+      const buyboxMatch = html.match(/class=["'][^"']*(?:ui-pdp-price__second-line|ui-pdp-price)[^"']*["'][\s\S]*?<\/div>/i) ||
+                          html.match(/class=["'][^"']*ui-pdp-container__row--price[^"']*["'][\s\S]*?<\/div>/i);
+      
+      const targetScope = buyboxMatch ? buyboxMatch[0] : null;
+
+      if (targetScope) {
+        const fracMatch = targetScope.match(/class=["'][^"']*andes-money-amount__fraction[^"']*["']>([0-9.]+)</i);
+        const centsMatch = targetScope.match(/class=["'][^"']*andes-money-amount__cents[^"']*["']>([0-9]{2})</i);
         if (fracMatch && fracMatch[1]) {
           const frac = fracMatch[1];
           const cents = centsMatch ? centsMatch[1] : '00';
@@ -203,7 +202,7 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
       }
     }
 
-    // 3. Aria-label fallback for current price: aria-label="Agora: X reais"
+    // LAYER 4: Aria-label for Exact Price ("Agora: X reais com Y centavos")
     if (!price) {
       const agoraMatch = html.match(/aria-label=["']Agora:\s*([0-9.]+)\s*reais(?:\s*com\s*([0-9]{1,2})\s*centavos)?["']/i);
       if (agoraMatch && agoraMatch[1]) {
@@ -213,15 +212,17 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
       }
     }
 
-    // 4. Previous / Original price (andes-money-amount--previous or aria-label="Antes: X reais")
-    const previousMatch = html.match(/class=["'][^"']*andes-money-amount--previous[^"']*["'][\s\S]*?<\/(?:s|span|div)>/i);
-    if (previousMatch) {
-      const fracMatch = previousMatch[0].match(/class=["'][^"']*andes-money-amount__fraction[^"']*["']>([0-9.]+)</i);
-      const centsMatch = previousMatch[0].match(/class=["'][^"']*andes-money-amount__cents[^"']*["']>([0-9]{2})</i);
-      if (fracMatch && fracMatch[1]) {
-        const frac = fracMatch[1];
-        const cents = centsMatch ? centsMatch[1] : '00';
-        originalPrice = `R$ ${frac},${cents}`;
+    // LAYER 5: Previous Original Price (Struck-through)
+    if (!originalPrice) {
+      const previousMatch = html.match(/class=["'][^"']*andes-money-amount--previous[^"']*["'][\s\S]*?<\/(?:s|span|div)>/i);
+      if (previousMatch) {
+        const fracMatch = previousMatch[0].match(/class=["'][^"']*andes-money-amount__fraction[^"']*["']>([0-9.]+)</i);
+        const centsMatch = previousMatch[0].match(/class=["'][^"']*andes-money-amount__cents[^"']*["']>([0-9]{2})</i);
+        if (fracMatch && fracMatch[1]) {
+          const frac = fracMatch[1];
+          const cents = centsMatch ? centsMatch[1] : '00';
+          originalPrice = `R$ ${frac},${cents}`;
+        }
       }
     }
 
@@ -234,48 +235,28 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
       }
     }
 
-    // 5. Check JSON-LD schema fallback
+    // LAYER 6: Fallback for Affiliate Showcase Cards (only if no PDP buybox exists)
     if (!price) {
-      const jsonLdRegex = /<script\s+type=["']application\/ld\+json["']>([\s\S]*?)<\/script>/gi;
-      let match;
-      while ((match = jsonLdRegex.exec(html)) !== null) {
-        try {
-          const schema = JSON.parse(match[1]);
-          if (schema) {
-            const offers = schema.offers;
-            if (offers) {
-              const offerPrice = offers.price || offers.lowPrice || (Array.isArray(offers) ? offers[0]?.price : null);
-              if (offerPrice) {
-                price = formatBrlNumber(offerPrice);
-                break;
-              }
-            }
-          }
-        } catch (err) {}
+      const polyCurrentMatch = html.match(/class=["'][^"']*poly-price__current[^"']*["'][\s\S]*?<\/div>/i);
+      if (polyCurrentMatch) {
+        const fracMatch = polyCurrentMatch[0].match(/class=["'][^"']*andes-money-amount__fraction[^"']*["']>([0-9.]+)</i);
+        const centsMatch = polyCurrentMatch[0].match(/class=["'][^"']*andes-money-amount__cents[^"']*["']>([0-9]{2})</i);
+        if (fracMatch && fracMatch[1]) {
+          const frac = fracMatch[1];
+          const cents = centsMatch ? centsMatch[1] : '00';
+          price = `R$ ${frac},${cents}`;
+        }
       }
     }
 
-    // 6. Check Meta Tags for price
-    if (!price) {
-      const metaPrice = html.match(/<meta\s+(?:property|name|itemprop)=["'](?:product:price:amount|og:price:amount|price)["']\s+content=["']([0-9.]+)["']/i) ||
-                        html.match(/<meta\s+content=["']([0-9.]+)["']\s+(?:property|name|itemprop)=["'](?:product:price:amount|og:price:amount|price)["']/i);
-      if (metaPrice && metaPrice[1]) {
-        price = formatBrlNumber(metaPrice[1]);
-      }
-    }
-
-    // 7. Discount label tag fallback
-    if (!discountTag) {
-      const discMatch = html.match(/"discount_label":\s*\{\s*"text":\s*"([^"]+)"/i) || 
-                        html.match(/discount_label.*?text.*?"([^"]+)"/i) ||
-                        html.match(/class=["'][^"']*ui-pdp-price__discount[^"']*["']>([^<]+)</i);
-      if (discMatch && discMatch[1]) {
-        discountTag = discMatch[1].trim();
-      }
+    // Discount percentage tag
+    const discMatch = html.match(/class=["'][^"']*(?:ui-pdp-price__discount|andes-money-amount__discount)[^"']*["']>([^<]+)</i);
+    if (discMatch && discMatch[1]) {
+      discountTag = discMatch[1].trim();
     }
   }
 
-  // Universal Fallbacks if price is still empty
+  // Universal Fallback via Meta tags
   if (!price) {
     const metaPrice = html.match(/<meta\s+(?:property|name|itemprop)=["'](?:product:price:amount|og:price:amount|price)["']\s+content=["']([0-9.,]+)["']/i);
     if (metaPrice && metaPrice[1]) {
@@ -293,7 +274,7 @@ async function fetchProductDetails(rawUrl) {
   let targetUrl = rawUrl.trim();
   const platform = detectPlatform(targetUrl);
 
-  // 1. Follow redirect if shortened link (like meli.la/..., amzn.to/..., s.shopee.com.br/...)
+  // 1. Follow redirect for shortened links
   if (
     targetUrl.includes('meli.la') ||
     targetUrl.includes('mercadolivre.com/sec/') ||
@@ -319,7 +300,7 @@ async function fetchProductDetails(rawUrl) {
     }
   }
 
-  // 2. Fetch page HTML to extract full metadata
+  // 2. Fetch page HTML
   const pageRes = await fetch(targetUrl, {
     method: 'GET',
     headers: {
@@ -336,10 +317,9 @@ async function fetchProductDetails(rawUrl) {
   let imageUrl = '';
 
   const titleMatch =
+    html.match(/<h1[^>]*class=["'][^"']*(?:ui-pdp-title|poly-component__title)[^"']*["'][^>]*>([^<]+)<\/h1>/i) ||
     html.match(/class=["'][^"']*poly-component__title[^"']*["'][^>]*><a[^>]*>([^<]+)<\/a>/i) ||
     html.match(/class=["'][^"']*poly-component__title[^"']*["'][^>]*>([^<]+)<\//i) ||
-    html.match(/<h2[^>]*class=["'][^"']*poly-box[^"']*["'][^>]*><a[^>]*>([^<]+)<\/a>/i) ||
-    html.match(/<h1[^>]*class=["'][^"']*(?:ui-pdp-title|poly-component__title)[^"']*["'][^>]*>([^<]+)<\/h1>/i) ||
     html.match(/<meta\s+property=["']og:title["']\s+content=["'](.*?)["']/i) ||
     html.match(/<title>(.*?)<\/title>/i);
   if (titleMatch && titleMatch[1]) {
@@ -348,12 +328,12 @@ async function fetchProductDetails(rawUrl) {
 
   const imageMatch =
     html.match(/<meta\s+property=["']og:image["']\s+content=["'](.*?)["']/i) ||
+    html.match(/class=["'][^"']*ui-pdp-image[^"']*["'][\s\S]*?src=["']([^"']+)["']/i) ||
     html.match(/class=["'][^"']*poly-component__picture[^"']*["'][\s\S]*?src=["']([^"']+)["']/i);
   if (imageMatch && imageMatch[1]) {
     imageUrl = imageMatch[1];
   }
 
-  // Fallback for Amazon image
   if (!imageUrl && platform === 'amazon') {
     const amzImgMatch = html.match(/id=["']landingImage["'][\s\S]*?data-old-hires=["']([^"']+)["']/i) ||
                         html.match(/data-a-dynamic-image=["']\{&quot;([^&]+)&quot;/i);
@@ -395,72 +375,49 @@ function detectCategory(title = '', description = '', url = '') {
   const text = `${title} ${description} ${url}`.toLowerCase();
 
   const rules = [
-    // 🛒 Supermercado & Mercearia
     { category: 'confeitaria_sobremesas', keywords: ['chocolate', 'bombom', 'biscoito', 'bolacha', 'doce de leite', 'nutella', 'pasta de amendoim', 'leite condensado', 'creme de leite', 'barra de chocolate', 'cacau', 'granulado', 'cobertura chocolate', 'achocolatado', 'nescau', 'toddy'] },
     { category: 'alimentos_basicos', keywords: ['arroz', 'feijao', 'feijão', 'azeite', 'oleo de soja', 'óleo de soja', 'macarrao', 'macarrão', 'massa', 'farinha de trigo', 'sal refinado', 'açucar', 'acucar', 'feijao preto', 'feijao carioca'] },
     { category: 'molhos_temperos', keywords: ['molho de tomate', 'extrato de tomate', 'tempero', 'molho shoyu', 'maionese', 'ketchup', 'mostarda', 'atum', 'sardinha', 'conserva', 'oregano', 'pimenta', 'curry', 'chimichurri'] },
     { category: 'bebidas_snacks', keywords: ['whisky', 'gin', 'vodka', 'cerveja', 'vinho', 'espumante', 'refrigerante', 'coca cola', 'suco', 'cafe', 'café', 'capsula cafe', 'cha', 'chá', 'snack', 'salgadinho', 'doritos', 'batata frita', 'amendoim', 'energetico', 'energético', 'red bull', 'monster'] },
-
-    // 🎂 Confeitaria & Festas
     { category: 'ingredientes_profissionais', keywords: ['pasta americana', 'corante alimenticio', 'desmoldante', 'essencia', 'emulsificante', 'glucose', 'chantilly', 'cobertura fracionada', 'harald', 'sicao', 'callebaut'] },
     { category: 'formas_utensilios', keywords: ['forma de bolo', 'forma silicone', 'bico de confeitar', 'bailarina bolo', 'espatula bolo', 'espátula bolo', 'cortador bolo', 'assadeira bolo', 'manga de confeitar', 'tapete silicone'] },
     { category: 'embalagens', keywords: ['embalagem', 'embalagens', 'caixa papelao', 'caixa papelão', 'caixa presente', 'caixa bolo', 'caixa doce', 'saco kraft', 'sacola kraft', 'sacola papel', 'saquinho', 'fita adesiva', 'plastico bolha', 'saco plastico', 'descartavel', 'descartável', 'copo descartavel', 'marmita'] },
     { category: 'festas', keywords: ['artigo de festa', 'decoracao festa', 'decoração festa', 'balao', 'balão', 'bexiga', 'topo de bolo', 'vela aniversario', 'vela aniversário', 'painel festa', 'lembrancinha', 'presente', 'kit festa'] },
-
-    // 🛋️ Móveis & Decoração
     { category: 'quarto', keywords: ['guarda roupa', 'cama box', 'colchao', 'colchão', 'cabeceira', 'comoda', 'cômoda', 'mesa de cabeceira', 'criado mudo', 'beliche'] },
     { category: 'sala_estar', keywords: ['sofa', 'sofá', 'poltrona', 'rack tv', 'painel tv', 'mesa de centro', 'tapete sala', 'cortina sala', 'almofada'] },
     { category: 'sala_jantar', keywords: ['mesa de jantar', 'cadeira de jantar', 'conjunto jantar', 'buffet sala', 'aparador', 'banqueta'] },
     { category: 'escritorio_organizacao', keywords: ['cadeira de escritorio', 'cadeira escritório', 'cadeira gamer', 'mesa escritorio', 'mesa escritório', 'escrivaninha', 'estante livros', 'gaveteiro'] },
-
-    // 🏠 Casa & Utilidades
     { category: 'cozinha', keywords: ['air fryer', 'airfryer', 'fritadeira', 'panela', 'panelas', 'frigideira', 'liquidificador', 'batedeira', 'cafeteira', 'nespresso', 'dolce gusto', 'sanduicheira', 'grill', 'mixer', 'processador', 'chaleira', 'faqueiro', 'faca chef', 'prato', 'copo', 'talher', 'balanca cozinha', 'balança digital', 'garrafa termica'] },
     { category: 'cama_mesa_banho', keywords: ['toalha de banho', 'toalha de rosto', 'jogo de toalhas', 'lencol', 'lençol', 'edredom', 'cobertor', 'manta', 'travesseiro', 'fronha', 'cobre leito', 'jogo de cama', 'cortina banheiro', 'tapete banheiro', 'toalha de mesa'] },
     { category: 'organizacao', keywords: ['organizador', 'organizadora', 'pote hermetico', 'potes hermeticos', 'vassoura', 'mop', 'rodo', 'dispenser', 'lixeira', 'cabide', 'varal', 'cesto organizador', 'prateleira', 'caixa organizadora', 'sapateira'] },
     { category: 'decoracao_basica', keywords: ['quadro decorativo', 'espelho', 'vaso decorativo', 'relogio de parede', 'luminaria mesa', 'abajur', 'difusor aroma'] },
-
-    // 📺 Eletros, TV & Climatização
     { category: 'grandes_eletros', keywords: ['geladeira', 'refrigerador', 'fogao', 'fogão', 'cooktop', 'forno de embutir', 'microondas', 'micro-ondas', 'freezer', 'cervejeira', 'adega climatizada'] },
     { category: 'lavagem_secagem', keywords: ['lavadora', 'maquina de lavar', 'máquina de lavar', 'lava e seca', 'secadora de roupas', 'tanquinho'] },
     { category: 'climatizacao', keywords: ['ar condicionado', 'ventilador', 'climatizador', 'aquecedor', 'umidificador'] },
     { category: 'tv_audio_video', keywords: ['smart tv', 'tv 50', 'tv 55', 'tv 65', 'televisao', 'televisão', 'soundbar', 'home theater', 'projetor', 'chromecast', 'fire stick', 'roku', 'tv box'] },
-
-    // ⚡ Tecnologia & Celulares
     { category: 'celulares', keywords: ['smartphone', 'celular', 'iphone', 'xiaomi', 'galaxy', 'motorola', 'redmi', 'poco', 'realme', 'capinha', 'pelicula celular', 'carregador tipo c', 'carregador celular', 'suporte celular', 'ring light'] },
     { category: 'smart_home', keywords: ['alexa', 'echo dot', 'lampada inteligente', 'fechadura digital', 'camera de seguranca', 'sensor inteligente', 'tomada inteligente'] },
     { category: 'informatica', keywords: ['notebook', 'computador', 'computador gamer', 'laptop', 'macbook', 'mouse', 'teclado', 'monitor', 'impressora', 'ssd', 'memoria ram', 'pendrive', 'pen drive', 'roteador', 'placa de video', 'gabinete', 'fonte atx', 'webcam', 'tablet', 'ipad'] },
     { category: 'audio_gadgets', keywords: ['fone de ouvido', 'fone bluetooth', 'headphone', 'airpod', 'caixa de som', 'jbl', 'microfone', 'power bank', 'carregador portatil', 'smartband', 'drone'] },
-
-    // 🎮 Games & Geek
     { category: 'consoles', keywords: ['playstation', 'ps5', 'ps4', 'xbox series', 'xbox one', 'nintendo switch', 'console'] },
     { category: 'jogos_midias', keywords: ['jogos ps5', 'jogos ps4', 'jogos switch', 'jogos xbox', 'midia fisica', 'game pass'] },
     { category: 'controles_acessorios_gamer', keywords: ['controle ps5', 'controle xbox', 'gamepad', 'joystick', 'headset gamer', 'volante gamer', 'teclado mecanico', 'mouse gamer', 'mousepad gamer'] },
     { category: 'colecionaveis_geek', keywords: ['action figure', 'funko pop', 'boneco colecionavel', 'estatua anime', 'colecionavel', 'cosplay'] },
-
-    // 🛠️ Ferramentas, Auto & Pet
     { category: 'ferramentas', keywords: ['furadeira', 'parafusadeira', 'martelete', 'martelo', 'chave de fenda', 'chave phillips', 'trena', 'serra eletrica', 'serra circular', 'esmerilhadeira', 'ferramenta', 'jogo de ferramentas'] },
     { category: 'construcao_eletrica', keywords: ['torneira', 'chuveiro', 'tomada', 'extensao eletrica', 'lampada led', 'tinta parede', 'fio eletrico', 'disjuntor', 'cano pvc'] },
     { category: 'automotivo', keywords: ['automotivo', 'carro', 'moto', 'motocicleta', 'pneu', 'capacete', 'farol', 'oleo motor', 'óleo motor', 'som automotivo', 'camera de re', 'capa automotiva', 'cera automotiva', 'lavagem automotiva', 'vonixx', 'pretinho'] },
     { category: 'petshop', keywords: ['racao', 'ração', 'cachorro', 'gato', 'pet', 'coleira', 'guia cachorro', 'arranhador', 'caminha pet', 'cama pet', 'petisco', 'comedouro', 'bebedouro pet', 'areia gato', 'tapete higienico', 'shampoo pet'] },
-
-    // 👗 Moda & Acessórios
     { category: 'roupas', keywords: ['camisa', 'camiseta', 'calca', 'calça', 'vestido', 'saia', 'bermuda', 'short', 'jaqueta', 'moletom', 'casaco', 'biquini', 'biquíni', 'lingerie', 'meia', 'cueca', 'sutia'] },
     { category: 'calcados', keywords: ['tenis', 'tênis', 'sapato', 'sandalia', 'sandália', 'bota', 'chinelo', 'havaianas', 'chuteira', 'rasteirinha'] },
     { category: 'bolsas_malas', keywords: ['bolsa', 'mochila', 'mala de viagem', 'mochila escolar', 'carteira', 'necessaire', 'pochete', 'pasta notebook'] },
     { category: 'relogios_oculos', keywords: ['relogio', 'relógio', 'smartwatch', 'oculos de sol', 'óculos de sol', 'armacao oculos', 'joia', 'jóia', 'semijoia', 'brinco', 'colar', 'pulseira'] },
-
-    // 💄 Beleza & Cuidados Pessoais
     { category: 'cabelos', keywords: ['shampoo', 'condicionador', 'mascara capilar', 'oleo capilar', 'secador de cabelo', 'chapinha', 'modelador de cachos', 'escova secadora', 'tonico capilar'] },
     { category: 'pele_rosto', keywords: ['skincare', 'serum facial', 'sérum', 'protetor solar', 'hidratante facial', 'gel de limpeza facial', 'agua micelar', 'vitamina c facial', 'antirrugas'] },
     { category: 'maquiagem_unhas', keywords: ['maquiagem', 'batom', 'base facial', 'rimel', 'rímel', 'delineador', 'paleta de sombras', 'esmalte', 'unha postica', 'cabine led unha'] },
     { category: 'perfumaria_higiene', keywords: ['perfume', 'colonia', 'colônia', 'eau de parfum', 'desodorante', 'sabonete', 'escova de dentes', 'fio dental', 'hidratante corporal'] },
-
-    // 💊 Saúde & Bem-Estar
     { category: 'suplementos', keywords: ['whey', 'creatina', 'suplemento', 'bcaa', 'glutamina', 'pre treino', 'pré treino', 'termogenico', 'vitamina', 'omega 3', 'colageno', 'hipercalorico', 'barra de proteina'] },
     { category: 'treino_funcional', keywords: ['haltere', 'colchonete', 'elastico treino', 'kettlebell', 'corda de pular', 'caneleira', 'barra fixa', 'faixa elastica', 'luva academia', 'tapete yoga', 'roda abdominal'] },
     { category: 'monitoramento_saude', keywords: ['medidor de pressao', 'termometro', 'inalador', 'nebulizador', 'oximetro', 'glicosimetro', 'massageador', 'balanca corporal', 'balança digital bioimpedancia', 'joelheira', 'corretor postural'] },
-
-    // 🧸 Brinquedos & Papelaria
     { category: 'brinquedos_pedagogicos', keywords: ['brinquedo', 'brinquedos', 'boneca', 'boneco', 'carrinho', 'lego', 'pelucia', 'pelúcia', 'nerf', 'patinete', 'barbie', 'hot wheels', 'massinha', 'slime', 'bebe', 'bebê', 'fralda', 'pampers', 'huggies', 'mamadeira', 'chupeta', 'carrinho de bebe', 'mordedor'] },
     { category: 'jogos_tabuleiro', keywords: ['jogo de tabuleiro', 'quebra cabeca', 'quebra-cabeça', 'domino', 'baralho', 'xadrez', 'war', 'banco imobiliario'] },
     { category: 'papelaria_escolar', keywords: ['livro', 'gibi', 'manga', 'mangá', 'quadrinhos', 'caderno', 'caneta', 'lapis de cor', 'estojo', 'papelaria', 'planner', 'agenda', 'marca texto', 'resma papel', 'tinta guache'] },
@@ -495,7 +452,7 @@ export default async function handler(req, res) {
   try {
     const action = req.query.action || req.body?.action || '';
 
-    // Action 1: Auto-fetch product details
+    // Action 1: Auto-fetch single product details with high precision
     if (action === 'fetch' || (req.query.url && !req.query.items && !req.body?.items)) {
       const targetUrl = req.query.url || req.body?.url;
       if (!targetUrl) {
@@ -505,7 +462,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ success: true, data });
     }
 
-    // Action 2: Health check
+    // Action 2: Batch health & price check
     let itemsToCheck = [];
     if (req.method === 'POST') {
       const body = req.body || {};
@@ -584,10 +541,8 @@ export default async function handler(req, res) {
 
           let pageTitle = '';
           const titleMatch =
-            text.match(/class=["'][^"']*poly-component__title[^"']*["'][^>]*><a[^>]*>([^<]+)<\/a>/i) ||
-            text.match(/class=["'][^"']*poly-component__title[^"']*["'][^>]*>([^<]+)<\//i) ||
-            text.match(/<h2[^>]*class=["'][^"']*poly-box[^"']*["'][^>]*><a[^>]*>([^<]+)<\/a>/i) ||
             text.match(/<h1[^>]*class=["'][^"']*(?:ui-pdp-title|poly-component__title)[^"']*["'][^>]*>([^<]+)<\/h1>/i) ||
+            text.match(/class=["'][^"']*poly-component__title[^"']*["'][^>]*><a[^>]*>([^<]+)<\/a>/i) ||
             text.match(/<meta\s+property=["']og:title["']\s+content=["'](.*?)["']/i) ||
             text.match(/<title>(.*?)<\/title>/i);
           if (titleMatch && titleMatch[1]) {

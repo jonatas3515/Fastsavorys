@@ -647,6 +647,7 @@ window.AffiliatesModule = (function () {
   }
 
   let lastHealthCheckResults = [];
+  let currentHealthFilterTab = 'all';
 
   async function checkAllLinksHealth() {
     const itemsToCheck = getFilteredProducts();
@@ -674,11 +675,6 @@ window.AffiliatesModule = (function () {
     try {
       const chunkSize = 25;
       let allResults = [];
-      let okCount = 0;
-      let pausedCount = 0;
-      let errorCount = 0;
-      let priceChangedCount = 0;
-      let pausedToDeactivateCount = 0;
 
       for (let i = 0; i < itemsToCheck.length; i += chunkSize) {
         const chunk = itemsToCheck.slice(i, i + chunkSize);
@@ -701,108 +697,11 @@ window.AffiliatesModule = (function () {
       }
 
       lastHealthCheckResults = allResults;
-
-      const itemsHtml = allResults.map(res => {
-        const prod = itemsToCheck.find(p => p.id == res.id) || 
-                     productsList.find(p => p.id == res.id) || 
-                     { title: res.title || 'Produto', image_url: '../assets/img/fast-logo.png', price_display: '' };
-        
-        let statusBadge = `<span class="px-2.5 py-1 text-xs font-bold rounded-full bg-green-100 text-green-800 flex items-center gap-1">🟢 Online no ML</span>`;
-        if (res.status === 'paused') {
-          pausedCount++;
-          if (prod.is_active !== false) pausedToDeactivateCount++;
-          statusBadge = `<span class="px-2.5 py-1 text-xs font-bold rounded-full bg-red-100 text-red-800 flex items-center gap-1">🔴 Pausado no ML</span>`;
-        } else if (res.status === 'error' || res.status === 'timeout' || res.status === 'warning') {
-          errorCount++;
-          statusBadge = `<span class="px-2.5 py-1 text-xs font-bold rounded-full bg-amber-100 text-amber-800 flex items-center gap-1">⚠️ Instável</span>`;
-        } else {
-          okCount++;
-        }
-
-        // Price comparison
-        const livePriceNum = parsePrice(res.price);
-        const storedPriceNum = parsePrice(prod.price_display);
-        const hasPriceDiff = livePriceNum > 0 && storedPriceNum > 0 && Math.abs(livePriceNum - storedPriceNum) >= 0.01;
-
-        let priceDiffHtml = '';
-        if (hasPriceDiff) {
-          priceChangedCount++;
-          const isLower = livePriceNum < storedPriceNum;
-          priceDiffHtml = `
-            <div class="mt-2 p-2.5 ${isLower ? 'bg-emerald-50 border-emerald-200 text-emerald-950' : 'bg-amber-50 border-amber-200 text-amber-950'} border rounded-xl flex flex-wrap items-center justify-between gap-2 text-xs">
-              <div class="font-medium flex items-center gap-1.5 flex-wrap">
-                <span>${isLower ? '📉' : '📈'}</span>
-                <span>Preço no ML:</span>
-                <span class="line-through text-gray-500">${escapeHtml(prod.price_display)}</span>
-                <span>➔</span>
-                <strong class="text-sm font-black ${isLower ? 'text-emerald-700' : 'text-amber-800'}">${escapeHtml(res.price)}</strong>
-              </div>
-              <button id="sync-price-btn-${prod.id}" onclick="AffiliatesModule.syncProductPrice(${prod.id}, '${escapeHtml(res.price)}', '${escapeHtml(res.original_price || '')}', this)" 
-                      class="px-2.5 py-1 ${isLower ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-amber-600 hover:bg-amber-700'} text-white font-bold rounded-lg shadow-sm transition text-xs flex items-center gap-1 active:scale-95">
-                🔄 Atualizar no Site
-              </button>
-            </div>
-          `;
-        }
-
-        // Action button for active/paused status
-        let actionBtn = '';
-        if (res.status === 'paused') {
-          if (prod.is_active !== false) {
-            actionBtn = `<button id="pause-btn-${prod.id}" onclick="AffiliatesModule.toggleProductActive(${prod.id}, false, this)" class="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg shadow-sm transition active:scale-95">Pausar no Site</button>`;
-          } else {
-            actionBtn = `<span class="px-2.5 py-1 bg-gray-100 text-gray-500 text-xs font-bold rounded-lg border border-gray-200">⏸️ Já Pausado</span>`;
-          }
-        } else if (res.status === 'active' && prod.is_active === false) {
-          actionBtn = `<button id="pause-btn-${prod.id}" onclick="AffiliatesModule.toggleProductActive(${prod.id}, true, this)" class="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-bold rounded-lg shadow-sm transition active:scale-95">Reativar no Site</button>`;
-        }
-
-        return `
-          <div class="p-3.5 bg-white border border-gray-100 hover:border-gray-200 rounded-2xl shadow-sm transition">
-            <div class="flex items-center justify-between gap-3">
-              <div class="flex items-center gap-3 min-w-0">
-                <img src="${escapeHtml(prod.image_url)}" alt="" class="w-11 h-11 object-contain rounded-xl bg-gray-50 border p-0.5 flex-shrink-0" onerror="this.src='../assets/img/fast-logo.png'" />
-                <div class="min-w-0">
-                  <div class="font-bold text-sm text-gray-900 truncate">${escapeHtml(prod.title || res.title)}</div>
-                  <div class="text-xs text-gray-500 truncate flex items-center gap-2 mt-0.5">
-                    <span>${escapeHtml(res.statusText || res.url)}</span>
-                    ${prod.price_display && !hasPriceDiff ? `<span class="text-gray-400">• Preço atual: <strong>${escapeHtml(prod.price_display)}</strong></span>` : ''}
-                  </div>
-                </div>
-              </div>
-              <div class="flex items-center gap-2 flex-shrink-0">
-                ${statusBadge}
-                ${actionBtn}
-                <a href="${escapeHtml(res.url)}" target="_blank" rel="noopener noreferrer" class="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg text-xs" title="Abrir link no Mercado Livre">🔗</a>
-              </div>
-            </div>
-            ${priceDiffHtml}
-          </div>
-        `;
-      }).join('');
-
-      let batchActionsHeader = '';
-      if (pausedToDeactivateCount > 0 || priceChangedCount > 0) {
-        batchActionsHeader = `
-          <div class="p-3 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-2xl flex flex-wrap items-center justify-between gap-2.5 mb-3 shadow-xs">
-            <div class="text-xs text-amber-950 font-medium">
-              ⚡ <strong>Ações Rápidas em Massa:</strong>
-              ${pausedToDeactivateCount > 0 ? `<span class="ml-1 font-bold text-red-700">• ${pausedToDeactivateCount} pausados no ML</span>` : ''}
-              ${priceChangedCount > 0 ? `<span class="ml-1 font-bold text-amber-800">• ${priceChangedCount} com preço alterado</span>` : ''}
-            </div>
-            <div class="flex items-center gap-2 flex-wrap">
-              ${pausedToDeactivateCount > 0 ? `<button onclick="AffiliatesModule.pauseAllInactiveProducts(this)" class="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-extrabold rounded-xl shadow-sm transition active:scale-95">⏸️ Pausar Todos (${pausedToDeactivateCount})</button>` : ''}
-              ${priceChangedCount > 0 ? `<button onclick="AffiliatesModule.syncAllChangedPrices(this)" class="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-extrabold rounded-xl shadow-sm transition active:scale-95">🔄 Atualizar Todos os Preços (${priceChangedCount})</button>` : ''}
-            </div>
-          </div>
-        `;
-      }
-
-      resultsContainer.innerHTML = batchActionsHeader + itemsHtml;
+      currentHealthFilterTab = 'all';
+      renderHealthCheckView();
 
       if (progress) progress.classList.add('hidden');
       if (resultsContainer) resultsContainer.classList.remove('hidden');
-      if (summary) summary.textContent = `Resultado: ${okCount} online, ${pausedCount} pausados no ML, ${priceChangedCount} com preço diferente (${itemsToCheck.length} verificados).`;
 
     } catch (err) {
       console.error('[HealthCheck] Erro:', err);
@@ -811,6 +710,190 @@ window.AffiliatesModule = (function () {
         resultsContainer.classList.remove('hidden');
         resultsContainer.innerHTML = `<div class="p-4 bg-red-50 text-red-700 rounded-xl text-center text-sm font-medium">Erro ao verificar links: ${escapeHtml(err.message)}</div>`;
       }
+    }
+  }
+
+  function setHealthFilterTab(tab) {
+    currentHealthFilterTab = tab;
+    renderHealthCheckView();
+  }
+
+  function renderHealthCheckView() {
+    const resultsContainer = document.getElementById('healthCheckerResults');
+    const summary = document.getElementById('healthCheckerSummary');
+    if (!resultsContainer || !lastHealthCheckResults) return;
+
+    let okCount = 0;
+    let pausedCount = 0;
+    let errorCount = 0;
+    let priceDropCount = 0;
+    let priceIncreaseCount = 0;
+    let pausedToDeactivateCount = 0;
+
+    const enrichedResults = lastHealthCheckResults.map(res => {
+      const prod = productsList.find(p => p.id == res.id) || 
+                   { title: res.title || 'Produto', image_url: '../assets/img/fast-logo.png', price_display: '' };
+      
+      const livePriceNum = parsePrice(res.price);
+      const storedPriceNum = parsePrice(prod.price_display);
+      const hasPriceDiff = livePriceNum > 0 && storedPriceNum > 0 && Math.abs(livePriceNum - storedPriceNum) >= 0.01;
+      const isDrop = hasPriceDiff && livePriceNum < storedPriceNum;
+      const isIncrease = hasPriceDiff && livePriceNum > storedPriceNum;
+
+      if (res.status === 'paused') {
+        pausedCount++;
+        if (prod.is_active !== false) pausedToDeactivateCount++;
+      } else if (res.status === 'error' || res.status === 'timeout' || res.status === 'warning') {
+        errorCount++;
+      } else {
+        okCount++;
+      }
+
+      if (isDrop) priceDropCount++;
+      if (isIncrease) priceIncreaseCount++;
+
+      return {
+        ...res,
+        prod,
+        livePriceNum,
+        storedPriceNum,
+        hasPriceDiff,
+        isDrop,
+        isIncrease
+      };
+    });
+
+    // Filter items based on current tab
+    const filteredResults = enrichedResults.filter(item => {
+      if (currentHealthFilterTab === 'drops') return item.isDrop;
+      if (currentHealthFilterTab === 'increases') return item.isIncrease;
+      if (currentHealthFilterTab === 'paused') return item.status === 'paused';
+      return true; // 'all'
+    });
+
+    const itemsHtml = filteredResults.map(item => {
+      const prod = item.prod;
+      let statusBadge = `<span class="px-2.5 py-1 text-xs font-bold rounded-full bg-green-100 text-green-800 flex items-center gap-1">🟢 Online</span>`;
+      if (item.status === 'paused') {
+        statusBadge = `<span class="px-2.5 py-1 text-xs font-bold rounded-full bg-red-100 text-red-800 flex items-center gap-1">🔴 Pausado no ML</span>`;
+      } else if (item.status === 'error' || item.status === 'timeout' || item.status === 'warning') {
+        statusBadge = `<span class="px-2.5 py-1 text-xs font-bold rounded-full bg-amber-100 text-amber-800 flex items-center gap-1">⚠️ Instável</span>`;
+      }
+
+      let priceDiffHtml = '';
+      if (item.hasPriceDiff) {
+        const isLower = item.isDrop;
+        priceDiffHtml = `
+          <div class="mt-2 p-2.5 ${isLower ? 'bg-emerald-50 border-emerald-200 text-emerald-950' : 'bg-amber-50 border-amber-200 text-amber-950'} border rounded-xl flex flex-wrap items-center justify-between gap-2 text-xs">
+            <div class="font-medium flex items-center gap-1.5 flex-wrap">
+              <span>${isLower ? '📉' : '📈'}</span>
+              <span>Preço no ML:</span>
+              <span class="line-through text-gray-500">${escapeHtml(prod.price_display)}</span>
+              <span>➔</span>
+              <strong class="text-sm font-black ${isLower ? 'text-emerald-700' : 'text-amber-800'}">${escapeHtml(item.price)}</strong>
+              ${isLower ? '<span class="bg-emerald-600 text-white font-extrabold px-1.5 py-0.5 rounded text-[10px]">Baixou! 🔥</span>' : '<span class="bg-amber-600 text-white font-extrabold px-1.5 py-0.5 rounded text-[10px]">Aumentou ⚠️</span>'}
+            </div>
+            <button id="sync-price-btn-${prod.id}" onclick="AffiliatesModule.syncProductPrice(${prod.id}, '${escapeHtml(item.price)}', '${escapeHtml(item.original_price || '')}', this)" 
+                    class="px-2.5 py-1 ${isLower ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-amber-600 hover:bg-amber-700'} text-white font-bold rounded-lg shadow-sm transition text-xs flex items-center gap-1 active:scale-95">
+              🔄 Atualizar no Site
+            </button>
+          </div>
+        `;
+      }
+
+      let actionBtn = '';
+      if (item.status === 'paused') {
+        if (prod.is_active !== false) {
+          actionBtn = `<button id="pause-btn-${prod.id}" onclick="AffiliatesModule.toggleProductActive(${prod.id}, false, this)" class="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg shadow-sm transition active:scale-95">Pausar no Site</button>`;
+        } else {
+          actionBtn = `<span class="px-2.5 py-1 bg-gray-100 text-gray-500 text-xs font-bold rounded-lg border border-gray-200">⏸️ Já Pausado</span>`;
+        }
+      } else if (item.status === 'active' && prod.is_active === false) {
+        actionBtn = `<button id="pause-btn-${prod.id}" onclick="AffiliatesModule.toggleProductActive(${prod.id}, true, this)" class="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-bold rounded-lg shadow-sm transition active:scale-95">Reativar no Site</button>`;
+      }
+
+      return `
+        <div class="p-3.5 bg-white border border-gray-100 hover:border-gray-200 rounded-2xl shadow-sm transition">
+          <div class="flex items-center justify-between gap-3">
+            <div class="flex items-center gap-3 min-w-0">
+              <img src="${escapeHtml(prod.image_url)}" alt="" class="w-11 h-11 object-contain rounded-xl bg-gray-50 border p-0.5 flex-shrink-0" onerror="this.src='../assets/img/fast-logo.png'" />
+              <div class="min-w-0">
+                <div class="font-bold text-sm text-gray-900 truncate">${escapeHtml(prod.title || item.title)}</div>
+                <div class="text-xs text-gray-500 truncate flex items-center gap-2 mt-0.5">
+                  <span>${escapeHtml(item.statusText || item.url)}</span>
+                  ${prod.price_display && !item.hasPriceDiff ? `<span class="text-gray-400">• Preço atual: <strong>${escapeHtml(prod.price_display)}</strong></span>` : ''}
+                </div>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 flex-shrink-0">
+              ${statusBadge}
+              ${actionBtn}
+              <a href="${escapeHtml(item.url)}" target="_blank" rel="noopener noreferrer" class="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg text-xs" title="Abrir link original">🔗</a>
+            </div>
+          </div>
+          ${priceDiffHtml}
+        </div>
+      `;
+    }).join('');
+
+    // TWO SEPARATE ACTION BUTTONS HEADER: ONE FOR DROPS AND ONE FOR INCREASES
+    const batchActionsHeader = `
+      <div class="space-y-3 mb-4">
+        <!-- Action Buttons Bar -->
+        <div class="p-3.5 bg-gradient-to-r from-gray-50 to-amber-50/50 border border-gray-200 rounded-2xl shadow-xs">
+          <div class="flex flex-wrap items-center justify-between gap-2.5">
+            <div class="text-xs text-gray-800 font-bold flex items-center gap-2">
+              <span>⚡ Sincronização Inteligente de Preços:</span>
+            </div>
+            <div class="flex items-center gap-2 flex-wrap">
+              ${priceDropCount > 0 ? `
+                <button onclick="AffiliatesModule.syncAllPriceDrops(this)" 
+                        class="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-xl shadow-sm transition active:scale-95 flex items-center gap-1.5">
+                  <span>📉</span> Atualizar Preços que Baixaram (${priceDropCount})
+                </button>
+              ` : ''}
+              ${priceIncreaseCount > 0 ? `
+                <button onclick="AffiliatesModule.syncAllPriceIncreases(this)" 
+                        class="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-black rounded-xl shadow-sm transition active:scale-95 flex items-center gap-1.5">
+                  <span>📈</span> Atualizar Preços que Aumentaram (${priceIncreaseCount})
+                </button>
+              ` : ''}
+              ${pausedToDeactivateCount > 0 ? `
+                <button onclick="AffiliatesModule.pauseAllInactiveProducts(this)" 
+                        class="px-3.5 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-black rounded-xl shadow-sm transition active:scale-95 flex items-center gap-1.5">
+                  <span>⏸️</span> Pausar Todos Inativos (${pausedToDeactivateCount})
+                </button>
+              ` : ''}
+            </div>
+          </div>
+        </div>
+
+        <!-- Filter Tabs -->
+        <div class="flex items-center gap-1.5 border-b pb-2 overflow-x-auto text-xs">
+          <button onclick="AffiliatesModule.setHealthFilterTab('all')" 
+                  class="px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1 ${currentHealthFilterTab === 'all' ? 'bg-gray-900 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}">
+            Todos (${enrichedResults.length})
+          </button>
+          <button onclick="AffiliatesModule.setHealthFilterTab('drops')" 
+                  class="px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1 ${currentHealthFilterTab === 'drops' ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200'}">
+            📉 Preços que Baixaram (${priceDropCount})
+          </button>
+          <button onclick="AffiliatesModule.setHealthFilterTab('increases')" 
+                  class="px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1 ${currentHealthFilterTab === 'increases' ? 'bg-amber-600 text-white' : 'bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200'}">
+            📈 Preços que Aumentaram (${priceIncreaseCount})
+          </button>
+          <button onclick="AffiliatesModule.setHealthFilterTab('paused')" 
+                  class="px-3 py-1.5 rounded-lg font-bold transition flex items-center gap-1 ${currentHealthFilterTab === 'paused' ? 'bg-red-600 text-white' : 'bg-red-50 text-red-800 hover:bg-red-100 border border-red-200'}">
+            ⏸️ Pausados (${pausedCount})
+          </button>
+        </div>
+      </div>
+    `;
+
+    resultsContainer.innerHTML = batchActionsHeader + (itemsHtml || '<div class="p-6 text-center text-gray-400 text-xs">Nenhum item nesta visualização.</div>');
+
+    if (summary) {
+      summary.textContent = `Resultado: ${okCount} online, ${pausedCount} pausados, ${priceDropCount} que baixaram, ${priceIncreaseCount} que aumentaram (${enrichedResults.length} verificados).`;
     }
   }
 
@@ -957,20 +1040,12 @@ window.AffiliatesModule = (function () {
 
       renderTable();
 
-      // Update individual buttons inside health checker
-      ids.forEach(id => {
-        const itemBtn = document.getElementById(`pause-btn-${id}`);
-        if (itemBtn) {
-          itemBtn.className = 'px-2.5 py-1 bg-gray-100 text-gray-600 text-xs font-bold rounded-lg border border-gray-200 cursor-default';
-          itemBtn.innerHTML = '⏸️ Pausado no Site';
-          itemBtn.disabled = true;
-        }
-      });
-
       if (btnElement) {
         btnElement.className = 'px-3 py-1.5 bg-gray-200 text-gray-700 text-xs font-bold rounded-lg cursor-default';
-        btnElement.innerHTML = `✅ ${ids.length} Pausados no Site!`;
+        btnElement.innerHTML = `✅ ${ids.length} Pausados!`;
       }
+
+      renderHealthCheckView();
 
       if (window.showToast) {
         window.showToast(`${ids.length} produtos foram pausados no site!`, 'success');
@@ -985,7 +1060,7 @@ window.AffiliatesModule = (function () {
     }
   }
 
-  async function syncAllChangedPrices(btnElement = null) {
+  async function syncAllPriceDrops(btnElement = null) {
     if (!lastHealthCheckResults || lastHealthCheckResults.length === 0) return;
 
     const itemsToUpdate = [];
@@ -995,7 +1070,7 @@ window.AffiliatesModule = (function () {
       if (!prod) return;
       const liveNumeric = parsePrice(res.price);
       const currentNumeric = parsePrice(prod.price_display);
-      if (liveNumeric > 0 && currentNumeric > 0 && Math.abs(liveNumeric - currentNumeric) >= 0.01) {
+      if (liveNumeric > 0 && currentNumeric > 0 && liveNumeric < currentNumeric) {
         itemsToUpdate.push({
           id: prod.id,
           newPrice: res.price,
@@ -1005,18 +1080,18 @@ window.AffiliatesModule = (function () {
     });
 
     if (itemsToUpdate.length === 0) {
-      alert('Nenhuma alteração de preço para sincronizar.');
+      alert('Nenhum produto com preço que baixou para sincronizar.');
       return;
     }
 
-    if (!confirm(`Deseja sincronizar os preços de todos os ${itemsToUpdate.length} produtos com a loja parceira?`)) {
+    if (!confirm(`Deseja sincronizar os ${itemsToUpdate.length} produtos que BAIXARAM de preço?`)) {
       return;
     }
 
     try {
       if (btnElement) {
         btnElement.disabled = true;
-        btnElement.textContent = 'Atualizando preços...';
+        btnElement.textContent = 'Atualizando baixas...';
       }
 
       for (const item of itemsToUpdate) {
@@ -1043,33 +1118,112 @@ window.AffiliatesModule = (function () {
         if (prod) {
           Object.assign(prod, updatePayload);
         }
-
-        const itemBtn = document.getElementById(`sync-price-btn-${item.id}`);
-        if (itemBtn) {
-          itemBtn.className = 'px-2.5 py-1 bg-emerald-100 text-emerald-800 text-xs font-bold rounded-lg border border-emerald-200 cursor-default';
-          itemBtn.innerHTML = '✅ Preço Atualizado!';
-          itemBtn.disabled = true;
-        }
       }
 
       renderTable();
+      renderHealthCheckView();
 
       if (btnElement) {
         btnElement.className = 'px-3 py-1.5 bg-emerald-200 text-emerald-900 text-xs font-bold rounded-lg cursor-default';
-        btnElement.innerHTML = `✅ ${itemsToUpdate.length} Preços Atualizados!`;
+        btnElement.innerHTML = `✅ ${itemsToUpdate.length} Preços Baixados Atualizados!`;
       }
 
       if (window.showToast) {
-        window.showToast(`${itemsToUpdate.length} preços atualizados com sucesso!`, 'success');
+        window.showToast(`${itemsToUpdate.length} produtos atualizados com preços promocionais!`, 'success');
       }
     } catch (e) {
-      console.error('[SyncAllPrices] Erro:', e);
+      console.error('[SyncPriceDrops] Erro:', e);
       if (btnElement) {
         btnElement.disabled = false;
         btnElement.textContent = 'Tentar novamente';
       }
       alert('Erro ao sincronizar preços: ' + (e.message || e));
     }
+  }
+
+  async function syncAllPriceIncreases(btnElement = null) {
+    if (!lastHealthCheckResults || lastHealthCheckResults.length === 0) return;
+
+    const itemsToUpdate = [];
+    lastHealthCheckResults.forEach(res => {
+      if (!res.price) return;
+      const prod = productsList.find(p => p.id == res.id);
+      if (!prod) return;
+      const liveNumeric = parsePrice(res.price);
+      const currentNumeric = parsePrice(prod.price_display);
+      if (liveNumeric > 0 && currentNumeric > 0 && liveNumeric > currentNumeric) {
+        itemsToUpdate.push({
+          id: prod.id,
+          newPrice: res.price,
+          newOrigPrice: res.original_price || prod.original_price || ''
+        });
+      }
+    });
+
+    if (itemsToUpdate.length === 0) {
+      alert('Nenhum produto com preço que aumentou para sincronizar.');
+      return;
+    }
+
+    if (!confirm(`Deseja sincronizar os ${itemsToUpdate.length} produtos que AUMENTARAM de preço?`)) {
+      return;
+    }
+
+    try {
+      if (btnElement) {
+        btnElement.disabled = true;
+        btnElement.textContent = 'Atualizando aumentos...';
+      }
+
+      for (const item of itemsToUpdate) {
+        const prod = productsList.find(p => p.id == item.id);
+        const discountPct = calcDiscountPercent(item.newOrigPrice, item.newPrice);
+        const updatePayload = {
+          price_display: item.newPrice,
+          updated_at: new Date().toISOString()
+        };
+        if (item.newOrigPrice) {
+          updatePayload.original_price = item.newOrigPrice;
+        }
+        if (discountPct > 0) {
+          updatePayload.discount_tag = `${discountPct}% OFF`;
+        }
+
+        if (window.supabaseClient) {
+          await window.supabaseClient
+            .from('fast_affiliate_products')
+            .update(updatePayload)
+            .eq('id', item.id);
+        }
+
+        if (prod) {
+          Object.assign(prod, updatePayload);
+        }
+      }
+
+      renderTable();
+      renderHealthCheckView();
+
+      if (btnElement) {
+        btnElement.className = 'px-3 py-1.5 bg-amber-200 text-amber-900 text-xs font-bold rounded-lg cursor-default';
+        btnElement.innerHTML = `✅ ${itemsToUpdate.length} Preços Aumentados Atualizados!`;
+      }
+
+      if (window.showToast) {
+        window.showToast(`${itemsToUpdate.length} produtos atualizados com os novos preços!`, 'success');
+      }
+    } catch (e) {
+      console.error('[SyncPriceIncreases] Erro:', e);
+      if (btnElement) {
+        btnElement.disabled = false;
+        btnElement.textContent = 'Tentar novamente';
+      }
+      alert('Erro ao sincronizar preços: ' + (e.message || e));
+    }
+  }
+
+  async function syncAllChangedPrices(btnElement = null) {
+    await syncAllPriceDrops(btnElement);
   }
 
   function escapeHtml(str) {
@@ -1589,9 +1743,12 @@ window.AffiliatesModule = (function () {
     clearFilters,
     checkAllLinksHealth,
     closeHealthModal,
+    setHealthFilterTab,
     toggleProductActive,
     syncProductPrice,
     pauseAllInactiveProducts,
+    syncAllPriceDrops,
+    syncAllPriceIncreases,
     syncAllChangedPrices,
     fetchProductDataFromML,
     insertBullet,
