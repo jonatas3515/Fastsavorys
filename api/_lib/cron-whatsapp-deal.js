@@ -130,27 +130,30 @@ async function handleSendWhatsAppDeal(req, res) {
     let mediaUrl = null;
 
     if (targetType === 'fastsavorys') {
-      // 1. Busca produto do cardápio FastSavory's
-      let { data: storeProducts, error: storeErr } = await supabaseAdmin
+      // 1. Busca produtos do cardápio FastSavory's
+      const { data: storeProducts, error: storeErr } = await supabaseAdmin
         .from('fast_products')
-        .select('*')
-        .order('last_posted_at', { ascending: true, nullsFirst: true })
-        .order('id', { ascending: true })
-        .limit(1);
-
-      if (storeErr) {
-        // Fallback caso a coluna last_posted_at ainda não tenha sido criada em fast_products
-        const fallbackQuery = await supabaseAdmin
-          .from('fast_products')
-          .select('*')
-          .order('id', { ascending: true })
-          .limit(1);
-        storeProducts = fallbackQuery.data;
-        storeErr = fallbackQuery.error;
-      }
+        .select('*');
 
       if (!storeErr && storeProducts && storeProducts.length > 0) {
-        product = storeProducts[0];
+        // Filtra itens principais do cardápio (exclui sachês, taxas ou descartáveis)
+        const validStoreProducts = storeProducts.filter(p => {
+          const name = (p.name || '').toLowerCase();
+          if (name.includes('sache') || name.includes('sachê') || name.includes('taxa') || name.includes('copo') || name.includes('guardanapo')) return false;
+          const price = typeof p.price === 'number' ? p.price : parseFloat(p.price);
+          return p.active !== false && !isNaN(price) && price > 0;
+        });
+
+        const pool = validStoreProducts.length > 0 ? validStoreProducts : storeProducts;
+        // Rotação inteligente por dia e hora para nunca repetir o mesmo salgado em horários seguidos
+        const now = new Date();
+        const daySeed = now.getDate();
+        const monthSeed = now.getMonth() + 1;
+        const hourIndex = [11, 13, 15, 17].indexOf(brtHours);
+        const slotIdx = hourIndex >= 0 ? hourIndex : (brtHours % 4);
+        const selectedIndex = (daySeed * 3 + monthSeed * 5 + slotIdx) % pool.length;
+
+        product = pool[selectedIndex];
         isFastSavorysStore = true;
         messageCaption = buildFastSavorysProductText(product);
         mediaUrl = product.image || product.image_url;

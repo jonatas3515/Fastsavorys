@@ -1,36 +1,8 @@
 name: Disparo Automático de Ofertas no WhatsApp (FastSavory's)
 
 on:
-  schedule:
-    # 13 Disparos Diários (08:00 às 20:00 BRT / UTC-3 -> 11:00 às 23:00 UTC)
-    # 08:00 BRT -> 11:00 UTC (Achadinhos)
-    # 09:00 BRT -> 12:00 UTC (Achadinhos)
-    # 10:00 BRT -> 13:00 UTC (Achadinhos)
-    # 11:00 BRT -> 14:00 UTC (🥟 FastSavory's - Salgados / Almoço)
-    # 12:00 BRT -> 15:00 UTC (Achadinhos)
-    # 13:00 BRT -> 16:00 UTC (🥟 FastSavory's - Salgados / Almoço Tarde)
-    # 14:00 BRT -> 17:00 UTC (Achadinhos)
-    # 15:00 BRT -> 18:00 UTC (🥟 FastSavory's - Salgados / Lanche)
-    # 16:00 BRT -> 19:00 UTC (Achadinhos)
-    # 17:00 BRT -> 20:00 UTC (🥟 FastSavory's - Salgados / Jantar / Festas)
-    # 18:00 BRT -> 21:00 UTC (Achadinhos)
-    # 19:00 BRT -> 22:00 UTC (Achadinhos)
-    # 20:00 BRT -> 23:00 UTC (Achadinhos)
-    - cron: '0 11 * * *'
-    - cron: '0 12 * * *'
-    - cron: '0 13 * * *'
-    - cron: '0 14 * * *'
-    - cron: '0 15 * * *'
-    - cron: '0 16 * * *'
-    - cron: '0 17 * * *'
-    - cron: '0 18 * * *'
-    - cron: '0 19 * * *'
-    - cron: '0 20 * * *'
-    - cron: '0 21 * * *'
-    - cron: '0 22 * * *'
-    - cron: '0 23 * * *'
-  
   # Permite disparar manualmente a qualquer momento pelo botão "Run workflow" no GitHub
+  # Os agendamentos automáticos de hora em hora rodam exclusivamente via cron-job.org
   workflow_dispatch:
     inputs:
       mode:
