@@ -130,12 +130,23 @@ async function handleSendWhatsAppDeal(req, res) {
 
     if (targetType === 'fastsavorys') {
       // 1. Busca produto do cardápio FastSavory's
-      const { data: storeProducts, error: storeErr } = await supabaseAdmin
+      let { data: storeProducts, error: storeErr } = await supabaseAdmin
         .from('fast_products')
         .select('*')
         .order('last_posted_at', { ascending: true, nullsFirst: true })
         .order('id', { ascending: true })
         .limit(1);
+
+      if (storeErr) {
+        // Fallback caso a coluna last_posted_at ainda não tenha sido criada em fast_products
+        const fallbackQuery = await supabaseAdmin
+          .from('fast_products')
+          .select('*')
+          .order('id', { ascending: true })
+          .limit(1);
+        storeProducts = fallbackQuery.data;
+        storeErr = fallbackQuery.error;
+      }
 
       if (!storeErr && storeProducts && storeProducts.length > 0) {
         product = storeProducts[0];
