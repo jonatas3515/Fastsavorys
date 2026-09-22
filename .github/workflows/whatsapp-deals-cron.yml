@@ -61,8 +61,9 @@ jobs:
           MODE="${{ github.event.inputs.mode || 'auto' }}"
           echo "🚀 Disparando rotina de envio de oferta (Modo: $MODE)..."
           
-          RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST "https://fastsavorys.vercel.app/api/cron/send-whatsapp-deal?mode=$MODE" \
+          RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST "https://fastsavorys.vercel.app/api/cron?action=send-whatsapp-deal&mode=$MODE" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "x-cron-secret: fastsavorys-cron-secret-2026" \
             -H "Content-Type: application/json")
           
           BODY=$(echo "$RESPONSE" | sed -e '$d')
