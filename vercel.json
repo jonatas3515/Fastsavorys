@@ -1,6 +1,18 @@
 {
     "rewrites": [
         {
+            "source": "/api/cron/send-whatsapp-deal",
+            "destination": "/api/cron?action=send-whatsapp-deal"
+        },
+        {
+            "source": "/api/cron/notify-scheduled-orders",
+            "destination": "/api/cron?action=notify-scheduled-orders"
+        },
+        {
+            "source": "/api/birthday-broadcast",
+            "destination": "/api/cron?action=birthday-broadcast"
+        },
+        {
             "source": "/api/manychat-reject-order",
             "destination": "/api/manychat-api?type=order-action&action=reject"
         },
@@ -72,11 +84,11 @@
     ],
     "crons": [
         {
-            "path": "/api/cron/notify-scheduled-orders",
+            "path": "/api/cron?action=notify-scheduled-orders",
             "schedule": "0 15 * * *"
         },
         {
-            "path": "/api/birthday-broadcast",
+            "path": "/api/cron?action=birthday-broadcast",
             "schedule": "0 12 * * *"
         }
     ]

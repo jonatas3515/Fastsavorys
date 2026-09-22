@@ -1,11 +1,9 @@
 /**
- * FastSavory's - Automação de Disparo de Ofertas no WhatsApp
- * Endpoint seguro chamado pelo GitHub Actions (09h, 12h, 15h)
+ * FastSavory's - Sub-módulo: Disparo de Ofertas no WhatsApp
  */
 
 const { createClient } = require('@supabase/supabase-js');
 
-// 1. Inicializa o cliente Supabase Admin
 let supabaseAdmin = null;
 if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
   supabaseAdmin = createClient(
@@ -21,7 +19,6 @@ if (process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
   );
 }
 
-// 2. Helper: Detecta a plataforma pelo link
 function detectPlatform(url = '') {
   const u = (url || '').toLowerCase();
   if (u.includes('amazon.com.br') || u.includes('amzn.to') || u.includes('a.co') || u.includes('amazon.')) {
@@ -33,7 +30,6 @@ function detectPlatform(url = '') {
   return { name: 'Mercado Livre' };
 }
 
-// 3. Helper: Calcula a porcentagem de desconto
 function parsePrice(str) {
   if (!str) return 0;
   let s = String(str).trim().replace(/[^\d,\.]/g, '');
@@ -60,7 +56,6 @@ function calcDiscountPercent(origStr, currStr) {
   return pct > 0 && pct < 100 ? pct : 0;
 }
 
-// 4. Helper: Constrói a mensagem formatada para WhatsApp
 function buildWhatsAppDealText(product) {
   const isFastPick = Boolean(product.is_fast_pick || product.badge_color === 'fast_seal');
   const sealHeader = isFastPick ? '👑 *PRODUTO TESTADO E RECOMENDADO PELA FASTSAVORY\'S* ✨\n' : '';
@@ -74,7 +69,6 @@ function buildWhatsAppDealText(product) {
   return `${sealHeader}🛍️ *ACHADINHO ${platform}* ⭐\n🔥 *${product.title}*\n${descText}\n💰 *Preço:* ${origPriceText}*${product.price_display || 'Confira no link'}*${discountText}\n\n👉 *COMPRE COM DESCONTO AQUI:*\n${product.affiliate_url}\n\n💬 *Entre no canal de avisos Achadinhos Fast no WhatsApp:*\nhttps://chat.whatsapp.com/C7dT0ZWaUZKHm7atI3eOLE`;
 }
 
-// 5. Helper: Baixa imagem e converte para base64 (evita bloqueio de hotlink 403 da Shopee/Amazon)
 async function fetchImageAsBase64(imageUrl) {
   if (!imageUrl || !imageUrl.startsWith('http')) return null;
 
@@ -104,35 +98,11 @@ async function fetchImageAsBase64(imageUrl) {
   return null;
 }
 
-module.exports = async function handler(req, res) {
-  // Configuração de CORS
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
-
-  if (req.method === 'OPTIONS') {
-    return res.status(200).end();
-  }
-
-  // 1. Verificação de Segurança (CRON_SECRET)
-  const requiredCronSecret = process.env.CRON_SECRET;
-  if (requiredCronSecret) {
-    const authHeader = req.headers['authorization'] || '';
-    const providedSecret = authHeader.replace(/^Bearer\s+/i, '').trim() ||
-      req.headers['x-cron-secret'] ||
-      req.query.key ||
-      req.query.secret;
-
-    if (!providedSecret || providedSecret !== requiredCronSecret) {
-      console.warn('[WhatsApp Deal Cron] ⛔ Acesso negado: Secret inválido ou ausente.');
-      return res.status(401).json({ success: false, error: 'Unauthorized: invalid cron secret' });
-    }
-  }
-
+async function handleSendWhatsAppDeal(req, res) {
   if (!supabaseAdmin) {
     return res.status(500).json({ success: false, error: 'Configuração do Supabase não encontrada.' });
   }
 
-  // 2. Variáveis da Evolution API
   const evolutionApiUrl = (process.env.EVOLUTION_API_URL || '').replace(/\/+$/, '');
   const evolutionApiKey = process.env.EVOLUTION_API_KEY || '';
   const evolutionInstance = process.env.EVOLUTION_INSTANCE || 'fastsavorys';
@@ -146,7 +116,6 @@ module.exports = async function handler(req, res) {
   }
 
   try {
-    // 3. Busca o produto ativo com maior tempo sem postar (Fila Anti-Repetição)
     const { data: products, error: dbError } = await supabaseAdmin
       .from('fast_affiliate_products')
       .select('*')
@@ -168,15 +137,12 @@ module.exports = async function handler(req, res) {
 
     const product = products[0];
     const messageCaption = buildWhatsAppDealText(product);
-
-    // 4. Prepara o envio da imagem
     const base64Image = await fetchImageAsBase64(product.image_url);
     const mediaPayload = base64Image || product.image_url;
 
     let sendSuccess = false;
     let sendResponse = null;
 
-    // Tentativa A: Envio como Imagem com Legenda (sendMedia)
     if (mediaPayload) {
       try {
         const mediaEndpoint = `${evolutionApiUrl}/message/sendMedia/${evolutionInstance}`;
@@ -201,14 +167,13 @@ module.exports = async function handler(req, res) {
           sendResponse = await response.json();
         } else {
           const errText = await response.text();
-          console.warn('[WhatsApp Deal] Falha ao enviar mídia, tentando texto puro:', errText);
+          console.warn('[WhatsApp Deal] Falha ao enviar mídia, tentando texto:', errText);
         }
       } catch (mediaErr) {
         console.warn('[WhatsApp Deal] Erro na requisição de mídia:', mediaErr.message);
       }
     }
 
-    // Tentativa B (Fallback): Se a imagem falhar, envia como mensagem de texto com link
     if (!sendSuccess) {
       const textEndpoint = `${evolutionApiUrl}/message/sendText/${evolutionInstance}`;
       const response = await fetch(textEndpoint, {
@@ -233,7 +198,6 @@ module.exports = async function handler(req, res) {
       sendResponse = await response.json();
     }
 
-    // 5. Atualiza o carimbo last_posted_at no banco
     const nowIso = new Date().toISOString();
     await supabaseAdmin
       .from('fast_affiliate_products')
@@ -250,10 +214,12 @@ module.exports = async function handler(req, res) {
     });
 
   } catch (error) {
-    console.error('[WhatsApp Deal Cron] ❌ Erro no processo:', error);
+    console.error('[WhatsApp Deal Cron] ❌ Erro:', error);
     return res.status(500).json({
       success: false,
       error: error.message || 'Erro interno ao processar disparo.'
     });
   }
-};
+}
+
+module.exports = { handleSendWhatsAppDeal };
