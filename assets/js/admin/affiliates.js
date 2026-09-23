@@ -317,11 +317,67 @@ window.AffiliatesModule = (function () {
     document.getElementById('affiliateTagInput').value = '';
     document.getElementById('affiliateBadgeColorInput').value = 'orange';
 
+    const typeSelect = document.getElementById('affiliateDiscountTypeSelect');
+    if (typeSelect) typeSelect.value = 'OFF';
+    const discountEl = document.getElementById('affiliateDiscountInput');
+    if (discountEl) discountEl.value = '';
+    const badge = document.getElementById('affiliateDiscountCalcBadge');
+    if (badge) badge.classList.add('hidden');
+
     const isFastPickEl = document.getElementById('affiliateIsFastPickInput');
     if (isFastPickEl) isFastPickEl.checked = false;
     document.getElementById('affiliateDescriptionInput').value = '🔸 ';
     document.getElementById('affiliateImagePreview').src = '../assets/img/fast-logo.png';
     document.getElementById('affiliateModal').classList.remove('hidden');
+  }
+
+  function recalculateDiscount() {
+    const priceVal = document.getElementById('affiliatePriceInput')?.value || '';
+    const origVal = document.getElementById('affiliateOriginalPriceInput')?.value || '';
+    const typeSelect = document.getElementById('affiliateDiscountTypeSelect');
+    const discountInput = document.getElementById('affiliateDiscountInput');
+    const badge = document.getElementById('affiliateDiscountCalcBadge');
+
+    const selectedType = typeSelect ? typeSelect.value : 'OFF';
+
+    if (selectedType === 'manual') {
+      if (badge) badge.classList.add('hidden');
+      return;
+    }
+
+    const curr = parsePrice(priceVal);
+    const orig = parsePrice(origVal);
+
+    if (orig > 0 && curr > 0 && orig > curr) {
+      const pct = Math.round(((orig - curr) / orig) * 100);
+      if (pct > 0) {
+        let label = `${pct}% OFF`;
+        if (selectedType === 'Com Cupom') {
+          label = `${pct}% OFF com Cupom`;
+        } else if (selectedType === 'No Pix') {
+          label = `${pct}% OFF no Pix`;
+        } else if (selectedType === 'No Pix com Cupom') {
+          label = `${pct}% OFF no Pix com Cupom`;
+        }
+        if (discountInput) discountInput.value = label;
+        if (badge) {
+          badge.textContent = `${pct}% Calculado`;
+          badge.classList.remove('hidden');
+        }
+        return;
+      }
+    }
+
+    if (badge) badge.classList.add('hidden');
+    if (discountInput && !discountInput.value.includes('%')) {
+      if (selectedType === 'Com Cupom') {
+        discountInput.value = 'Com Cupom';
+      } else if (selectedType === 'No Pix') {
+        discountInput.value = 'No Pix';
+      } else if (selectedType === 'No Pix com Cupom') {
+        discountInput.value = 'No Pix com Cupom';
+      }
+    }
   }
 
   function openEditModal(id) {
@@ -339,15 +395,27 @@ window.AffiliatesModule = (function () {
     document.getElementById('affiliateOriginalPriceInput').value = item.original_price || '';
     document.getElementById('affiliateCategoryInput').value = item.category || 'cozinha';
 
-    const pct = calcDiscountPercent(item.original_price, item.price_display);
+    const typeSelect = document.getElementById('affiliateDiscountTypeSelect');
     const discountEl = document.getElementById('affiliateDiscountInput');
-    if (discountEl) {
-      discountEl.value = pct > 0 ? `${pct}% OFF` : '';
+    const rawTag = (item.discount_tag || '').trim();
+
+    let detectedType = 'OFF';
+    if (/no pix c(om|\/)?\s*cupom/i.test(rawTag)) {
+      detectedType = 'No Pix com Cupom';
+    } else if (/no pix/i.test(rawTag)) {
+      detectedType = 'No Pix';
+    } else if (/c(om|\/)?\s*cupom/i.test(rawTag)) {
+      detectedType = 'Com Cupom';
+    } else if (rawTag && !/off/i.test(rawTag)) {
+      detectedType = 'manual';
     }
 
-    const tagVal = item.discount_tag || '';
-    const isDiscountOnly = /^[⚡🔥\s]*\d+%\s*OFF/i.test(tagVal.trim());
-    const actualTag = isDiscountOnly ? '' : tagVal;
+    if (typeSelect) typeSelect.value = detectedType;
+    if (discountEl) discountEl.value = rawTag;
+    recalculateDiscount();
+
+    const isDiscountOnly = /^[⚡🔥\s]*\d+%\s*OFF/i.test(rawTag) || /no pix|cupom/i.test(rawTag);
+    const actualTag = isDiscountOnly ? '' : rawTag;
 
     const preset = detectBadgePreset(actualTag, item.badge_color);
     const presetSelect = document.getElementById('affiliateTagPresetSelect');
@@ -492,17 +560,19 @@ window.AffiliatesModule = (function () {
 
     const isFastPick = document.getElementById('affiliateIsFastPickInput') ? document.getElementById('affiliateIsFastPickInput').checked : false;
 
+    const discountVal = document.getElementById('affiliateDiscountInput')?.value?.trim() || '';
     const presetSelect = document.getElementById('affiliateTagPresetSelect');
     const presetVal = presetSelect ? presetSelect.value : '';
-    let finalTag = null;
+    let finalTag = discountVal || null;
     let finalColor = 'orange';
 
     if (presetVal === 'custom') {
-      finalTag = document.getElementById('affiliateTagInput')?.value?.trim() || null;
+      const customTag = document.getElementById('affiliateTagInput')?.value?.trim();
+      if (customTag) finalTag = customTag;
       finalColor = document.getElementById('affiliateBadgeColorInput')?.value || 'orange';
     } else if (presetVal) {
       const [tag, color] = presetVal.split('|');
-      finalTag = tag || null;
+      if (tag) finalTag = tag;
       finalColor = color || 'orange';
     }
 
@@ -1751,6 +1821,7 @@ window.AffiliatesModule = (function () {
     syncAllPriceIncreases,
     syncAllChangedPrices,
     fetchProductDataFromML,
+    recalculateDiscount,
     insertBullet,
     pasteFromClipboard,
     detectCategoryClient,
