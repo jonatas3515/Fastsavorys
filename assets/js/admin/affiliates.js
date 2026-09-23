@@ -307,8 +307,6 @@ window.AffiliatesModule = (function () {
     if (form) form.reset();
     document.getElementById('affiliateModalTitle').textContent = '➕ Novo Achadinho (ML, Amazon & Shopee)';
     document.getElementById('affiliateId').value = '';
-    const discountEl = document.getElementById('affiliateDiscountInput');
-    if (discountEl) discountEl.value = '';
 
     const presetSelect = document.getElementById('affiliateTagPresetSelect');
     if (presetSelect) presetSelect.value = '';
