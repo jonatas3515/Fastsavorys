@@ -109,15 +109,15 @@ async function handleSendWhatsAppDeal(req, res) {
     });
   }
 
-  // Identificação do modo (auto, fastsavorys, affiliate)
+  // Identificação do modo e Horário de Brasília (UTC-3)
+  const now = new Date();
+  const utcHours = now.getUTCHours();
+  const brtHours = (utcHours - 3 + 24) % 24;
+
   const mode = req.query.mode || (req.body && req.body.mode) || 'auto';
   let targetType = mode;
 
   if (mode === 'auto') {
-    // Horário de Brasília (UTC-3)
-    const now = new Date();
-    const utcHours = now.getUTCHours();
-    const brtHours = (utcHours - 3 + 24) % 24;
     // Às 11h, 13h, 15h e 17h envia produtos próprios da FastSavory's
     const isFastSavorysHour = [11, 13, 15, 17].includes(brtHours);
     targetType = isFastSavorysHour ? 'fastsavorys' : 'affiliate';
@@ -146,7 +146,6 @@ async function handleSendWhatsAppDeal(req, res) {
 
         const pool = validStoreProducts.length > 0 ? validStoreProducts : storeProducts;
         // Rotação inteligente por dia e hora para nunca repetir o mesmo salgado em horários seguidos
-        const now = new Date();
         const daySeed = now.getDate();
         const monthSeed = now.getMonth() + 1;
         const hourIndex = [11, 13, 15, 17].indexOf(brtHours);
