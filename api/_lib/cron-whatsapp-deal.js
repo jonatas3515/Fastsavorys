@@ -113,14 +113,20 @@ async function handleSendWhatsAppDeal(req, res) {
   const now = new Date();
   const utcHours = now.getUTCHours();
   const brtHours = (utcHours - 3 + 24) % 24;
+  const utcMinutes = now.getUTCMinutes();
+  // Arredonda para o slot de 30 min mais próximo (:00 ou :30)
+  const slotMinute = (utcMinutes >= 15 && utcMinutes < 45) ? '30' : '00';
+  const timeKey = `${String(brtHours).padStart(2, '0')}:${slotMinute}`;
 
   const mode = req.query.mode || (req.body && req.body.mode) || 'auto';
   let targetType = mode;
 
+  // 8 Horários estratégicos da FastSavory's (Almoço das 10h30 às 14h30 e Lanche/Jantar das 15h30 às 17h30)
+  const fastSavorysSlots = ['10:30', '11:30', '12:30', '13:30', '14:30', '15:30', '16:30', '17:30'];
+
   if (mode === 'auto') {
-    // Às 11h, 13h, 15h e 17h envia produtos próprios da FastSavory's
-    const isFastSavorysHour = [11, 13, 15, 17].includes(brtHours);
-    targetType = isFastSavorysHour ? 'fastsavorys' : 'affiliate';
+    const isFastSavorysSlot = fastSavorysSlots.includes(timeKey);
+    targetType = isFastSavorysSlot ? 'fastsavorys' : 'affiliate';
   }
 
   try {
@@ -145,12 +151,12 @@ async function handleSendWhatsAppDeal(req, res) {
         });
 
         const pool = validStoreProducts.length > 0 ? validStoreProducts : storeProducts;
-        // Rotação inteligente por dia e hora para nunca repetir o mesmo salgado em horários seguidos
+        // Rotação inteligente por dia e horário para nunca repetir o mesmo produto nos 8 disparos do dia
         const daySeed = now.getDate();
         const monthSeed = now.getMonth() + 1;
-        const hourIndex = [11, 13, 15, 17].indexOf(brtHours);
-        const slotIdx = hourIndex >= 0 ? hourIndex : (brtHours % 4);
-        const selectedIndex = (daySeed * 3 + monthSeed * 5 + slotIdx) % pool.length;
+        const hourIndex = fastSavorysSlots.indexOf(timeKey);
+        const slotIdx = hourIndex >= 0 ? hourIndex : (brtHours % 8);
+        const selectedIndex = (daySeed * 5 + monthSeed * 3 + slotIdx) % pool.length;
 
         product = pool[selectedIndex];
         isFastSavorysStore = true;
