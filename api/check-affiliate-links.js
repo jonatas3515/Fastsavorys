@@ -571,6 +571,71 @@ export default async function handler(req, res) {
   try {
     const action = req.query.action || req.body?.action || '';
 
+    // Action 0: 1-Click Quick Save from Bookmarklet or External Extensions
+    if (action === 'quick-save' || action === 'save') {
+      const payload = req.method === 'POST' ? req.body : req.query;
+      const title = (payload.title || '').trim();
+      let affiliate_url = (payload.affiliate_url || payload.url || '').trim();
+
+      if (!title || !affiliate_url) {
+        return res.status(400).json({ success: false, error: 'Título e URL são obrigatórios.' });
+      }
+
+      // Auto-tag Amazon links
+      if (affiliate_url.includes('amazon.com.br') || affiliate_url.includes('amazon.com')) {
+        try {
+          const u = new URL(affiliate_url);
+          u.searchParams.set('tag', 'jonatas00a3-20');
+          u.searchParams.set('linkCode', 'sl2');
+          affiliate_url = u.toString();
+        } catch (e) {}
+      }
+
+      const SUPABASE_URL = process.env.SUPABASE_URL || 'https://vqjyjdllapqbqpylshkw.supabase.co';
+      const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxanlqZGxsYXBxYnFweWxzaGt3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY0MzgyNDUsImV4cCI6MjA4MjAxNDI0NX0.tfTR9YnM5l0do7FJfxML6i05KTSrMInQMqFrWXx6aAU';
+
+      const itemToInsert = {
+        title,
+        description: payload.description ? String(payload.description).trim() : null,
+        affiliate_url,
+        image_url: payload.image_url ? String(payload.image_url).trim() : '',
+        price_display: payload.price_display ? String(payload.price_display).trim() : (payload.price ? String(payload.price).trim() : null),
+        original_price: payload.original_price ? String(payload.original_price).trim() : null,
+        category: payload.category || detectCategory(title, payload.description || '', affiliate_url),
+        discount_tag: payload.discount_tag || payload.tag || null,
+        badge_color: payload.badge_color || payload.color || 'orange',
+        is_fast_pick: payload.is_fast_pick === true || payload.is_fast_pick === 'true',
+        position: 1,
+        is_active: true,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      const insertRes = await fetch(`${SUPABASE_URL}/rest/v1/fast_affiliate_products`, {
+        method: 'POST',
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`,
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation'
+        },
+        body: JSON.stringify([itemToInsert])
+      });
+
+      if (!insertRes.ok) {
+        const errText = await insertRes.text();
+        console.error('[Quick Save] Erro ao salvar no Supabase:', errText);
+        return res.status(500).json({ success: false, error: 'Erro ao salvar no banco', details: errText });
+      }
+
+      const inserted = await insertRes.json();
+      return res.status(200).json({
+        success: true,
+        message: '🎉 Oferta salva no FastSavory\'s com sucesso!',
+        data: inserted?.[0] || itemToInsert
+      });
+    }
+
     // Action 1: Auto-fetch single product details with high precision
     if (action === 'fetch' || (req.query.url && !req.query.items && !req.body?.items)) {
       const targetUrl = req.query.url || req.body?.url;

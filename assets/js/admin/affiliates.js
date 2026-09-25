@@ -1793,6 +1793,132 @@ window.AffiliatesModule = (function () {
     return 'confeitaria_sobremesas';
   }
 
+  // ==========================================
+  // DEALS MINER (AUTONOMOUS MERCADO LIVRE INGESTION)
+  // ==========================================
+  function openMinerModal() {
+    const modal = document.getElementById('affiliateMinerModal');
+    if (modal) {
+      modal.classList.remove('hidden');
+      const logBox = document.getElementById('minerLiveLogBox');
+      if (logBox) logBox.classList.add('hidden');
+    }
+  }
+
+  function closeMinerModal() {
+    const modal = document.getElementById('affiliateMinerModal');
+    if (modal) modal.classList.add('hidden');
+  }
+
+  async function runDealsMiner() {
+    const btn = document.getElementById('minerRunBtn');
+    const logBox = document.getElementById('minerLiveLogBox');
+    const logEl = document.getElementById('minerLiveLog');
+    const minDiscount = parseInt(document.getElementById('minerMinDiscount')?.value || '20', 10);
+    const limit = parseInt(document.getElementById('minerLimit')?.value || '12', 10);
+
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = `<span class="animate-spin inline-block mr-1">⏳</span> Minerando Ofertas...`;
+    }
+
+    if (logBox && logEl) {
+      logBox.classList.remove('hidden');
+      logEl.innerHTML = `<div class="text-yellow-400 font-bold">[1/3] 📡 Conectando ao hub de ofertas do Mercado Livre...</div>`;
+    }
+
+    try {
+      const resp = await fetch(`/api/affiliate-deals-miner?min_discount=${minDiscount}&limit=${limit}`);
+      const data = await resp.json();
+
+      if (!resp.ok || !data.success) {
+        throw new Error(data.error || 'Falha ao executar mineração');
+      }
+
+      if (logEl) {
+        let lines = [];
+        lines.push(`<div class="text-blue-400">[2/3] 🔍 Encontradas ${data.scraped_count || 0} promoções ativas no ML.</div>`);
+        lines.push(`<div class="text-emerald-400 font-bold mt-1">[3/3] ✨ Resultado do Processamento:</div>`);
+        lines.push(`<div class="pl-3 text-white">✅ Novos Cadastrados: <strong class="text-green-400">${data.inserted_count || 0}</strong></div>`);
+        lines.push(`<div class="pl-3 text-white">⏩ Já existiam (Ignorados): <strong class="text-yellow-300">${data.duplicate_count || 0}</strong></div>`);
+        lines.push(`<div class="pl-3 text-white">⏭️ Desconto menor que ${minDiscount}%: <strong class="text-gray-400">${data.ignored_discount_count || 0}</strong></div>`);
+        
+        if (data.items && data.items.length > 0) {
+          lines.push(`<div class="mt-2 text-xs text-gray-300 border-t border-gray-700 pt-2 font-semibold">Itens processados recentemente:</div>`);
+          data.items.slice(0, 5).forEach(item => {
+            lines.push(`<div class="text-[11px] text-gray-300 truncate">📦 ${item.title || 'Produto'} - <span class="text-yellow-400">${item.price_display}</span> (${item.discount_tag})</div>`);
+          });
+        }
+
+        logEl.innerHTML += lines.join('');
+      }
+
+      if (window.showToast) {
+        window.showToast(`🤖 Mineração concluída! +${data.inserted_count || 0} novas ofertas inseridas.`, 'success');
+      }
+
+      await loadProducts();
+    } catch (err) {
+      console.error('[Deals Miner] Erro:', err);
+      if (logEl) {
+        logEl.innerHTML += `<div class="text-rose-400 font-bold mt-2">❌ Erro: ${err.message}</div>`;
+      }
+      if (window.showToast) {
+        window.showToast(`Erro na mineração: ${err.message}`, 'error');
+      }
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = `<span>🚀 Iniciar Nova Mineração</span>`;
+      }
+    }
+  }
+
+  // ==========================================
+  // 1-CLICK QUICK CLIP (BOOKMARKLET)
+  // ==========================================
+  function getBookmarkletCode() {
+    return `javascript:(function(){try{const host=window.location.hostname;let payload={platform:'unknown',url:window.location.href,title:'',image_url:'',price_display:'',original_price:'',discount_tag:''};if(host.includes('amazon')){payload.platform='amazon';payload.title=(document.getElementById('productTitle')?.innerText||document.title||'').trim();const img=document.getElementById('landingImage')||document.querySelector('#imgTagWrapperId img')||document.querySelector('#main-image-container img')||document.querySelector('.a-dynamic-image');payload.image_url=img?.src||img?.getAttribute('data-old-hires')||'';const pw=document.querySelector('.a-price .a-price-whole')?.innerText?.replace(/[\\r\\n\\t]/g,'').trim();const pf=document.querySelector('.a-price .a-price-fraction')?.innerText?.trim();if(pw){payload.price_display='R$ '+pw+(pf?','+pf:',00');}const basis=document.querySelector('.basisPrice .a-offscreen, .a-text-price .a-offscreen, .apex-basisprice-value .a-offscreen')?.innerText?.trim();if(basis)payload.original_price=basis;const sav=document.querySelector('.savingsPercentage, .reinventPriceSavingsPercentageMargin')?.innerText?.trim();if(sav)payload.discount_tag=sav.replace('-','').trim()+' OFF';}else if(host.includes('mercadolivre')||host.includes('mercadolibre')){payload.platform='mercadolivre';payload.title=(document.querySelector('h1.ui-pdp-title')?.innerText||document.title||'').trim();const img=document.querySelector('.ui-pdp-gallery__figure img, .ui-pdp-image, img.ui-pdp-image');payload.image_url=img?.src||'';const frac=document.querySelector('.ui-pdp-price__second-line .andes-money-amount__fraction')?.innerText?.trim();const cents=document.querySelector('.ui-pdp-price__second-line .andes-money-amount__cents')?.innerText?.trim();if(frac){payload.price_display='R$ '+frac+(cents?','+cents:',00');}const origFrac=document.querySelector('.ui-pdp-price__original-value .andes-money-amount__fraction')?.innerText?.trim();if(origFrac){const origCents=document.querySelector('.ui-pdp-price__original-value .andes-money-amount__cents')?.innerText?.trim();payload.original_price='R$ '+origFrac+(origCents?','+origCents:',00');}const disc=document.querySelector('.ui-pdp-price__second-line .andes-money-amount__discount')?.innerText?.trim();if(disc)payload.discount_tag=disc+' OFF';}else{alert('⚠️ Use este botão em uma página de produto da Amazon ou Mercado Livre!');return;}if(!payload.title){alert('⚠️ Não foi possível identificar o título do produto.');return;}const toast=document.createElement('div');toast.style.cssText='position:fixed;top:20px;right:20px;z-index:99999999;background:#6366f1;color:#fff;padding:16px 22px;border-radius:12px;font-family:sans-serif;font-weight:bold;font-size:14px;box-shadow:0 10px 25px rgba(0,0,0,0.3);';toast.innerText='⚡ Enviando para FastSavory\\'s Achadinhos...';document.body.appendChild(toast);fetch('https://fastsavorys.vercel.app/api/check-affiliate-links?action=quick-save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).then(r=>r.json()).then(data=>{if(data.success){toast.style.background='#10b981';toast.innerHTML='🎉 Salvo com Sucesso no Site!<br><span style=\"font-size:11px;font-weight:normal;\">'+(payload.title.substring(0,40))+'...</span>';setTimeout(()=>toast.remove(),3500);}else{toast.style.background='#e11d48';toast.innerText='❌ '+(data.error||'Erro ao salvar');setTimeout(()=>toast.remove(),4000);}}).catch(e=>{toast.style.background='#e11d48';toast.innerText='❌ Erro de conexão: '+e.message;setTimeout(()=>toast.remove(),4000);});}catch(e){alert('Erro Quick Clip: '+e.message);}})();`;
+  }
+
+  function openBookmarkletModal() {
+    const modal = document.getElementById('affiliateBookmarkletModal');
+    if (!modal) return;
+    modal.classList.remove('hidden');
+
+    const code = getBookmarkletCode();
+    const draggableLink = document.getElementById('affiliateBookmarkletDraggableLink');
+    if (draggableLink) {
+      draggableLink.setAttribute('href', code);
+    }
+    const preview = document.getElementById('affiliateBookmarkletCodePreview');
+    if (preview) {
+      preview.value = code;
+    }
+  }
+
+  function closeBookmarkletModal() {
+    const modal = document.getElementById('affiliateBookmarkletModal');
+    if (modal) modal.classList.add('hidden');
+  }
+
+  function copyBookmarkletCode() {
+    const code = getBookmarkletCode();
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(code).then(() => {
+        if (window.showToast) {
+          window.showToast('📋 Código do Bookmarklet copiado!', 'success');
+        } else {
+          alert('Código copiado para a área de transferência!');
+        }
+      }).catch(() => {
+        prompt('Copie o código JS abaixo:', code);
+      });
+    } else {
+      prompt('Copie o código JS abaixo:', code);
+    }
+  }
+
   return {
     init: loadProducts,
     loadProducts,
@@ -1840,6 +1966,13 @@ window.AffiliatesModule = (function () {
     shareToFacebook,
     shareNative,
     copyShareText,
-    copyShareLinkOnly
+    copyShareLinkOnly,
+    openMinerModal,
+    closeMinerModal,
+    runDealsMiner,
+    openBookmarkletModal,
+    closeBookmarkletModal,
+    copyBookmarkletCode,
+    getBookmarkletCode
   };
 })();
