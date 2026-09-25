@@ -499,7 +499,7 @@
                 <a 
                   href="${escapeHtml(item.affiliate_url)}" 
                   target="_blank" 
-                  rel="noopener noreferrer"
+                  rel="noopener"
                   class="flex-1 py-2.5 px-3 ${platformInfo.btnClass} font-extrabold text-xs sm:text-sm rounded-xl shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-1.5 text-center group-hover:ring-2 group-hover:ring-offset-1"
                 >
                   <span>${platformInfo.btnText}</span>
