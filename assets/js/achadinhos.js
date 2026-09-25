@@ -411,7 +411,8 @@
       // Resolução inteligente de cor do selo (respeitando os presets oficiais)
       let resolvedColor = item.badge_color || 'orange';
       const normTag = rawTag.toLowerCase();
-      if (normTag.includes('imperd') || normTag.includes('oferta imperdivel')) resolvedColor = 'blue';
+      if (normTag.includes('escolha da amazon') || normTag.includes("amazon's choice")) resolvedColor = 'black';
+      else if (normTag.includes('imperd') || normTag.includes('oferta imperdivel')) resolvedColor = 'blue';
       else if (normTag.includes('mais vendido')) resolvedColor = 'orange';
       else if (normTag.includes('buscado')) resolvedColor = 'purple';
       else if (normTag.includes('pratico') || normTag.includes('prático')) resolvedColor = 'amber';

@@ -211,7 +211,8 @@ window.AffiliatesModule = (function () {
       // Resolução inteligente de cor do selo (respeitando os presets oficiais)
       let resolvedColor = item.badge_color || 'orange';
       const normTag = customTagText.toLowerCase();
-      if (normTag.includes('imperd') || normTag.includes('oferta imperdivel')) resolvedColor = 'blue';
+      if (normTag.includes('escolha da amazon') || normTag.includes("amazon's choice")) resolvedColor = 'black';
+      else if (normTag.includes('imperd') || normTag.includes('oferta imperdivel')) resolvedColor = 'blue';
       else if (normTag.includes('mais vendido')) resolvedColor = 'orange';
       else if (normTag.includes('buscado')) resolvedColor = 'purple';
       else if (normTag.includes('pratico') || normTag.includes('prático')) resolvedColor = 'amber';
@@ -274,6 +275,7 @@ window.AffiliatesModule = (function () {
   function detectBadgePreset(tag, color) {
     if (!tag) return '';
     const norm = tag.toLowerCase().trim();
+    if (norm.includes('escolha da amazon') || norm.includes("amazon's choice") || norm === 'escolha da amazon') return 'Escolha da Amazon|black';
     if (norm.includes('imperd') || norm === '💥 oferta imperdível' || norm === 'oferta imperdível') return '💥 Oferta Imperdível|blue';
     if (norm.includes('mais vendido') || norm === '🔥 mais vendido' || norm === 'mais vendido') return '🔥 Mais Vendido|orange';
     if (norm.includes('buscado') || norm === '➕ buscado' || norm === '➕ mais buscado' || norm === 'mais buscado') return '➕ Buscado|purple';

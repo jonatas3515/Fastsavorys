@@ -77,36 +77,124 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
       html.includes('Currently unavailable') ||
       html.includes('Não disponível') ||
       html.includes('Não temos previsão de quando este produto') ||
-      html.includes('produto não foi encontrado')
+      html.includes('produto não foi encontrado') ||
+      html.includes('id="outOfStock"') ||
+      html.includes('data-action="out-of-stock"')
     ) {
       isPaused = true;
     }
 
-    // 2. High-precision Amazon BuyBox Scoping
-    const buyboxScope = html.match(/id=["'](?:corePrice_feature_div|corePriceDisplay_desktop_feature_div|apex_desktop|desktop_unifiedPrice)[^"']*["'][\s\S]*?<\/div>/i) ||
-                        html.match(/class=["'][^"']*a-box-group[^"']*["'][\s\S]*?class=["'][^"']*a-price[^"']*["'][\s\S]*?<\/div>/i);
-    const searchHtml = buyboxScope ? buyboxScope[0] : html;
-
-    const amazonOffscreen = searchHtml.match(/class=["'][^"']*a-price[^"']*["'][\s\S]*?class=["'][^"']*a-offscreen[^"']*["']>([^<]+)</i);
-    if (amazonOffscreen && amazonOffscreen[1]) {
-      const clean = amazonOffscreen[1].replace(/&nbsp;/g, ' ').replace(/[^\d.,]/g, '').trim();
-      if (clean) price = `R$ ${clean}`;
+    // LAYER A: Structured JSON-LD Schema
+    const jsonLdRegex = /<script\s+type=["']application\/ld\+json["']>([\s\S]*?)<\/script>/gi;
+    let jMatch;
+    while ((jMatch = jsonLdRegex.exec(html)) !== null) {
+      try {
+        const schema = JSON.parse(jMatch[1]);
+        if (schema) {
+          const item = Array.isArray(schema) ? schema[0] : schema;
+          if (item && (item['@type'] === 'Product' || item['@type'] === 'ItemPage' || item.offers)) {
+            const offers = item.offers;
+            if (offers) {
+              const offerObj = Array.isArray(offers) ? offers[0] : offers;
+              const offerPrice = offerObj?.price || offerObj?.lowPrice;
+              if (offerPrice && Number(offerPrice) > 0) {
+                price = formatBrlNumber(Number(offerPrice));
+                if (offerObj?.availability && offerObj.availability.includes('OutOfStock')) {
+                  isPaused = true;
+                }
+                break;
+              }
+            }
+          }
+        }
+      } catch (e) {}
     }
 
+    // LAYER B: Targeted Amazon BuyBox / Apex Price Classes
     if (!price) {
-      const wholeMatch = searchHtml.match(/class=["'][^"']*a-price-whole[^"']*["']>([0-9.,]+)</i);
-      const fracMatch = searchHtml.match(/class=["'][^"']*a-price-fraction[^"']*["']>([0-9]{2})</i);
-      if (wholeMatch && wholeMatch[1]) {
+      const targetedOffscreen = html.match(/class=["'][^"']*(?:apexPriceToPay|priceToPay|corePriceDisplay|reinventPricePriceToPayMargin|base-price|price-block)[^"']*["'][\s\S]*?class=["'][^"']*a-offscreen[^"']*["']>([^<]+)</i);
+      if (targetedOffscreen && targetedOffscreen[1]) {
+        const clean = targetedOffscreen[1].replace(/&nbsp;/g, ' ').replace(/[^\d.,]/g, '').trim();
+        if (clean) price = `R$ ${clean}`;
+      }
+    }
+
+    // LAYER C: CorePrice feature div without premature div truncation
+    if (!price) {
+      const corePriceSection = html.match(/id=["'](?:corePriceDisplay_desktop_feature_div|corePrice_feature_div|apex_desktop|desktop_unifiedPrice|desktop_buybox)[^"']*["'][\s\S]{1,3000}/i);
+      if (corePriceSection) {
+        const offscreenMatch = corePriceSection[0].match(/class=["'][^"']*a-offscreen[^"']*["']>([^<]+)</i);
+        if (offscreenMatch && offscreenMatch[1]) {
+          const clean = offscreenMatch[1].replace(/&nbsp;/g, ' ').replace(/[^\d.,]/g, '').trim();
+          if (clean) price = `R$ ${clean}`;
+        }
+      }
+    }
+
+    // LAYER D: Classic Amazon Price Block IDs
+    if (!price) {
+      const classicMatch = html.match(/id=["'](?:priceblock_ourprice|priceblock_dealprice|priceblock_saleprice|price_inside_buybox|tp-tool-tip-subtotal-price-value)["'][^>]*>([^<]+)</i);
+      if (classicMatch && classicMatch[1]) {
+        const clean = classicMatch[1].replace(/&nbsp;/g, ' ').replace(/[^\d.,]/g, '').trim();
+        if (clean) price = `R$ ${clean}`;
+      }
+    }
+
+    // LAYER E: Price Whole + Fraction combination
+    if (!price) {
+      const wholeMatch = html.match(/class=["'][^"']*a-price-whole[^"']*["']>([0-9.,]+)<[\s\S]*?class=["'][^"']*a-price-fraction[^"']*["']>([0-9]{2})</i);
+      if (wholeMatch && wholeMatch[1] && wholeMatch[2]) {
         const whole = wholeMatch[1].replace(/[^\d.]/g, '');
-        const frac = fracMatch ? fracMatch[1] : '00';
+        const frac = wholeMatch[2];
         price = `R$ ${whole},${frac}`;
       }
     }
 
-    const amazonOriginal = searchHtml.match(/class=["'][^"']*a-text-price[^"']*["'][\s\S]*?class=["'][^"']*a-offscreen[^"']*["']>([^<]+)</i);
-    if (amazonOriginal && amazonOriginal[1]) {
-      const clean = amazonOriginal[1].replace(/&nbsp;/g, ' ').replace(/[^\d.,]/g, '').trim();
-      if (clean) originalPrice = `R$ ${clean}`;
+    // LAYER F: Embedded Amazon JSON (Twister / Buying Options)
+    if (!price) {
+      const buyingPriceMatch = html.match(/"(?:buyingPrice|priceAmount|displayPrice)"\s*:\s*(?:([0-9.]+)|"([^"]+)")/i);
+      if (buyingPriceMatch) {
+        if (buyingPriceMatch[1]) {
+          const num = parseFloat(buyingPriceMatch[1]);
+          if (!isNaN(num) && num > 0) price = formatBrlNumber(num);
+        } else if (buyingPriceMatch[2]) {
+          const clean = buyingPriceMatch[2].replace(/&nbsp;/g, ' ').replace(/[^\d.,]/g, '').trim();
+          if (clean) price = `R$ ${clean}`;
+        }
+      }
+    }
+
+    // LAYER G: General a-offscreen with R$ in the whole document
+    if (!price) {
+      const generalOffscreen = html.match(/class=["'][^"']*a-offscreen[^"']*["']>(\s*R\$\s*[0-9.,]+)<\/span>/i);
+      if (generalOffscreen && generalOffscreen[1]) {
+        const clean = generalOffscreen[1].replace(/&nbsp;/g, ' ').replace(/[^\d.,]/g, '').trim();
+        if (clean) price = `R$ ${clean}`;
+      }
+    }
+
+    // Amazon Original / Strike-through Price
+    const origOffscreen = html.match(/class=["'][^"']*(?:a-text-price|basisPrice|savingPriceOverride)[^"']*["'][\s\S]*?class=["'][^"']*a-offscreen[^"']*["']>([^<]+)</i);
+    if (origOffscreen && origOffscreen[1]) {
+      const clean = origOffscreen[1].replace(/&nbsp;/g, ' ').replace(/[^\d.,]/g, '').trim();
+      if (clean && clean !== price.replace(/[^\d.,]/g, '')) originalPrice = `R$ ${clean}`;
+    }
+
+    if (!originalPrice) {
+      const listPriceMatch = html.match(/id=["'](?:priceblock_pospromoprice|regularprice_structural|listPrice)["'][^>]*>([^<]+)</i);
+      if (listPriceMatch && listPriceMatch[1]) {
+        const clean = listPriceMatch[1].replace(/&nbsp;/g, ' ').replace(/[^\d.,]/g, '').trim();
+        if (clean && clean !== price.replace(/[^\d.,]/g, '')) originalPrice = `R$ ${clean}`;
+      }
+    }
+
+    // Amazon Discount percentage
+    const discPctMatch = html.match(/class=["'][^"']*(?:savingPriceOverride|reinventPriceSavingsPercentageMargin|savingsPercentage)[^"']*["']>([^<]*%[^<]*)</i) ||
+                          html.match(/"savingsPercentage"\s*:\s*([0-9]+)/i);
+    if (discPctMatch && discPctMatch[1]) {
+      const text = discPctMatch[1].trim();
+      discountTag = text.includes('%') ? text.replace(/^-/, '').trim() : `${text}% OFF`;
+      if (!discountTag.toUpperCase().includes('OFF')) discountTag += ' OFF';
     }
 
   } else if (platform === 'shopee') {
@@ -291,7 +379,10 @@ async function fetchProductDetails(rawUrl) {
         redirect: 'follow',
         headers: {
           'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+          'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+          'Upgrade-Insecure-Requests': '1'
         }
       });
       if (headRes.url) {
@@ -307,9 +398,17 @@ async function fetchProductDetails(rawUrl) {
     method: 'GET',
     headers: {
       'User-Agent':
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-      'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8'
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+      'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+      'Sec-Ch-Ua': '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+      'Sec-Ch-Ua-Mobile': '?0',
+      'Sec-Ch-Ua-Platform': '"Windows"',
+      'Sec-Fetch-Dest': 'document',
+      'Sec-Fetch-Mode': 'navigate',
+      'Sec-Fetch-Site': 'none',
+      'Sec-Fetch-User': '?1',
+      'Upgrade-Insecure-Requests': '1'
     }
   });
 
@@ -319,6 +418,7 @@ async function fetchProductDetails(rawUrl) {
   let imageUrl = '';
 
   const titleMatch =
+    html.match(/<h1[^>]*id=["']productTitle["'][^>]*>([^<]+)<\/h1>/i) ||
     html.match(/<h1[^>]*class=["'][^"']*(?:ui-pdp-title|poly-component__title)[^"']*["'][^>]*>([^<]+)<\/h1>/i) ||
     html.match(/class=["'][^"']*poly-component__title[^"']*["'][^>]*><a[^>]*>([^<]+)<\/a>/i) ||
     html.match(/class=["'][^"']*poly-component__title[^"']*["'][^>]*>([^<]+)<\//i) ||
@@ -338,7 +438,9 @@ async function fetchProductDetails(rawUrl) {
 
   if (!imageUrl && platform === 'amazon') {
     const amzImgMatch = html.match(/id=["']landingImage["'][\s\S]*?data-old-hires=["']([^"']+)["']/i) ||
-                        html.match(/data-a-dynamic-image=["']\{&quot;([^&]+)&quot;/i);
+                        html.match(/id=["']landingImage["'][\s\S]*?src=["']([^"']+)["']/i) ||
+                        html.match(/data-a-dynamic-image=["']\{&quot;([^&]+)&quot;/i) ||
+                        html.match(/id=["'](?:imgBlkFront|main-image)["'][^>]*src=["']([^"']+)["']/i);
     if (amzImgMatch && amzImgMatch[1]) {
       imageUrl = amzImgMatch[1];
     }
@@ -501,9 +603,17 @@ export default async function handler(req, res) {
             method: 'GET',
             headers: {
               'User-Agent':
-                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-              'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7'
+                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+              'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+              'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+              'Sec-Ch-Ua': '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+              'Sec-Ch-Ua-Mobile': '?0',
+              'Sec-Ch-Ua-Platform': '"Windows"',
+              'Sec-Fetch-Dest': 'document',
+              'Sec-Fetch-Mode': 'navigate',
+              'Sec-Fetch-Site': 'none',
+              'Sec-Fetch-User': '?1',
+              'Upgrade-Insecure-Requests': '1'
             },
             redirect: 'follow',
             signal: controller.signal
