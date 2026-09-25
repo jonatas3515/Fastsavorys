@@ -412,6 +412,8 @@
       let resolvedColor = item.badge_color || 'orange';
       const normTag = rawTag.toLowerCase();
       if (normTag.includes('escolha da amazon') || normTag.includes("amazon's choice")) resolvedColor = 'black';
+      else if (normTag.includes('menor preco') || normTag.includes('menor preço')) resolvedColor = 'rose';
+      else if (normTag === 'oferta' || (normTag.includes('oferta') && !normTag.includes('imperd'))) resolvedColor = 'pink';
       else if (normTag.includes('imperd') || normTag.includes('oferta imperdivel')) resolvedColor = 'blue';
       else if (normTag.includes('mais vendido')) resolvedColor = 'orange';
       else if (normTag.includes('buscado')) resolvedColor = 'purple';

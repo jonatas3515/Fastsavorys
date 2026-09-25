@@ -212,6 +212,8 @@ window.AffiliatesModule = (function () {
       let resolvedColor = item.badge_color || 'orange';
       const normTag = customTagText.toLowerCase();
       if (normTag.includes('escolha da amazon') || normTag.includes("amazon's choice")) resolvedColor = 'black';
+      else if (normTag.includes('menor preco') || normTag.includes('menor preço')) resolvedColor = 'rose';
+      else if (normTag === 'oferta' || (normTag.includes('oferta') && !normTag.includes('imperd'))) resolvedColor = 'pink';
       else if (normTag.includes('imperd') || normTag.includes('oferta imperdivel')) resolvedColor = 'blue';
       else if (normTag.includes('mais vendido')) resolvedColor = 'orange';
       else if (normTag.includes('buscado')) resolvedColor = 'purple';
@@ -276,6 +278,8 @@ window.AffiliatesModule = (function () {
     if (!tag) return '';
     const norm = tag.toLowerCase().trim();
     if (norm.includes('escolha da amazon') || norm.includes("amazon's choice") || norm === 'escolha da amazon') return 'Escolha da Amazon|black';
+    if (norm.includes('menor preco') || norm.includes('menor preço') || norm === 'menor preço' || norm === '🔴 menor preço') return 'Menor Preço|rose';
+    if (norm === 'oferta' || norm === '🌸 oferta' || (norm.includes('oferta') && !norm.includes('imperd') && !norm.includes('oficial'))) return 'Oferta|pink';
     if (norm.includes('imperd') || norm === '💥 oferta imperdível' || norm === 'oferta imperdível') return '💥 Oferta Imperdível|blue';
     if (norm.includes('mais vendido') || norm === '🔥 mais vendido' || norm === 'mais vendido') return '🔥 Mais Vendido|orange';
     if (norm.includes('buscado') || norm === '➕ buscado' || norm === '➕ mais buscado' || norm === 'mais buscado') return '➕ Buscado|purple';
