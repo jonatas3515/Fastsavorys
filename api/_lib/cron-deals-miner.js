@@ -70,77 +70,98 @@ function detectCategory(title = '', description = '', url = '') {
 }
 
 async function scrapeMercadoLivreDeals() {
-  const url = 'https://www.mercadolivre.com.br/ofertas?container_id=MLB779362-1&page=1';
-  const res = await fetch(url, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-      'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8'
-    }
-  });
-
-  if (!res.ok) {
-    throw new Error(`Falha ao carregar ofertas do Mercado Livre: HTTP ${res.status}`);
-  }
-
-  const html = await res.text();
-  const cardChunks = html.split(/<div\s+class=["'][^"']*poly-card\s+poly-card--grid[^"']*["']/i);
-  cardChunks.shift(); // Remove header
+  const targetUrls = [
+    'https://www.mercadolivre.com.br/ofertas?container_id=MLB779362-1&page=1',
+    'https://www.mercadolivre.com.br/ofertas',
+    'https://www.mercadolivre.com.br/ofertas?promotion_type=DEAL_OF_THE_DAY'
+  ];
 
   const deals = [];
+  const seenUrls = new Set();
 
-  for (const chunk of cardChunks) {
-    const linkMatch = chunk.match(/<a\s+[^>]*href=["'](https:\/\/[^"'\s]+)["'][^>]*class=["']poly-component__title[^"']*["']/i) ||
-                      chunk.match(/class=["'][^"']*poly-component__title[^"']*["'][^>]*><a\s+[^>]*href=["'](https:\/\/[^"'\s]+)["']/i);
-    if (!linkMatch) continue;
-    const cleanUrl = linkMatch[1].split('#')[0].split('?')[0];
-
-    const titleMatch = chunk.match(/class=["']poly-component__title[^"']*["'][^>]*><a[^>]*>([\s\S]*?)<\/a>/i) ||
-                       chunk.match(/class=["']poly-component__title[^"']*["'][^>]*>([\s\S]*?)<\//i);
-    const rawTitle = titleMatch ? titleMatch[1].replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&#39;/g, "'").trim() : '';
-
-    const imgMatch = chunk.match(/class=["']poly-component__picture[^"']*["'][\s\S]*?src=["']([^"']+)["']/i) ||
-                     chunk.match(/class=["']poly-component__picture[^"']*["'][\s\S]*?data-src=["']([^"']+)["']/i);
-    const imageUrl = imgMatch ? imgMatch[1] : '';
-
-    const ratingMatch = chunk.match(/class=["'][^"']*poly-component__review-compacted[^"']*["'][\s\S]*?<span[^>]*>([0-9.]+)</i);
-    const rating = ratingMatch ? parseFloat(ratingMatch[1]) : 0;
-
-    let price = '';
-    const currentAmountMatch = chunk.match(/class=["']poly-price__current[^"']*["'][\s\S]*?aria-label=["']([0-9.]+)\s*reais(?:\s*com\s*([0-9]{1,2})\s*centavos)?["']/i);
-    if (currentAmountMatch) {
-      const frac = currentAmountMatch[1];
-      const cents = currentAmountMatch[2] ? currentAmountMatch[2].padStart(2, '0') : '00';
-      price = `R$ ${frac},${cents}`;
-    }
-
-    let originalPrice = '';
-    const prevAmountMatch = chunk.match(/class=["']andes-money-amount--previous[^"']*["'][^>]*aria-label=["']Antes:\s*([0-9.]+)\s*reais(?:\s*com\s*([0-9]{1,2})\s*centavos)?["']/i);
-    if (prevAmountMatch) {
-      const frac = prevAmountMatch[1];
-      const cents = prevAmountMatch[2] ? prevAmountMatch[2].padStart(2, '0') : '00';
-      originalPrice = `R$ ${frac},${cents}`;
-    }
-
-    const discMatch = chunk.match(/class=["'][^"']*(?:poly-price__discount|polylabel-pill|andes-money-amount__discount)[^"']*["'][^>]*>([0-9]+)%\s*OFF</i);
-    const discountPercent = discMatch ? parseInt(discMatch[1], 10) : 0;
-
-    const badgeMatch = chunk.match(/class=["']polylabel-fs-xs\s+polylabel-fw-semibold["']>([^<]+)</i);
-    const badgeText = badgeMatch ? badgeMatch[1].trim() : '';
-
-    if (rawTitle && price && cleanUrl) {
-      deals.push({
-        title: rawTitle,
-        cleanUrl,
-        imageUrl,
-        price,
-        originalPrice,
-        discountPercent,
-        discountTag: discountPercent > 0 ? `${discountPercent}% OFF` : '',
-        rating,
-        badgeText,
-        category: detectCategory(rawTitle, badgeText, cleanUrl)
+  for (const url of targetUrls) {
+    try {
+      const res = await fetch(url, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+          'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8',
+          'Cache-Control': 'no-cache'
+        }
       });
+
+      if (!res.ok) continue;
+
+      const html = await res.text();
+      const cardChunks = html.split(/<div\s+class=["'][^"']*(?:poly-card|ui-search-result|promotion-item)[^"']*["']/i);
+      cardChunks.shift(); // Remove header
+
+      for (const chunk of cardChunks) {
+        const linkMatch = chunk.match(/<a\s+[^>]*href=["'](https:\/\/[^"'\s]+)["'][^>]*class=["'][^"']*(?:poly-component__title|ui-search-item__title|ui-search-link)[^"']*["']/i) ||
+                          chunk.match(/class=["'][^"']*(?:poly-component__title|ui-search-item__title)[^"']*["'][^>]*><a\s+[^>]*href=["'](https:\/\/[^"'\s]+)["']/i) ||
+                          chunk.match(/<a\s+[^>]*href=["'](https:\/\/[^"'\s]+)["']/i);
+        if (!linkMatch) continue;
+        const cleanUrl = linkMatch[1].split('#')[0].split('?')[0];
+        if (seenUrls.has(cleanUrl)) continue;
+
+        const titleMatch = chunk.match(/class=["'][^"']*(?:poly-component__title|ui-search-item__title)[^"']*["'][^>]*><a[^>]*>([\s\S]*?)<\/a>/i) ||
+                           chunk.match(/class=["'][^"']*(?:poly-component__title|ui-search-item__title)[^"']*["'][^>]*>([\s\S]*?)<\//i) ||
+                           chunk.match(/aria-label=["']([^"']+)["']/i);
+        const rawTitle = titleMatch ? titleMatch[1].replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&#39;/g, "'").trim() : '';
+
+        const imgMatch = chunk.match(/class=["'][^"']*(?:poly-component__picture|ui-search-result-image__element)[^"']*["'][\s\S]*?src=["']([^"']+)["']/i) ||
+                         chunk.match(/class=["'][^"']*(?:poly-component__picture|ui-search-result-image__element)[^"']*["'][\s\S]*?data-src=["']([^"']+)["']/i) ||
+                         chunk.match(/<img[^>]*src=["'](https:\/\/[^"'\s]+mlstatic[^"'\s]+)["']/i);
+        const imageUrl = imgMatch ? imgMatch[1] : '';
+
+        const ratingMatch = chunk.match(/class=["'][^"']*(?:poly-component__review-compacted|ui-search-reviews)[^"']*["'][\s\S]*?<span[^>]*>([0-9.]+)</i);
+        const rating = ratingMatch ? parseFloat(ratingMatch[1]) : 0;
+
+        let price = '';
+        const currentAmountMatch = chunk.match(/class=["'][^"']*(?:poly-price__current|andes-money-amount)[^"']*["'][\s\S]*?aria-label=["']([0-9.]+)\s*reais(?:\s*com\s*([0-9]{1,2})\s*centavos)?["']/i) ||
+                                   chunk.match(/<span\s+class=["'][^"']*andes-money-amount__fraction[^"']*["']>([0-9.]+)<\/span>/i);
+        if (currentAmountMatch) {
+          const frac = currentAmountMatch[1];
+          const cents = currentAmountMatch[2] ? currentAmountMatch[2].padStart(2, '0') : '00';
+          price = `R$ ${frac},${cents}`;
+        }
+
+        let originalPrice = '';
+        const prevAmountMatch = chunk.match(/class=["'][^"']*(?:andes-money-amount--previous|andes-money-amount--strike)[^"']*["'][^>]*aria-label=["']Antes:\s*([0-9.]+)\s*reais(?:\s*com\s*([0-9]{1,2})\s*centavos)?["']/i) ||
+                                chunk.match(/<s>[\s\S]*?([0-9.,]+)<\/s>/i);
+        if (prevAmountMatch) {
+          const frac = prevAmountMatch[1];
+          const cents = prevAmountMatch[2] ? prevAmountMatch[2].padStart(2, '0') : '00';
+          originalPrice = `R$ ${frac},${cents}`;
+        }
+
+        const discMatch = chunk.match(/class=["'][^"']*(?:poly-price__discount|polylabel-pill|andes-money-amount__discount|ui-search-price__discount)[^"']*["'][^>]*>([0-9]+)%\s*OFF</i) ||
+                          chunk.match(/([0-9]+)%\s*OFF/i);
+        const discountPercent = discMatch ? parseInt(discMatch[1], 10) : 0;
+
+        const badgeMatch = chunk.match(/class=["'][^"']*(?:polylabel-fs-xs|ui-search-item__highlight-label)[^"']*["']>([^<]+)</i);
+        const badgeText = badgeMatch ? badgeMatch[1].trim() : '';
+
+        if (rawTitle && price && cleanUrl) {
+          seenUrls.add(cleanUrl);
+          deals.push({
+            title: rawTitle,
+            cleanUrl,
+            imageUrl,
+            price,
+            originalPrice,
+            discountPercent,
+            discountTag: discountPercent > 0 ? `${discountPercent}% OFF` : '',
+            rating,
+            badgeText,
+            category: detectCategory(rawTitle, badgeText, cleanUrl)
+          });
+        }
+      }
+
+      if (deals.length >= 24) break;
+    } catch (e) {
+      console.warn('[Deals Miner Scraper] Erro na URL', url, e.message);
     }
   }
 
@@ -148,14 +169,14 @@ async function scrapeMercadoLivreDeals() {
 }
 
 async function handleMineDeals(req, res) {
-  const limit = Math.min(Math.max(parseInt(req.query?.limit || req.body?.limit || '3', 10), 1), 15);
-  const minDiscount = Math.max(parseInt(req.query?.min_discount || req.body?.min_discount || '25', 10), 0);
-  const minRating = parseFloat(req.query?.min_rating || req.body?.min_rating || '4.0');
+  const limit = Math.min(Math.max(parseInt(req.query?.limit || req.body?.limit || '12', 10), 1), 48);
+  const minDiscount = Math.max(parseInt(req.query?.min_discount || req.body?.min_discount || '20', 10), 0);
+  const minRating = parseFloat(req.query?.min_rating || req.body?.min_rating || '0');
   const dryRun = req.query?.dry_run === 'true' || req.body?.dry_run === true;
   const targetCategory = req.query?.category || req.body?.category || null;
 
   try {
-    console.log(`[Deals Miner] Iniciando mineração no Mercado Livre (Min ${minDiscount}% OFF, Min ${minRating}⭐, Limite: ${limit})...`);
+    console.log(`[Deals Miner] Iniciando mineração no Mercado Livre (Min ${minDiscount}% OFF, Limite: ${limit})...`);
 
     // 1. Scrape all current promotion cards
     const allDeals = await scrapeMercadoLivreDeals();
@@ -175,10 +196,16 @@ async function handleMineDeals(req, res) {
       return res.status(200).json({
         success: true,
         message: 'Nenhuma oferta atendeu a todos os critérios de filtro nesta execução.',
+        scraped_count: allDeals.length,
         totalScanned: allDeals.length,
+        qualified_count: 0,
         qualifiedCount: 0,
+        inserted_count: 0,
         insertedCount: 0,
-        deals: []
+        duplicate_count: 0,
+        ignored_discount_count: allDeals.length,
+        deals: [],
+        items: []
       });
     }
 
@@ -186,9 +213,13 @@ async function handleMineDeals(req, res) {
       return res.status(200).json({
         success: true,
         dryRun: true,
+        scraped_count: allDeals.length,
         totalScanned: allDeals.length,
+        qualified_count: qualified.length,
         qualifiedCount: qualified.length,
-        candidateDeals: qualified.slice(0, limit)
+        inserted_count: 0,
+        candidateDeals: qualified.slice(0, limit),
+        items: qualified.slice(0, limit)
       });
     }
 
@@ -197,7 +228,7 @@ async function handleMineDeals(req, res) {
     let existingTitles = new Set();
 
     try {
-      const getRes = await fetch(`${SUPABASE_URL}/rest/v1/fast_affiliate_products?select=id,title,affiliate_url&limit=200`, {
+      const getRes = await fetch(`${SUPABASE_URL}/rest/v1/fast_affiliate_products?select=id,title,affiliate_url&limit=300`, {
         headers: {
           'apikey': SUPABASE_KEY,
           'Authorization': `Bearer ${SUPABASE_KEY}`
@@ -218,11 +249,14 @@ async function handleMineDeals(req, res) {
 
     // 4. Select only non-duplicate items
     const dealsToInsert = [];
+    let duplicatesSkipped = 0;
+
     for (const deal of qualified) {
       const cleanUrlNorm = deal.cleanUrl.toLowerCase().split('?')[0].split('#')[0];
       const titleNorm = deal.title.toLowerCase().trim();
 
       if (existingUrls.has(cleanUrlNorm) || existingTitles.has(titleNorm)) {
+        duplicatesSkipped++;
         continue;
       }
 
@@ -274,11 +308,17 @@ async function handleMineDeals(req, res) {
       return res.status(200).json({
         success: true,
         message: 'Todas as ofertas qualificadas já estão cadastradas no banco.',
+        scraped_count: allDeals.length,
         totalScanned: allDeals.length,
+        qualified_count: qualified.length,
         qualifiedCount: qualified.length,
+        inserted_count: 0,
         insertedCount: 0,
+        duplicate_count: duplicatesSkipped,
+        ignored_discount_count: allDeals.length - qualified.length,
         skippedDuplicates: true,
-        deals: []
+        deals: [],
+        items: []
       });
     }
 
@@ -306,10 +346,16 @@ async function handleMineDeals(req, res) {
     return res.status(200).json({
       success: true,
       message: `🎉 ${dealsToInsert.length} novas ofertas mineradas e cadastradas no FastSavory's com sucesso!`,
+      scraped_count: allDeals.length,
       totalScanned: allDeals.length,
+      qualified_count: qualified.length,
       qualifiedCount: qualified.length,
+      inserted_count: dealsToInsert.length,
       insertedCount: dealsToInsert.length,
-      deals: insertedData
+      duplicate_count: duplicatesSkipped,
+      ignored_discount_count: allDeals.length - qualified.length,
+      deals: insertedData,
+      items: dealsToInsert
     });
 
   } catch (error) {

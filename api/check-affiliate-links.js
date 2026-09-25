@@ -636,6 +636,11 @@ export default async function handler(req, res) {
       });
     }
 
+    // Action 0.5: Automatic 4x daily Link Health, Status & Price Synchronizer
+    if (action === 'auto-sync' || action === 'auto-sync-links' || action === 'sync-prices') {
+      return handleAutoSyncLinks(req, res);
+    }
+
     // Action 1: Auto-fetch single product details with high precision
     if (action === 'fetch' || (req.query.url && !req.query.items && !req.body?.items)) {
       const targetUrl = req.query.url || req.body?.url;
@@ -794,3 +799,113 @@ export default async function handler(req, res) {
     return res.status(500).json({ error: 'Erro ao processar', details: error.message });
   }
 }
+
+async function handleAutoSyncLinks(req, res) {
+  const SUPABASE_URL = process.env.SUPABASE_URL || 'https://vqjyjdllapqbqpylshkw.supabase.co';
+  const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxanlqZGxsYXBxYnFweWxzaGt3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY0MzgyNDUsImV4cCI6MjA4MjAxNDI0NX0.tfTR9YnM5l0do7FJfxML6i05KTSrMInQMqFrWXx6aAU';
+
+  try {
+    console.log('[AutoSync Affiliate Links] Iniciando verificação programada de links...');
+    const dbRes = await fetch(`${SUPABASE_URL}/rest/v1/fast_affiliate_products?select=*&is_active=eq.true&order=position.asc`, {
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`
+      }
+    });
+
+    if (!dbRes.ok) {
+      throw new Error(`Erro ao buscar produtos do banco: HTTP ${dbRes.status}`);
+    }
+
+    const items = await dbRes.json();
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(200).json({ success: true, message: 'Nenhum produto ativo para verificar.', total_checked: 0 });
+    }
+
+    let pausedCount = 0;
+    let priceUpdatedCount = 0;
+    let unchangedCount = 0;
+    let errorCount = 0;
+    const updates = [];
+
+    // Processa em batches de 3 para não sobrecarregar
+    for (let i = 0; i < items.length; i += 3) {
+      const batch = items.slice(i, i + 3);
+      await Promise.all(batch.map(async (item) => {
+        try {
+          const details = await fetchProductDetails(item.affiliate_url);
+          
+          if (details.is_active === false) {
+            await fetch(`${SUPABASE_URL}/rest/v1/fast_affiliate_products?id=eq.${item.id}`, {
+              method: 'PATCH',
+              headers: {
+                'apikey': SUPABASE_KEY,
+                'Authorization': `Bearer ${SUPABASE_KEY}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ is_active: false, updated_at: new Date().toISOString() })
+            });
+            pausedCount++;
+            updates.push({ id: item.id, title: item.title, action: 'paused', reason: 'Pausado ou Esgotado' });
+          } else {
+            const patchPayload = { updated_at: new Date().toISOString() };
+            let hasPriceChange = false;
+
+            if (details.price_display && details.price_display !== item.price_display) {
+              patchPayload.price_display = details.price_display;
+              hasPriceChange = true;
+            }
+            if (details.original_price && details.original_price !== item.original_price) {
+              patchPayload.original_price = details.original_price;
+              hasPriceChange = true;
+            }
+            if (details.discount_tag && details.discount_tag !== item.discount_tag) {
+              patchPayload.discount_tag = details.discount_tag;
+              hasPriceChange = true;
+            }
+
+            if (hasPriceChange) {
+              await fetch(`${SUPABASE_URL}/rest/v1/fast_affiliate_products?id=eq.${item.id}`, {
+                method: 'PATCH',
+                headers: {
+                  'apikey': SUPABASE_KEY,
+                  'Authorization': `Bearer ${SUPABASE_KEY}`,
+                  'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(patchPayload)
+              });
+              priceUpdatedCount++;
+              updates.push({ id: item.id, title: item.title, action: 'price_updated', old_price: item.price_display, new_price: details.price_display });
+            } else {
+              unchangedCount++;
+            }
+          }
+        } catch (itemErr) {
+          errorCount++;
+          console.warn(`[AutoSync] Erro ao checar item #${item.id}:`, itemErr.message);
+        }
+      }));
+    }
+
+    console.log(`[AutoSync Affiliate Links] Concluído: ${items.length} verificados | ${priceUpdatedCount} preços atualizados | ${pausedCount} pausados`);
+
+    return res.status(200).json({
+      success: true,
+      message: `✅ Verificação concluída: ${items.length} links verificados (${priceUpdatedCount} preços atualizados, ${pausedCount} pausados, ${unchangedCount} inalterados).`,
+      total_checked: items.length,
+      price_updated_count: priceUpdatedCount,
+      paused_count: pausedCount,
+      unchanged_count: unchangedCount,
+      error_count: errorCount,
+      updates
+    });
+  } catch (error) {
+    console.error('[AutoSync Affiliate Links] Erro geral:', error);
+    return res.status(500).json({ success: false, error: 'Erro ao executar verificação automática', details: error.message });
+  }
+}
+
+module.exports.handleAutoSyncLinks = handleAutoSyncLinks;
+module.exports.fetchProductDetails = fetchProductDetails;
+module.exports.extractProductPriceAndStatus = extractProductPriceAndStatus;
+

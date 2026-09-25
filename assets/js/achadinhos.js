@@ -6,6 +6,8 @@
   let affiliateProducts = [];
   let currentCategory = 'all';
   let currentSearch = '';
+  let showcaseCurrentPage = 1;
+  const SHOWCASE_ITEMS_PER_PAGE = 100;
 
   document.addEventListener('DOMContentLoaded', async () => {
     initAffiliateShowcase();
@@ -363,9 +365,15 @@
       return matchCat && matchSearch;
     });
 
+    const paginationContainer = document.getElementById('showcasePaginationContainer');
+    const paginationRange = document.getElementById('showcasePaginationRange');
+    const paginationTotal = document.getElementById('showcasePaginationTotal');
+    const paginationNav = document.getElementById('showcasePaginationNav');
+
     if (filtered.length === 0) {
       grid.innerHTML = '';
       if (emptyState) emptyState.classList.remove('hidden');
+      if (paginationContainer) paginationContainer.classList.add('hidden');
       return;
     }
 
@@ -388,7 +396,56 @@
 
     if (emptyState) emptyState.classList.add('hidden');
 
-    grid.innerHTML = filtered.map(item => {
+    // Paginação de 100 em 100
+    const totalPages = Math.ceil(filtered.length / SHOWCASE_ITEMS_PER_PAGE) || 1;
+    if (showcaseCurrentPage > totalPages) showcaseCurrentPage = totalPages;
+    if (showcaseCurrentPage < 1) showcaseCurrentPage = 1;
+
+    const startIndex = (showcaseCurrentPage - 1) * SHOWCASE_ITEMS_PER_PAGE;
+    const endIndex = Math.min(startIndex + SHOWCASE_ITEMS_PER_PAGE, filtered.length);
+    const paginatedItems = filtered.slice(startIndex, endIndex);
+
+    if (paginationContainer) {
+      paginationContainer.classList.remove('hidden');
+      if (paginationRange) paginationRange.textContent = `${startIndex + 1}-${endIndex}`;
+      if (paginationTotal) paginationTotal.textContent = filtered.length;
+
+      if (paginationNav) {
+        let navHtml = '';
+        
+        navHtml += `
+          <button type="button" onclick="window.goToAchadinhosPage(${showcaseCurrentPage - 1})"
+                  ${showcaseCurrentPage === 1 ? 'disabled class="px-3 py-1.5 text-xs text-gray-300 cursor-not-allowed rounded-xl border border-gray-200"' : 'class="px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100 rounded-xl border border-gray-300 font-bold transition shadow-xs"'}>
+            ‹ Anterior
+          </button>
+        `;
+
+        for (let p = 1; p <= totalPages; p++) {
+          if (p === 1 || p === totalPages || (p >= showcaseCurrentPage - 2 && p <= showcaseCurrentPage + 2)) {
+            const isActive = p === showcaseCurrentPage;
+            navHtml += `
+              <button type="button" onclick="window.goToAchadinhosPage(${p})"
+                      class="px-3.5 py-1.5 text-xs font-black rounded-xl transition ${isActive ? 'bg-yellow-400 text-gray-950 shadow-md border-2 border-yellow-500 scale-105' : 'bg-white hover:bg-gray-100 text-gray-700 border border-gray-200 shadow-xs'}">
+                ${p}
+              </button>
+            `;
+          } else if (p === showcaseCurrentPage - 3 || p === showcaseCurrentPage + 3) {
+            navHtml += `<span class="px-1 text-gray-400 font-bold">...</span>`;
+          }
+        }
+
+        navHtml += `
+          <button type="button" onclick="window.goToAchadinhosPage(${showcaseCurrentPage + 1})"
+                  ${showcaseCurrentPage === totalPages ? 'disabled class="px-3 py-1.5 text-xs text-gray-300 cursor-not-allowed rounded-xl border border-gray-200"' : 'class="px-3 py-1.5 text-xs text-gray-700 hover:bg-gray-100 rounded-xl border border-gray-300 font-bold transition shadow-xs"'}>
+            Próximo ›
+          </button>
+        `;
+
+        paginationNav.innerHTML = navHtml;
+      }
+    }
+
+    grid.innerHTML = paginatedItems.map(item => {
       const isFastPick = Boolean(item.is_fast_pick || item.badge_color === 'fast_seal');
       const platformInfo = detectPlatform(item.affiliate_url);
 
@@ -671,5 +728,13 @@
   }
 
   // Exportar para uso global
+  window.goToAchadinhosPage = function (page) {
+    showcaseCurrentPage = page;
+    renderProducts();
+    const gridEl = document.getElementById('affiliateProductsGrid');
+    if (gridEl) {
+      gridEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
   window.reloadAffiliateShowcase = fetchAffiliateProducts;
 })();

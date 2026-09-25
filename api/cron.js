@@ -10,6 +10,7 @@ const { handleSendWhatsAppDeal } = require('./_lib/cron-whatsapp-deal');
 const { handleNotifyScheduledOrders } = require('./_lib/cron-scheduled-orders');
 const { handleBirthdayBroadcast } = require('./_lib/cron-birthday-broadcast');
 const { handleMineDeals } = require('./_lib/cron-deals-miner');
+const { handleAutoSyncLinks } = require('./check-affiliate-links');
 
 module.exports = async function handler(req, res) {
   // CORS
@@ -24,8 +25,9 @@ module.exports = async function handler(req, res) {
   const action = req.query.action || (req.body && req.body.action) || 'send-whatsapp-deal';
 
   // Validação de Segurança Global de CRON_SECRET
+  const isPublicAction = ['send-whatsapp-deal', 'whatsapp-deal', 'mine-deals', 'deals-miner', 'auto-sync-links', 'check-sync-links', 'verify-links'].includes(action);
   const requiredCronSecret = process.env.CRON_SECRET;
-  if (requiredCronSecret && action !== 'send-whatsapp-deal' && action !== 'whatsapp-deal' && action !== 'mine-deals' && action !== 'deals-miner') {
+  if (requiredCronSecret && !isPublicAction) {
     const authHeader = req.headers['authorization'] || '';
     const providedSecret = authHeader.replace(/^Bearer\s+/i, '').trim() ||
       req.headers['x-cron-secret'] ||
@@ -47,6 +49,11 @@ module.exports = async function handler(req, res) {
     case 'deals-miner':
       return handleMineDeals(req, res);
 
+    case 'auto-sync-links':
+    case 'check-sync-links':
+    case 'verify-links':
+      return handleAutoSyncLinks(req, res);
+
     case 'notify-scheduled-orders':
     case 'scheduled-orders':
       return handleNotifyScheduledOrders(req, res);
@@ -58,7 +65,7 @@ module.exports = async function handler(req, res) {
     default:
       return res.status(400).json({
         success: false,
-        error: `Ação desconhecida: "${action}". Ações válidas: send-whatsapp-deal, mine-deals, notify-scheduled-orders, birthday-broadcast.`
+        error: `Ação desconhecida: "${action}". Ações válidas: send-whatsapp-deal, mine-deals, auto-sync-links, notify-scheduled-orders, birthday-broadcast.`
       });
   }
 };

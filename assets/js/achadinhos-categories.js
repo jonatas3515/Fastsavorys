@@ -177,12 +177,16 @@ window.AchadinhosCategories = (function () {
     return currentTree;
   }
 
+  let remoteColumnDisabled = false;
+
   /**
    * Carrega categorias do Supabase com stale-while-revalidate
    */
   async function loadCategories(force = false) {
     // 1. Garante que temos pelo menos o cache local carregado
     getTree();
+
+    if (remoteColumnDisabled) return getTree();
 
     // 2. Busca do Supabase em background
     try {
@@ -193,7 +197,12 @@ window.AchadinhosCategories = (function () {
           .eq('id', 1)
           .single();
 
-        if (!error && data && data.affiliate_categories) {
+        if (error) {
+          remoteColumnDisabled = true;
+          return getTree();
+        }
+
+        if (data && data.affiliate_categories) {
           let remoteData = data.affiliate_categories;
           if (typeof remoteData === 'string') {
             try { remoteData = JSON.parse(remoteData); } catch (err) {}
@@ -214,7 +223,7 @@ window.AchadinhosCategories = (function () {
         }
       }
     } catch (e) {
-      console.warn('[AchadinhosCategories] Erro ao buscar do Supabase:', e);
+      remoteColumnDisabled = true;
     }
 
     return getTree();
@@ -236,7 +245,7 @@ window.AchadinhosCategories = (function () {
     localStorage.setItem(VERSION_KEY, String(currentVersion));
 
     // 2. Salva no Supabase (fast_store_config)
-    if (window.supabaseClient) {
+    if (window.supabaseClient && !remoteColumnDisabled) {
       const payload = {
         affiliate_categories: {
           version: currentVersion,
@@ -252,10 +261,10 @@ window.AchadinhosCategories = (function () {
           .eq('id', 1);
 
         if (error) {
-          console.warn('[AchadinhosCategories] Coluna affiliate_categories não encontrada, salvando em fallback:', error);
+          remoteColumnDisabled = true;
         }
       } catch (err) {
-        console.warn('[AchadinhosCategories] Erro ao sincronizar com banco:', err);
+        remoteColumnDisabled = true;
       }
     }
 

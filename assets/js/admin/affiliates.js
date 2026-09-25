@@ -8,6 +8,8 @@ window.AffiliatesModule = (function () {
   let searchQuery = '';
   let categoryFilter = 'all';
   let statusFilter = 'all';
+  let adminCurrentPage = 1;
+  const ADMIN_ITEMS_PER_PAGE = 100;
 
   async function loadProducts() {
     const tbody = document.getElementById('affiliateAdminTableBody');
@@ -64,16 +66,19 @@ window.AffiliatesModule = (function () {
 
   function handleSearch(val) {
     searchQuery = (val || '').toLowerCase().trim();
+    adminCurrentPage = 1;
     renderTable();
   }
 
   function handleCategoryFilter(val) {
     categoryFilter = val || 'all';
+    adminCurrentPage = 1;
     renderTable();
   }
 
   function handleStatusFilter(val) {
     statusFilter = val || 'all';
+    adminCurrentPage = 1;
     renderTable();
   }
 
@@ -81,6 +86,7 @@ window.AffiliatesModule = (function () {
     searchQuery = '';
     categoryFilter = 'all';
     statusFilter = 'all';
+    adminCurrentPage = 1;
     const sInput = document.getElementById('affiliateAdminSearchInput');
     const cSelect = document.getElementById('affiliateAdminCategoryFilter');
     const stSelect = document.getElementById('affiliateAdminStatusFilter');
@@ -88,6 +94,15 @@ window.AffiliatesModule = (function () {
     if (cSelect) cSelect.value = 'all';
     if (stSelect) stSelect.value = 'all';
     renderTable();
+  }
+
+  function goToPage(page) {
+    adminCurrentPage = page;
+    renderTable();
+    const tableEl = document.getElementById('affiliateAdminTableBody');
+    if (tableEl) {
+      tableEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
   }
 
   function getFilteredProducts() {
@@ -146,6 +161,11 @@ window.AffiliatesModule = (function () {
 
   function renderTable() {
     const tbody = document.getElementById('affiliateAdminTableBody');
+    const paginationContainer = document.getElementById('affiliatePaginationContainer');
+    const paginationRange = document.getElementById('affiliatePaginationRange');
+    const paginationTotal = document.getElementById('affiliatePaginationTotal');
+    const paginationNav = document.getElementById('affiliatePaginationNav');
+
     if (!tbody) return;
 
     if (productsList.length === 0) {
@@ -156,6 +176,7 @@ window.AffiliatesModule = (function () {
           </td>
         </tr>
       `;
+      if (paginationContainer) paginationContainer.classList.add('hidden');
       return;
     }
 
@@ -170,10 +191,64 @@ window.AffiliatesModule = (function () {
           </td>
         </tr>
       `;
+      if (paginationContainer) paginationContainer.classList.add('hidden');
       return;
     }
 
-    tbody.innerHTML = filtered.map((item, index) => {
+    // Paginação de 100 em 100
+    const totalPages = Math.ceil(filtered.length / ADMIN_ITEMS_PER_PAGE) || 1;
+    if (adminCurrentPage > totalPages) adminCurrentPage = totalPages;
+    if (adminCurrentPage < 1) adminCurrentPage = 1;
+
+    const startIndex = (adminCurrentPage - 1) * ADMIN_ITEMS_PER_PAGE;
+    const endIndex = Math.min(startIndex + ADMIN_ITEMS_PER_PAGE, filtered.length);
+    const paginatedItems = filtered.slice(startIndex, endIndex);
+
+    if (paginationContainer) {
+      paginationContainer.classList.remove('hidden');
+      if (paginationRange) paginationRange.textContent = `${startIndex + 1}-${endIndex}`;
+      if (paginationTotal) paginationTotal.textContent = filtered.length;
+
+      if (paginationNav) {
+        let navHtml = '';
+        
+        // Botão Anterior
+        navHtml += `
+          <button type="button" onclick="AffiliatesModule.goToPage(${adminCurrentPage - 1})"
+                  ${adminCurrentPage === 1 ? 'disabled class="px-2.5 py-1 text-xs text-gray-300 cursor-not-allowed rounded border border-gray-200"' : 'class="px-2.5 py-1 text-xs text-gray-700 hover:bg-gray-100 rounded border border-gray-300 font-bold transition"'}>
+            ‹ Anterior
+          </button>
+        `;
+
+        // Abas Numéricas (1, 2, 3...)
+        for (let p = 1; p <= totalPages; p++) {
+          if (p === 1 || p === totalPages || (p >= adminCurrentPage - 2 && p <= adminCurrentPage + 2)) {
+            const isActive = p === adminCurrentPage;
+            navHtml += `
+              <button type="button" onclick="AffiliatesModule.goToPage(${p})"
+                      class="px-3 py-1 text-xs font-bold rounded-lg transition ${isActive ? 'bg-yellow-400 text-gray-950 shadow-sm border border-yellow-500 scale-105' : 'bg-white hover:bg-gray-100 text-gray-700 border border-gray-200'}">
+                ${p}
+              </button>
+            `;
+          } else if (p === adminCurrentPage - 3 || p === adminCurrentPage + 3) {
+            navHtml += `<span class="px-1 text-gray-400 font-bold">...</span>`;
+          }
+        }
+
+        // Botão Próximo
+        navHtml += `
+          <button type="button" onclick="AffiliatesModule.goToPage(${adminCurrentPage + 1})"
+                  ${adminCurrentPage === totalPages ? 'disabled class="px-2.5 py-1 text-xs text-gray-300 cursor-not-allowed rounded border border-gray-200"' : 'class="px-2.5 py-1 text-xs text-gray-700 hover:bg-gray-100 rounded border border-gray-300 font-bold transition"'}>
+            Próximo ›
+          </button>
+        `;
+
+        paginationNav.innerHTML = navHtml;
+      }
+    }
+
+    tbody.innerHTML = paginatedItems.map((item, index) => {
+      const absoluteIdx = startIndex + index + 1;
       const activeBadge = item.is_active 
         ? `<span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-green-100 text-green-800">Ativo</span>`
         : `<span class="px-2 py-0.5 text-xs font-semibold rounded-full bg-gray-100 text-gray-600">Pausado</span>`;
@@ -235,7 +310,7 @@ window.AffiliatesModule = (function () {
 
       return `
         <tr class="hover:bg-gray-50 transition-colors border-b border-gray-100 ${isFastPick ? 'bg-pink-50/20' : ''}">
-          <td class="p-3 text-center text-xs font-bold text-gray-500 w-12">${index + 1}</td>
+          <td class="p-3 text-center text-xs font-bold text-gray-500 w-12">${absoluteIdx}</td>
           <td class="p-3 w-16">
             <img src="${escapeHtml(item.image_url)}" alt="" class="w-12 h-12 object-contain rounded-lg border-2 ${isFastPick ? 'border-pink-500 ring-2 ring-pink-100' : 'border-gray-200'} bg-white p-1" 
                  onerror="this.src='../assets/img/fast-logo.png'" />
@@ -1973,6 +2048,7 @@ window.AffiliatesModule = (function () {
     openBookmarkletModal,
     closeBookmarkletModal,
     copyBookmarkletCode,
-    getBookmarkletCode
+    getBookmarkletCode,
+    goToPage
   };
 })();
