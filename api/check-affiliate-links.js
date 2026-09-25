@@ -7,13 +7,13 @@
 
 function detectPlatform(url = '') {
   const u = (url || '').toLowerCase();
-  if (u.includes('amazon.com.br') || u.includes('amzn.to') || u.includes('a.co') || u.includes('amazon.')) {
+  if (u.includes('amazon') || u.includes('amzn') || u.includes('a.co') || u.includes('amzlinks')) {
     return 'amazon';
   }
-  if (u.includes('shopee.com.br') || u.includes('s.shopee.com.br') || u.includes('shope.ee') || u.includes('shopee.')) {
+  if (u.includes('shopee') || u.includes('s.shopee') || u.includes('shope.ee')) {
     return 'shopee';
   }
-  if (u.includes('mercadolivre.com') || u.includes('mercadolibre.com') || u.includes('meli.la')) {
+  if (u.includes('mercadolivre') || u.includes('mercadolibre') || u.includes('meli.la')) {
     return 'mercadolivre';
   }
   return 'marketplace';
@@ -22,6 +22,7 @@ function detectPlatform(url = '') {
 function cleanTitle(title = '', platform = '') {
   if (!title) return '';
   let clean = title.trim();
+  clean = clean.replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&#39;/g, "'");
   if (platform === 'mercadolivre' || !platform) {
     clean = clean.replace(/\s*\|\s*Mercado\s*Livre.*$/i, '')
                  .replace(/\s*-\s*Mercado\s*Livre.*$/i, '');
@@ -36,6 +37,15 @@ function cleanTitle(title = '', platform = '') {
                  .replace(/\s*-\s*Shopee.*$/i, '');
   }
   return clean.trim();
+}
+
+function cleanAmazonImageUrl(url = '') {
+  if (!url) return '';
+  const m = url.match(/(https?:\/\/[^\/]+\/images\/I\/[a-zA-Z0-9+_.-]+?)(?:\._[^.]+\.jpg|\.jpg_.*|\.jpg)$/i);
+  if (m && m[1]) {
+    return `${m[1]}.jpg`;
+  }
+  return url;
 }
 
 function formatBrlNumber(num) {
@@ -84,63 +94,23 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
       isPaused = true;
     }
 
-    // LAYER A: Structured JSON-LD Schema
-    const jsonLdRegex = /<script\s+type=["']application\/ld\+json["']>([\s\S]*?)<\/script>/gi;
-    let jMatch;
-    while ((jMatch = jsonLdRegex.exec(html)) !== null) {
-      try {
-        const schema = JSON.parse(jMatch[1]);
-        if (schema) {
-          const item = Array.isArray(schema) ? schema[0] : schema;
-          if (item && (item['@type'] === 'Product' || item['@type'] === 'ItemPage' || item.offers)) {
-            const offers = item.offers;
-            if (offers) {
-              const offerObj = Array.isArray(offers) ? offers[0] : offers;
-              const offerPrice = offerObj?.price || offerObj?.lowPrice;
-              if (offerPrice && Number(offerPrice) > 0) {
-                price = formatBrlNumber(Number(offerPrice));
-                if (offerObj?.availability && offerObj.availability.includes('OutOfStock')) {
-                  isPaused = true;
-                }
-                break;
-              }
-            }
-          }
-        }
-      } catch (e) {}
+    // 1. Check aok-offscreen with priceToPay label (Amazon Pix / Cash price)
+    const pixMatch = html.match(/class=["'][^"']*aok-offscreen[^"']*["'][^>]*>\s*(R\$\s*[0-9.,]+)\s*<\/span>/i);
+    if (pixMatch && pixMatch[1]) {
+      const clean = pixMatch[1].replace(/&nbsp;/g, ' ').replace(/[^\d.,]/g, '').trim();
+      if (clean) price = `R$ ${clean}`;
     }
 
-    // LAYER B: Targeted Amazon BuyBox / Apex Price Classes
+    // 2. Targeted Amazon BuyBox / Apex Price Classes
     if (!price) {
-      const targetedOffscreen = html.match(/class=["'][^"']*(?:apexPriceToPay|priceToPay|corePriceDisplay|reinventPricePriceToPayMargin|base-price|price-block)[^"']*["'][\s\S]*?class=["'][^"']*a-offscreen[^"']*["']>([^<]+)</i);
+      const targetedOffscreen = html.match(/class=["'][^"']*(?:apex-pricetopay-value|apexPriceToPay|priceToPay|reinventPricePriceToPayMargin|corePriceDisplay)[^"']*["'][\s\S]*?class=["'][^"']*a-offscreen[^"']*["']>([^<]+)</i);
       if (targetedOffscreen && targetedOffscreen[1]) {
         const clean = targetedOffscreen[1].replace(/&nbsp;/g, ' ').replace(/[^\d.,]/g, '').trim();
         if (clean) price = `R$ ${clean}`;
       }
     }
 
-    // LAYER C: CorePrice feature div without premature div truncation
-    if (!price) {
-      const corePriceSection = html.match(/id=["'](?:corePriceDisplay_desktop_feature_div|corePrice_feature_div|apex_desktop|desktop_unifiedPrice|desktop_buybox)[^"']*["'][\s\S]{1,3000}/i);
-      if (corePriceSection) {
-        const offscreenMatch = corePriceSection[0].match(/class=["'][^"']*a-offscreen[^"']*["']>([^<]+)</i);
-        if (offscreenMatch && offscreenMatch[1]) {
-          const clean = offscreenMatch[1].replace(/&nbsp;/g, ' ').replace(/[^\d.,]/g, '').trim();
-          if (clean) price = `R$ ${clean}`;
-        }
-      }
-    }
-
-    // LAYER D: Classic Amazon Price Block IDs
-    if (!price) {
-      const classicMatch = html.match(/id=["'](?:priceblock_ourprice|priceblock_dealprice|priceblock_saleprice|price_inside_buybox|tp-tool-tip-subtotal-price-value)["'][^>]*>([^<]+)</i);
-      if (classicMatch && classicMatch[1]) {
-        const clean = classicMatch[1].replace(/&nbsp;/g, ' ').replace(/[^\d.,]/g, '').trim();
-        if (clean) price = `R$ ${clean}`;
-      }
-    }
-
-    // LAYER E: Price Whole + Fraction combination
+    // 3. Whole + Fraction combination
     if (!price) {
       const wholeMatch = html.match(/class=["'][^"']*a-price-whole[^"']*["']>([0-9.,]+)<[\s\S]*?class=["'][^"']*a-price-fraction[^"']*["']>([0-9]{2})</i);
       if (wholeMatch && wholeMatch[1] && wholeMatch[2]) {
@@ -150,21 +120,44 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
       }
     }
 
-    // LAYER F: Embedded Amazon JSON (Twister / Buying Options)
+    // 4. Classic Amazon Price Block IDs
     if (!price) {
-      const buyingPriceMatch = html.match(/"(?:buyingPrice|priceAmount|displayPrice)"\s*:\s*(?:([0-9.]+)|"([^"]+)")/i);
-      if (buyingPriceMatch) {
-        if (buyingPriceMatch[1]) {
-          const num = parseFloat(buyingPriceMatch[1]);
-          if (!isNaN(num) && num > 0) price = formatBrlNumber(num);
-        } else if (buyingPriceMatch[2]) {
-          const clean = buyingPriceMatch[2].replace(/&nbsp;/g, ' ').replace(/[^\d.,]/g, '').trim();
-          if (clean) price = `R$ ${clean}`;
-        }
+      const classicMatch = html.match(/id=["'](?:priceblock_ourprice|priceblock_dealprice|priceblock_saleprice|price_inside_buybox|tp-tool-tip-subtotal-price-value)["'][^>]*>([^<]+)</i);
+      if (classicMatch && classicMatch[1]) {
+        const clean = classicMatch[1].replace(/&nbsp;/g, ' ').replace(/[^\d.,]/g, '').trim();
+        if (clean) price = `R$ ${clean}`;
       }
     }
 
-    // LAYER G: General a-offscreen with R$ in the whole document
+    // 5. Structured JSON-LD Schema
+    if (!price) {
+      const jsonLdRegex = /<script\s+type=["']application\/ld\+json["']>([\s\S]*?)<\/script>/gi;
+      let jMatch;
+      while ((jMatch = jsonLdRegex.exec(html)) !== null) {
+        try {
+          const schema = JSON.parse(jMatch[1]);
+          if (schema) {
+            const item = Array.isArray(schema) ? schema[0] : schema;
+            if (item && (item['@type'] === 'Product' || item['@type'] === 'ItemPage' || item.offers)) {
+              const offers = item.offers;
+              if (offers) {
+                const offerObj = Array.isArray(offers) ? offers[0] : offers;
+                const offerPrice = offerObj?.price || offerObj?.lowPrice;
+                if (offerPrice && Number(offerPrice) > 0) {
+                  price = formatBrlNumber(Number(offerPrice));
+                  if (offerObj?.availability && offerObj.availability.includes('OutOfStock')) {
+                    isPaused = true;
+                  }
+                  break;
+                }
+              }
+            }
+          }
+        } catch (e) {}
+      }
+    }
+
+    // 6. General a-offscreen with R$ in the whole document
     if (!price) {
       const generalOffscreen = html.match(/class=["'][^"']*a-offscreen[^"']*["']>(\s*R\$\s*[0-9.,]+)<\/span>/i);
       if (generalOffscreen && generalOffscreen[1]) {
@@ -174,7 +167,9 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
     }
 
     // Amazon Original / Strike-through Price
-    const origOffscreen = html.match(/class=["'][^"']*(?:a-text-price|basisPrice|savingPriceOverride)[^"']*["'][\s\S]*?class=["'][^"']*a-offscreen[^"']*["']>([^<]+)</i);
+    const origOffscreen = html.match(/class=["'][^"']*(?:apex-basisprice-offscreen-label|apex-basisprice-value|a-text-price|basisPrice|savingPriceOverride)[^"']*["'][\s\S]*?(?:De:\s*)?(R\$\s*[0-9.,]+)/i) ||
+                          html.match(/data-basisprice-label="[^"]*"\s+class=["'][^"']*apex-basisprice-offscreen-label[^"']*["'][^>]*>(?:De:\s*)?(R\$\s*[0-9.,]+)</i) ||
+                          html.match(/class=["'][^"']*(?:apex-basisprice-offscreen-label|a-text-strike)[^"']*["'][^>]*>(?:De:\s*)?(R\$\s*[0-9.,]+)</i);
     if (origOffscreen && origOffscreen[1]) {
       const clean = origOffscreen[1].replace(/&nbsp;/g, ' ').replace(/[^\d.,]/g, '').trim();
       if (clean && clean !== price.replace(/[^\d.,]/g, '')) originalPrice = `R$ ${clean}`;
@@ -362,30 +357,40 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
 
 async function fetchProductDetails(rawUrl) {
   let targetUrl = rawUrl.trim();
-  const platform = detectPlatform(targetUrl);
+  let platform = detectPlatform(targetUrl);
 
+  let initialHtml = '';
   // 1. Follow redirect for shortened links
   if (
     targetUrl.includes('meli.la') ||
     targetUrl.includes('mercadolivre.com/sec/') ||
     targetUrl.includes('amzn.to') ||
     targetUrl.includes('a.co') ||
+    targetUrl.includes('link.amazon') ||
+    targetUrl.includes('amzlinks.in') ||
     targetUrl.includes('s.shopee.com.br') ||
     targetUrl.includes('shope.ee')
   ) {
     try {
+      const ua = (platform === 'amazon' || targetUrl.includes('amazon') || targetUrl.includes('amzn') || targetUrl.includes('amzlinks'))
+        ? 'WhatsApp/2.24.8.85 i'
+        : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+
       const headRes = await fetch(targetUrl, {
         method: 'GET',
         redirect: 'follow',
         headers: {
-          'User-Agent':
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+          'User-Agent': ua,
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-          'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
-          'Upgrade-Insecure-Requests': '1'
+          'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7'
         }
       });
-      if (headRes.url) {
+
+      initialHtml = await headRes.text();
+      const btnMatch = initialHtml.match(/btn_url=([^"&'\s]+)/i);
+      if (btnMatch && btnMatch[1]) {
+        try { targetUrl = decodeURIComponent(btnMatch[1]); } catch (e) {}
+      } else if (headRes.url) {
         targetUrl = headRes.url;
       }
     } catch (e) {
@@ -393,12 +398,17 @@ async function fetchProductDetails(rawUrl) {
     }
   }
 
+  platform = detectPlatform(targetUrl);
+
+  const fetchUa = platform === 'amazon'
+    ? 'WhatsApp/2.24.8.85 i'
+    : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+
   // 2. Fetch page HTML
   const pageRes = await fetch(targetUrl, {
     method: 'GET',
     headers: {
-      'User-Agent':
-        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+      'User-Agent': fetchUa,
       'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
       'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
       'Sec-Ch-Ua': '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
@@ -418,22 +428,27 @@ async function fetchProductDetails(rawUrl) {
   let imageUrl = '';
 
   const titleMatch =
-    html.match(/<h1[^>]*id=["']productTitle["'][^>]*>([^<]+)<\/h1>/i) ||
-    html.match(/<h1[^>]*class=["'][^"']*(?:ui-pdp-title|poly-component__title)[^"']*["'][^>]*>([^<]+)<\/h1>/i) ||
-    html.match(/class=["'][^"']*poly-component__title[^"']*["'][^>]*><a[^>]*>([^<]+)<\/a>/i) ||
-    html.match(/class=["'][^"']*poly-component__title[^"']*["'][^>]*>([^<]+)<\//i) ||
+    html.match(/<h1[^>]*id=["']productTitle["'][^>]*>([\s\S]*?)<\/h1>/i) ||
+    html.match(/<h1[^>]*class=["'][^"']*(?:ui-pdp-title|poly-component__title)[^"']*["'][^>]*>([\s\S]*?)<\/h1>/i) ||
+    html.match(/class=["'][^"']*poly-component__title[^"']*["'][^>]*><a[^>]*>([\s\S]*?)<\/a>/i) ||
+    html.match(/class=["'][^"']*poly-component__title[^"']*["'][^>]*>([\s\S]*?)<\//i) ||
     html.match(/<meta\s+property=["']og:title["']\s+content=["'](.*?)["']/i) ||
-    html.match(/<title>(.*?)<\/title>/i);
+    html.match(/<title>([\s\S]*?)<\/title>/i) ||
+    initialHtml.match(/<meta\s+property=["']og:title["']\s+content=["'](.*?)["']/i) ||
+    initialHtml.match(/<title>([\s\S]*?)<\/title>/i);
   if (titleMatch && titleMatch[1]) {
     title = cleanTitle(titleMatch[1], platform);
   }
 
   const imageMatch =
+    html.match(/id=["']landingImage["'][^>]*src=["']([^"']+)["']/i) ||
+    html.match(/id=["']landingImage["'][^>]*data-old-hires=["']([^"']+)["']/i) ||
     html.match(/<meta\s+property=["']og:image["']\s+content=["'](.*?)["']/i) ||
     html.match(/class=["'][^"']*ui-pdp-image[^"']*["'][\s\S]*?src=["']([^"']+)["']/i) ||
-    html.match(/class=["'][^"']*poly-component__picture[^"']*["'][\s\S]*?src=["']([^"']+)["']/i);
+    html.match(/class=["'][^"']*poly-component__picture[^"']*["'][\s\S]*?src=["']([^"']+)["']/i) ||
+    initialHtml.match(/<meta\s+property=["']og:image["']\s+content=["'](.*?)["']/i);
   if (imageMatch && imageMatch[1]) {
-    imageUrl = imageMatch[1];
+    imageUrl = platform === 'amazon' ? cleanAmazonImageUrl(imageMatch[1]) : imageMatch[1];
   }
 
   if (!imageUrl && platform === 'amazon') {
@@ -442,7 +457,7 @@ async function fetchProductDetails(rawUrl) {
                         html.match(/data-a-dynamic-image=["']\{&quot;([^&]+)&quot;/i) ||
                         html.match(/id=["'](?:imgBlkFront|main-image)["'][^>]*src=["']([^"']+)["']/i);
     if (amzImgMatch && amzImgMatch[1]) {
-      imageUrl = amzImgMatch[1];
+      imageUrl = cleanAmazonImageUrl(amzImgMatch[1]);
     }
   }
 
@@ -599,11 +614,15 @@ export default async function handler(req, res) {
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 8000);
 
+          const isAmz = url.includes('amazon') || url.includes('amzn') || url.includes('a.co') || url.includes('amzlinks');
+          const fetchUa = isAmz
+            ? 'WhatsApp/2.24.8.85 i'
+            : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+
           const response = await fetch(url, {
             method: 'GET',
             headers: {
-              'User-Agent':
-                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+              'User-Agent': fetchUa,
               'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
               'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
               'Sec-Ch-Ua': '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',

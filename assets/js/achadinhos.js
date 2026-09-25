@@ -295,7 +295,7 @@
 
   function detectPlatform(url = '') {
     const u = (url || '').toLowerCase();
-    if (u.includes('amazon.com.br') || u.includes('amzn.to') || u.includes('a.co') || u.includes('amazon.')) {
+    if (u.includes('amazon') || u.includes('amzn') || u.includes('a.co') || u.includes('amzlinks')) {
       return { 
         id: 'amazon', 
         name: 'Amazon', 

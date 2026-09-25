@@ -135,10 +135,10 @@ window.AffiliatesModule = (function () {
 
   function detectPlatform(url = '') {
     const u = (url || '').toLowerCase();
-    if (u.includes('amazon.com.br') || u.includes('amzn.to') || u.includes('a.co') || u.includes('amazon.')) {
+    if (u.includes('amazon') || u.includes('amzn') || u.includes('a.co') || u.includes('amzlinks')) {
       return { id: 'amazon', name: 'Amazon', icon: '📦', badge: 'bg-amber-100 text-amber-900 border-amber-300' };
     }
-    if (u.includes('shopee.com.br') || u.includes('s.shopee.com.br') || u.includes('shope.ee') || u.includes('shopee.')) {
+    if (u.includes('shopee') || u.includes('s.shopee') || u.includes('shope.ee')) {
       return { id: 'shopee', name: 'Shopee', icon: '🧡', badge: 'bg-orange-100 text-orange-900 border-orange-300' };
     }
     return { id: 'mercadolivre', name: 'Mercado Livre', icon: '💛', badge: 'bg-yellow-100 text-yellow-900 border-yellow-300' };
@@ -486,9 +486,9 @@ window.AffiliatesModule = (function () {
 
       const info = data.data;
 
-      // Preenche automaticamente o título se não tiver
+      // Preenche automaticamente o título
       const titleEl = document.getElementById('affiliateTitleInput');
-      if (info.title && (!titleEl.value.trim() || titleEl.value.trim() === '')) {
+      if (info.title && (!titleEl.value.trim() || titleEl.value.trim().startsWith('Produto '))) {
         titleEl.value = info.title;
       }
 
@@ -508,7 +508,7 @@ window.AffiliatesModule = (function () {
         document.getElementById('affiliateOriginalPriceInput').value = info.original_price;
       }
 
-      // Preenche campo de Desconto (e NÃO preenche Selo/Tag para evitar duplicação)
+      // Preenche campo de Desconto e recalcula
       const discountEl = document.getElementById('affiliateDiscountInput');
       if (discountEl) {
         if (info.discount_percent > 0) {
@@ -518,19 +518,22 @@ window.AffiliatesModule = (function () {
         }
       }
 
+      recalculateDiscount();
+
       // Preenche categoria detectada automaticamente
       const detectedCat = info.category || detectCategoryClient(info.title || '');
       if (detectedCat && document.getElementById('affiliateCategoryInput')) {
         document.getElementById('affiliateCategoryInput').value = detectedCat;
       }
 
+      const platformName = info.platform === 'amazon' ? 'Amazon' : (info.platform === 'shopee' ? 'Shopee' : 'Mercado Livre');
       if (info.is_active === false) {
         document.getElementById('affiliateActiveInput').checked = false;
-        alert('⚠️ Atenção: Este anúncio parece estar pausado ou finalizado no Mercado Livre.');
+        alert(`⚠️ Atenção: Este anúncio parece estar pausado ou finalizado na ${platformName}.`);
       }
 
       if (window.showToast) {
-        window.showToast('✨ Dados do anúncio e categoria preenchidos automaticamente!', 'success');
+        window.showToast(`✨ Dados da ${platformName} preenchidos automaticamente!`, 'success');
       }
     } catch (err) {
       console.warn('[AutoFetch ML] Erro:', err);
