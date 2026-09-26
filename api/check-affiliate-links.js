@@ -559,7 +559,7 @@ function detectCategory(title = '', description = '', url = '') {
   return 'confeitaria_sobremesas';
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
@@ -1050,6 +1050,7 @@ async function handleAutoSyncLinks(req, res) {
   }
 }
 
+module.exports = handler;
 module.exports.handleAutoSyncLinks = handleAutoSyncLinks;
 module.exports.fetchProductDetails = fetchProductDetails;
 module.exports.extractProductPriceAndStatus = extractProductPriceAndStatus;

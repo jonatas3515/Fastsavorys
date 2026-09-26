@@ -49,6 +49,25 @@ function calcDiscountPercent(origStr, currStr) {
   return pct > 0 && pct < 100 ? pct : 0;
 }
 
+function buildWhatsAppDealText(product) {
+  const isFastPick = Boolean(product.is_fast_pick || product.badge_color === 'fast_seal');
+  const sealHeader = isFastPick ? '👑 *PRODUTO TESTADO E RECOMENDADO PELA FASTSAVORY\'S* ✨\n' : '';
+  const platform = detectPlatform(product.affiliate_url).name.toUpperCase();
+  const pct = calcDiscountPercent(product.original_price, product.price_display);
+  const discountText = pct > 0 ? ` (${pct}% OFF)` : (product.discount_tag ? ` (${product.discount_tag})` : '');
+  const origPriceText = product.original_price ? `~${product.original_price}~ ➔ ` : '';
+  const descText = product.description ? `\n${product.description}\n` : '';
+
+  return `${sealHeader}🛍️ *ACHADINHO ${platform}* ⭐\n🔥 *${product.title}*\n${descText}\n💰 *Preço:* ${origPriceText}*${product.price_display || 'Confira no link'}*${discountText}\n\n👉 *COMPRE COM DESCONTO AQUI:*\n${product.affiliate_url}\n\n💬 *Entre no canal VIP de ofertas da FastSavory's:*\nhttps://chat.whatsapp.com/C7dT0ZWaUZKHm7atI3eOLE`;
+}
+
+function buildFastSavorysProductText(product) {
+  const price = typeof product.price === 'number' ? `R$ ${product.price.toFixed(2).replace('.', ',')}` : (product.price || '');
+  const desc = product.description ? `\n${product.description}\n` : '';
+
+  return `😋 *BATEU AQUELA FOME? DIRETO DA COZINHA FASTSAVORY'S!* 🥟🔥\n\n✨ *${product.name}*\n${desc}\n💰 *Apenas:* *${price}*\n\n🛵 *Peça agora quentinho pelo nosso cardápio online:*\nhttps://fastsavorys.vercel.app/pages/fast.html\n\n💬 *Ou faça seu pedido direto pelo WhatsApp:* (73) 99934-8552`;
+}
+
 function buildPriceDropAlertText(product, oldPrice, newPrice) {
   const isFastPick = Boolean(product.is_fast_pick || product.badge_color === 'fast_seal');
   const sealHeader = isFastPick ? '👑 *PRODUTO TESTADO E RECOMENDADO PELA FASTSAVORY\'S* ✨\n' : '';
