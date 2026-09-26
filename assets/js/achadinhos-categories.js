@@ -193,16 +193,16 @@ window.AchadinhosCategories = (function () {
 
     if (remoteColumnDisabled) return getTree();
 
-    // 2. Busca do Supabase em background
+    // 2. Busca do Supabase em background (silencioso)
     try {
       if (window.supabaseClient) {
         const { data, error } = await window.supabaseClient
           .from('fast_store_config')
-          .select('affiliate_categories, updated_at')
+          .select('*')
           .eq('id', 1)
-          .single();
+          .maybeSingle();
 
-        if (error) {
+        if (error || !data) {
           remoteColumnDisabled = true;
           return getTree();
         }

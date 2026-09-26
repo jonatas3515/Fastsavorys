@@ -693,9 +693,20 @@ export default async function handler(req, res) {
         return res.status(404).json({ success: false, error: 'Produto não encontrado.' });
       }
       const targetProd = pData[0];
-      const { sendProductDealToWhatsApp } = require('./_lib/cron-whatsapp-deal');
-      const waRes = await sendProductDealToWhatsApp(targetProd);
-      return res.status(200).json({ success: true, message: '🚀 Oferta enviada com sucesso no WhatsApp!', evolutionResponse: waRes });
+      
+      try {
+        const { sendProductDealToWhatsApp } = require('./_lib/cron-whatsapp-deal');
+        const waRes = await sendProductDealToWhatsApp(targetProd);
+        return res.status(200).json({ success: true, message: '🚀 Oferta enviada com sucesso no WhatsApp!', evolutionResponse: waRes });
+      } catch (waErr) {
+        console.warn('[Send WhatsApp 1-Click Error]:', waErr.message);
+        return res.status(200).json({
+          success: false,
+          configured: false,
+          error: waErr.message || 'Configuração da Evolution API não encontrada na Vercel.',
+          product: targetProd
+        });
+      }
     }
 
     // Action 0.3: Price Alert Lead Capture

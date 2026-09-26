@@ -2104,15 +2104,23 @@ window.AffiliatesModule = (function () {
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        if (window.showToast) window.showToast('✅ Oferta disparada com sucesso no WhatsApp!', 'success');
-        else alert('✅ Oferta disparada com sucesso no WhatsApp!');
+        if (window.showToast) window.showToast('✅ Oferta disparada com sucesso no grupo do WhatsApp!', 'success');
+        else alert('✅ Oferta disparada com sucesso no grupo do WhatsApp!');
+      } else if (data.configured === false) {
+        if (window.showToast) {
+          window.showToast('ℹ️ Disparo automático requer as variáveis da Evolution API na Vercel. Abrindo modal para envio direto...', 'info');
+        } else {
+          alert('ℹ️ Para envio 100% automático direto pelo servidor, configure as variáveis EVOLUTION_API_URL, EVOLUTION_API_KEY e WHATSAPP_DEALS_GROUP_JID na Vercel.\n\nAbrindo janela de compartilhamento...');
+        }
+        openShareModal(id);
       } else {
         throw new Error(data.error || 'Erro ao enviar.');
       }
     } catch (err) {
       console.error('[Send to WhatsApp Error]', err);
-      if (window.showToast) window.showToast('❌ Erro: ' + err.message, 'error');
-      else alert('Erro ao disparar no WhatsApp: ' + err.message);
+      if (window.showToast) window.showToast('❌ ' + err.message, 'error');
+      else alert('Aviso: ' + err.message);
+      openShareModal(id);
     }
   }
 
