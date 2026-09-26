@@ -65,7 +65,7 @@ function buildFastSavorysProductText(product) {
   const price = typeof product.price === 'number' ? `R$ ${product.price.toFixed(2).replace('.', ',')}` : (product.price || '');
   const desc = product.description ? `\n${product.description}\n` : '';
 
-  return `😋 *BATEU AQUELA FOME? DIRETO DA COZINHA FASTSAVORY'S!* 🥟🔥\n\n✨ *${product.name}*\n${desc}\n💰 *Apenas:* *${price}*\n\n🛵 *Peça agora quentinho pelo nosso cardápio online:*\nhttps://fastsavorys.vercel.app/pages/fast.html\n\n💬 *Ou faça seu pedido direto pelo WhatsApp:* (73) 99934-8552`;
+  return `😋 *BATEU AQUELA FOME? DIRETO DA COZINHA FASTSAVORY'S!* 🥟🔥\n\n✨ *${product.name}*\n${desc}\n💰 *Apenas:* *${price}*\n\n🛵 *Peça agora quentinho pelo nosso cardápio online:*\nhttps://fastsavorys.vercel.app/pages/fast.html\n\n💬 *Ou faça seu pedido direto pelo WhatsApp:* (73) 99936-6554`;
 }
 
 function buildPriceDropAlertText(product, oldPrice, newPrice) {
