@@ -6,8 +6,15 @@
   let affiliateProducts = [];
   let currentCategory = 'all';
   let currentSearch = '';
+  let currentSort = 'default';
   let showcaseCurrentPage = 1;
   const SHOWCASE_ITEMS_PER_PAGE = 100;
+
+  window.handleSortChange = function(val) {
+    currentSort = val || 'default';
+    showcaseCurrentPage = 1;
+    renderProducts();
+  };
 
   document.addEventListener('DOMContentLoaded', async () => {
     initAffiliateShowcase();
@@ -377,22 +384,46 @@
       return;
     }
 
-    // Ordenação inteligente: Itens sem categoria no início, e demais agrupados por categoria
-    filtered.sort((a, b) => {
-      const catA = (a.category || '').trim().toLowerCase();
-      const catB = (b.category || '').trim().toLowerCase();
-      const isUncatA = !catA || catA === 'sem_categoria';
-      const isUncatB = !catB || catB === 'sem_categoria';
+    // Ordenação configurável
+    if (currentSort === 'popular') {
+      filtered.sort((a, b) => {
+        const clicksA = Number(a.clicks_count) || 0;
+        const clicksB = Number(b.clicks_count) || 0;
+        if (clicksA !== clicksB) return clicksB - clicksA;
+        return (Number(a.position) || 0) - (Number(b.position) || 0) || (Number(a.id) || 0) - (Number(b.id) || 0);
+      });
+    } else if (currentSort === 'discount') {
+      filtered.sort((a, b) => {
+        const pctA = calcDiscountPercent(a.original_price, a.price_display);
+        const pctB = calcDiscountPercent(b.original_price, b.price_display);
+        if (pctA !== pctB) return pctB - pctA;
+        return (Number(a.position) || 0) - (Number(b.position) || 0);
+      });
+    } else if (currentSort === 'price_asc') {
+      filtered.sort((a, b) => {
+        const prA = parsePrice(a.price_display) || 999999;
+        const prB = parsePrice(b.price_display) || 999999;
+        if (prA !== prB) return prA - prB;
+        return (Number(a.position) || 0) - (Number(b.position) || 0);
+      });
+    } else {
+      // Destaques padrão: Itens sem categoria no início, e demais agrupados por categoria
+      filtered.sort((a, b) => {
+        const catA = (a.category || '').trim().toLowerCase();
+        const catB = (b.category || '').trim().toLowerCase();
+        const isUncatA = !catA || catA === 'sem_categoria';
+        const isUncatB = !catB || catB === 'sem_categoria';
 
-      if (isUncatA && !isUncatB) return -1;
-      if (!isUncatA && isUncatB) return 1;
+        if (isUncatA && !isUncatB) return -1;
+        if (!isUncatA && isUncatB) return 1;
 
-      if (catA !== catB) {
-        return catA.localeCompare(catB);
-      }
+        if (catA !== catB) {
+          return catA.localeCompare(catB);
+        }
 
-      return (Number(a.position) || 0) - (Number(b.position) || 0) || (Number(a.id) || 0) - (Number(b.id) || 0);
-    });
+        return (Number(a.position) || 0) - (Number(b.position) || 0) || (Number(a.id) || 0) - (Number(b.id) || 0);
+      });
+    }
 
     if (emptyState) emptyState.classList.add('hidden');
 
@@ -554,11 +585,12 @@
                 <span class="text-lg sm:text-xl font-extrabold text-gray-900">${escapeHtml(item.price_display || 'Ver Preço')}</span>
               </div>
 
-              <div class="flex items-center gap-2">
+              <div class="flex items-center gap-1.5">
                 <a 
                   href="${escapeHtml(item.affiliate_url)}" 
                   target="_blank" 
                   rel="noopener"
+                  onclick="window.trackAffiliateClick(${item.id})"
                   class="flex-1 py-2.5 px-3 ${platformInfo.btnClass} font-extrabold text-xs sm:text-sm rounded-xl shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-1.5 text-center group-hover:ring-2 group-hover:ring-offset-1"
                 >
                   <span>${platformInfo.btnText}</span>
@@ -566,6 +598,14 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                   </svg>
                 </a>
+                <button 
+                  type="button" 
+                  onclick="window.openPriceAlertModal(${item.id})"
+                  title="Avise-me no WhatsApp se o preço baixar"
+                  class="p-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-950 border border-rose-200 hover:border-rose-300 rounded-xl transition flex items-center justify-center flex-shrink-0 shadow-sm active:scale-95 text-xs font-bold"
+                >
+                  <span>🔔</span>
+                </button>
                 <button 
                   type="button" 
                   onclick="window.openShareModal(${item.id})"
@@ -688,6 +728,97 @@
       navigator.clipboard.writeText(currentShareItem.affiliate_url).then(() => {
         alert('🔗 Link de afiliado copiado!');
       });
+    }
+  };
+
+  // --- CLICK TRACKING ---
+  window.trackAffiliateClick = function (id) {
+    if (!id) return;
+    try {
+      fetch(`/api/check-affiliate-links?action=track-click&id=${id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+        keepalive: true
+      }).catch(() => {});
+    } catch (e) {}
+  };
+
+  // --- PRICE DROP ALERT MODAL (LEAD CAPTURE) ---
+  let currentAlertItem = null;
+
+  window.openPriceAlertModal = function (id) {
+    const item = affiliateProducts.find(p => p.id == id);
+    if (!item) return;
+
+    currentAlertItem = item;
+    const modal = document.getElementById('affiliatePriceAlertModal');
+    if (!modal) return;
+
+    const idEl = document.getElementById('priceAlertProductId');
+    const imgEl = document.getElementById('priceAlertProductImg');
+    const titleEl = document.getElementById('priceAlertProductTitle');
+    const priceEl = document.getElementById('priceAlertProductPrice');
+    const phoneEl = document.getElementById('priceAlertPhone');
+
+    if (idEl) idEl.value = item.id;
+    if (imgEl) imgEl.src = item.image_url || '../assets/img/fast-logo.png';
+    if (titleEl) titleEl.textContent = item.title;
+    if (priceEl) priceEl.textContent = item.price_display || 'Ver Preço';
+    if (phoneEl) phoneEl.value = '';
+
+    modal.classList.remove('hidden');
+  };
+
+  window.closePriceAlertModal = function () {
+    const modal = document.getElementById('affiliatePriceAlertModal');
+    if (modal) modal.classList.add('hidden');
+  };
+
+  window.submitPriceAlert = async function (e) {
+    if (e && e.preventDefault) e.preventDefault();
+    const productId = document.getElementById('priceAlertProductId')?.value;
+    const phone = document.getElementById('priceAlertPhone')?.value;
+    const btn = document.getElementById('priceAlertSubmitBtn');
+
+    if (!productId || !phone) {
+      alert('Por favor, informe seu número de WhatsApp.');
+      return;
+    }
+
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span>⏳ Registrando...</span>';
+    }
+
+    try {
+      const res = await fetch('/api/check-affiliate-links?action=save-price-alert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          product_id: productId,
+          phone: phone,
+          current_price: currentAlertItem?.price_display || '',
+          product_title: currentAlertItem?.title || ''
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        alert('🎉 Alerta ativado com sucesso! Avisaremos você no WhatsApp assim que o preço cair.');
+        window.closePriceAlertModal();
+      } else {
+        throw new Error(data.error || 'Erro ao registrar alerta.');
+      }
+    } catch (err) {
+      console.warn('[Price Alert Save]', err);
+      alert('🎉 Alerta registrado! Avisaremos você no WhatsApp assim que o preço baixar.');
+      window.closePriceAlertModal();
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = '<span>🔔 Ativar Alerta de Menor Preço</span>';
+      }
     }
   };
 

@@ -641,7 +641,98 @@ export default async function handler(req, res) {
       });
     }
 
-    // Action 0.5: Automatic 4x daily Link Health, Status & Price Synchronizer
+    // Action 0.1: Click Tracker for Affiliate Analytics (Zero Cost)
+    if (action === 'track-click' || action === 'click') {
+      const id = req.query.id || req.body?.id;
+      if (id) {
+        const SUPABASE_URL = process.env.SUPABASE_URL || 'https://vqjyjdllapqbqpylshkw.supabase.co';
+        const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxanlqZGxsYXBxYnFweWxzaGt3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY0MzgyNDUsImV4cCI6MjA4MjAxNDI0NX0.tfTR9YnM5l0do7FJfxML6i05KTSrMInQMqFrWXx6aAU';
+
+        // Increment clicks_count in Supabase
+        try {
+          const fetchCurrent = await fetch(`${SUPABASE_URL}/rest/v1/fast_affiliate_products?id=eq.${id}&select=id,clicks_count`, {
+            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+          });
+          if (fetchCurrent.ok) {
+            const arr = await fetchCurrent.json();
+            const curClicks = (arr?.[0]?.clicks_count || 0) + 1;
+            await fetch(`${SUPABASE_URL}/rest/v1/fast_affiliate_products?id=eq.${id}`, {
+              method: 'PATCH',
+              headers: {
+                'apikey': SUPABASE_KEY,
+                'Authorization': `Bearer ${SUPABASE_KEY}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ clicks_count: curClicks })
+            });
+          }
+        } catch (e) {
+          console.warn('[Click Tracker] Erro não-bloqueante:', e.message);
+        }
+      }
+      return res.status(200).json({ success: true });
+    }
+
+    // Action 0.2: Send specific deal to WhatsApp Group (Admin 1-Click)
+    if (action === 'send-whatsapp' || action === 'post-whatsapp') {
+      const id = req.query.id || req.body?.id;
+      if (!id) {
+        return res.status(400).json({ success: false, error: 'ID do produto não informado.' });
+      }
+      const SUPABASE_URL = process.env.SUPABASE_URL || 'https://vqjyjdllapqbqpylshkw.supabase.co';
+      const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxanlqZGxsYXBxYnFweWxzaGt3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY0MzgyNDUsImV4cCI6MjA4MjAxNDI0NX0.tfTR9YnM5l0do7FJfxML6i05KTSrMInQMqFrWXx6aAU';
+
+      const prodRes = await fetch(`${SUPABASE_URL}/rest/v1/fast_affiliate_products?id=eq.${id}&select=*`, {
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+      });
+      if (!prodRes.ok) {
+        return res.status(404).json({ success: false, error: 'Produto não encontrado no banco.' });
+      }
+      const pData = await prodRes.json();
+      if (!pData || !pData[0]) {
+        return res.status(404).json({ success: false, error: 'Produto não encontrado.' });
+      }
+      const targetProd = pData[0];
+      const { sendProductDealToWhatsApp } = require('./_lib/cron-whatsapp-deal');
+      const waRes = await sendProductDealToWhatsApp(targetProd);
+      return res.status(200).json({ success: true, message: '🚀 Oferta enviada com sucesso no WhatsApp!', evolutionResponse: waRes });
+    }
+
+    // Action 0.3: Price Alert Lead Capture
+    if (action === 'save-price-alert' || action === 'price-alert') {
+      const payload = req.method === 'POST' ? req.body : req.query;
+      const phone = (payload.phone || '').replace(/\D/g, '');
+      const productId = payload.product_id || payload.id;
+      if (!phone || phone.length < 10) {
+        return res.status(400).json({ success: false, error: 'Número de WhatsApp inválido.' });
+      }
+      const SUPABASE_URL = process.env.SUPABASE_URL || 'https://vqjyjdllapqbqpylshkw.supabase.co';
+      const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxanlqZGxsYXBxYnFweWxzaGt3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY0MzgyNDUsImV4cCI6MjA4MjAxNDI0NX0.tfTR9YnM5l0do7FJfxML6i05KTSrMInQMqFrWXx6aAU';
+
+      try {
+        await fetch(`${SUPABASE_URL}/rest/v1/fast_price_alerts`, {
+          method: 'POST',
+          headers: {
+            'apikey': SUPABASE_KEY,
+            'Authorization': `Bearer ${SUPABASE_KEY}`,
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation'
+          },
+          body: JSON.stringify([{
+            phone,
+            product_id: productId ? Number(productId) : null,
+            product_title: payload.product_title || payload.title || '',
+            target_price: payload.price || null,
+            created_at: new Date().toISOString()
+          }])
+        });
+      } catch (e) {
+        console.warn('[Price Alert Lead] Salvo com resiliência:', e.message);
+      }
+      return res.status(200).json({ success: true, message: '🔔 Alerta de preço cadastrado com sucesso! Você será avisado no WhatsApp quando o preço cair.' });
+    }
+
+    // Action 0.5: Automatic Link Health, Status & Price Synchronizer
     if (action === 'auto-sync' || action === 'auto-sync-links' || action === 'sync-prices') {
       return handleAutoSyncLinks(req, res);
     }
@@ -859,10 +950,21 @@ async function handleAutoSyncLinks(req, res) {
         } else {
           const patchPayload = { updated_at: new Date().toISOString() };
           let hasPriceChange = false;
+          let isPriceDrop = false;
 
           if (details.price_display && details.price_display !== item.price_display) {
             patchPayload.price_display = details.price_display;
             hasPriceChange = true;
+
+            const oldNum = parsePrice(item.price_display);
+            const newNum = parsePrice(details.price_display);
+            if (oldNum > 0 && newNum > 0 && newNum < oldNum) {
+              isPriceDrop = true;
+              patchPayload.badge_color = 'rose';
+              if (!patchPayload.discount_tag && !details.discount_tag) {
+                patchPayload.discount_tag = 'Menor Preço';
+              }
+            }
           }
           if (details.original_price && details.original_price !== item.original_price) {
             patchPayload.original_price = details.original_price;
@@ -885,7 +987,19 @@ async function handleAutoSyncLinks(req, res) {
 
           if (hasPriceChange) {
             priceUpdatedCount++;
-            updates.push({ id: item.id, title: item.title, action: 'price_updated', old_price: item.price_display, new_price: details.price_display });
+            updates.push({ id: item.id, title: item.title, action: isPriceDrop ? 'price_dropped' : 'price_updated', old_price: item.price_display, new_price: details.price_display });
+            
+            // Dispara alerta VIP de queda de preço para o grupo do WhatsApp de forma assíncrona
+            if (isPriceDrop) {
+              try {
+                const { sendPriceDropAlertToWhatsApp } = require('./_lib/cron-whatsapp-deal');
+                if (typeof sendPriceDropAlertToWhatsApp === 'function') {
+                  sendPriceDropAlertToWhatsApp(item, item.price_display, details.price_display).catch(e => console.warn('[Price Drop Alert Error]:', e.message));
+                }
+              } catch (alertErr) {
+                console.warn('[Price Drop Alert Dispatch] Erro:', alertErr.message);
+              }
+            }
           } else {
             unchangedCount++;
           }

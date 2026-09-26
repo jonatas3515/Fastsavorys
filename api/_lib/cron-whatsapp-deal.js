@@ -59,37 +59,103 @@ function calcDiscountPercent(origStr, currStr) {
   return pct > 0 && pct < 100 ? pct : 0;
 }
 
-function buildWhatsAppDealText(product) {
+function buildPriceDropAlertText(product, oldPrice, newPrice) {
   const isFastPick = Boolean(product.is_fast_pick || product.badge_color === 'fast_seal');
   const sealHeader = isFastPick ? '👑 *PRODUTO TESTADO E RECOMENDADO PELA FASTSAVORY\'S* ✨\n' : '';
   const platform = detectPlatform(product.affiliate_url).name.toUpperCase();
+  const pct = calcDiscountPercent(oldPrice, newPrice);
+  const discountText = pct > 0 ? ` (${pct}% DE QUEDA)` : '';
 
-  const pct = calcDiscountPercent(product.original_price, product.price_display);
-  const discountText = pct > 0 ? ` (${pct}% OFF)` : '';
-  const origPriceText = product.original_price ? `~${product.original_price}~ ➔ ` : '';
-  const descText = product.description && product.description.trim() ? `\n${product.description.trim()}\n` : '';
-
-  return `${sealHeader}🛍️ *ACHADINHO ${platform}* ⭐\n🔥 *${product.title}*\n${descText}\n💰 *Preço:* ${origPriceText}*${product.price_display || 'Confira no link'}*${discountText}\n\n👉 *COMPRE COM DESCONTO AQUI:*\n${product.affiliate_url}\n\n💬 *Entre no canal de avisos Achadinhos Fast no WhatsApp:*\nhttps://chat.whatsapp.com/C7dT0ZWaUZKHm7atI3eOLE`;
+  return `🚨 *ALERTA DE QUEDA DE PREÇO NO AR!* 📉⚡\n${sealHeader}\n🛍️ *ACHADINHO ${platform}*\n🔥 *${product.title}*\n\n💥 *BAIXOU AGORA:* de ~${oldPrice}~ por apenas *${newPrice}*!${discountText}\n\n👉 *GARANTA COM O MENOR PREÇO AQUI:*\n${product.affiliate_url}\n\n💬 *Entre no canal VIP de ofertas da FastSavory's:*\nhttps://chat.whatsapp.com/C7dT0ZWaUZKHm7atI3eOLE`;
 }
 
-function buildFastSavorysProductText(product) {
-  const categoryEmoji = {
-    'salgados': '🥟',
-    'mini': '✨',
-    'kits': '🎉',
-    'bolos': '🎂',
-    'bebidas': '🥤',
-    'adicionais': '🍟'
-  }[(product.category || '').toLowerCase()] || '🥟';
+async function dispatchWhatsAppMessage(messageCaption, mediaUrl) {
+  const evolutionApiUrl = (process.env.EVOLUTION_API_URL || '').replace(/\/+$/, '');
+  const evolutionApiKey = process.env.EVOLUTION_API_KEY || '';
+  const evolutionInstance = process.env.EVOLUTION_INSTANCE || 'fastsavorys';
+  const targetGroupJid = process.env.WHATSAPP_DEALS_GROUP_JID || '';
 
-  const categoryName = (product.category || 'Salgados').toUpperCase();
-  const descText = product.description && product.description.trim() ? `\n${product.description.trim()}\n` : '';
-  const numPrice = typeof product.price === 'number' ? product.price : parseFloat(product.price);
-  const priceFormatted = !isNaN(numPrice) && numPrice > 0
-    ? numPrice.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
-    : (product.price ? `R$ ${product.price}` : 'Consulte no site');
+  if (!evolutionApiUrl || !evolutionApiKey || !targetGroupJid) {
+    throw new Error('Configuração do WhatsApp não encontrada nas variáveis de ambiente.');
+  }
 
-  return `😋 *FASTSAVORY'S - ${categoryName}* ${categoryEmoji}\n🔥 *${product.name}*\n${descText}\n💰 *Preço:* *${priceFormatted}*\n\n🛒 *FAÇA SEU PEDIDO AGORA NO SITE:*\nhttps://fastsavorys.vercel.app\n\n💬 *Entre no canal de avisos Achadinhos Fast no WhatsApp:*\nhttps://chat.whatsapp.com/C7dT0ZWaUZKHm7atI3eOLE`;
+  // Normaliza URL da imagem
+  if (mediaUrl && !mediaUrl.startsWith('http')) {
+    mediaUrl = `https://fastsavorys.vercel.app${mediaUrl.startsWith('/') ? '' : '/'}${mediaUrl}`;
+  }
+
+  let sendSuccess = false;
+  let sendResponse = null;
+
+  if (mediaUrl && mediaUrl.startsWith('http')) {
+    try {
+      const mediaEndpoint = `${evolutionApiUrl}/message/sendMedia/${evolutionInstance}`;
+      const response = await fetch(mediaEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': evolutionApiKey
+        },
+        body: JSON.stringify({
+          number: targetGroupJid,
+          media: mediaUrl,
+          mediatype: 'image',
+          mimetype: 'image/jpeg',
+          caption: messageCaption,
+          fileName: 'oferta.jpg'
+        })
+      });
+
+      if (response.ok) {
+        sendSuccess = true;
+        sendResponse = await response.json();
+      }
+    } catch (err) {
+      console.warn('[WhatsApp Dispatch] Erro ao enviar mídia:', err.message);
+    }
+  }
+
+  if (!sendSuccess) {
+    const textEndpoint = `${evolutionApiUrl}/message/sendText/${evolutionInstance}`;
+    const response = await fetch(textEndpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': evolutionApiKey
+      },
+      body: JSON.stringify({
+        number: targetGroupJid,
+        text: messageCaption,
+        linkPreview: true
+      })
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Erro ao enviar mensagem no WhatsApp: ${errText}`);
+    }
+
+    sendResponse = await response.json();
+  }
+
+  return sendResponse;
+}
+
+async function sendPriceDropAlertToWhatsApp(product, oldPrice, newPrice) {
+  try {
+    const caption = buildPriceDropAlertText(product, oldPrice, newPrice);
+    const mediaUrl = product.image_url || product.image;
+    return await dispatchWhatsAppMessage(caption, mediaUrl);
+  } catch (e) {
+    console.warn('[Price Drop Alert] Não foi possível disparar no WhatsApp:', e.message);
+    return null;
+  }
+}
+
+async function sendProductDealToWhatsApp(product) {
+  const caption = buildWhatsAppDealText(product);
+  const mediaUrl = product.image_url || product.image;
+  return await dispatchWhatsAppMessage(caption, mediaUrl);
 }
 
 async function handleSendWhatsAppDeal(req, res) {
@@ -289,4 +355,10 @@ async function handleSendWhatsAppDeal(req, res) {
   }
 }
 
-module.exports = { handleSendWhatsAppDeal };
+module.exports = {
+  handleSendWhatsAppDeal,
+  sendPriceDropAlertToWhatsApp,
+  sendProductDealToWhatsApp,
+  buildWhatsAppDealText,
+  buildPriceDropAlertText
+};

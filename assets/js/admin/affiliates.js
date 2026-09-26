@@ -183,6 +183,21 @@ window.AffiliatesModule = (function () {
         .slice(0, 50);
     }
 
+    // Filtro Especial: 📥 Sugestões da IA (Mineração)
+    if (statusFilter === 'suggestions') {
+      return productsList.filter(item => {
+        const isSuggestion = item.is_ai_suggestion === true || item.source === 'miner' || (item.badge_color === 'purple' && item.is_active === false);
+        const matchCat = matchesCategoryFilter(item, categoryFilter);
+        const matchSearch = !searchQuery || 
+          (item.title && item.title.toLowerCase().includes(searchQuery)) ||
+          (item.description && item.description.toLowerCase().includes(searchQuery)) ||
+          (item.category && item.category.toLowerCase().includes(searchQuery)) ||
+          (item.discount_tag && item.discount_tag.toLowerCase().includes(searchQuery));
+
+        return isSuggestion && matchCat && matchSearch;
+      });
+    }
+
     const result = productsList.filter(item => {
       const matchCat = matchesCategoryFilter(item, categoryFilter);
       const matchStatus = statusFilter === 'all' || 
@@ -376,6 +391,10 @@ window.AffiliatesModule = (function () {
         ? `<span class="inline-block text-[10px] ${badgeStyle} px-1.5 py-0.2 rounded border">${escapeHtml(customTagText)}</span>`
         : '';
 
+      const clicksBadge = (item.clicks_count && item.clicks_count > 0)
+        ? `<span class="inline-flex items-center gap-1 text-[10px] bg-sky-50 text-sky-800 border border-sky-200 font-extrabold px-1.5 py-0.2 rounded" title="Total de cliques no link">👆 ${item.clicks_count} cliques</span>`
+        : '';
+
       const lastUpdatedText = formatLastUpdated(item.updated_at || item.created_at);
 
       return `
@@ -394,6 +413,7 @@ window.AffiliatesModule = (function () {
               ${platformBadge}
               ${discountBadge}
               ${customTagBadge}
+              ${clicksBadge}
             </div>
           </td>
           <td class="p-3 text-xs text-gray-600">${escapeHtml(catLabel)}</td>
@@ -405,6 +425,8 @@ window.AffiliatesModule = (function () {
           <td class="p-3 text-center">${activeBadge}</td>
           <td class="p-3 text-right">
             <div class="flex items-center justify-end gap-1.5">
+              <button onclick="AffiliatesModule.sendToWhatsApp(${item.id})" 
+                      class="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg text-xs font-bold" title="🚀 Disparar Oferta no WhatsApp VIP">🚀</button>
               <button onclick="AffiliatesModule.openShareModal(${item.id})" 
                       class="p-1.5 text-green-600 hover:bg-green-50 rounded-lg text-xs font-medium" title="Compartilhar Oferta">📤</button>
               <a href="${escapeHtml(item.affiliate_url)}" target="_blank" rel="noopener noreferrer" 
@@ -2065,6 +2087,35 @@ window.AffiliatesModule = (function () {
     }
   }
 
+  async function sendToWhatsApp(id) {
+    const item = productsList.find(p => p.id == id);
+    if (!item) return;
+
+    if (!confirm(`Deseja disparar este achadinho agora no Grupo VIP do WhatsApp?\n\n"${item.title}"`)) {
+      return;
+    }
+
+    try {
+      if (window.showToast) window.showToast('🚀 Enviando oferta para o WhatsApp...', 'info');
+      const res = await fetch(`/api/check-affiliate-links?action=send-whatsapp&id=${id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        if (window.showToast) window.showToast('✅ Oferta disparada com sucesso no WhatsApp!', 'success');
+        else alert('✅ Oferta disparada com sucesso no WhatsApp!');
+      } else {
+        throw new Error(data.error || 'Erro ao enviar.');
+      }
+    } catch (err) {
+      console.error('[Send to WhatsApp Error]', err);
+      if (window.showToast) window.showToast('❌ Erro: ' + err.message, 'error');
+      else alert('Erro ao disparar no WhatsApp: ' + err.message);
+    }
+  }
+
   return {
     init: loadProducts,
     loadProducts,
@@ -2113,6 +2164,7 @@ window.AffiliatesModule = (function () {
     shareNative,
     copyShareText,
     copyShareLinkOnly,
+    sendToWhatsApp,
     openMinerModal,
     closeMinerModal,
     runDealsMiner,
