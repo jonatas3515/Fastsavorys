@@ -94,15 +94,12 @@ async function dispatchWhatsAppMessage(messageCaption, mediaUrl) {
     mediaUrl = `https://fastsavorys.vercel.app${mediaUrl.startsWith('/') ? '' : '/'}${mediaUrl}`;
   }
 
-  let sendSuccess = false;
-  let sendResponse = null;
-
-  // 1. Tenta envio com imagem (sendMedia) com timeout de 30s para acomodar o cold start do Render
+  // 1. Se possuir URL de imagem, envia EXCLUSIVAMENTE via sendMedia (evita mensagens duplicadas)
   if (mediaUrl && mediaUrl.startsWith('http')) {
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 45000);
 
+    try {
       const mediaEndpoint = `${evolutionApiUrl}/message/sendMedia/${evolutionInstance}`;
       const response = await fetch(mediaEndpoint, {
         method: 'POST',
@@ -124,48 +121,63 @@ async function dispatchWhatsAppMessage(messageCaption, mediaUrl) {
       clearTimeout(timeoutId);
 
       if (response.ok) {
-        sendSuccess = true;
-        sendResponse = await response.json();
+        return await response.json();
       } else {
         const errText = await response.text();
-        console.warn(`[WhatsApp Dispatch] Falha no sendMedia (HTTP ${response.status}):`, errText);
+        console.warn(`[WhatsApp Dispatch] Resposta sendMedia (HTTP ${response.status}):`, errText);
+        // Só tenta texto se o erro for 400 (imagem inválida/ilegível na URL)
+        if (response.status === 400) {
+          const textRes = await fetch(`${evolutionApiUrl}/message/sendText/${evolutionInstance}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': evolutionApiKey
+            },
+            body: JSON.stringify({
+              number: targetGroupJid,
+              text: messageCaption,
+              linkPreview: true
+            })
+          });
+          if (textRes.ok) return await textRes.json();
+        }
+        return { success: false, status: response.status, error: errText };
       }
     } catch (err) {
-      console.warn('[WhatsApp Dispatch] Erro na requisição sendMedia:', err.message);
+      clearTimeout(timeoutId);
+      console.warn('[WhatsApp Dispatch] sendMedia em processamento:', err.message);
+      // Retorna sucesso para NUNCA disparar sendText redundante em paralelo
+      return { success: true, warning: 'sendMedia dispatched' };
     }
   }
 
-  // 2. Fallback: Envio de Texto simples (sendText) se mídia falhar
-  if (!sendSuccess) {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
+  // 2. Se NÃO houver imagem, envia apenas texto
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-    const textEndpoint = `${evolutionApiUrl}/message/sendText/${evolutionInstance}`;
-    const response = await fetch(textEndpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'apikey': evolutionApiKey
-      },
-      body: JSON.stringify({
-        number: targetGroupJid,
-        text: messageCaption,
-        linkPreview: true
-      }),
-      signal: controller.signal
-    });
+  const textEndpoint = `${evolutionApiUrl}/message/sendText/${evolutionInstance}`;
+  const response = await fetch(textEndpoint, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': evolutionApiKey
+    },
+    body: JSON.stringify({
+      number: targetGroupJid,
+      text: messageCaption,
+      linkPreview: true
+    }),
+    signal: controller.signal
+  });
 
-    clearTimeout(timeoutId);
+  clearTimeout(timeoutId);
 
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`Evolution API retornou erro HTTP ${response.status}: ${errText}`);
-    }
-
-    sendResponse = await response.json();
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Evolution API retornou erro HTTP ${response.status}: ${errText}`);
   }
 
-  return sendResponse;
+  return await response.json();
 }
 
 async function sendPriceDropAlertToWhatsApp(product, oldPrice, newPrice) {
