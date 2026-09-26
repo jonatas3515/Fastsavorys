@@ -59,8 +59,40 @@ function showAdminPanel() {
         adminWrapper.style.display = 'flex';
     }
 
-    // Default to Dashboard
-    switchAdminTab('ordersPanelFast');
+    // Restore Active Tab from localStorage / hash or default to ordersPanelFast
+    let initialTab = 'ordersPanelFast';
+    const hash = window.location.hash.replace('#', '').trim();
+    const hashPanelMap = {
+        'pedidos': 'ordersPanelFast',
+        'orders': 'ordersPanelFast',
+        'produtos': 'productsPanelFast',
+        'products': 'productsPanelFast',
+        'clientes': 'clientsPanelFast',
+        'clients': 'clientsPanelFast',
+        'relatorios': 'reportsPanelFast',
+        'reports': 'reportsPanelFast',
+        'promocoes': 'promotionsPanelFast',
+        'promos': 'promotionsPanelFast',
+        'banner': 'bannerPanelFast',
+        'avaliacoes': 'ratingsPanelFast',
+        'ratings': 'ratingsPanelFast',
+        'achadinhos': 'affiliatesPanelFast',
+        'afiliados': 'affiliatesPanelFast',
+        'affiliates': 'affiliatesPanelFast',
+        'config': 'configPanelFast',
+        'regras': 'configPanelFast'
+    };
+
+    if (hash && hashPanelMap[hash]) {
+        initialTab = hashPanelMap[hash];
+    } else {
+        const savedTab = localStorage.getItem('fastAdminActiveTab');
+        if (savedTab && document.getElementById(savedTab)) {
+            initialTab = savedTab;
+        }
+    }
+
+    switchAdminTab(initialTab);
 
     // Hide Public Elements
     document.getElementById('cartBtn')?.classList.add('hidden');
@@ -84,6 +116,13 @@ function switchAdminTab(targetId, btnElement) {
     if (targetId === 'rulesPanelFast') targetId = 'configPanelFast';
     if (targetId === 'promotionPanelFast') targetId = 'promotionsPanelFast';
     if (targetId === 'bannerPanelLegacy') targetId = 'bannerPanelFast';
+
+    // Salva a aba ativa no localStorage para persistir em F5 / recarregamento
+    if (targetId) {
+        try {
+            localStorage.setItem('fastAdminActiveTab', targetId);
+        } catch (e) {}
+    }
 
     // Hide all panels
     document.querySelectorAll('.admin-panel').forEach(p => p.classList.add('hidden'));

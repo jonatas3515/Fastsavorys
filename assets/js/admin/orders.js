@@ -372,41 +372,49 @@ function renderDashboardOrders(orders) {
         return;
     }
 
+    // Group arrays for Kanban rendering
+    const kanbanCards = {
+        payment: [],
+        pending: [],
+        preparing: [],
+        ready: [],
+        completed: []
+    };
+
     orders.forEach(order => {
         // Determine Kanban Column
-        let targetCol = null;
+        let colKey = null;
         const s = order.status;
         const p = order.payment_status;
         const isCard = order.payment_method?.startsWith('cartao') || order.payment_method === 'card_stripe';
 
         if (s === 'pending' || s === 'awaiting_payment') {
             if (isCard && p !== 'paid_full' && p !== 'paid') {
-                targetCol = cols.payment;
+                colKey = 'payment';
                 counts.payment++;
             } else {
-                targetCol = cols.pending;
+                colKey = 'pending';
                 counts.received++;
             }
         } else if (s === 'accepted') {
-            targetCol = cols.pending;
+            colKey = 'pending';
             counts.received++;
         } else if (s === 'preparing') {
-            targetCol = cols.preparing;
+            colKey = 'preparing';
             counts.preparing++;
         } else if (s === 'confirmed' || s === 'out_for_delivery') {
-            targetCol = cols.ready;
+            colKey = 'ready';
             counts.delivery++;
         } else if (s === 'delivered' || s === 'cancelled') {
-            targetCol = cols.completed;
+            colKey = 'completed';
             counts.completed++;
         }
 
-        // Render Kanban Card
-        if (targetCol) {
-            targetCol.innerHTML += createOrderCardHtml(order);
+        if (colKey) {
+            kanbanCards[colKey].push(order);
         }
 
-        // Render List Row
+        // Render List Row (Full history preserved)
         if (listBody) {
             listBody.innerHTML += createOrderRowHtml(order);
         }
@@ -417,6 +425,32 @@ function renderDashboardOrders(orders) {
             mobileList.innerHTML += createOrderCardHtml(order);
         }
     });
+
+    // Render Kanban Columns
+    if (cols.payment) cols.payment.innerHTML = kanbanCards.payment.map(o => createOrderCardHtml(o)).join('');
+    if (cols.pending) cols.pending.innerHTML = kanbanCards.pending.map(o => createOrderCardHtml(o)).join('');
+    if (cols.preparing) cols.preparing.innerHTML = kanbanCards.preparing.map(o => createOrderCardHtml(o)).join('');
+    if (cols.ready) cols.ready.innerHTML = kanbanCards.ready.map(o => createOrderCardHtml(o)).join('');
+
+    // Coluna Concluídos: Limita aos 100 mais recentes para deixar o Kanban ultra rápido
+    if (cols.completed) {
+        const completedLimit = 100;
+        const visibleCompleted = kanbanCards.completed.slice(0, completedLimit);
+        let completedHtml = visibleCompleted.map(o => createOrderCardHtml(o)).join('');
+
+        if (kanbanCards.completed.length > completedLimit) {
+            const hiddenCount = kanbanCards.completed.length - completedLimit;
+            completedHtml += `
+                <div class="p-3 bg-gray-50 border border-dashed border-gray-300 rounded-xl text-center text-xs text-gray-500 my-2 space-y-1">
+                    <p class="font-medium">⚡ Mostrando os <strong>100 mais recentes</strong> de ${kanbanCards.completed.length} pedidos finalizados.</p>
+                    <button type="button" onclick="switchOrderView('list')" class="text-rose-600 font-bold hover:underline inline-flex items-center gap-1">
+                        <span>📜 Ver todos os ${hiddenCount} pedidos antigos na Tabela</span> →
+                    </button>
+                </div>
+            `;
+        }
+        cols.completed.innerHTML = completedHtml;
+    }
 
     // Update Counts Labels (IDs from HTML)
     if (document.getElementById('count-payment')) document.getElementById('count-payment').textContent = counts.payment;

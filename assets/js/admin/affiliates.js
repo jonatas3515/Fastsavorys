@@ -105,7 +105,56 @@ window.AffiliatesModule = (function () {
     }
   }
 
+  function formatLastUpdated(dateStr) {
+    if (!dateStr) return '';
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return '';
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = d.getFullYear();
+      const hours = String(d.getHours()).padStart(2, '0');
+      const minutes = String(d.getMinutes()).padStart(2, '0');
+      return `Atualizado em ${day}/${month}/${year} às ${hours}h${minutes}`;
+    } catch (e) {
+      return '';
+    }
+  }
+
   function getFilteredProducts() {
+    // Filtro Especial: 50 Últimos Adicionados (ordenados pelos mais novos)
+    if (statusFilter === 'recent50') {
+      return productsList
+        .slice()
+        .sort((a, b) => {
+          const dateA = new Date(a.created_at || a.updated_at || 0).getTime();
+          const dateB = new Date(b.created_at || b.updated_at || 0).getTime();
+          if (dateA !== dateB) return dateB - dateA;
+          return (Number(b.id) || 0) - (Number(a.id) || 0);
+        })
+        .filter(item => {
+          let matchCat = false;
+          if (categoryFilter === 'all') {
+            matchCat = true;
+          } else if (categoryFilter === 'fast_picks') {
+            matchCat = Boolean(item.is_fast_pick || item.badge_color === 'fast_seal');
+          } else if (categoryFilter === 'sem_categoria') {
+            matchCat = !item.category || item.category === '' || item.category === 'sem_categoria';
+          } else {
+            matchCat = item.category === categoryFilter;
+          }
+
+          const matchSearch = !searchQuery || 
+            (item.title && item.title.toLowerCase().includes(searchQuery)) ||
+            (item.description && item.description.toLowerCase().includes(searchQuery)) ||
+            (item.category && item.category.toLowerCase().includes(searchQuery)) ||
+            (item.discount_tag && item.discount_tag.toLowerCase().includes(searchQuery));
+
+          return matchCat && matchSearch;
+        })
+        .slice(0, 50);
+    }
+
     const result = productsList.filter(item => {
       let matchCat = false;
       if (categoryFilter === 'all') {
@@ -308,6 +357,8 @@ window.AffiliatesModule = (function () {
         ? `<span class="inline-block text-[10px] ${badgeStyle} px-1.5 py-0.2 rounded border">${escapeHtml(customTagText)}</span>`
         : '';
 
+      const lastUpdatedText = formatLastUpdated(item.updated_at || item.created_at);
+
       return `
         <tr class="hover:bg-gray-50 transition-colors border-b border-gray-100 ${isFastPick ? 'bg-pink-50/20' : ''}">
           <td class="p-3 text-center text-xs font-bold text-gray-500 w-12">${absoluteIdx}</td>
@@ -330,6 +381,7 @@ window.AffiliatesModule = (function () {
           <td class="p-3 font-bold text-sm text-gray-800">
             <div>${escapeHtml(item.price_display || '-')}</div>
             ${item.original_price ? `<div class="text-[10px] text-gray-400 line-through">${escapeHtml(item.original_price)}</div>` : ''}
+            ${lastUpdatedText ? `<div class="text-[9.5px] text-gray-400 font-normal mt-1 flex items-center gap-1" title="Data da última verificação automática"><span>🕒</span><span>${escapeHtml(lastUpdatedText)}</span></div>` : ''}
           </td>
           <td class="p-3 text-center">${activeBadge}</td>
           <td class="p-3 text-right">
