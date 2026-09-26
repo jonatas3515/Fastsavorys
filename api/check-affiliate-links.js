@@ -78,6 +78,7 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
   let price = '';
   let originalPrice = '';
   let discountTag = '';
+  let couponCode = '';
   let isPaused = false;
 
   if (platform === 'amazon') {
@@ -192,6 +193,15 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
       if (!discountTag.toUpperCase().includes('OFF')) discountTag += ' OFF';
     }
 
+    // Amazon Coupon / Voucher Detection
+    const amzCouponMatch = html.match(/id=["']couponBadgeV2["'][\s\S]*?>([^<]+)</i) ||
+                           html.match(/class=["'][^"']*a-color-success[^"']*["'][^>]*>([^<]*Economize\s*[^<]+com cupom[^<]*)</i) ||
+                           html.match(/data-cpc-coupon=["']([^"']+)["']/i) ||
+                           html.match(/<label[^>]*class=["'][^"']*a-form-label[^"']*["'][^>]*>\s*(Aplicar cupom de\s*[^<]+)<\/label>/i);
+    if (amzCouponMatch && amzCouponMatch[1]) {
+      couponCode = amzCouponMatch[1].replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+    }
+
   } else if (platform === 'shopee') {
     if (
       html.includes('Produto esgotado') ||
@@ -206,6 +216,14 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
     if (metaPrice && metaPrice[1]) {
       const val = parseFloat(metaPrice[1].replace(',', '.'));
       if (!isNaN(val) && val > 0) price = formatBrlNumber(val);
+    }
+
+    // Shopee Voucher Detection
+    const shopeeCouponMatch = html.match(/"voucher_code"\s*:\s*"([^"]+)"/i) ||
+                              html.match(/"voucherDescription"\s*:\s*"([^"]+)"/i) ||
+                              html.match(/class=["'][^"']*voucher-ticket[^"']*["'][\s\S]*?>([^<]+)</i);
+    if (shopeeCouponMatch && shopeeCouponMatch[1]) {
+      couponCode = shopeeCouponMatch[1].trim();
     }
 
   } else {
@@ -235,6 +253,21 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
     const discLabelMatch = html.match(/"discount_label"\s*:\s*\{\s*"text"\s*:\s*"([^"]+)"/i);
     if (discLabelMatch && discLabelMatch[1]) {
       discountTag = discLabelMatch[1].trim();
+    }
+
+    // Mercado Livre Coupon Detection (JSON state or PDP pills)
+    const mlCouponCodeMatch = html.match(/"coupon_code"\s*:\s*"([^"]+)"/i) ||
+                              html.match(/"coupon"\s*:\s*\{\s*"code"\s*:\s*"([^"]+)"/i) ||
+                              html.match(/"campaign_code"\s*:\s*"([^"]+)"/i) ||
+                              html.match(/class=["'][^"']*ui-pdp-promotions-pill__label[^"']*["']>([^<]+)<\/span>/i) ||
+                              html.match(/class=["'][^"']*ui-pdp-promotions-pill[^"']*["'][\s\S]*?>([A-Z0-9_-]{4,20})</i);
+    if (mlCouponCodeMatch && mlCouponCodeMatch[1]) {
+      let cCode = mlCouponCodeMatch[1].trim();
+      if (/cupom:?\s*([A-Z0-9_-]+)/i.test(cCode)) {
+        const m = cCode.match(/cupom:?\s*([A-Z0-9_-]+)/i);
+        if (m && m[1]) cCode = m[1];
+      }
+      couponCode = cCode;
     }
 
     // LAYER 2: Structured JSON-LD Schema (Fallback)
@@ -352,7 +385,7 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
     }
   }
 
-  return { price, originalPrice, discountTag, isPaused };
+  return { price, originalPrice, discountTag, couponCode, isPaused };
 }
 
 async function fetchProductDetails(rawUrl) {
@@ -461,7 +494,7 @@ async function fetchProductDetails(rawUrl) {
     }
   }
 
-  const { price, originalPrice, discountTag, isPaused } = extractProductPriceAndStatus(html, platform);
+  const { price, originalPrice, discountTag, couponCode, isPaused } = extractProductPriceAndStatus(html, platform);
 
   let discountPercent = 0;
   if (price && originalPrice) {
@@ -483,6 +516,7 @@ async function fetchProductDetails(rawUrl) {
     original_price: originalPrice || '',
     discount_percent: discountPercent,
     discount_tag: discountTag || (discountPercent > 0 ? `${discountPercent}% OFF` : ''),
+    coupon_code: couponCode || '',
     category: detectedCategory,
     platform: platform,
     is_active: !isPaused,
@@ -608,6 +642,7 @@ async function handler(req, res) {
         original_price: payload.original_price ? String(payload.original_price).trim() : null,
         category: payload.category || detectCategory(title, payload.description || '', affiliate_url),
         discount_tag: payload.discount_tag || payload.tag || null,
+        coupon_code: payload.coupon_code ? String(payload.coupon_code).trim() : null,
         badge_color: payload.badge_color || payload.color || 'orange',
         is_fast_pick: payload.is_fast_pick === true || payload.is_fast_pick === 'true',
         position: 1,
@@ -983,6 +1018,10 @@ async function handleAutoSyncLinks(req, res) {
           }
           if (details.discount_tag && details.discount_tag !== item.discount_tag) {
             patchPayload.discount_tag = details.discount_tag;
+            hasPriceChange = true;
+          }
+          if (details.coupon_code && details.coupon_code !== item.coupon_code) {
+            patchPayload.coupon_code = details.coupon_code;
             hasPriceChange = true;
           }
 

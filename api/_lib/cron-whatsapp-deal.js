@@ -57,8 +57,9 @@ function buildWhatsAppDealText(product) {
   const discountText = pct > 0 ? ` (${pct}% OFF)` : (product.discount_tag ? ` (${product.discount_tag})` : '');
   const origPriceText = product.original_price ? `~${product.original_price}~ ➔ ` : '';
   const descText = product.description ? `\n${product.description}\n` : '';
+  const couponText = product.coupon_code ? `\n🎟️ *CUPOM DISPONÍVEL:* Use o cupom *${product.coupon_code}* na finalização!\n` : '';
 
-  return `${sealHeader}🛍️ *ACHADINHO ${platform}* ⭐\n🔥 *${product.title}*\n${descText}\n💰 *Preço:* ${origPriceText}*${product.price_display || 'Confira no link'}*${discountText}\n\n👉 *COMPRE COM DESCONTO AQUI:*\n${product.affiliate_url}\n\n💬 *Entre no canal VIP de ofertas da FastSavory's:*\nhttps://chat.whatsapp.com/C7dT0ZWaUZKHm7atI3eOLE`;
+  return `${sealHeader}🛍️ *ACHADINHO ${platform}* ⭐\n🔥 *${product.title}*\n${descText}\n💰 *Preço:* ${origPriceText}*${product.price_display || 'Confira no link'}*${discountText}${couponText}\n\n👉 *COMPRE COM DESCONTO AQUI:*\n${product.affiliate_url}\n\n💬 *Entre no canal VIP de ofertas da FastSavory's:*\nhttps://chat.whatsapp.com/C7dT0ZWaUZKHm7atI3eOLE`;
 }
 
 function buildFastSavorysProductText(product) {
@@ -234,15 +235,32 @@ async function handleSendWhatsAppDeal(req, res) {
         .select('*');
 
       if (!storeErr && storeProducts && storeProducts.length > 0) {
-        // Filtra itens principais do cardápio (exclui sachês, taxas ou descartáveis)
+        // Filtra itens principais do cardápio: SOMENTE ATIVOS, VISÍVEIS e com FOTO REAL (exclui sachês, descartáveis, condimentos ou itens ocultos)
         const validStoreProducts = storeProducts.filter(p => {
           const name = (p.name || '').toLowerCase();
-          if (name.includes('sache') || name.includes('sachê') || name.includes('taxa') || name.includes('copo') || name.includes('guardanapo')) return false;
+          if (
+            name.includes('sache') || 
+            name.includes('sachê') || 
+            name.includes('taxa') || 
+            name.includes('copo') || 
+            name.includes('guardanapo') ||
+            name.includes('ketchup') ||
+            name.includes('maionese') ||
+            name.includes('mostarda') ||
+            name.includes('embalagem')
+          ) return false;
+          
           const price = typeof p.price === 'number' ? p.price : parseFloat(p.price);
-          return p.active !== false && !isNaN(price) && price > 0;
+          const isVisible = p.visible === true && !p.unavailable_today && p.catalog_enabled !== false;
+          const hasValidImage = Boolean(p.image && typeof p.image === 'string' && p.image.startsWith('http'));
+          
+          return isVisible && hasValidImage && !isNaN(price) && price > 0;
         });
 
-        const pool = validStoreProducts.length > 0 ? validStoreProducts : storeProducts;
+        // Se por algum motivo todos estiverem sem foto, usa os visíveis como fallback
+        const fallbackVisible = storeProducts.filter(p => p.visible === true && !p.unavailable_today && p.catalog_enabled !== false);
+        const pool = validStoreProducts.length > 0 ? validStoreProducts : (fallbackVisible.length > 0 ? fallbackVisible : storeProducts);
+        
         // Rotação inteligente por dia e horário para nunca repetir o mesmo produto nos 8 disparos do dia
         const daySeed = now.getDate();
         const monthSeed = now.getMonth() + 1;

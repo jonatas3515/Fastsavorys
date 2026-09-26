@@ -576,6 +576,27 @@
                 ${escapeHtml(item.title)}
               </h3>
               ${item.description ? `<p class="text-xs text-gray-500 mt-1 line-clamp-2">${escapeHtml(item.description)}</p>` : ''}
+              
+              <!-- Cupom de Desconto 1-Click Copy -->
+              ${item.coupon_code ? `
+                <div class="mt-2.5 p-2 bg-gradient-to-r from-indigo-50/90 via-purple-50/80 to-indigo-50/90 border border-indigo-200/90 rounded-xl flex items-center justify-between gap-2 shadow-2xs">
+                  <div class="flex items-center gap-1.5 min-w-0">
+                    <span class="text-sm">🎟️</span>
+                    <div class="truncate">
+                      <span class="text-[9px] uppercase tracking-wider text-indigo-700 block font-bold leading-tight">Cupom Ativo:</span>
+                      <span class="text-xs font-black text-indigo-950 tracking-wider font-mono">${escapeHtml(item.coupon_code)}</span>
+                    </div>
+                  </div>
+                  <button 
+                    type="button" 
+                    onclick="window.copyAffiliateCoupon('${escapeHtml(item.coupon_code)}', this)"
+                    class="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[11px] font-black transition shadow-xs flex items-center gap-1 flex-shrink-0 active:scale-95 cursor-pointer"
+                    title="Copiar cupom de desconto"
+                  >
+                    <span>📋</span> <span>Copiar</span>
+                  </button>
+                </div>
+              ` : ''}
             </div>
 
             <!-- Preço e Botão de Ação -->
@@ -633,11 +654,12 @@
     const discountText = pct > 0 ? ` (${pct}% OFF)` : '';
     const origPriceText = item.original_price ? `~${item.original_price}~ ➔ ` : '';
     const descText = item.description ? `\n${item.description}\n` : '';
+    const couponText = item.coupon_code ? `\n🎟️ *CUPOM DISPONÍVEL:* Use o cupom *${item.coupon_code}* na finalização!\n` : '';
     const isFastPick = Boolean(item.is_fast_pick || item.badge_color === 'fast_seal');
     const sealHeader = isFastPick ? '👑 *PRODUTO TESTADO E RECOMENDADO PELA FASTSAVORY\'S* ✨\n' : '';
     const platformInfo = detectPlatform(item.affiliate_url);
 
-    return `${sealHeader}🛍️ *ACHADINHO ${platformInfo.name.toUpperCase()}* ⭐\n🔥 *${item.title}*\n${descText}\n💰 *Preço:* ${origPriceText}*${item.price_display || 'Confira no link'}*${discountText}\n\n👉 *COMPRE COM DESCONTO AQUI:*\n${item.affiliate_url}\n\n💬 *Entre no canal de avisos Achadinhos Fast no WhatsApp:*\nhttps://chat.whatsapp.com/C7dT0ZWaUZKHm7atI3eOLE`;
+    return `${sealHeader}🛍️ *ACHADINHO ${platformInfo.name.toUpperCase()}* ⭐\n🔥 *${item.title}*\n${descText}\n💰 *Preço:* ${origPriceText}*${item.price_display || 'Confira no link'}*${discountText}${couponText}\n\n👉 *COMPRE COM DESCONTO AQUI:*\n${item.affiliate_url}\n\n💬 *Entre no canal de avisos Achadinhos Fast no WhatsApp:*\nhttps://chat.whatsapp.com/C7dT0ZWaUZKHm7atI3eOLE`;
   }
 
   window.openShareModal = function (id) {
@@ -859,6 +881,30 @@
   }
 
   // Exportar para uso global
+  window.copyAffiliateCoupon = function (code, btn) {
+    if (!code) return;
+    const cleanCode = String(code).trim();
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(cleanCode).then(() => {
+        if (btn) {
+          const origHtml = btn.innerHTML;
+          btn.innerHTML = '<span>✅</span> <span>Copiado!</span>';
+          btn.classList.add('bg-emerald-600');
+          btn.classList.remove('bg-indigo-600');
+          setTimeout(() => {
+            btn.innerHTML = origHtml;
+            btn.classList.remove('bg-emerald-600');
+            btn.classList.add('bg-indigo-600');
+          }, 2000);
+        }
+      }).catch(() => {
+        prompt('Copie o código do cupom:', cleanCode);
+      });
+    } else {
+      prompt('Copie o código do cupom:', cleanCode);
+    }
+  };
+
   window.goToAchadinhosPage = function (page) {
     showcaseCurrentPage = page;
     renderProducts();

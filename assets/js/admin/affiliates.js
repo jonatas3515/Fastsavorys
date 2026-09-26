@@ -395,6 +395,10 @@ window.AffiliatesModule = (function () {
         ? `<span class="inline-flex items-center gap-1 text-[10px] bg-sky-50 text-sky-800 border border-sky-200 font-extrabold px-1.5 py-0.2 rounded" title="Total de cliques no link">👆 ${item.clicks_count} cliques</span>`
         : '';
 
+      const couponBadge = item.coupon_code
+        ? `<span class="inline-flex items-center gap-0.5 text-[10px] bg-indigo-50 text-indigo-900 border border-indigo-300 font-extrabold px-1.5 py-0.2 rounded" title="Cupom: ${escapeHtml(item.coupon_code)}">🎟️ ${escapeHtml(item.coupon_code)}</span>`
+        : '';
+
       const lastUpdatedText = formatLastUpdated(item.updated_at || item.created_at);
 
       return `
@@ -412,6 +416,7 @@ window.AffiliatesModule = (function () {
             <div class="flex items-center gap-1.5 mt-1 flex-wrap">
               ${platformBadge}
               ${discountBadge}
+              ${couponBadge}
               ${customTagBadge}
               ${clicksBadge}
             </div>
@@ -528,6 +533,8 @@ window.AffiliatesModule = (function () {
 
     const isFastPickEl = document.getElementById('affiliateIsFastPickInput');
     if (isFastPickEl) isFastPickEl.checked = false;
+    const couponEl = document.getElementById('affiliateCouponInput');
+    if (couponEl) couponEl.value = '';
     document.getElementById('affiliateDescriptionInput').value = '🔸 ';
     document.getElementById('affiliateImagePreview').src = '../assets/img/fast-logo.png';
     document.getElementById('affiliateModal').classList.remove('hidden');
@@ -639,6 +646,9 @@ window.AffiliatesModule = (function () {
     const isFastPickEl = document.getElementById('affiliateIsFastPickInput');
     if (isFastPickEl) isFastPickEl.checked = isFastPick;
 
+    const couponEl = document.getElementById('affiliateCouponInput');
+    if (couponEl) couponEl.value = item.coupon_code || '';
+
     document.getElementById('affiliateActiveInput').checked = item.is_active !== false;
 
     // Atualiza preview da imagem
@@ -722,6 +732,11 @@ window.AffiliatesModule = (function () {
 
       recalculateDiscount();
 
+      // Preenche cupom detectado automaticamente
+      if (info.coupon_code && document.getElementById('affiliateCouponInput')) {
+        document.getElementById('affiliateCouponInput').value = info.coupon_code;
+      }
+
       // Preenche categoria detectada automaticamente
       const detectedCat = info.category || detectCategoryClient(info.title || '');
       if (detectedCat && document.getElementById('affiliateCategoryInput')) {
@@ -766,6 +781,7 @@ window.AffiliatesModule = (function () {
     const isFastPick = document.getElementById('affiliateIsFastPickInput') ? document.getElementById('affiliateIsFastPickInput').checked : false;
 
     const discountVal = document.getElementById('affiliateDiscountInput')?.value?.trim() || '';
+    const couponVal = document.getElementById('affiliateCouponInput')?.value?.trim() || null;
     const presetSelect = document.getElementById('affiliateTagPresetSelect');
     const presetVal = presetSelect ? presetSelect.value : '';
     let finalTag = discountVal || null;
@@ -790,6 +806,7 @@ window.AffiliatesModule = (function () {
       original_price: document.getElementById('affiliateOriginalPriceInput').value.trim() || null,
       category: document.getElementById('affiliateCategoryInput').value || 'cozinha',
       discount_tag: finalTag,
+      coupon_code: couponVal,
       badge_color: finalColor || 'orange',
       is_fast_pick: isFastPick,
       position: Number(assignedPosition) || 1,
