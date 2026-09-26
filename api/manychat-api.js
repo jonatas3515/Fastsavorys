@@ -2211,7 +2211,7 @@ async function handleGeminiCore(req, res) {
     }
     // Dica extra: cliente pediu doces
     if (intents.includes('doces')) {
-        intentHint += '\n[⛔ ATENÇÃO: O cliente perguntou sobre DOCES. A FastSavory\'s NÃO vende doces tradicionais (brigadeiro, cajuzinho, bem-casado, trufa, brownie, cupcake etc.). NÃO diga "sim, fazemos doces". Esclareça com honestidade e ofereça o que temos: bolos (Naked Cake/Vulcão) e mini salgados. Se ele pedir "50 doces", NÃO interprete como mini salgados.]';
+        intentHint += '\n[🍰 DOCES & SOBREMESAS: O cliente perguntou sobre DOCES. Apresente nossas *Mini Empadas Doces* (sabores: Romeu e Julieta, Chocolate e Doce de Leite — R$ 2,50 un ou pacote com 5 por R$ 10,00) e nossos *Bolos* (Naked Cake e Vulcão). Esclareça que NÃO temos docinhos tradicionais de festa avulsos (como brigadeiro ou cajuzinho).]';
     }
     // Dica extra: salgado com quantidade mas sem especificar mini/grande
     if (hasSalgadoQty && !specifiedMini && !specifiedGrande && intents.includes('salgados')) {
