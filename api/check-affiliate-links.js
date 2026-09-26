@@ -804,9 +804,14 @@ async function handleAutoSyncLinks(req, res) {
   const SUPABASE_URL = process.env.SUPABASE_URL || 'https://vqjyjdllapqbqpylshkw.supabase.co';
   const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxanlqZGxsYXBxYnFweWxzaGt3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY0MzgyNDUsImV4cCI6MjA4MjAxNDI0NX0.tfTR9YnM5l0do7FJfxML6i05KTSrMInQMqFrWXx6aAU';
 
+  // Limite por ciclo para responder em menos de 3-4 segundos e nunca estourar o timeout do cron-job
+  const limit = Math.min(Math.max(parseInt(req.query?.limit || req.body?.limit || '12', 10), 1), 30);
+
   try {
-    console.log('[AutoSync Affiliate Links] Iniciando verificação programada de links...');
-    const dbRes = await fetch(`${SUPABASE_URL}/rest/v1/fast_affiliate_products?select=*&is_active=eq.true&order=position.asc`, {
+    console.log(`[AutoSync Affiliate Links] Verificando lote de ${limit} links (Round-robin pelos mais antigos)...`);
+    
+    // Busca os produtos ativos que foram atualizados há mais tempo (fila rotativa)
+    const dbRes = await fetch(`${SUPABASE_URL}/rest/v1/fast_affiliate_products?select=*&is_active=eq.true&order=updated_at.asc&limit=${limit}`, {
       headers: {
         'apikey': SUPABASE_KEY,
         'Authorization': `Bearer ${SUPABASE_KEY}`
@@ -828,70 +833,80 @@ async function handleAutoSyncLinks(req, res) {
     let errorCount = 0;
     const updates = [];
 
-    // Processa em batches de 3 para não sobrecarregar
-    for (let i = 0; i < items.length; i += 3) {
-      const batch = items.slice(i, i + 3);
-      await Promise.all(batch.map(async (item) => {
-        try {
-          const details = await fetchProductDetails(item.affiliate_url);
-          
-          if (details.is_active === false) {
-            await fetch(`${SUPABASE_URL}/rest/v1/fast_affiliate_products?id=eq.${item.id}`, {
-              method: 'PATCH',
-              headers: {
-                'apikey': SUPABASE_KEY,
-                'Authorization': `Bearer ${SUPABASE_KEY}`,
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({ is_active: false, updated_at: new Date().toISOString() })
-            });
-            pausedCount++;
-            updates.push({ id: item.id, title: item.title, action: 'paused', reason: 'Pausado ou Esgotado' });
-          } else {
-            const patchPayload = { updated_at: new Date().toISOString() };
-            let hasPriceChange = false;
+    // Executa em paralelo de forma ultra rápida com timeout individual de 4s
+    await Promise.all(items.map(async (item) => {
+      try {
+        const details = await fetchProductDetails(item.affiliate_url);
+        
+        if (details.is_active === false) {
+          // Pausado ou esgotado na loja de origem
+          await fetch(`${SUPABASE_URL}/rest/v1/fast_affiliate_products?id=eq.${item.id}`, {
+            method: 'PATCH',
+            headers: {
+              'apikey': SUPABASE_KEY,
+              'Authorization': `Bearer ${SUPABASE_KEY}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ is_active: false, updated_at: new Date().toISOString() })
+          });
+          pausedCount++;
+          updates.push({ id: item.id, title: item.title, action: 'paused', reason: 'Pausado/Esgotado' });
+        } else {
+          const patchPayload = { updated_at: new Date().toISOString() };
+          let hasPriceChange = false;
 
-            if (details.price_display && details.price_display !== item.price_display) {
-              patchPayload.price_display = details.price_display;
-              hasPriceChange = true;
-            }
-            if (details.original_price && details.original_price !== item.original_price) {
-              patchPayload.original_price = details.original_price;
-              hasPriceChange = true;
-            }
-            if (details.discount_tag && details.discount_tag !== item.discount_tag) {
-              patchPayload.discount_tag = details.discount_tag;
-              hasPriceChange = true;
-            }
-
-            if (hasPriceChange) {
-              await fetch(`${SUPABASE_URL}/rest/v1/fast_affiliate_products?id=eq.${item.id}`, {
-                method: 'PATCH',
-                headers: {
-                  'apikey': SUPABASE_KEY,
-                  'Authorization': `Bearer ${SUPABASE_KEY}`,
-                  'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(patchPayload)
-              });
-              priceUpdatedCount++;
-              updates.push({ id: item.id, title: item.title, action: 'price_updated', old_price: item.price_display, new_price: details.price_display });
-            } else {
-              unchangedCount++;
-            }
+          if (details.price_display && details.price_display !== item.price_display) {
+            patchPayload.price_display = details.price_display;
+            hasPriceChange = true;
           }
-        } catch (itemErr) {
-          errorCount++;
-          console.warn(`[AutoSync] Erro ao checar item #${item.id}:`, itemErr.message);
-        }
-      }));
-    }
+          if (details.original_price && details.original_price !== item.original_price) {
+            patchPayload.original_price = details.original_price;
+            hasPriceChange = true;
+          }
+          if (details.discount_tag && details.discount_tag !== item.discount_tag) {
+            patchPayload.discount_tag = details.discount_tag;
+            hasPriceChange = true;
+          }
 
-    console.log(`[AutoSync Affiliate Links] Concluído: ${items.length} verificados | ${priceUpdatedCount} preços atualizados | ${pausedCount} pausados`);
+          await fetch(`${SUPABASE_URL}/rest/v1/fast_affiliate_products?id=eq.${item.id}`, {
+            method: 'PATCH',
+            headers: {
+              'apikey': SUPABASE_KEY,
+              'Authorization': `Bearer ${SUPABASE_KEY}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(patchPayload)
+          });
+
+          if (hasPriceChange) {
+            priceUpdatedCount++;
+            updates.push({ id: item.id, title: item.title, action: 'price_updated', old_price: item.price_display, new_price: details.price_display });
+          } else {
+            unchangedCount++;
+          }
+        }
+      } catch (itemErr) {
+        errorCount++;
+        // Atualiza updated_at mesmo em erro para não travar a fila rotativa
+        try {
+          await fetch(`${SUPABASE_URL}/rest/v1/fast_affiliate_products?id=eq.${item.id}`, {
+            method: 'PATCH',
+            headers: {
+              'apikey': SUPABASE_KEY,
+              'Authorization': `Bearer ${SUPABASE_KEY}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ updated_at: new Date().toISOString() })
+          });
+        } catch (e) {}
+      }
+    }));
+
+    console.log(`[AutoSync Affiliate Links] Lote concluído: ${items.length} verificados | ${priceUpdatedCount} preços atualizados | ${pausedCount} pausados`);
 
     return res.status(200).json({
       success: true,
-      message: `✅ Verificação concluída: ${items.length} links verificados (${priceUpdatedCount} preços atualizados, ${pausedCount} pausados, ${unchangedCount} inalterados).`,
+      message: `✅ Lote verificado com sucesso (${items.length} links). Preços atualizados: ${priceUpdatedCount} | Pausados: ${pausedCount} | Inalterados: ${unchangedCount}`,
       total_checked: items.length,
       price_updated_count: priceUpdatedCount,
       paused_count: pausedCount,
