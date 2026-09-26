@@ -25,7 +25,11 @@ module.exports = async function handler(req, res) {
   const action = req.query.action || (req.body && req.body.action) || 'send-whatsapp-deal';
 
   // Validação de Segurança Global de CRON_SECRET
-  const isPublicAction = ['send-whatsapp-deal', 'whatsapp-deal', 'mine-deals', 'deals-miner', 'auto-sync-links', 'check-sync-links', 'verify-links'].includes(action);
+  const isPublicAction = [
+    'send-whatsapp-deal', 'whatsapp-deal', 'whatsapp', 'send-deal', 'deal', 'disparos', 'disparo-whatsapp',
+    'mine-deals', 'deals-miner', 'miner',
+    'auto-sync-links', 'auto-check-links', 'sync-links', 'check-sync-links', 'verify-links', 'check-links', 'sync'
+  ].includes(action);
   const requiredCronSecret = process.env.CRON_SECRET;
   if (requiredCronSecret && !isPublicAction) {
     const authHeader = req.headers['authorization'] || '';
@@ -43,15 +47,25 @@ module.exports = async function handler(req, res) {
   switch (action) {
     case 'send-whatsapp-deal':
     case 'whatsapp-deal':
+    case 'whatsapp':
+    case 'send-deal':
+    case 'deal':
+    case 'disparos':
+    case 'disparo-whatsapp':
       return handleSendWhatsAppDeal(req, res);
 
     case 'mine-deals':
     case 'deals-miner':
+    case 'miner':
       return handleMineDeals(req, res);
 
     case 'auto-sync-links':
+    case 'auto-check-links':
+    case 'sync-links':
     case 'check-sync-links':
     case 'verify-links':
+    case 'check-links':
+    case 'sync':
       return handleAutoSyncLinks(req, res);
 
     case 'notify-scheduled-orders':
