@@ -121,6 +121,44 @@ window.AffiliatesModule = (function () {
     }
   }
 
+  function isItemUncategorized(item) {
+    if (!item.category || item.category === '' || item.category === 'sem_categoria') return true;
+    if (window.AchadinhosCategories) {
+      const categoryMap = window.AchadinhosCategories.getCategoryMap();
+      if (categoryMap && Object.keys(categoryMap).length > 0 && !categoryMap[item.category]) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function matchesCategoryFilter(item, filter) {
+    if (!filter || filter === 'all') return true;
+    if (filter === 'fast_picks') {
+      return Boolean(item.is_fast_pick || item.badge_color === 'fast_seal');
+    }
+    if (filter === 'sem_categoria') {
+      return isItemUncategorized(item);
+    }
+    if (filter.startsWith('group_')) {
+      const macroGroups = window.AchadinhosCategories ? window.AchadinhosCategories.getMacroGroups() : {};
+      const group = macroGroups[filter];
+      return group ? (group.categories || []).includes(item.category) : false;
+    }
+    // Subcategoria específica ou alias
+    if (item.category === filter) return true;
+    if (window.AchadinhosCategories) {
+      const tree = window.AchadinhosCategories.getTree();
+      for (const g of tree) {
+        const sub = (g.subcategories || []).find(s => s.slug === filter);
+        if (sub && Array.isArray(sub.aliases) && sub.aliases.includes(item.category)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
   function getFilteredProducts() {
     // Filtro Especial: 50 Últimos Adicionados (ordenados pelos mais novos)
     if (statusFilter === 'recent50') {
@@ -133,17 +171,7 @@ window.AffiliatesModule = (function () {
           return (Number(b.id) || 0) - (Number(a.id) || 0);
         })
         .filter(item => {
-          let matchCat = false;
-          if (categoryFilter === 'all') {
-            matchCat = true;
-          } else if (categoryFilter === 'fast_picks') {
-            matchCat = Boolean(item.is_fast_pick || item.badge_color === 'fast_seal');
-          } else if (categoryFilter === 'sem_categoria') {
-            matchCat = !item.category || item.category === '' || item.category === 'sem_categoria';
-          } else {
-            matchCat = item.category === categoryFilter;
-          }
-
+          const matchCat = matchesCategoryFilter(item, categoryFilter);
           const matchSearch = !searchQuery || 
             (item.title && item.title.toLowerCase().includes(searchQuery)) ||
             (item.description && item.description.toLowerCase().includes(searchQuery)) ||
@@ -156,17 +184,7 @@ window.AffiliatesModule = (function () {
     }
 
     const result = productsList.filter(item => {
-      let matchCat = false;
-      if (categoryFilter === 'all') {
-        matchCat = true;
-      } else if (categoryFilter === 'fast_picks') {
-        matchCat = Boolean(item.is_fast_pick || item.badge_color === 'fast_seal');
-      } else if (categoryFilter === 'sem_categoria') {
-        matchCat = !item.category || item.category === '' || item.category === 'sem_categoria';
-      } else {
-        matchCat = item.category === categoryFilter;
-      }
-
+      const matchCat = matchesCategoryFilter(item, categoryFilter);
       const matchStatus = statusFilter === 'all' || 
         (statusFilter === 'active' && item.is_active !== false) ||
         (statusFilter === 'paused' && item.is_active === false);
@@ -181,13 +199,14 @@ window.AffiliatesModule = (function () {
 
     // Ordenação: Itens SEM CATEGORIA no início (topo), e os demais agrupados por categoria
     return result.sort((a, b) => {
-      const catA = (a.category || '').trim().toLowerCase();
-      const catB = (b.category || '').trim().toLowerCase();
-      const isUncatA = !catA || catA === 'sem_categoria';
-      const isUncatB = !catB || catB === 'sem_categoria';
+      const isUncatA = isItemUncategorized(a);
+      const isUncatB = isItemUncategorized(b);
 
       if (isUncatA && !isUncatB) return -1;
       if (!isUncatA && isUncatB) return 1;
+
+      const catA = (a.category || '').trim().toLowerCase();
+      const catB = (b.category || '').trim().toLowerCase();
 
       if (catA !== catB) {
         return catA.localeCompare(catB);
@@ -304,7 +323,7 @@ window.AffiliatesModule = (function () {
 
       const categoryMap = window.AchadinhosCategories ? window.AchadinhosCategories.getCategoryMap() : {};
       
-      const isUncategorized = !item.category || item.category === 'sem_categoria';
+      const isUncategorized = isItemUncategorized(item);
       const catLabel = isUncategorized 
         ? `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-900 border border-amber-300 animate-pulse">⚠️ Sem Categoria</span>`
         : (categoryMap[item.category] || item.category || 'Geral');

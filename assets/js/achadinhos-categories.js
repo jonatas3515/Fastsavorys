@@ -4,10 +4,10 @@
  */
 
 window.AchadinhosCategories = (function () {
-  const STORAGE_KEY = 'fast_achadinhos_categories_v2';
+  const STORAGE_KEY = 'fast_achadinhos_categories_v3';
   const VERSION_KEY = 'fast_achadinhos_categories_version';
 
-  // Árvore Padrão (12 Macro Grupos e 46 Subcategorias)
+  // Árvore Padrão (12 Macro Grupos e Novas Subcategorias Otimizadas)
   const DEFAULT_TREE = [
     {
       id: 'group_supermercado',
@@ -15,9 +15,47 @@ window.AchadinhosCategories = (function () {
       icon: '🛒',
       subcategories: [
         { slug: 'confeitaria_sobremesas', label: 'Confeitaria & Sobremesas', aliases: ['mercearia_doce'] },
-        { slug: 'alimentos_basicos', label: 'Alimentos Básicos & Grãos', aliases: ['mercearia_salgada'] },
-        { slug: 'molhos_temperos', label: 'Molhos, Temperos & Conservas', aliases: [] },
-        { slug: 'bebidas_snacks', label: 'Bebidas & Snacks', aliases: ['supermercado'] }
+        { slug: 'alimentos_basicos', label: 'Alimentos Básicos & Grãos', aliases: ['alimentos_basicos_graos', 'mercearia_salgada'] },
+        { slug: 'molhos_temperos', label: 'Molhos, Temperos & Conservas', aliases: ['molhos_temperos_conservas'] },
+        { slug: 'bebidas_snacks', label: 'Bebidas & Snacks', aliases: ['supermercado'] },
+        { slug: 'limpeza_organizacao', label: 'Limpeza e Organização', aliases: ['limpeza', 'organizacao_limpeza'] }
+      ]
+    },
+    {
+      id: 'group_casa',
+      label: 'Cozinha',
+      icon: '🍳',
+      subcategories: [
+        { slug: 'eletroportateis', label: 'Eletroportáteis', aliases: ['cozinha', 'eletroportateis_cozinha'] },
+        { slug: 'eletrodomesticos', label: 'Eletrodomésticos', aliases: ['fogao', 'microondas'] },
+        { slug: 'cama_mesa_banho', label: 'Cama, Mesa & Banho', aliases: ['banho', 'mesa'] },
+        { slug: 'cafe_cha_expresso', label: 'Café, Chá & Expresso', aliases: ['cafe', 'cafeteira', 'cha_expresso'] },
+        { slug: 'panelas_loucas_copos', label: 'Panelas, Louças & Copos', aliases: ['panelas', 'loucas', 'copos'] },
+        { slug: 'utensilios_domesticos', label: 'Utensílios Domésticos', aliases: ['utensilios', 'organizacao', 'utilidades', 'decoracao_basica'] }
+      ]
+    },
+    {
+      id: 'group_eletros',
+      label: 'Eletros, TV & Climatização',
+      icon: '📺',
+      subcategories: [
+        { slug: 'grandes_eletros', label: 'Grandes Eletrodomésticos', aliases: [] },
+        { slug: 'lavagem_secagem', label: 'Lavagem & Secagem', aliases: ['lavanderia'] },
+        { slug: 'climatizacao', label: 'Climatização & Ar-Condicionado', aliases: ['ar_condicionado'] },
+        { slug: 'tv_audio_video', label: 'TVs, Áudio & Vídeo', aliases: ['tv', 'audio_video'] },
+        { slug: 'ventiladores', label: 'Ventiladores', aliases: ['ventilador', 'circuladores'] }
+      ]
+    },
+    {
+      id: 'group_beleza',
+      label: 'Beleza & Cuidados Pessoais',
+      icon: '💄',
+      subcategories: [
+        { slug: 'cabelos', label: 'Cabelos', aliases: ['cabelo'] },
+        { slug: 'pele_rosto', label: 'Cuidados com a Pele & Rosto', aliases: ['pele', 'rosto'] },
+        { slug: 'maquiagem_unhas', label: 'Maquiagem & Unhas', aliases: ['maquiagem', 'unhas'] },
+        { slug: 'perfumaria_higiene', label: 'Perfumaria & Higiene', aliases: ['beleza', 'perfumaria', 'higiene'] },
+        { slug: 'barbear_depilacao', label: 'Barbear & Depilação', aliases: ['barbear', 'depilacao', 'barba'] }
       ]
     },
     {
@@ -40,28 +78,6 @@ window.AchadinhosCategories = (function () {
         { slug: 'sala_estar', label: 'Sala de Estar', aliases: [] },
         { slug: 'sala_jantar', label: 'Sala de Jantar', aliases: [] },
         { slug: 'escritorio_organizacao', label: 'Escritório & Organização', aliases: [] }
-      ]
-    },
-    {
-      id: 'group_casa',
-      label: 'Casa & Utilidades',
-      icon: '🏠',
-      subcategories: [
-        { slug: 'cozinha', label: 'Cozinha & Eletroportáteis', aliases: [] },
-        { slug: 'cama_mesa_banho', label: 'Cama, Mesa & Banho', aliases: ['banho'] },
-        { slug: 'organizacao', label: 'Organização & Limpeza', aliases: ['utilidades'] },
-        { slug: 'decoracao_basica', label: 'Utilidades & Decoração Básica', aliases: [] }
-      ]
-    },
-    {
-      id: 'group_eletros',
-      label: 'Eletros, TV & Climatização',
-      icon: '📺',
-      subcategories: [
-        { slug: 'grandes_eletros', label: 'Grandes Eletrodomésticos', aliases: ['eletrodomesticos'] },
-        { slug: 'lavagem_secagem', label: 'Lavagem & Secagem', aliases: [] },
-        { slug: 'climatizacao', label: 'Climatização & Ar-Condicionado', aliases: [] },
-        { slug: 'tv_audio_video', label: 'TVs, Áudio & Vídeo', aliases: [] }
       ]
     },
     {
@@ -106,17 +122,6 @@ window.AchadinhosCategories = (function () {
         { slug: 'calcados', label: 'Calçados', aliases: [] },
         { slug: 'bolsas_malas', label: 'Bolsas, Mochilas & Malas', aliases: ['acessorios'] },
         { slug: 'relogios_oculos', label: 'Relógios & Óculos', aliases: ['joias'] }
-      ]
-    },
-    {
-      id: 'group_beleza',
-      label: 'Beleza & Cuidados Pessoais',
-      icon: '💄',
-      subcategories: [
-        { slug: 'cabelos', label: 'Cabelos', aliases: [] },
-        { slug: 'pele_rosto', label: 'Cuidados com a Pele & Rosto', aliases: [] },
-        { slug: 'maquiagem_unhas', label: 'Maquiagem & Unhas', aliases: [] },
-        { slug: 'perfumaria_higiene', label: 'Perfumaria & Higiene', aliases: ['beleza', 'perfumaria'] }
       ]
     },
     {
