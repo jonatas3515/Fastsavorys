@@ -70,13 +70,13 @@ function buildPriceDropAlertText(product, oldPrice, newPrice) {
 }
 
 async function dispatchWhatsAppMessage(messageCaption, mediaUrl) {
-  const evolutionApiUrl = (process.env.EVOLUTION_API_URL || '').replace(/\/+$/, '');
-  const evolutionApiKey = process.env.EVOLUTION_API_KEY || '';
-  const evolutionInstance = process.env.EVOLUTION_INSTANCE || 'fastsavorys';
-  const targetGroupJid = process.env.WHATSAPP_DEALS_GROUP_JID || '';
+  const evolutionApiUrl = (process.env.EVOLUTION_API_URL || '').trim().replace(/\/+$/, '');
+  const evolutionApiKey = (process.env.EVOLUTION_API_KEY || '').trim();
+  const evolutionInstance = (process.env.EVOLUTION_INSTANCE || 'fastsavorys').trim();
+  const targetGroupJid = (process.env.WHATSAPP_DEALS_GROUP_JID || '').trim();
 
   if (!evolutionApiUrl || !evolutionApiKey || !targetGroupJid) {
-    throw new Error('Configuração do WhatsApp não encontrada nas variáveis de ambiente.');
+    throw new Error('Configuração do WhatsApp não encontrada nas variáveis de ambiente da Vercel (EVOLUTION_API_URL, EVOLUTION_API_KEY ou WHATSAPP_DEALS_GROUP_JID).');
   }
 
   // Normaliza URL da imagem
@@ -87,8 +87,12 @@ async function dispatchWhatsAppMessage(messageCaption, mediaUrl) {
   let sendSuccess = false;
   let sendResponse = null;
 
+  // 1. Tenta envio com imagem (sendMedia) com timeout de 30s para acomodar o cold start do Render
   if (mediaUrl && mediaUrl.startsWith('http')) {
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+
       const mediaEndpoint = `${evolutionApiUrl}/message/sendMedia/${evolutionInstance}`;
       const response = await fetch(mediaEndpoint, {
         method: 'POST',
@@ -103,19 +107,29 @@ async function dispatchWhatsAppMessage(messageCaption, mediaUrl) {
           mimetype: 'image/jpeg',
           caption: messageCaption,
           fileName: 'oferta.jpg'
-        })
+        }),
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
 
       if (response.ok) {
         sendSuccess = true;
         sendResponse = await response.json();
+      } else {
+        const errText = await response.text();
+        console.warn(`[WhatsApp Dispatch] Falha no sendMedia (HTTP ${response.status}):`, errText);
       }
     } catch (err) {
-      console.warn('[WhatsApp Dispatch] Erro ao enviar mídia:', err.message);
+      console.warn('[WhatsApp Dispatch] Erro na requisição sendMedia:', err.message);
     }
   }
 
+  // 2. Fallback: Envio de Texto simples (sendText) se mídia falhar
   if (!sendSuccess) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
     const textEndpoint = `${evolutionApiUrl}/message/sendText/${evolutionInstance}`;
     const response = await fetch(textEndpoint, {
       method: 'POST',
@@ -127,12 +141,15 @@ async function dispatchWhatsAppMessage(messageCaption, mediaUrl) {
         number: targetGroupJid,
         text: messageCaption,
         linkPreview: true
-      })
+      }),
+      signal: controller.signal
     });
+
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       const errText = await response.text();
-      throw new Error(`Erro ao enviar mensagem no WhatsApp: ${errText}`);
+      throw new Error(`Evolution API retornou erro HTTP ${response.status}: ${errText}`);
     }
 
     sendResponse = await response.json();

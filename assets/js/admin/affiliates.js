@@ -461,6 +461,29 @@ window.AffiliatesModule = (function () {
     const tagInput = document.getElementById('affiliateTagInput');
     const colorInput = document.getElementById('affiliateBadgeColorInput');
 
+    function updateTagSelectVisual(val) {
+      const sel = document.getElementById('affiliateTagPresetSelect');
+      if (!sel) return;
+
+      sel.className = 'w-full px-3 py-2.5 border rounded-xl outline-none font-extrabold text-sm focus:ring-2 focus:ring-amber-500 transition-all shadow-sm';
+
+      if (!val || val === 'custom') {
+        sel.classList.add('bg-white', 'text-gray-700', 'border-gray-200');
+        return;
+      }
+
+      const color = val.includes('|') ? val.split('|')[1] : val;
+      if (color === 'blue') sel.classList.add('bg-blue-100', 'text-blue-950', 'border-blue-300', 'shadow-blue-100/50');
+      else if (color === 'orange') sel.classList.add('bg-orange-100', 'text-orange-950', 'border-orange-300', 'shadow-orange-100/50');
+      else if (color === 'purple') sel.classList.add('bg-purple-100', 'text-purple-950', 'border-purple-300', 'shadow-purple-100/50');
+      else if (color === 'amber' || color === 'yellow') sel.classList.add('bg-yellow-100', 'text-yellow-950', 'border-yellow-300', 'shadow-yellow-100/50');
+      else if (color === 'black') sel.classList.add('bg-gray-900', 'text-white', 'border-gray-950', 'shadow-gray-300/50');
+      else if (color === 'pink') sel.classList.add('bg-pink-100', 'text-pink-950', 'border-pink-300', 'shadow-pink-100/50');
+      else if (color === 'rose' || color === 'red') sel.classList.add('bg-rose-100', 'text-rose-950', 'border-rose-300', 'shadow-rose-100/50');
+      else if (color === 'emerald' || color === 'green') sel.classList.add('bg-emerald-100', 'text-emerald-950', 'border-emerald-300', 'shadow-emerald-100/50');
+      else sel.classList.add('bg-white', 'text-gray-700', 'border-gray-200');
+    }
+
     if (val === 'custom') {
       if (customBox) customBox.classList.remove('hidden');
     } else if (!val) {
@@ -473,6 +496,8 @@ window.AffiliatesModule = (function () {
       if (tagInput) tagInput.value = tag;
       if (colorInput) colorInput.value = color;
     }
+
+    updateTagSelectVisual(val);
   }
 
   function openNewModal() {
@@ -488,6 +513,11 @@ window.AffiliatesModule = (function () {
     if (customBox) customBox.classList.add('hidden');
     document.getElementById('affiliateTagInput').value = '';
     document.getElementById('affiliateBadgeColorInput').value = 'orange';
+
+    const sel = document.getElementById('affiliateTagPresetSelect');
+    if (sel) {
+      sel.className = 'w-full px-3 py-2.5 border rounded-xl bg-white text-gray-700 border-gray-200 outline-none font-bold text-sm focus:ring-2 focus:ring-amber-500 transition-all shadow-sm';
+    }
 
     const typeSelect = document.getElementById('affiliateDiscountTypeSelect');
     if (typeSelect) typeSelect.value = 'OFF';
