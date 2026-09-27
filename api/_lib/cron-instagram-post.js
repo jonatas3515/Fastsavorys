@@ -122,10 +122,14 @@ async function publishToInstagramFeed(imageUrl, caption) {
     finalImageUrl = `https://fastsavorys.vercel.app${finalImageUrl.startsWith('/') ? '' : '/'}${finalImageUrl}`;
   }
 
-  console.log(`[Instagram API] Criando container de mídia para conta ${accountId}...`);
+  const isIgToken = accessToken.startsWith('IG');
+  const baseUrl = isIgToken ? 'https://graph.instagram.com/v21.0' : 'https://graph.facebook.com/v21.0';
+  const targetId = isIgToken ? 'me' : accountId;
 
-  // 1. Criar container de mídia no Instagram (POST /{ig_user_id}/media)
-  const containerUrl = new URL(`https://graph.facebook.com/v19.0/${accountId}/media`);
+  console.log(`[Instagram API] Criando container de mídia para conta ${targetId} via ${baseUrl}...`);
+
+  // 1. Criar container de mídia no Instagram (POST /{targetId}/media)
+  const containerUrl = new URL(`${baseUrl}/${targetId}/media`);
   containerUrl.searchParams.set('image_url', finalImageUrl);
   containerUrl.searchParams.set('caption', caption);
   containerUrl.searchParams.set('access_token', accessToken);
@@ -149,8 +153,8 @@ async function publishToInstagramFeed(imageUrl, caption) {
   // Pequena pausa para processamento da imagem pelos servidores do Meta
   await new Promise(r => setTimeout(r, 2500));
 
-  // 2. Publicar o container no Feed (POST /{ig_user_id}/media_publish)
-  const publishUrl = new URL(`https://graph.facebook.com/v19.0/${accountId}/media_publish`);
+  // 2. Publicar o container no Feed (POST /{targetId}/media_publish)
+  const publishUrl = new URL(`${baseUrl}/${targetId}/media_publish`);
   publishUrl.searchParams.set('creation_id', creationId);
   publishUrl.searchParams.set('access_token', accessToken);
 
