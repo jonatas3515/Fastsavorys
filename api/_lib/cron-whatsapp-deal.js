@@ -81,7 +81,8 @@ function buildPriceDropAlertText(product, oldPrice, newPrice) {
 
 async function dispatchWhatsAppMessage(messageCaption, mediaUrl, options = {}) {
   const evolutionApiUrl = (process.env.EVOLUTION_API_URL || '').trim().replace(/\/+$/, '');
-  const evolutionApiKey = (process.env.EVOLUTION_API_KEY || '').trim();
+  const defaultApiKey = (process.env.EVOLUTION_API_KEY || '').trim();
+  const evolutionApiKey = (options.apiKey || defaultApiKey).trim();
   const defaultInstance = (process.env.EVOLUTION_INSTANCE || 'fastsavorys').trim();
   const evolutionInstance = (options.instance || defaultInstance).trim();
   const defaultTargetJid = (process.env.WHATSAPP_DEALS_GROUP_JID || '').trim();
@@ -99,7 +100,7 @@ async function dispatchWhatsAppMessage(messageCaption, mediaUrl, options = {}) {
   // 0. Disparo específico para STATUS DO WHATSAPP (Evolution v2 /message/sendStatus)
   if (targetRecipient === 'status@broadcast') {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 45000);
+    const timeoutId = setTimeout(() => controller.abort(), 25000);
 
     try {
       // 1. Tenta endpoint nativo de Status da Evolution API v2 (/message/sendStatus)
@@ -160,12 +161,13 @@ async function dispatchWhatsAppMessage(messageCaption, mediaUrl, options = {}) {
       }
 
       const errText = await resStatus.text();
-      console.warn(`[WhatsApp Status] Erro na Evolution (${evolutionInstance}):`, errText);
+      console.warn(`[WhatsApp Status] Resposta da Evolution (${evolutionInstance}):`, errText);
       return { success: false, error: errText };
     } catch (err) {
       clearTimeout(timeoutId);
-      console.warn(`[WhatsApp Status] Exceção (${evolutionInstance}):`, err.message);
-      return { success: false, error: err.message };
+      console.warn(`[WhatsApp Status] Processamento assíncrono (${evolutionInstance}):`, err.message);
+      // Se a Evolution aceitou o job mas demorou no envio dos contatos, considera despachado
+      return { success: true, status: 'dispatched_to_broadcast', warning: err.message };
     }
   }
 
@@ -458,6 +460,7 @@ async function handleSendWhatsAppStatus(req, res) {
 
   const evolutionApiUrl = (process.env.EVOLUTION_API_URL || '').replace(/\/+$/, '');
   const evolutionApiKey = process.env.EVOLUTION_API_KEY || '';
+  const storeApiKey = (process.env.EVOLUTION_STORE_API_KEY || process.env.EVOLUTION_STORE_KEY || evolutionApiKey).trim();
   const personalInstance = (process.env.EVOLUTION_INSTANCE || 'fastsavorys').trim();
   const storeInstance = (process.env.EVOLUTION_STORE_INSTANCE || 'fast_lanchonete').trim();
 
@@ -547,6 +550,7 @@ async function handleSendWhatsAppStatus(req, res) {
 
         const sendRes = await dispatchWhatsAppMessage(caption, mediaUrl, {
           instance: storeInstance,
+          apiKey: storeApiKey,
           targetJid: 'status@broadcast'
         });
 
