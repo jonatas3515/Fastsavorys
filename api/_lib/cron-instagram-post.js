@@ -81,14 +81,46 @@ ${couponText}
 #achadinhos #promocao #desconto #ofertas #mercadolivre #amazonbrasil #shopeebrasil #achadinhosdashopee #achados #comprinhas`;
 }
 
+function getStoreContext() {
+  const now = new Date();
+  const utcHours = now.getUTCHours();
+  const brtHours = (utcHours - 3 + 24) % 24;
+  const dayOfWeek = (new Date(now.getTime() - 3 * 3600 * 1000)).getUTCDay(); // 0 = Domingo, 1 = Segunda, ..., 6 = Sábado
+
+  const isSunday = dayOfWeek === 0;
+  const isOperatingHours = !isSunday && (brtHours >= 14 && brtHours < 18);
+  const isMorningBooking = !isSunday && (brtHours >= 8 && brtHours < 14);
+  const isNightBooking = !isSunday && (brtHours >= 18 || brtHours < 8);
+
+  return { isSunday, isOperatingHours, isMorningBooking, isNightBooking, dayOfWeek, brtHours };
+}
+
 /**
- * Gera legenda do Instagram para Produtos da FastSavory's com Gatilho do ManyChat
+ * Gera legenda do Instagram para Produtos da FastSavory's com Gatilho do ManyChat e Contexto de Horário
  */
 function buildInstagramStoreCaption(product) {
   const price = typeof product.price === 'number' ? `R$ ${product.price.toFixed(2).replace('.', ',')}` : (product.price || '');
   const desc = product.description ? `\n${product.description}\n` : '';
+  const { isSunday, isOperatingHours, isMorningBooking } = getStoreContext();
 
-  return `😋 BATEU AQUELA FOME? DIRETO DA COZINHA FASTSAVORY'S! 🥟🔥
+  let header = `😋 BATEU AQUELA FOME? DIRETO DA COZINHA FASTSAVORY'S! 🥟🔥`;
+  let orderInfo = `🛵 COMO FAZER SEU PEDIDO?\n🕒 Horário de funcionamento: Segunda a Sábado das 14h às 18h (Agendamentos a partir das 12h)!\n👇 Comente "CARDAPIO" ou "QUERO" aqui nos comentários que te enviamos nosso cardápio completo no direct!`;
+
+  if (isSunday) {
+    header = `😋 PLANEJANDO O LANCHE DA SEMANA? DIRETO DA FASTSAVORY'S! 🥟📅`;
+    orderInfo = `📅 COMO AGENDAR SEU PEDIDO?\n🕒 Aos domingos estamos fechados para recarregar as energias. Funcionamos de Segunda a Sábado das 14h às 18h (com agendamentos a partir das 12h)!\n👇 Comente "CARDAPIO" ou "QUERO" aqui nos comentários para agendar com antecedência e receber nosso cardápio no direct!`;
+  } else if (isOperatingHours) {
+    header = `😋 FORNADA SAINDO AGORA! DIRETO DA COZINHA FASTSAVORY'S! 🥟🔥`;
+    orderInfo = `🛵 PEDIDOS ABERTOS AGORA!\n🕒 Estamos funcionando a todo vapor (das 14h às 18h)!\n👇 Comente "CARDAPIO" ou "QUERO" aqui nos comentários para pedir quentinho agora mesmo!`;
+  } else if (isMorningBooking) {
+    header = `😋 BATEU AQUELA FOME? DIRETO DA COZINHA FASTSAVORY'S! 🥟✨`;
+    orderInfo = `📅 AGENDAMENTO ABERTO PARA HOJE!\n🕒 Nosso atendimento de pedidos começa às 12h e as entregas quentinhas saem das 14h às 18h!\n👇 Comente "CARDAPIO" ou "QUERO" aqui nos comentários para agendar o seu antecipadamente!`;
+  } else {
+    header = `😋 PLANEJANDO SEU LANCHE PARA AMANHÃ? DIRETO DA FASTSAVORY'S! 🥟✨`;
+    orderInfo = `📅 AGENDAMENTO PARA O PRÓXIMO DIA!\n🕒 Funcionamos de Segunda a Sábado das 14h às 18h (agendamentos a partir das 12h)!\n👇 Comente "CARDAPIO" ou "QUERO" aqui nos comentários para garantir sua encomenda no direct!`;
+  }
+
+  return `${header}
 
 ✨ ${product.name}
 ${desc}
@@ -96,8 +128,7 @@ ${desc}
 
 Feito com ingredientes selecionados, quentinho e crocante na medida certa para o seu lanche ou festa! 🎉
 ━━━━━━━━━━━━━━━━━━━
-🛵 COMO FAZER SEU PEDIDO?
-👇 Comente "CARDAPIO" ou "QUERO" aqui nos comentários que te enviamos nosso cardápio completo no direct!
+${orderInfo}
 
 💬 Ou clique no link da bio para pedir pelo WhatsApp: (73) 99936-6554
 ━━━━━━━━━━━━━━━━━━━
