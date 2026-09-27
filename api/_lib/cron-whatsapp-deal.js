@@ -109,7 +109,6 @@ async function dispatchWhatsAppMessage(messageCaption, mediaUrl, options = {}) {
         content: (mediaUrl && mediaUrl.startsWith('http')) ? mediaUrl : messageCaption,
         caption: (mediaUrl && mediaUrl.startsWith('http')) ? messageCaption : undefined,
         allContacts: true,
-        statusJidList: [],
         options: {
           delay: 1200,
           presence: 'composing'
