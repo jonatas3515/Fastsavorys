@@ -62,11 +62,62 @@ function buildWhatsAppDealText(product) {
   return `${sealHeader}🛍️ *ACHADINHO ${platform}* ⭐\n🔥 *${product.title}*\n${descText}\n💰 *Preço:* ${origPriceText}*${product.price_display || 'Confira no link'}*${discountText}${couponText}\n\n👉 *COMPRE COM DESCONTO AQUI:*\n${product.affiliate_url}\n\n💬 *Entre no canal VIP de ofertas da FastSavory's:*\nhttps://chat.whatsapp.com/C7dT0ZWaUZKHm7atI3eOLE`;
 }
 
+function getStoreContext() {
+  const now = new Date();
+  const utcHours = now.getUTCHours();
+  const brtHours = (utcHours - 3 + 24) % 24;
+  const dayOfWeek = (new Date(now.getTime() - 3 * 3600 * 1000)).getUTCDay(); // 0 = Domingo, 1 = Segunda, ..., 6 = Sábado
+
+  const isSunday = dayOfWeek === 0;
+  const isOperatingHours = !isSunday && (brtHours >= 14 && brtHours < 18);
+  const isMorningBooking = !isSunday && (brtHours >= 8 && brtHours < 14);
+  const isNightBooking = !isSunday && (brtHours >= 18 || brtHours < 8);
+
+  return { isSunday, isOperatingHours, isMorningBooking, isNightBooking, dayOfWeek, brtHours };
+}
+
 function buildFastSavorysProductText(product) {
   const price = typeof product.price === 'number' ? `R$ ${product.price.toFixed(2).replace('.', ',')}` : (product.price || '');
   const desc = product.description ? `\n${product.description}\n` : '';
+  const { isSunday, isOperatingHours, isMorningBooking } = getStoreContext();
 
-  return `😋 *BATEU AQUELA FOME? DIRETO DA COZINHA FASTSAVORY'S!* 🥟🔥\n\n✨ *${product.name}*\n${desc}\n💰 *Apenas:* *${price}*\n\n🛵 *Peça agora quentinho pelo nosso cardápio online:*\nhttps://fastsavorys.vercel.app/pages/fast.html\n\n💬 *Ou faça seu pedido direto pelo WhatsApp:* (73) 99936-6554`;
+  let callToAction = '';
+  if (isSunday) {
+    callToAction = `📅 *Garanta seus salgados para a semana! Agende com antecedência pelo cardápio online:*\nhttps://fastsavorys.vercel.app/pages/fast.html\n\n💬 *Dúvidas e encomendas no WhatsApp:* (73) 99936-6554`;
+  } else if (isOperatingHours) {
+    callToAction = `🛵 *Peça agora quentinho pelo nosso cardápio online:*\nhttps://fastsavorys.vercel.app/pages/fast.html\n\n💬 *Ou faça seu pedido direto pelo WhatsApp:* (73) 99936-6554`;
+  } else if (isMorningBooking) {
+    callToAction = `📅 *Agendamentos abertos para hoje a partir das 14h! Garanta o seu pelo cardápio online:*\nhttps://fastsavorys.vercel.app/pages/fast.html\n\n💬 *Ou agende direto pelo WhatsApp:* (73) 99936-6554`;
+  } else {
+    callToAction = `📅 *Agende com antecedência para amanhã pelo nosso cardápio online:*\nhttps://fastsavorys.vercel.app/pages/fast.html\n\n💬 *Ou faça seu agendamento no WhatsApp:* (73) 99936-6554`;
+  }
+
+  const header = isSunday
+    ? `😋 *PLANEJANDO O LANCHE DA SEMANA? DIRETO DA FASTSAVORY'S!* 🥟📅`
+    : `😋 *BATEU AQUELA FOME? DIRETO DA COZINHA FASTSAVORY'S!* 🥟🔥`;
+
+  return `${header}\n\n✨ *${product.name}*\n${desc}\n💰 *Apenas:* *${price}*\n\n${callToAction}`;
+}
+
+function buildFastSavorysStatusText(product) {
+  const { isSunday, isOperatingHours, isMorningBooking } = getStoreContext();
+
+  if (isSunday) {
+    return `🥟 BATEU AQUELA VONTADE? 📅 Agende seus salgados para a semana pelo nosso cardápio online:\nhttps://fastsavorys.vercel.app/pages/fast.html`;
+  }
+  if (isOperatingHours) {
+    return `😋 FORNADA SAINDO AGORA! 🛵 Peça quentinho pelo nosso cardápio online:\nhttps://fastsavorys.vercel.app/pages/fast.html`;
+  }
+  if (isMorningBooking) {
+    return `🥟 BATEU AQUELA FOME? 📅 Agende seu pedido para hoje a partir das 14h pelo nosso cardápio:\nhttps://fastsavorys.vercel.app/pages/fast.html`;
+  }
+  return `🥟 BATEU AQUELA FOME? 📅 Agende com antecedência pelo nosso cardápio online:\nhttps://fastsavorys.vercel.app/pages/fast.html`;
+}
+
+function buildWhatsAppStatusDealText(product) {
+  const platform = detectPlatform(product.affiliate_url).name.toUpperCase();
+  const price = product.price_display ? `Apenas ${product.price_display}!` : 'Confira no link!';
+  return `🛍️ ACHADINHO ${platform}\n🔥 ${price} 👉 GARANTA COM O MENOR PREÇO AQUI:\n${product.affiliate_url}`;
 }
 
 function buildPriceDropAlertText(product, oldPrice, newPrice) {
@@ -77,6 +128,31 @@ function buildPriceDropAlertText(product, oldPrice, newPrice) {
   const discountText = pct > 0 ? ` (${pct}% DE QUEDA)` : '';
 
   return `🚨 *ALERTA DE QUEDA DE PREÇO NO AR!* 📉⚡\n${sealHeader}\n🛍️ *ACHADINHO ${platform}*\n🔥 *${product.title}*\n\n💥 *BAIXOU AGORA:* de ~${oldPrice}~ por apenas *${newPrice}*!${discountText}\n\n👉 *GARANTA COM O MENOR PREÇO AQUI:*\n${product.affiliate_url}\n\n💬 *Entre no canal VIP de ofertas da FastSavory's:*\nhttps://chat.whatsapp.com/C7dT0ZWaUZKHm7atI3eOLE`;
+}
+
+async function fetchImageAsBase64(imageUrl) {
+  if (!imageUrl || !imageUrl.startsWith('http')) return null;
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 6000);
+    const res = await fetch(imageUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8'
+      },
+      signal: controller.signal
+    });
+    clearTimeout(timeout);
+    if (res.ok) {
+      const buffer = await res.arrayBuffer();
+      const base64 = Buffer.from(buffer).toString('base64');
+      const contentType = res.headers.get('content-type') || 'image/jpeg';
+      return `data:${contentType};base64,${base64}`;
+    }
+  } catch (err) {
+    console.warn('[WhatsApp] Falha ao converter imagem para base64:', err.message);
+  }
+  return null;
 }
 
 async function dispatchWhatsAppMessage(messageCaption, mediaUrl, options = {}) {
@@ -97,54 +173,24 @@ async function dispatchWhatsAppMessage(messageCaption, mediaUrl, options = {}) {
     mediaUrl = `https://fastsavorys.vercel.app${mediaUrl.startsWith('/') ? '' : '/'}${mediaUrl}`;
   }
 
-  // 0. Disparo específico para STATUS DO WHATSAPP (Direto via sendMedia status@broadcast)
+  // 0. Disparo específico para STATUS DO WHATSAPP (Stories)
   if (targetRecipient === 'status@broadcast') {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 20000);
+    const timeoutId = setTimeout(() => controller.abort(), 45000);
 
     try {
-      if (mediaUrl && mediaUrl.startsWith('http')) {
-        const mediaEndpoint = `${evolutionApiUrl}/message/sendMedia/${evolutionInstance}`;
-        const resMedia = await fetch(mediaEndpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': evolutionApiKey
-          },
-          body: JSON.stringify({
-            number: 'status@broadcast',
-            media: mediaUrl,
-            mediatype: 'image',
-            mimetype: 'image/jpeg',
-            caption: messageCaption,
-            fileName: 'status.jpg',
-            options: {
-              delay: 1000,
-              presence: 'composing'
-            }
-          }),
-          signal: controller.signal
-        });
-
-        clearTimeout(timeoutId);
-        if (resMedia.ok) {
-          return await resMedia.json();
-        }
-        const errText = await resMedia.text();
-        console.warn(`[WhatsApp Status] Resposta sendMedia (${evolutionInstance}):`, errText);
-        return { success: false, error: errText };
-      }
-
-      // Fallback para sendStatus somente se não houver mídia (apenas texto)
       const statusEndpoint = `${evolutionApiUrl}/message/sendStatus/${evolutionInstance}`;
-      const statusPayload = {
+      const isImage = Boolean(mediaUrl && mediaUrl.startsWith('http'));
+
+      const statusPayload = isImage ? {
+        type: 'image',
+        content: mediaUrl,
+        caption: messageCaption || '',
+        allContacts: true
+      } : {
         type: 'text',
-        content: messageCaption,
-        allContacts: true,
-        options: {
-          delay: 1000,
-          presence: 'composing'
-        }
+        content: messageCaption || '',
+        allContacts: true
       };
 
       const resStatus = await fetch(statusEndpoint, {
@@ -167,7 +213,7 @@ async function dispatchWhatsAppMessage(messageCaption, mediaUrl, options = {}) {
       return { success: false, error: errText };
     } catch (err) {
       clearTimeout(timeoutId);
-      console.warn(`[WhatsApp Status] Exceção (${evolutionInstance}):`, err.message);
+      console.warn(`[WhatsApp Status] sendStatus (${evolutionInstance}) erro:`, err.message);
       return { success: false, error: err.message };
     }
   }
@@ -175,7 +221,7 @@ async function dispatchWhatsAppMessage(messageCaption, mediaUrl, options = {}) {
   // 1. Se possuir URL de imagem, envia EXCLUSIVAMENTE via sendMedia (evita mensagens duplicadas)
   if (mediaUrl && mediaUrl.startsWith('http')) {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 45000);
+    const timeoutId = setTimeout(() => controller.abort(), 12000);
 
     try {
       const mediaEndpoint = `${evolutionApiUrl}/message/sendMedia/${evolutionInstance}`;
@@ -191,7 +237,7 @@ async function dispatchWhatsAppMessage(messageCaption, mediaUrl, options = {}) {
           mediatype: 'image',
           mimetype: 'image/jpeg',
           caption: messageCaption,
-          fileName: 'status_oferta.jpg',
+          fileName: 'oferta.jpg',
           options: {
             delay: 1200,
             presence: 'composing'
@@ -207,69 +253,52 @@ async function dispatchWhatsAppMessage(messageCaption, mediaUrl, options = {}) {
       } else {
         const errText = await response.text();
         console.warn(`[WhatsApp Dispatch] Resposta sendMedia (${evolutionInstance} -> ${targetRecipient}, HTTP ${response.status}):`, errText);
-        // Só tenta texto se o erro for 400 e não for Status do WhatsApp
-        if (response.status === 400 && targetRecipient !== 'status@broadcast') {
-          const textRes = await fetch(`${evolutionApiUrl}/message/sendText/${evolutionInstance}`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'apikey': evolutionApiKey
-            },
-            body: JSON.stringify({
-              number: targetRecipient,
-              text: messageCaption,
-              linkPreview: true,
-              options: {
-                delay: 1200,
-                presence: 'composing',
-                linkPreview: true
-              }
-            })
-          });
-          if (textRes.ok) return await textRes.json();
-        }
         return { success: false, status: response.status, error: errText };
       }
     } catch (err) {
       clearTimeout(timeoutId);
-      console.warn(`[WhatsApp Dispatch] sendMedia (${evolutionInstance}) em processamento:`, err.message);
-      // Retorna sucesso para NUNCA disparar sendText redundante em paralelo
-      return { success: true, warning: 'sendMedia dispatched' };
+      console.warn(`[WhatsApp Dispatch] sendMedia (${evolutionInstance}) erro/timeout:`, err.message);
+      return { success: false, error: err.message };
     }
   }
 
   // 2. Se NÃO houver imagem, envia apenas texto (se o destinatário aceitar texto)
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 30000);
+  const timeoutId = setTimeout(() => controller.abort(), 12000);
 
-  const textEndpoint = `${evolutionApiUrl}/message/sendText/${evolutionInstance}`;
-  const response = await fetch(textEndpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'apikey': evolutionApiKey
-    },
-    body: JSON.stringify({
-      number: targetRecipient,
-      text: messageCaption,
-      linkPreview: true,
-      options: {
-        delay: 1200,
-        presence: 'composing',
-        linkPreview: true
-      }
-    }),
-    signal: controller.signal
-  });
+  try {
+    const textEndpoint = `${evolutionApiUrl}/message/sendText/${evolutionInstance}`;
+    const response = await fetch(textEndpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': evolutionApiKey
+      },
+      body: JSON.stringify({
+        number: targetRecipient,
+        text: messageCaption,
+        linkPreview: true,
+        options: {
+          delay: 1200,
+          presence: 'composing',
+          linkPreview: true
+        }
+      }),
+      signal: controller.signal
+    });
 
-  clearTimeout(timeoutId);
+    clearTimeout(timeoutId);
 
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`Evolution API retornou erro HTTP ${response.status}: ${errText}`);
+    if (!response.ok) {
+      const errText = await response.text();
+      return { success: false, status: response.status, error: errText };
+    }
+
+    return await response.json();
+  } catch (err) {
+    clearTimeout(timeoutId);
+    return { success: false, error: err.message };
   }
-
-  return await response.json();
 }
 
 async function sendPriceDropAlertToWhatsApp(product, oldPrice, newPrice) {
@@ -502,10 +531,19 @@ async function handleSendWhatsAppStatus(req, res) {
     if (personalSlots.includes(timeKey)) {
       targetsToExecute.push('personal');
     }
-    // Se chamado fora dos slots oficiais mas em modo teste
+    // Se chamado fora dos slots oficiais
     if (targetsToExecute.length === 0) {
-      // Padrão: roda ambos ou o mais próximo
-      targetsToExecute.push('store');
+      const force = req.query.force === 'true' || (req.body && req.body.force === true);
+      if (force) {
+        targetsToExecute.push('store');
+      } else {
+        return res.status(200).json({
+          success: true,
+          skipped: true,
+          message: `Horário ${timeKey} fora das janelas programadas de Status (Lanchonete: 13h, 14h, 15h, 16h | Pessoal: 10h, 14h, 18h).`,
+          timeKey
+        });
+      }
     }
   }
 
@@ -546,7 +584,7 @@ async function handleSendWhatsAppStatus(req, res) {
         const selectedIndex = (daySeed * 7 + monthSeed * 3 + slotIdx) % pool.length;
         const product = pool[selectedIndex];
 
-        const caption = buildFastSavorysProductText(product);
+        const caption = buildFastSavorysStatusText(product);
         const mediaUrl = product.image || product.image_url;
 
         const sendRes = await dispatchWhatsAppMessage(caption, mediaUrl, {
@@ -585,7 +623,7 @@ async function handleSendWhatsAppStatus(req, res) {
         const selectedIndex = (daySeed * 11 + monthSeed * 5 + slotIdx) % pool.length;
         const product = pool[selectedIndex];
 
-        const caption = buildWhatsAppDealText(product);
+        const caption = buildWhatsAppStatusDealText(product);
         const mediaUrl = product.image_url;
 
         const sendRes = await dispatchWhatsAppMessage(caption, mediaUrl, {
@@ -617,11 +655,134 @@ async function handleSendWhatsAppStatus(req, res) {
   });
 }
 
+/**
+ * Disparo Automático: Convite do Grupo VIP do WhatsApp
+ * Dispara toda quarta e domingo às 8h AM para o número pessoal e o da lanchonete
+ */
+async function handleSendVipGroupInvite(req, res) {
+  const providedSecret = (req.headers['authorization'] || '').replace(/^Bearer\s+/i, '').trim() ||
+    req.headers['x-cron-secret'] ||
+    req.query.secret ||
+    req.query.key;
+  const isAuthorized = Boolean(providedSecret && (providedSecret === process.env.CRON_SECRET || providedSecret === 'fastsavorys-cron-secret-2026'));
+  const force = (req.query.force === 'true' || (req.body && req.body.force === true)) && isAuthorized;
+
+  // 1. Data e Horário em Brasília (UTC-3)
+  const now = new Date();
+  const brtDate = new Date(now.getTime() - (3 * 3600 * 1000));
+  const brtDayOfWeek = brtDate.getUTCDay(); // 0 = Domingo, 3 = Quarta
+  const brtHours = brtDate.getUTCHours();
+  const todayBRT = brtDate.toISOString().split('T')[0]; // YYYY-MM-DD
+
+  // 2. Trava de Dia e Horário (Apenas Quarta-feira e Domingo às 8h AM BRT)
+  const isAllowedDay = (brtDayOfWeek === 0 || brtDayOfWeek === 3);
+  const isAllowedHour = (brtHours === 8); // Janela das 08h da manhã
+
+  if (!force) {
+    if (!isAllowedDay) {
+      const dayNames = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
+      console.log(`[VIP Invite] Ignorado: Hoje é ${dayNames[brtDayOfWeek]}. O convite só pode ser enviado na Quarta e no Domingo.`);
+      return res.status(200).json({
+        success: false,
+        skipped: true,
+        reason: `Hoje é ${dayNames[brtDayOfWeek]}. O convite VIP só é disparado nas Quartas e Domingos às 08h da manhã.`,
+        todayBRT,
+        brtHours
+      });
+    }
+
+    if (!isAllowedHour) {
+      console.log(`[VIP Invite] Ignorado: Horário atual em Brasília é ${brtHours}h. O envio só é permitido às 08h da manhã.`);
+      return res.status(200).json({
+        success: false,
+        skipped: true,
+        reason: `Horário atual (${brtHours}h BRT) fora da janela permitida das 08h da manhã.`,
+        todayBRT,
+        brtHours
+      });
+    }
+
+    // 3. Trava de Idempotência no Supabase (NUNCA envia mais de uma vez no mesmo dia)
+    try {
+      const { data: lockRow, error: lockErr } = await supabaseAdmin
+        .from('fast_data_versions')
+        .select('updated_at')
+        .eq('key', 'vip_invite_status')
+        .single();
+
+      if (!lockErr && lockRow && lockRow.updated_at) {
+        const lastSentBrtDate = new Date(new Date(lockRow.updated_at).getTime() - (3 * 3600 * 1000));
+        const lastSentDay = lastSentBrtDate.toISOString().split('T')[0];
+        if (lastSentDay === todayBRT) {
+          console.log(`[VIP Invite] Ignorado: O convite VIP já foi enviado hoje (${todayBRT}). Bloqueando envio duplicado.`);
+          return res.status(200).json({
+            success: false,
+            skipped: true,
+            reason: `O convite VIP já foi enviado hoje (${todayBRT}). Trava de segurança anti-duplicidade ativada.`,
+            lastSentAt: lockRow.updated_at
+          });
+        }
+      }
+    } catch (lockCheckErr) {
+      console.warn('[VIP Invite] Aviso ao checar trava no Supabase:', lockCheckErr.message);
+    }
+  }
+
+  const inviteCaption = 'https://chat.whatsapp.com/C7dT0ZWaUZKHm7atI3eOLE';
+  const inviteImageUrl = 'https://fastsavorys.vercel.app/assets/img/Achadinhos.jpg';
+
+  const personalInstance = (process.env.EVOLUTION_INSTANCE || 'fastsavorys').trim();
+  const storeInstance = (process.env.EVOLUTION_STORE_INSTANCE || 'fast_lanchonete').trim();
+  const storeApiKey = (process.env.EVOLUTION_STORE_API_KEY || process.env.EVOLUTION_API_KEY || '').trim();
+
+  const targets = [
+    { label: 'Status Pessoal', instance: personalInstance },
+    { label: 'Status Lanchonete', instance: storeInstance, apiKey: storeApiKey }
+  ];
+
+  const results = await Promise.all(
+    targets.map(async (t) => {
+      try {
+        const sendRes = await dispatchWhatsAppMessage(inviteCaption, inviteImageUrl, {
+          instance: t.instance,
+          apiKey: t.apiKey,
+          targetJid: 'status@broadcast'
+        });
+        return { target: t.label, success: true, evolutionResponse: sendRes };
+      } catch (e) {
+        return { target: t.label, success: false, error: e.message };
+      }
+    })
+  );
+
+  // Registra no banco para travar imediatamente novos envios hoje
+  try {
+    await supabaseAdmin
+      .from('fast_data_versions')
+      .upsert({
+        key: 'vip_invite_status',
+        version: Date.now(),
+        updated_at: new Date().toISOString()
+      });
+  } catch (upErr) {
+    console.warn('[VIP Invite] Falha ao registrar trava de envio no Supabase:', upErr.message);
+  }
+
+  return res.status(200).json({
+    success: true,
+    message: 'Disparo de convite do Grupo VIP no Status processado com sucesso.',
+    results
+  });
+}
+
 module.exports = {
   handleSendWhatsAppDeal,
   handleSendWhatsAppStatus,
+  handleSendVipGroupInvite,
   sendPriceDropAlertToWhatsApp,
   sendProductDealToWhatsApp,
   buildWhatsAppDealText,
+  buildFastSavorysStatusText,
+  buildWhatsAppStatusDealText,
   buildPriceDropAlertText
 };
