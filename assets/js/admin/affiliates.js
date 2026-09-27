@@ -608,6 +608,14 @@ window.AffiliatesModule = (function () {
     const discountEl = document.getElementById('affiliateDiscountInput');
     const rawTag = (item.discount_tag || '').trim();
 
+    // Calcula o percentual de desconto se houver preço riscado e preço atual
+    const origP = parsePrice(item.original_price);
+    const currP = parsePrice(item.price_display);
+    let calculatedPct = 0;
+    if (origP > 0 && currP > 0 && origP > currP) {
+      calculatedPct = Math.round(((origP - currP) / origP) * 100);
+    }
+
     let detectedType = 'OFF';
     if (/no pix c(om|\/)?\s*cupom/i.test(rawTag)) {
       detectedType = 'No Pix com Cupom';
@@ -615,12 +623,21 @@ window.AffiliatesModule = (function () {
       detectedType = 'No Pix';
     } else if (/c(om|\/)?\s*cupom/i.test(rawTag)) {
       detectedType = 'Com Cupom';
-    } else if (rawTag && !/off/i.test(rawTag)) {
+    } else if (rawTag && !/off/i.test(rawTag) && calculatedPct === 0) {
       detectedType = 'manual';
     }
 
     if (typeSelect) typeSelect.value = detectedType;
-    if (discountEl) discountEl.value = rawTag;
+
+    if (calculatedPct > 0) {
+      let label = `${calculatedPct}% OFF`;
+      if (detectedType === 'Com Cupom') label = `${calculatedPct}% OFF com Cupom`;
+      else if (detectedType === 'No Pix') label = `${calculatedPct}% OFF no Pix`;
+      else if (detectedType === 'No Pix com Cupom') label = `${calculatedPct}% OFF no Pix com Cupom`;
+      if (discountEl) discountEl.value = label;
+    } else {
+      if (discountEl) discountEl.value = rawTag;
+    }
     recalculateDiscount();
 
     const isDiscountOnly = /^[⚡🔥\s]*\d+%\s*OFF/i.test(rawTag) || /no pix|cupom/i.test(rawTag);

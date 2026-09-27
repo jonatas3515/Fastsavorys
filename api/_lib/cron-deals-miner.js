@@ -100,7 +100,7 @@ async function scrapeMercadoLivreDeals() {
       if (!res.ok) continue;
 
       const html = await res.text();
-      const cardChunks = html.split(/<div\s+class=["'][^"']*(?:poly-card|ui-search-result|promotion-item)[^"']*["']/i);
+      const cardChunks = html.split(/<(?:div|li)\s+class=["'][^"']*(?:poly-card\b(?!__)|ui-search-result\b(?!__)|promotion-item\b(?!__))[^"']*["']/i);
       cardChunks.shift(); // Remove header
 
       for (const chunk of cardChunks) {
@@ -116,10 +116,16 @@ async function scrapeMercadoLivreDeals() {
                            chunk.match(/aria-label=["']([^"']+)["']/i);
         const rawTitle = titleMatch ? titleMatch[1].replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&#39;/g, "'").trim() : '';
 
-        const imgMatch = chunk.match(/class=["'][^"']*(?:poly-component__picture|ui-search-result-image__element)[^"']*["'][\s\S]*?src=["']([^"']+)["']/i) ||
-                         chunk.match(/class=["'][^"']*(?:poly-component__picture|ui-search-result-image__element)[^"']*["'][\s\S]*?data-src=["']([^"']+)["']/i) ||
-                         chunk.match(/<img[^>]*src=["'](https:\/\/[^"'\s]+mlstatic[^"'\s]+)["']/i);
-        const imageUrl = imgMatch ? imgMatch[1] : '';
+        let imageUrl = '';
+        const imgMatch = chunk.match(/data-src=["'](https?:\/\/[^"'\s]+)["']/i) ||
+                         chunk.match(/data-srcset=["'](https?:\/\/[^"'\s,]+)/i) ||
+                         chunk.match(/srcset=["'](https?:\/\/[^"'\s,]+)/i) ||
+                         chunk.match(/src=["'](https?:\/\/[^"'\s]+mlstatic\.com\/[^"'\s]+)["']/i) ||
+                         chunk.match(/class=["'][^"']*(?:poly-component__picture|ui-search-result-image__element)[^"']*["'][\s\S]*?src=["'](https?:\/\/[^"'\s]+)["']/i) ||
+                         chunk.match(/(https:\/\/http2\.mlstatic\.com\/D_[^\s"']+)/i);
+        if (imgMatch && imgMatch[1]) {
+          imageUrl = imgMatch[1];
+        }
 
         const ratingMatch = chunk.match(/class=["'][^"']*(?:poly-component__review-compacted|ui-search-reviews)[^"']*["'][\s\S]*?<span[^>]*>([0-9.]+)</i);
         const rating = ratingMatch ? parseFloat(ratingMatch[1]) : 0;
@@ -254,7 +260,7 @@ async function handleMineDeals(req, res) {
       console.warn('[Deals Miner] Aviso ao checar duplicatas no banco:', dbErr.message);
     }
 
-    // 4. Select only non-duplicate items
+    // 4. Select and enrich non-duplicate items
     const dealsToInsert = [];
     let duplicatesSkipped = 0;
 
@@ -267,21 +273,35 @@ async function handleMineDeals(req, res) {
         continue;
       }
 
+      // Se a imagem estiver vazia ou com placeholder, busca a página do produto para extrair foto oficial em alta resolução
+      let finalImg = deal.imageUrl;
+      let finalCoupon = '';
+      if (!finalImg || !finalImg.startsWith('http')) {
+        try {
+          const { fetchProductDetails } = require('../check-affiliate-links');
+          const details = await fetchProductDetails(deal.cleanUrl);
+          if (details && details.image_url) {
+            finalImg = details.image_url;
+          }
+          if (details && details.coupon_code) {
+            finalCoupon = details.coupon_code;
+          }
+        } catch (fetchErr) {
+          console.warn('[Deals Miner] Fallback fetch de imagem:', fetchErr.message);
+        }
+      }
+
       // Determine smart badge & color
-      let badgeTag = deal.discountTag || `${deal.discountPercent}% OFF`;
-      let badgeColor = 'pink';
+      let discountTag = deal.discountTag || (deal.discountPercent > 0 ? `${deal.discountPercent}% OFF` : '');
+      let badgeColor = 'orange';
 
       if (deal.discountPercent >= 50) {
-        badgeTag = '💥 Oferta Imperdível';
         badgeColor = 'blue';
       } else if (deal.badgeText && deal.badgeText.toUpperCase().includes('MAIS VENDIDO')) {
-        badgeTag = '🔥 Mais Vendido';
         badgeColor = 'orange';
       } else if (deal.discountPercent >= 35) {
-        badgeTag = '🌸 Oferta';
         badgeColor = 'pink';
       } else {
-        badgeTag = '🔴 Menor Preço';
         badgeColor = 'rose';
       }
 
@@ -289,11 +309,12 @@ async function handleMineDeals(req, res) {
         title: deal.title,
         description: deal.badgeText ? `🔸 ${deal.badgeText} no Mercado Livre` : null,
         affiliate_url: deal.cleanUrl,
-        image_url: deal.imageUrl,
+        image_url: finalImg || '',
         price_display: deal.price,
         original_price: deal.originalPrice || null,
         category: deal.category || 'cozinha',
-        discount_tag: badgeTag,
+        discount_tag: discountTag || null,
+        coupon_code: finalCoupon || null,
         badge_color: badgeColor,
         is_fast_pick: false,
         position: 1,
