@@ -79,14 +79,16 @@ function buildPriceDropAlertText(product, oldPrice, newPrice) {
   return `🚨 *ALERTA DE QUEDA DE PREÇO NO AR!* 📉⚡\n${sealHeader}\n🛍️ *ACHADINHO ${platform}*\n🔥 *${product.title}*\n\n💥 *BAIXOU AGORA:* de ~${oldPrice}~ por apenas *${newPrice}*!${discountText}\n\n👉 *GARANTA COM O MENOR PREÇO AQUI:*\n${product.affiliate_url}\n\n💬 *Entre no canal VIP de ofertas da FastSavory's:*\nhttps://chat.whatsapp.com/C7dT0ZWaUZKHm7atI3eOLE`;
 }
 
-async function dispatchWhatsAppMessage(messageCaption, mediaUrl) {
+async function dispatchWhatsAppMessage(messageCaption, mediaUrl, options = {}) {
   const evolutionApiUrl = (process.env.EVOLUTION_API_URL || '').trim().replace(/\/+$/, '');
   const evolutionApiKey = (process.env.EVOLUTION_API_KEY || '').trim();
-  const evolutionInstance = (process.env.EVOLUTION_INSTANCE || 'fastsavorys').trim();
-  const targetGroupJid = (process.env.WHATSAPP_DEALS_GROUP_JID || '').trim();
+  const defaultInstance = (process.env.EVOLUTION_INSTANCE || 'fastsavorys').trim();
+  const evolutionInstance = (options.instance || defaultInstance).trim();
+  const defaultTargetJid = (process.env.WHATSAPP_DEALS_GROUP_JID || '').trim();
+  const targetRecipient = (options.targetJid || defaultTargetJid).trim();
 
-  if (!evolutionApiUrl || !evolutionApiKey || !targetGroupJid) {
-    throw new Error('Configuração do WhatsApp não encontrada nas variáveis de ambiente da Vercel (EVOLUTION_API_URL, EVOLUTION_API_KEY ou WHATSAPP_DEALS_GROUP_JID).');
+  if (!evolutionApiUrl || !evolutionApiKey || !targetRecipient) {
+    throw new Error('Configuração do WhatsApp não encontrada nas variáveis de ambiente da Vercel (EVOLUTION_API_URL, EVOLUTION_API_KEY ou destinatário JID).');
   }
 
   // Normaliza URL da imagem
@@ -108,12 +110,12 @@ async function dispatchWhatsAppMessage(messageCaption, mediaUrl) {
           'apikey': evolutionApiKey
         },
         body: JSON.stringify({
-          number: targetGroupJid,
+          number: targetRecipient,
           media: mediaUrl,
           mediatype: 'image',
           mimetype: 'image/jpeg',
           caption: messageCaption,
-          fileName: 'oferta.jpg'
+          fileName: 'status_oferta.jpg'
         }),
         signal: controller.signal
       });
@@ -124,9 +126,9 @@ async function dispatchWhatsAppMessage(messageCaption, mediaUrl) {
         return await response.json();
       } else {
         const errText = await response.text();
-        console.warn(`[WhatsApp Dispatch] Resposta sendMedia (HTTP ${response.status}):`, errText);
-        // Só tenta texto se o erro for 400 (imagem inválida/ilegível na URL)
-        if (response.status === 400) {
+        console.warn(`[WhatsApp Dispatch] Resposta sendMedia (${evolutionInstance} -> ${targetRecipient}, HTTP ${response.status}):`, errText);
+        // Só tenta texto se o erro for 400 e não for Status do WhatsApp
+        if (response.status === 400 && targetRecipient !== 'status@broadcast') {
           const textRes = await fetch(`${evolutionApiUrl}/message/sendText/${evolutionInstance}`, {
             method: 'POST',
             headers: {
@@ -134,7 +136,7 @@ async function dispatchWhatsAppMessage(messageCaption, mediaUrl) {
               'apikey': evolutionApiKey
             },
             body: JSON.stringify({
-              number: targetGroupJid,
+              number: targetRecipient,
               text: messageCaption,
               linkPreview: true
             })
@@ -145,13 +147,13 @@ async function dispatchWhatsAppMessage(messageCaption, mediaUrl) {
       }
     } catch (err) {
       clearTimeout(timeoutId);
-      console.warn('[WhatsApp Dispatch] sendMedia em processamento:', err.message);
+      console.warn(`[WhatsApp Dispatch] sendMedia (${evolutionInstance}) em processamento:`, err.message);
       // Retorna sucesso para NUNCA disparar sendText redundante em paralelo
       return { success: true, warning: 'sendMedia dispatched' };
     }
   }
 
-  // 2. Se NÃO houver imagem, envia apenas texto
+  // 2. Se NÃO houver imagem, envia apenas texto (se o destinatário aceitar texto)
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 30000);
 
@@ -163,7 +165,7 @@ async function dispatchWhatsAppMessage(messageCaption, mediaUrl) {
       'apikey': evolutionApiKey
     },
     body: JSON.stringify({
-      number: targetGroupJid,
+      number: targetRecipient,
       text: messageCaption,
       linkPreview: true
     }),
@@ -411,8 +413,175 @@ async function handleSendWhatsAppDeal(req, res) {
   }
 }
 
+/**
+ * Disparo Automático para STATUS DO WHATSAPP (Stories)
+ * 1. Lanchonete (73 99936-6554): 4 disparos por dia (13h, 14h, 15h, 16h) - Apenas FastSavory's
+ * 2. Pessoal (73 99934-8552): 3 disparos por dia (10h, 14h, 18h) - Apenas Achadinhos
+ */
+async function handleSendWhatsAppStatus(req, res) {
+  if (!supabaseAdmin) {
+    return res.status(500).json({ success: false, error: 'Configuração do Supabase não encontrada.' });
+  }
+
+  const evolutionApiUrl = (process.env.EVOLUTION_API_URL || '').replace(/\/+$/, '');
+  const evolutionApiKey = process.env.EVOLUTION_API_KEY || '';
+  const personalInstance = (process.env.EVOLUTION_INSTANCE || 'fastsavorys').trim();
+  const storeInstance = (process.env.EVOLUTION_STORE_INSTANCE || 'fast_lanchonete').trim();
+
+  if (!evolutionApiUrl || !evolutionApiKey) {
+    return res.status(400).json({
+      success: false,
+      error: 'EVOLUTION_API_URL ou EVOLUTION_API_KEY não configuradas na Vercel.'
+    });
+  }
+
+  const now = new Date();
+  const utcHours = now.getUTCHours();
+  const brtHours = (utcHours - 3 + 24) % 24;
+  const utcMinutes = now.getUTCMinutes();
+  const slotMinute = (utcMinutes >= 15 && utcMinutes < 45) ? '30' : '00';
+  const timeKey = `${String(brtHours).padStart(2, '0')}:${slotMinute}`;
+
+  const mode = req.query.mode || (req.body && req.body.mode) || 'auto';
+  const targetChannel = req.query.channel || (req.body && req.body.channel) || '';
+
+  // Horários oficiais definidos pelo usuário
+  const storeSlots = ['13:00', '14:00', '15:00', '16:00'];
+  const personalSlots = ['10:00', '14:00', '18:00'];
+
+  let targetsToExecute = [];
+
+  if (targetChannel === 'store' || mode === 'store' || mode === 'fastsavorys') {
+    targetsToExecute.push('store');
+  } else if (targetChannel === 'personal' || mode === 'personal' || mode === 'achadinhos') {
+    targetsToExecute.push('personal');
+  } else if (mode === 'all') {
+    targetsToExecute.push('store', 'personal');
+  } else {
+    // Modo automático por horário
+    if (storeSlots.includes(timeKey)) {
+      targetsToExecute.push('store');
+    }
+    if (personalSlots.includes(timeKey)) {
+      targetsToExecute.push('personal');
+    }
+    // Se chamado fora dos slots oficiais mas em modo teste
+    if (targetsToExecute.length === 0) {
+      // Padrão: roda ambos ou o mais próximo
+      targetsToExecute.push('store');
+    }
+  }
+
+  const results = [];
+
+  for (const channel of targetsToExecute) {
+    try {
+      if (channel === 'store') {
+        // --- 1. STATUS DA LANCHONETE (FastSavory's) ---
+        const { data: storeProducts, error: storeErr } = await supabaseAdmin
+          .from('fast_products')
+          .select('*');
+
+        if (storeErr || !storeProducts || storeProducts.length === 0) {
+          results.push({ channel: 'store', success: false, error: 'Nenhum produto da loja encontrado.' });
+          continue;
+        }
+
+        const validStoreProducts = storeProducts.filter(p => {
+          const name = (p.name || '').toLowerCase();
+          if (
+            name.includes('sache') || name.includes('sachê') || 
+            name.includes('taxa') || name.includes('copo') || 
+            name.includes('guardanapo') || name.includes('ketchup') || 
+            name.includes('maionese') || name.includes('mostarda') ||
+            name.includes('embalagem')
+          ) return false;
+          const price = typeof p.price === 'number' ? p.price : parseFloat(p.price);
+          const isVisible = p.visible === true && !p.unavailable_today && p.catalog_enabled !== false;
+          const hasValidImage = Boolean(p.image && typeof p.image === 'string' && p.image.startsWith('http'));
+          return isVisible && hasValidImage && !isNaN(price) && price > 0;
+        });
+
+        const pool = validStoreProducts.length > 0 ? validStoreProducts : storeProducts.filter(p => p.visible === true);
+        const daySeed = now.getDate();
+        const monthSeed = now.getMonth() + 1;
+        const slotIdx = storeSlots.indexOf(timeKey) >= 0 ? storeSlots.indexOf(timeKey) : (brtHours % 4);
+        const selectedIndex = (daySeed * 7 + monthSeed * 3 + slotIdx) % pool.length;
+        const product = pool[selectedIndex];
+
+        const caption = buildFastSavorysProductText(product);
+        const mediaUrl = product.image || product.image_url;
+
+        const sendRes = await dispatchWhatsAppMessage(caption, mediaUrl, {
+          instance: storeInstance,
+          targetJid: 'status@broadcast'
+        });
+
+        results.push({
+          channel: 'store_fastsavorys',
+          instance: storeInstance,
+          target: 'status@broadcast',
+          productTitle: product.name,
+          price: product.price,
+          status: 'posted_to_status',
+          evolutionResponse: sendRes
+        });
+
+      } else if (channel === 'personal') {
+        // --- 2. STATUS PESSOAL (Achadinhos) ---
+        const { data: affiliateProducts, error: affErr } = await supabaseAdmin
+          .from('fast_affiliate_products')
+          .select('*')
+          .eq('is_active', true);
+
+        if (affErr || !affiliateProducts || affiliateProducts.length === 0) {
+          results.push({ channel: 'personal', success: false, error: 'Nenhum achadinho ativo encontrado.' });
+          continue;
+        }
+
+        const validAffiliate = affiliateProducts.filter(p => Boolean(p.image_url && p.image_url.startsWith('http')));
+        const pool = validAffiliate.length > 0 ? validAffiliate : affiliateProducts;
+        const daySeed = now.getDate();
+        const monthSeed = now.getMonth() + 1;
+        const slotIdx = personalSlots.indexOf(timeKey) >= 0 ? personalSlots.indexOf(timeKey) : (brtHours % 3);
+        const selectedIndex = (daySeed * 11 + monthSeed * 5 + slotIdx) % pool.length;
+        const product = pool[selectedIndex];
+
+        const caption = buildWhatsAppDealText(product);
+        const mediaUrl = product.image_url;
+
+        const sendRes = await dispatchWhatsAppMessage(caption, mediaUrl, {
+          instance: personalInstance,
+          targetJid: 'status@broadcast'
+        });
+
+        results.push({
+          channel: 'personal_achadinhos',
+          instance: personalInstance,
+          target: 'status@broadcast',
+          productTitle: product.title,
+          price: product.price_display,
+          status: 'posted_to_status',
+          evolutionResponse: sendRes
+        });
+      }
+    } catch (chanErr) {
+      console.error(`[WhatsApp Status] Erro no canal ${channel}:`, chanErr.message);
+      results.push({ channel, success: false, error: chanErr.message });
+    }
+  }
+
+  return res.status(200).json({
+    success: true,
+    message: 'Processamento de Status do WhatsApp concluído.',
+    timeKey,
+    results
+  });
+}
+
 module.exports = {
   handleSendWhatsAppDeal,
+  handleSendWhatsAppStatus,
   sendPriceDropAlertToWhatsApp,
   sendProductDealToWhatsApp,
   buildWhatsAppDealText,

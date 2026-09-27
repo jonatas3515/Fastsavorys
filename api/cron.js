@@ -6,7 +6,7 @@
  * 3. action=birthday-broadcast (Felicitações e cupom de aniversário)
  */
 
-const { handleSendWhatsAppDeal } = require('./_lib/cron-whatsapp-deal');
+const { handleSendWhatsAppDeal, handleSendWhatsAppStatus } = require('./_lib/cron-whatsapp-deal');
 const { handleNotifyScheduledOrders } = require('./_lib/cron-scheduled-orders');
 const { handleBirthdayBroadcast } = require('./_lib/cron-birthday-broadcast');
 const { handleMineDeals } = require('./_lib/cron-deals-miner');
@@ -27,6 +27,7 @@ module.exports = async function handler(req, res) {
   // Validação de Segurança Global de CRON_SECRET
   const isPublicAction = [
     'send-whatsapp-deal', 'whatsapp-deal', 'whatsapp', 'send-deal', 'deal', 'disparos', 'disparo-whatsapp',
+    'send-whatsapp-status', 'whatsapp-status', 'status', 'stories', 'status-whatsapp', 'status-deal',
     'mine-deals', 'deals-miner', 'miner',
     'auto-sync-links', 'auto-check-links', 'sync-links', 'check-sync-links', 'verify-links', 'check-links', 'sync'
   ].includes(action);
@@ -53,6 +54,14 @@ module.exports = async function handler(req, res) {
     case 'disparos':
     case 'disparo-whatsapp':
       return handleSendWhatsAppDeal(req, res);
+
+    case 'send-whatsapp-status':
+    case 'whatsapp-status':
+    case 'status':
+    case 'stories':
+    case 'status-whatsapp':
+    case 'status-deal':
+      return handleSendWhatsAppStatus(req, res);
 
     case 'mine-deals':
     case 'deals-miner':
