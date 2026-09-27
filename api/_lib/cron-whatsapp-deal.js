@@ -408,65 +408,11 @@ async function handleSendWhatsAppDeal(req, res) {
       mediaUrl = `https://fastsavorys.vercel.app${mediaUrl.startsWith('/') ? '' : '/'}${mediaUrl}`;
     }
 
-    let sendSuccess = false;
-    let sendResponse = null;
-
-    // Disparo com imagem via sendMedia
-    if (mediaUrl && mediaUrl.startsWith('http')) {
-      try {
-        const mediaEndpoint = `${evolutionApiUrl}/message/sendMedia/${evolutionInstance}`;
-        const response = await fetch(mediaEndpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': evolutionApiKey
-          },
-          body: JSON.stringify({
-            number: targetGroupJid,
-            media: mediaUrl,
-            mediatype: 'image',
-            mimetype: 'image/jpeg',
-            caption: messageCaption,
-            fileName: 'produto.jpg'
-          })
-        });
-
-        if (response.ok) {
-          sendSuccess = true;
-          sendResponse = await response.json();
-        } else {
-          const errText = await response.text();
-          console.warn('[WhatsApp Deal] Falha ao enviar mídia, tentando texto:', errText);
-        }
-      } catch (mediaErr) {
-        console.warn('[WhatsApp Deal] Erro na requisição de mídia:', mediaErr.message);
-      }
-    }
-
-    // Fallback: Disparo de Texto simples se mídia falhar
-    if (!sendSuccess) {
-      const textEndpoint = `${evolutionApiUrl}/message/sendText/${evolutionInstance}`;
-      const response = await fetch(textEndpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': evolutionApiKey
-        },
-        body: JSON.stringify({
-          number: targetGroupJid,
-          text: messageCaption,
-          linkPreview: true
-        })
-      });
-
-      if (!response.ok) {
-        const errText = await response.text();
-        throw new Error(`Erro ao enviar mensagem no WhatsApp: ${errText}`);
-      }
-
-      sendSuccess = true;
-      sendResponse = await response.json();
-    }
+    // Disparo centralizado via dispatchWhatsAppMessage
+    const sendResponse = await dispatchWhatsAppMessage(messageCaption, mediaUrl, {
+      instance: evolutionInstance,
+      targetJid: targetGroupJid
+    });
 
     // Atualiza data do último envio (last_posted_at) na tabela correspondente
     const nowIso = new Date().toISOString();
