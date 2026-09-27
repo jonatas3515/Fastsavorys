@@ -136,10 +136,13 @@ ${orderInfo}
 }
 
 /**
- * Envia uma foto para o Feed do Instagram usando a Meta Graph API Oficial
+ * Envia uma foto para o Feed ou Stories do Instagram usando a Meta Graph API Oficial
  * Requer: INSTAGRAM_ACCOUNT_ID e INSTAGRAM_ACCESS_TOKEN
  */
-async function publishToInstagramFeed(imageUrl, caption) {
+async function publishToInstagramFeed(imageUrl, caption, options = {}) {
+  const target = (options.target || 'feed').toLowerCase();
+  const isStory = target === 'story' || target === 'stories';
+
   const accountId = (process.env.INSTAGRAM_ACCOUNT_ID || process.env.INSTAGRAM_BUSINESS_ACCOUNT_ID || '').trim();
   const accessToken = (process.env.INSTAGRAM_ACCESS_TOKEN || process.env.META_ACCESS_TOKEN || process.env.FACEBOOK_PAGE_ACCESS_TOKEN || '').trim();
 
@@ -157,12 +160,16 @@ async function publishToInstagramFeed(imageUrl, caption) {
   const baseUrl = isIgToken ? 'https://graph.instagram.com/v21.0' : 'https://graph.facebook.com/v21.0';
   const targetId = isIgToken ? 'me' : accountId;
 
-  console.log(`[Instagram API] Criando container de mídia para conta ${targetId} via ${baseUrl}...`);
+  console.log(`[Instagram API] Criando container para ${isStory ? 'STORIES' : 'FEED'} na conta ${targetId} via ${baseUrl}...`);
 
   // 1. Criar container de mídia no Instagram (POST /{targetId}/media)
   const containerUrl = new URL(`${baseUrl}/${targetId}/media`);
   containerUrl.searchParams.set('image_url', finalImageUrl);
-  containerUrl.searchParams.set('caption', caption);
+  if (isStory) {
+    containerUrl.searchParams.set('media_type', 'STORIES');
+  } else if (caption) {
+    containerUrl.searchParams.set('caption', caption);
+  }
   containerUrl.searchParams.set('access_token', accessToken);
 
   const containerRes = await fetch(containerUrl.toString(), {
@@ -179,12 +186,12 @@ async function publishToInstagramFeed(imageUrl, caption) {
   }
 
   const creationId = containerData.id;
-  console.log(`[Instagram API] Container criado com ID: ${creationId}. Publicando no feed...`);
+  console.log(`[Instagram API] Container criado com ID: ${creationId}. Publicando no ${isStory ? 'Stories' : 'Feed'}...`);
 
   // Pequena pausa para processamento da imagem pelos servidores do Meta
   await new Promise(r => setTimeout(r, 2500));
 
-  // 2. Publicar o container no Feed (POST /{targetId}/media_publish)
+  // 2. Publicar o container (POST /{targetId}/media_publish)
   const publishUrl = new URL(`${baseUrl}/${targetId}/media_publish`);
   publishUrl.searchParams.set('creation_id', creationId);
   publishUrl.searchParams.set('access_token', accessToken);
@@ -202,23 +209,34 @@ async function publishToInstagramFeed(imageUrl, caption) {
     throw new Error(`Falha na Meta Graph API (Publicação da Mídia): ${errMsg}`);
   }
 
-  console.log(`[Instagram API] ✅ Post publicado com sucesso! IG Media ID: ${publishData.id}`);
+  console.log(`[Instagram API] ✅ Post publicado com sucesso no ${isStory ? 'Stories' : 'Feed'}! IG Media ID: ${publishData.id}`);
   return {
     success: true,
     mediaId: publishData.id,
-    creationId
+    creationId,
+    target: isStory ? 'story' : 'feed'
   };
 }
 
 /**
  * Handler principal acionado pelo Cron ou via manual
  * Parâmetro: ?channel=store (FastSavory's) ou ?channel=deal (Achadinhos)
+ * Parâmetro: ?target=feed (padrão) ou ?target=story (Stories)
  */
 async function handleSendInstagramPost(req, res) {
   const channel = (req.query?.channel || req.body?.channel || 'store').toLowerCase();
+  const target = (req.query?.target || req.body?.target || 'feed').toLowerCase();
   const dryRun = req.query?.dry_run === 'true' || req.body?.dry_run === true;
 
-  console.log(`[Instagram Cron] Iniciando publicação para canal: ${channel} (dryRun: ${dryRun})`);
+  // REGRA DE OURO: Bloqueio estrito de Achadinhos no Feed
+  if (target === 'feed' && (channel === 'deal' || channel === 'affiliate')) {
+    return res.status(400).json({
+      success: false,
+      error: 'Achadinhos estão permanentemente proibidos de serem postados no Feed do Instagram.'
+    });
+  }
+
+  console.log(`[Instagram Cron] Iniciando publicação para canal: ${channel} | Alvo: ${target} (dryRun: ${dryRun})`);
 
   try {
     // -------------------------------------------------------------
@@ -277,7 +295,7 @@ async function handleSendInstagramPost(req, res) {
         });
       }
 
-      const publishResult = await publishToInstagramFeed(imageUrl, caption);
+      const publishResult = await publishToInstagramFeed(imageUrl, caption, { target });
 
       // Atualiza last_posted_at do produto da lanchonete
       try {
@@ -339,7 +357,7 @@ async function handleSendInstagramPost(req, res) {
       });
     }
 
-    const publishResult = await publishToInstagramFeed(imageUrl, caption);
+    const publishResult = await publishToInstagramFeed(imageUrl, caption, { target });
 
     // Atualiza last_posted_at do produto de afiliados
     try {
