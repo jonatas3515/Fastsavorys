@@ -461,33 +461,33 @@ window.AffiliatesModule = (function () {
     return 'custom';
   }
 
+  function updateTagSelectVisual(val) {
+    const sel = document.getElementById('affiliateTagPresetSelect');
+    if (!sel) return;
+
+    sel.className = 'w-full px-2.5 py-1.5 border rounded-lg outline-none font-medium text-xs focus:ring-2 focus:ring-amber-400 transition-all shadow-sm';
+
+    if (!val || val === 'custom') {
+      sel.classList.add('bg-white', 'text-gray-700', 'border-gray-200');
+      return;
+    }
+
+    const color = val.includes('|') ? val.split('|')[1] : val;
+    if (color === 'blue') sel.classList.add('bg-blue-50', 'text-blue-700', 'border-blue-200');
+    else if (color === 'orange') sel.classList.add('bg-orange-50', 'text-orange-700', 'border-orange-200');
+    else if (color === 'purple') sel.classList.add('bg-purple-50', 'text-purple-700', 'border-purple-200');
+    else if (color === 'amber' || color === 'yellow') sel.classList.add('bg-amber-50', 'text-amber-700', 'border-amber-200');
+    else if (color === 'black') sel.classList.add('bg-slate-100', 'text-slate-700', 'border-slate-300');
+    else if (color === 'pink') sel.classList.add('bg-pink-50', 'text-pink-700', 'border-pink-200');
+    else if (color === 'rose' || color === 'red') sel.classList.add('bg-rose-50', 'text-rose-700', 'border-rose-200');
+    else if (color === 'emerald' || color === 'green') sel.classList.add('bg-emerald-50', 'text-emerald-700', 'border-emerald-200');
+    else sel.classList.add('bg-white', 'text-gray-700', 'border-gray-200');
+  }
+
   function handleTagPresetChange(val) {
     const customBox = document.getElementById('affiliateCustomTagBox');
     const tagInput = document.getElementById('affiliateTagInput');
     const colorInput = document.getElementById('affiliateBadgeColorInput');
-
-    function updateTagSelectVisual(val) {
-      const sel = document.getElementById('affiliateTagPresetSelect');
-      if (!sel) return;
-
-      sel.className = 'w-full px-2.5 py-1.5 border rounded-lg outline-none font-medium text-xs focus:ring-2 focus:ring-amber-400 transition-all shadow-sm';
-
-      if (!val || val === 'custom') {
-        sel.classList.add('bg-white', 'text-gray-700', 'border-gray-200');
-        return;
-      }
-
-      const color = val.includes('|') ? val.split('|')[1] : val;
-      if (color === 'blue') sel.classList.add('bg-blue-50', 'text-blue-700', 'border-blue-200');
-      else if (color === 'orange') sel.classList.add('bg-orange-50', 'text-orange-700', 'border-orange-200');
-      else if (color === 'purple') sel.classList.add('bg-purple-50', 'text-purple-700', 'border-purple-200');
-      else if (color === 'amber' || color === 'yellow') sel.classList.add('bg-amber-50', 'text-amber-700', 'border-amber-200');
-      else if (color === 'black') sel.classList.add('bg-slate-100', 'text-slate-700', 'border-slate-300');
-      else if (color === 'pink') sel.classList.add('bg-pink-50', 'text-pink-700', 'border-pink-200');
-      else if (color === 'rose' || color === 'red') sel.classList.add('bg-rose-50', 'text-rose-700', 'border-rose-200');
-      else if (color === 'emerald' || color === 'green') sel.classList.add('bg-emerald-50', 'text-emerald-700', 'border-emerald-200');
-      else sel.classList.add('bg-white', 'text-gray-700', 'border-gray-200');
-    }
 
     if (val === 'custom') {
       if (customBox) customBox.classList.remove('hidden');
