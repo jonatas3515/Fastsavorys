@@ -97,21 +97,52 @@ async function dispatchWhatsAppMessage(messageCaption, mediaUrl, options = {}) {
     mediaUrl = `https://fastsavorys.vercel.app${mediaUrl.startsWith('/') ? '' : '/'}${mediaUrl}`;
   }
 
-  // 0. Disparo específico para STATUS DO WHATSAPP (Evolution v2 /message/sendStatus)
+  // 0. Disparo específico para STATUS DO WHATSAPP (Direto via sendMedia status@broadcast)
   if (targetRecipient === 'status@broadcast') {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 25000);
+    const timeoutId = setTimeout(() => controller.abort(), 20000);
 
     try {
-      // 1. Tenta endpoint nativo de Status da Evolution API v2 (/message/sendStatus)
+      if (mediaUrl && mediaUrl.startsWith('http')) {
+        const mediaEndpoint = `${evolutionApiUrl}/message/sendMedia/${evolutionInstance}`;
+        const resMedia = await fetch(mediaEndpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': evolutionApiKey
+          },
+          body: JSON.stringify({
+            number: 'status@broadcast',
+            media: mediaUrl,
+            mediatype: 'image',
+            mimetype: 'image/jpeg',
+            caption: messageCaption,
+            fileName: 'status.jpg',
+            options: {
+              delay: 1000,
+              presence: 'composing'
+            }
+          }),
+          signal: controller.signal
+        });
+
+        clearTimeout(timeoutId);
+        if (resMedia.ok) {
+          return await resMedia.json();
+        }
+        const errText = await resMedia.text();
+        console.warn(`[WhatsApp Status] Resposta sendMedia (${evolutionInstance}):`, errText);
+        return { success: false, error: errText };
+      }
+
+      // Fallback para sendStatus somente se não houver mídia (apenas texto)
       const statusEndpoint = `${evolutionApiUrl}/message/sendStatus/${evolutionInstance}`;
       const statusPayload = {
-        type: (mediaUrl && mediaUrl.startsWith('http')) ? 'image' : 'text',
-        content: (mediaUrl && mediaUrl.startsWith('http')) ? mediaUrl : messageCaption,
-        caption: (mediaUrl && mediaUrl.startsWith('http')) ? messageCaption : undefined,
+        type: 'text',
+        content: messageCaption,
         allContacts: true,
         options: {
-          delay: 1200,
+          delay: 1000,
           presence: 'composing'
         }
       };
@@ -127,47 +158,17 @@ async function dispatchWhatsAppMessage(messageCaption, mediaUrl, options = {}) {
       });
 
       clearTimeout(timeoutId);
-
       if (resStatus.ok) {
         return await resStatus.json();
       }
 
-      // 2. Fallback para /message/sendMedia com destinatário status@broadcast
-      if (mediaUrl && mediaUrl.startsWith('http')) {
-        const mediaEndpoint = `${evolutionApiUrl}/message/sendMedia/${evolutionInstance}`;
-        const resMedia = await fetch(mediaEndpoint, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': evolutionApiKey
-          },
-          body: JSON.stringify({
-            number: 'status@broadcast',
-            media: mediaUrl,
-            mediatype: 'image',
-            mimetype: 'image/jpeg',
-            caption: messageCaption,
-            fileName: 'status_oferta.jpg',
-            options: {
-              delay: 1200,
-              presence: 'composing'
-            }
-          })
-        });
-
-        if (resMedia.ok) {
-          return await resMedia.json();
-        }
-      }
-
       const errText = await resStatus.text();
-      console.warn(`[WhatsApp Status] Resposta da Evolution (${evolutionInstance}):`, errText);
+      console.warn(`[WhatsApp Status] Resposta sendStatus (${evolutionInstance}):`, errText);
       return { success: false, error: errText };
     } catch (err) {
       clearTimeout(timeoutId);
-      console.warn(`[WhatsApp Status] Processamento assíncrono (${evolutionInstance}):`, err.message);
-      // Se a Evolution aceitou o job mas demorou no envio dos contatos, considera despachado
-      return { success: true, status: 'dispatched_to_broadcast', warning: err.message };
+      console.warn(`[WhatsApp Status] Exceção (${evolutionInstance}):`, err.message);
+      return { success: false, error: err.message };
     }
   }
 
