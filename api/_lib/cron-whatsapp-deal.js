@@ -108,7 +108,12 @@ async function dispatchWhatsAppMessage(messageCaption, mediaUrl, options = {}) {
         type: (mediaUrl && mediaUrl.startsWith('http')) ? 'image' : 'text',
         content: (mediaUrl && mediaUrl.startsWith('http')) ? mediaUrl : messageCaption,
         caption: (mediaUrl && mediaUrl.startsWith('http')) ? messageCaption : undefined,
-        statusJidList: []
+        allContacts: true,
+        statusJidList: [],
+        options: {
+          delay: 1200,
+          presence: 'composing'
+        }
       };
 
       const resStatus = await fetch(statusEndpoint, {
@@ -142,7 +147,11 @@ async function dispatchWhatsAppMessage(messageCaption, mediaUrl, options = {}) {
             mediatype: 'image',
             mimetype: 'image/jpeg',
             caption: messageCaption,
-            fileName: 'status_oferta.jpg'
+            fileName: 'status_oferta.jpg',
+            options: {
+              delay: 1200,
+              presence: 'composing'
+            }
           })
         });
 
@@ -180,7 +189,11 @@ async function dispatchWhatsAppMessage(messageCaption, mediaUrl, options = {}) {
           mediatype: 'image',
           mimetype: 'image/jpeg',
           caption: messageCaption,
-          fileName: 'status_oferta.jpg'
+          fileName: 'status_oferta.jpg',
+          options: {
+            delay: 1200,
+            presence: 'composing'
+          }
         }),
         signal: controller.signal
       });
@@ -203,7 +216,12 @@ async function dispatchWhatsAppMessage(messageCaption, mediaUrl, options = {}) {
             body: JSON.stringify({
               number: targetRecipient,
               text: messageCaption,
-              linkPreview: true
+              linkPreview: true,
+              options: {
+                delay: 1200,
+                presence: 'composing',
+                linkPreview: true
+              }
             })
           });
           if (textRes.ok) return await textRes.json();
@@ -232,7 +250,12 @@ async function dispatchWhatsAppMessage(messageCaption, mediaUrl, options = {}) {
     body: JSON.stringify({
       number: targetRecipient,
       text: messageCaption,
-      linkPreview: true
+      linkPreview: true,
+      options: {
+        delay: 1200,
+        presence: 'composing',
+        linkPreview: true
+      }
     }),
     signal: controller.signal
   });
