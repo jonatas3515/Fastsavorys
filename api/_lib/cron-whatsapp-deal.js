@@ -96,6 +96,71 @@ async function dispatchWhatsAppMessage(messageCaption, mediaUrl, options = {}) {
     mediaUrl = `https://fastsavorys.vercel.app${mediaUrl.startsWith('/') ? '' : '/'}${mediaUrl}`;
   }
 
+  // 0. Disparo específico para STATUS DO WHATSAPP (Evolution v2 /message/sendStatus)
+  if (targetRecipient === 'status@broadcast') {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 45000);
+
+    try {
+      // 1. Tenta endpoint nativo de Status da Evolution API v2 (/message/sendStatus)
+      const statusEndpoint = `${evolutionApiUrl}/message/sendStatus/${evolutionInstance}`;
+      const statusPayload = {
+        type: (mediaUrl && mediaUrl.startsWith('http')) ? 'image' : 'text',
+        content: (mediaUrl && mediaUrl.startsWith('http')) ? mediaUrl : messageCaption,
+        caption: (mediaUrl && mediaUrl.startsWith('http')) ? messageCaption : undefined,
+        statusJidList: []
+      };
+
+      const resStatus = await fetch(statusEndpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': evolutionApiKey
+        },
+        body: JSON.stringify(statusPayload),
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      if (resStatus.ok) {
+        return await resStatus.json();
+      }
+
+      // 2. Fallback para /message/sendMedia com destinatário status@broadcast
+      if (mediaUrl && mediaUrl.startsWith('http')) {
+        const mediaEndpoint = `${evolutionApiUrl}/message/sendMedia/${evolutionInstance}`;
+        const resMedia = await fetch(mediaEndpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': evolutionApiKey
+          },
+          body: JSON.stringify({
+            number: 'status@broadcast',
+            media: mediaUrl,
+            mediatype: 'image',
+            mimetype: 'image/jpeg',
+            caption: messageCaption,
+            fileName: 'status_oferta.jpg'
+          })
+        });
+
+        if (resMedia.ok) {
+          return await resMedia.json();
+        }
+      }
+
+      const errText = await resStatus.text();
+      console.warn(`[WhatsApp Status] Erro na Evolution (${evolutionInstance}):`, errText);
+      return { success: false, error: errText };
+    } catch (err) {
+      clearTimeout(timeoutId);
+      console.warn(`[WhatsApp Status] Exceção (${evolutionInstance}):`, err.message);
+      return { success: false, error: err.message };
+    }
+  }
+
   // 1. Se possuir URL de imagem, envia EXCLUSIVAMENTE via sendMedia (evita mensagens duplicadas)
   if (mediaUrl && mediaUrl.startsWith('http')) {
     const controller = new AbortController();
