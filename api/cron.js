@@ -13,6 +13,11 @@ const { handleBirthdayBroadcast } = require('./_lib/cron-birthday-broadcast');
 const { handleMineDeals } = require('./_lib/cron-deals-miner');
 const { handleAutoSyncLinks } = require('./check-affiliate-links');
 
+// Permite execução de até 60s na Vercel para envio de mídias pesadas
+const config = {
+  maxDuration: 60
+};
+
 module.exports = async function handler(req, res) {
   // CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -102,3 +107,5 @@ module.exports = async function handler(req, res) {
       });
   }
 };
+
+module.exports.config = config;
