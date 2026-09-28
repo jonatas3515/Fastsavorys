@@ -488,10 +488,21 @@ async function handleSendWhatsAppStatus(req, res) {
     return res.status(500).json({ success: false, error: 'Configuração do Supabase não encontrada.' });
   }
 
+  const mode = req.query.mode || (req.body && req.body.mode) || 'auto';
+  const targetChannel = req.query.channel || (req.body && req.body.channel) || '';
+
+  // Bloqueio definitivo do número pessoal (solicitação do usuário)
+  if (targetChannel === 'personal' || mode === 'personal' || mode === 'achadinhos') {
+    return res.status(200).json({
+      success: false,
+      skipped: true,
+      message: 'Disparos de Status no WhatsApp pessoal foram permanentemente desativados. Apenas a lanchonete está ativa.'
+    });
+  }
+
   const evolutionApiUrl = (process.env.EVOLUTION_API_URL || '').replace(/\/+$/, '');
   const evolutionApiKey = process.env.EVOLUTION_API_KEY || '';
   const storeApiKey = (process.env.EVOLUTION_STORE_API_KEY || process.env.EVOLUTION_STORE_KEY || evolutionApiKey).trim();
-  const personalInstance = (process.env.EVOLUTION_INSTANCE || 'fastsavorys').trim();
   const storeInstance = (process.env.EVOLUTION_STORE_INSTANCE || 'fast_lanchonete').trim();
 
   if (!evolutionApiUrl || !evolutionApiKey) {
@@ -508,28 +519,19 @@ async function handleSendWhatsAppStatus(req, res) {
   const slotMinute = (utcMinutes >= 15 && utcMinutes < 45) ? '30' : '00';
   const timeKey = `${String(brtHours).padStart(2, '0')}:${slotMinute}`;
 
-  const mode = req.query.mode || (req.body && req.body.mode) || 'auto';
-  const targetChannel = req.query.channel || (req.body && req.body.channel) || '';
+  // Horários oficiais definidos pelo usuário (Apenas Lanchonete FastSavory's)
 
-  // Horários oficiais definidos pelo usuário
+  // Horários oficiais definidos pelo usuário (Apenas Lanchonete FastSavory's)
   const storeSlots = ['13:00', '14:00', '15:00', '16:00'];
-  const personalSlots = ['10:00', '14:00', '18:00'];
 
   let targetsToExecute = [];
 
-  if (targetChannel === 'store' || mode === 'store' || mode === 'fastsavorys') {
+  if (targetChannel === 'store' || mode === 'store' || mode === 'fastsavorys' || mode === 'all') {
     targetsToExecute.push('store');
-  } else if (targetChannel === 'personal' || mode === 'personal' || mode === 'achadinhos') {
-    targetsToExecute.push('personal');
-  } else if (mode === 'all') {
-    targetsToExecute.push('store', 'personal');
   } else {
     // Modo automático por horário
     if (storeSlots.includes(timeKey)) {
       targetsToExecute.push('store');
-    }
-    if (personalSlots.includes(timeKey)) {
-      targetsToExecute.push('personal');
     }
     // Se chamado fora dos slots oficiais
     if (targetsToExecute.length === 0) {
@@ -540,7 +542,7 @@ async function handleSendWhatsAppStatus(req, res) {
         return res.status(200).json({
           success: true,
           skipped: true,
-          message: `Horário ${timeKey} fora das janelas programadas de Status (Lanchonete: 13h, 14h, 15h, 16h | Pessoal: 10h, 14h, 18h).`,
+          message: `Horário ${timeKey} fora das janelas programadas de Status da Lanchonete (13h, 14h, 15h, 16h).`,
           timeKey
         });
       }
@@ -599,44 +601,6 @@ async function handleSendWhatsAppStatus(req, res) {
           target: 'status@broadcast',
           productTitle: product.name,
           price: product.price,
-          status: 'posted_to_status',
-          evolutionResponse: sendRes
-        });
-
-      } else if (channel === 'personal') {
-        // --- 2. STATUS PESSOAL (Achadinhos) ---
-        const { data: affiliateProducts, error: affErr } = await supabaseAdmin
-          .from('fast_affiliate_products')
-          .select('*')
-          .eq('is_active', true);
-
-        if (affErr || !affiliateProducts || affiliateProducts.length === 0) {
-          results.push({ channel: 'personal', success: false, error: 'Nenhum achadinho ativo encontrado.' });
-          continue;
-        }
-
-        const validAffiliate = affiliateProducts.filter(p => Boolean(p.image_url && p.image_url.startsWith('http')));
-        const pool = validAffiliate.length > 0 ? validAffiliate : affiliateProducts;
-        const daySeed = now.getDate();
-        const monthSeed = now.getMonth() + 1;
-        const slotIdx = personalSlots.indexOf(timeKey) >= 0 ? personalSlots.indexOf(timeKey) : (brtHours % 3);
-        const selectedIndex = (daySeed * 11 + monthSeed * 5 + slotIdx) % pool.length;
-        const product = pool[selectedIndex];
-
-        const caption = buildWhatsAppStatusDealText(product);
-        const mediaUrl = product.image_url;
-
-        const sendRes = await dispatchWhatsAppMessage(caption, mediaUrl, {
-          instance: personalInstance,
-          targetJid: 'status@broadcast'
-        });
-
-        results.push({
-          channel: 'personal_achadinhos',
-          instance: personalInstance,
-          target: 'status@broadcast',
-          productTitle: product.title,
-          price: product.price_display,
           status: 'posted_to_status',
           evolutionResponse: sendRes
         });
@@ -731,12 +695,10 @@ async function handleSendVipGroupInvite(req, res) {
   const inviteCaption = 'https://chat.whatsapp.com/C7dT0ZWaUZKHm7atI3eOLE';
   const inviteImageUrl = 'https://fastsavorys.vercel.app/assets/img/Achadinhos.jpg';
 
-  const personalInstance = (process.env.EVOLUTION_INSTANCE || 'fastsavorys').trim();
   const storeInstance = (process.env.EVOLUTION_STORE_INSTANCE || 'fast_lanchonete').trim();
   const storeApiKey = (process.env.EVOLUTION_STORE_API_KEY || process.env.EVOLUTION_API_KEY || '').trim();
 
   const targets = [
-    { label: 'Status Pessoal', instance: personalInstance },
     { label: 'Status Lanchonete', instance: storeInstance, apiKey: storeApiKey }
   ];
 
