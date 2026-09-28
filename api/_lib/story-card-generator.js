@@ -1,7 +1,8 @@
 /**
- * FastSavory's - Gerador Dinâmico de Cards 9:16 para Instagram Stories
+ * FastSavory's - Gerador de Cards 9:16 para Instagram Stories
  * Transforma fotos quadradas (1:1) em Stories verticais (9:16 - 576x1024)
- * usando templates oficiais com molduras arredondadas, títulos e preços estilizados.
+ * usando templates oficiais com molduras arredondadas e CTAs fixos na zona segura,
+ * eliminando 100% o risco de falhas de fontes/textos do servidor.
  */
 
 const sharp = require('sharp');
@@ -15,9 +16,9 @@ const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABA
 const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: false } });
 
 const TEMPLATE_FALLBACK_URLS = {
-  store: 'https://vqjyjdllapqbqpylshkw.supabase.co/storage/v1/object/public/fast-images/templates/story_template_store.jpg',
-  mercadolivre: 'https://vqjyjdllapqbqpylshkw.supabase.co/storage/v1/object/public/fast-images/templates/story_template_mercadolivre.jpg',
-  amazon: 'https://vqjyjdllapqbqpylshkw.supabase.co/storage/v1/object/public/fast-images/templates/story_template_amazon.jpg'
+  store: 'https://fastsavorys.vercel.app/assets/img/story_template_store.jpg',
+  mercadolivre: 'https://fastsavorys.vercel.app/assets/img/story_template_mercadolivre.jpg',
+  amazon: 'https://fastsavorys.vercel.app/assets/img/story_template_amazon.jpg'
 };
 
 function detectPlatform(url = '') {
@@ -26,36 +27,6 @@ function detectPlatform(url = '') {
     return 'amazon';
   }
   return 'mercadolivre';
-}
-
-function escapeXml(unsafe = '') {
-  return String(unsafe).replace(/[<>&'"]/g, c => {
-    switch (c) {
-      case '<': return '&lt;';
-      case '>': return '&gt;';
-      case '&': return '&amp;';
-      case '\'': return '&apos;';
-      case '"': return '&quot;';
-      default: return c;
-    }
-  });
-}
-
-function formatTitle(title, maxLen = 26) {
-  if (!title) return '';
-  const clean = String(title).trim().toUpperCase();
-  if (clean.length <= maxLen) return clean;
-  return clean.slice(0, maxLen - 1).trim() + '...';
-}
-
-function formatPriceDisplay(price) {
-  if (price === null || price === undefined) return '';
-  if (typeof price === 'number') {
-    return price.toFixed(2).replace('.', ',');
-  }
-  let s = String(price).trim();
-  s = s.replace(/R\$\s*/gi, '').trim();
-  return s;
 }
 
 async function loadTemplateBuffer(templateType) {
@@ -72,124 +43,49 @@ async function loadTemplateBuffer(templateType) {
     }
   }
 
-  // Fallback: Baixa do Supabase Storage
+  // Fallback via URL pública da Vercel
   const remoteUrl = TEMPLATE_FALLBACK_URLS[templateType] || TEMPLATE_FALLBACK_URLS.mercadolivre;
   console.log(`[Story Generator] Carregando template ${templateType} via fallback HTTP: ${remoteUrl}`);
   const resp = await fetch(remoteUrl);
   if (!resp.ok) {
-    throw new Error(`Falha ao baixar template ${templateType} remoto: ${resp.statusText}`);
+    throw new Error(`Falha ao carregar template ${templateType}: ${resp.statusText}`);
   }
   return Buffer.from(await resp.arrayBuffer());
 }
 
 /**
- * Gera o Story Card completo (9:16) e faz upload direto para o Supabase Storage
+ * Gera o Story Card 9:16 limpo e faz upload direto para o Supabase Storage
  * @param {Object} params
  * @param {'store'|'deal'} params.channel
  * @param {Object} [params.product] - Objeto do produto da loja
  * @param {Object} [params.deal] - Objeto do produto de achadinhos
- * @returns {Promise<string>} URL pública no Supabase Storage pronta para o Instagram
+ * @returns {Promise<string>} URL pública no Supabase Storage pronta para o Instagram Stories
  */
 async function generateStoryCard({ channel, product, deal }) {
-  console.log(`[Story Generator] Gerando card para canal: ${channel}...`);
+  console.log(`[Story Generator] Iniciando composição limpa 9:16 para canal: ${channel}...`);
 
   let templateType = 'store';
-  let rawTitle = '';
-  let rawPrice = '';
   let productImageUrl = '';
-  let fitMode = 'contain';
+  let fitMode = 'cover';
+  let frame;
 
   if (channel === 'store' || product) {
     templateType = 'store';
-    rawTitle = product?.name || 'FastSavory\'s';
-    rawPrice = formatPriceDisplay(product?.price);
     productImageUrl = product?.image || product?.image_url;
     fitMode = 'cover';
+    frame = { left: 63, top: 103, width: 450, height: 450, radius: 30 };
   } else {
     templateType = detectPlatform(deal?.affiliate_url);
-    rawTitle = deal?.title || 'Oferta Exclusiva';
-    rawPrice = formatPriceDisplay(deal?.price_display || deal?.price);
     productImageUrl = deal?.image_url;
     fitMode = 'contain';
+    frame = { left: 65, top: 204, width: 445, height: 455, radius: 32 };
   }
 
   if (!productImageUrl || !productImageUrl.startsWith('http')) {
     throw new Error(`URL de imagem do produto inválida para o story: "${productImageUrl}"`);
   }
 
-  // Configurações de layout por template
-  let frame;
-  let titleStyle;
-  let priceStyle;
-
-  if (templateType === 'store') {
-    frame = { left: 63, top: 103, width: 450, height: 450, radius: 30 };
-    titleStyle = {
-      x: 288,
-      y: 685,
-      fontSize: 26,
-      fill: '#1a1a1a',
-      fontWeight: 'bold',
-      textAnchor: 'middle'
-    };
-    priceStyle = {
-      x: 235,
-      y: 820,
-      fontSize: 44,
-      fill: '#ffffff',
-      shadowFill: '#4a1500',
-      shadowDx: 2,
-      shadowDy: 2,
-      fontWeight: '900',
-      textAnchor: 'start'
-    };
-  } else if (templateType === 'amazon') {
-    frame = { left: 65, top: 204, width: 445, height: 455, radius: 32 };
-    titleStyle = {
-      x: 288,
-      y: 728,
-      fontSize: 24,
-      fill: '#141419',
-      fontWeight: 'bold',
-      textAnchor: 'middle'
-    };
-    priceStyle = {
-      x: 185,
-      y: 858,
-      fontSize: 44,
-      fill: '#d66000',
-      shadowFill: null,
-      shadowDx: 0,
-      shadowDy: 0,
-      fontWeight: '900',
-      textAnchor: 'start'
-    };
-  } else {
-    // Mercado Livre (e padrão para outros achadinhos)
-    templateType = 'mercadolivre';
-    frame = { left: 65, top: 204, width: 445, height: 455, radius: 32 };
-    titleStyle = {
-      x: 288,
-      y: 728,
-      fontSize: 24,
-      fill: '#002882',
-      fontWeight: 'bold',
-      textAnchor: 'middle'
-    };
-    priceStyle = {
-      x: 235,
-      y: 852,
-      fontSize: 44,
-      fill: '#ffffff',
-      shadowFill: '#00195a',
-      shadowDx: 2,
-      shadowDy: 2,
-      fontWeight: '900',
-      textAnchor: 'start'
-    };
-  }
-
-  // 1. Carrega o template de fundo
+  // 1. Carrega o template de fundo oficial 9:16 (576 x 1024)
   const templateBuffer = await loadTemplateBuffer(templateType);
 
   // 2. Baixa a foto do produto
@@ -201,14 +97,13 @@ async function generateStoryCard({ channel, product, deal }) {
   }
   const prodRawBuffer = Buffer.from(await imgResp.arrayBuffer());
 
-  // 3. Cria máscara com cantos arredondados
+  // 3. Aplica máscara com cantos arredondados na foto do produto
   const maskSvg = Buffer.from(`
     <svg width="${frame.width}" height="${frame.height}">
       <rect x="0" y="0" width="${frame.width}" height="${frame.height}" rx="${frame.radius}" ry="${frame.radius}" fill="#fff"/>
     </svg>
   `);
 
-  // Redimensiona mantendo proporção e aplica máscara
   const resizeOptions = {
     fit: fitMode,
     background: { r: 255, g: 255, b: 255, alpha: 1 }
@@ -220,38 +115,15 @@ async function generateStoryCard({ channel, product, deal }) {
     .png()
     .toBuffer();
 
-  // 4. Monta SVG de texto
-  const safeTitle = escapeXml(formatTitle(rawTitle, 26));
-  const safePrice = escapeXml(rawPrice);
-
-  let shadowSvg = '';
-  if (priceStyle.shadowFill && safePrice) {
-    shadowSvg = `<text x="${priceStyle.x + priceStyle.shadowDx}" y="${priceStyle.y + priceStyle.shadowDy}" font-family="Arial, Helvetica, sans-serif" font-weight="${priceStyle.fontWeight}" font-size="${priceStyle.fontSize}px" fill="${priceStyle.shadowFill}" text-anchor="${priceStyle.textAnchor}">${safePrice}</text>`;
-  }
-
-  let priceSvg = '';
-  if (safePrice) {
-    priceSvg = `<text x="${priceStyle.x}" y="${priceStyle.y}" font-family="Arial, Helvetica, sans-serif" font-weight="${priceStyle.fontWeight}" font-size="${priceStyle.fontSize}px" fill="${priceStyle.fill}" text-anchor="${priceStyle.textAnchor}">${safePrice}</text>`;
-  }
-
-  const textSvg = Buffer.from(`
-    <svg width="576" height="1024" xmlns="http://www.w3.org/2000/svg">
-      <text x="${titleStyle.x}" y="${titleStyle.y}" font-family="Arial, Helvetica, sans-serif" font-weight="${titleStyle.fontWeight}" font-size="${titleStyle.fontSize}px" fill="${titleStyle.fill}" text-anchor="${titleStyle.textAnchor}">${safeTitle}</text>
-      ${shadowSvg}
-      ${priceSvg}
-    </svg>
-  `);
-
-  // 5. Compõe imagem final em 9:16 (576x1024)
+  // 4. Compõe a foto na moldura central do template
   const compositeBuffer = await sharp(templateBuffer)
     .composite([
-      { input: roundedProductBuffer, top: frame.top, left: frame.left },
-      { input: textSvg, top: 0, left: 0 }
+      { input: roundedProductBuffer, top: frame.top, left: frame.left }
     ])
-    .jpeg({ quality: 94 })
+    .jpeg({ quality: 95 })
     .toBuffer();
 
-  // 6. Upload para Supabase Storage (bucket fast-images)
+  // 5. Upload seguro para o Supabase Storage (bucket fast-images)
   const fileName = `stories/story_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.jpg`;
   const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
     .from('fast-images')
@@ -270,7 +142,7 @@ async function generateStoryCard({ channel, product, deal }) {
     .getPublicUrl(fileName);
 
   const publicUrl = urlData.publicUrl;
-  console.log(`[Story Generator] ✅ Card de Story gerado e salvo: ${publicUrl}`);
+  console.log(`[Story Generator] ✅ Card 9:16 limpo gerado e salvo com sucesso: ${publicUrl}`);
   return publicUrl;
 }
 
