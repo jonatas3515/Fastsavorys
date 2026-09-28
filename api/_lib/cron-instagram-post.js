@@ -10,6 +10,7 @@
  */
 
 const { createClient } = require('@supabase/supabase-js');
+const { generateStoryCard } = require('./story-card-generator');
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://vqjyjdllapqbqpylshkw.supabase.co';
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxanlqZGxsYXBxYnFweWxzaGt3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY0MzgyNDUsImV4cCI6MjA4MjAxNDI0NX0.tfTR9YnM5l0do7FJfxML6i05KTSrMInQMqFrWXx6aAU';
@@ -283,13 +284,22 @@ async function handleSendInstagramPost(req, res) {
 
       const chosenProduct = validStoreProducts[0];
       const caption = buildInstagramStoreCaption(chosenProduct);
-      const imageUrl = chosenProduct.image;
+      let imageUrl = chosenProduct.image;
+
+      if (target === 'story' || target === 'stories') {
+        console.log(`[Instagram Cron] Gerando card 9:16 oficial para o Story da FastSavory's ("${chosenProduct.name}")...`);
+        imageUrl = await generateStoryCard({
+          channel: 'store',
+          product: chosenProduct
+        });
+      }
 
       if (dryRun) {
         return res.status(200).json({
           success: true,
           dryRun: true,
           channel: 'store',
+          target,
           product: { id: chosenProduct.id, name: chosenProduct.name, image: imageUrl },
           caption
         });
@@ -311,6 +321,7 @@ async function handleSendInstagramPost(req, res) {
         success: true,
         message: `✅ Post da FastSavory's ("${chosenProduct.name}") publicado com sucesso no Instagram!`,
         channel: 'store',
+        target,
         product: { id: chosenProduct.id, name: chosenProduct.name },
         mediaId: publishResult.mediaId
       });
@@ -345,13 +356,22 @@ async function handleSendInstagramPost(req, res) {
 
     const chosenDeal = validDeals[0];
     const caption = buildInstagramDealCaption(chosenDeal);
-    const imageUrl = chosenDeal.image_url;
+    let imageUrl = chosenDeal.image_url;
+
+    if (target === 'story' || target === 'stories') {
+      console.log(`[Instagram Cron] Gerando card 9:16 oficial para o Story de Achadinho ("${chosenDeal.title}")...`);
+      imageUrl = await generateStoryCard({
+        channel: 'deal',
+        deal: chosenDeal
+      });
+    }
 
     if (dryRun) {
       return res.status(200).json({
         success: true,
         dryRun: true,
         channel: 'deal',
+        target,
         product: { id: chosenDeal.id, title: chosenDeal.title, image_url: imageUrl },
         caption
       });
@@ -373,6 +393,7 @@ async function handleSendInstagramPost(req, res) {
       success: true,
       message: `✅ Achadinho ("${chosenDeal.title}") publicado com sucesso no Instagram!`,
       channel: 'deal',
+      target,
       product: { id: chosenDeal.id, title: chosenDeal.title },
       mediaId: publishResult.mediaId
     });

@@ -6,7 +6,7 @@
  * 3. action=birthday-broadcast (Felicitações e cupom de aniversário)
  */
 
-const { handleSendWhatsAppDeal, handleSendWhatsAppStatus } = require('./_lib/cron-whatsapp-deal');
+const { handleSendWhatsAppDeal, handleSendWhatsAppStatus, handleSendVipGroupInvite } = require('./_lib/cron-whatsapp-deal');
 const { handleSendInstagramPost } = require('./_lib/cron-instagram-post');
 const { handleNotifyScheduledOrders } = require('./_lib/cron-scheduled-orders');
 const { handleBirthdayBroadcast } = require('./_lib/cron-birthday-broadcast');
@@ -34,6 +34,7 @@ module.exports = async function handler(req, res) {
   const isPublicAction = [
     'send-whatsapp-deal', 'whatsapp-deal', 'whatsapp', 'send-deal', 'deal', 'disparos', 'disparo-whatsapp',
     'send-whatsapp-status', 'whatsapp-status', 'status', 'stories', 'status-whatsapp', 'status-deal',
+    'send-vip-invite', 'vip-invite', 'invite', 'convite-vip', 'convite',
     'send-instagram-post', 'instagram-post', 'instagram', 'post-instagram', 'insta', 'ig',
     'mine-deals', 'deals-miner', 'miner',
     'auto-sync-links', 'auto-check-links', 'sync-links', 'check-sync-links', 'verify-links', 'check-links', 'sync'
@@ -69,6 +70,13 @@ module.exports = async function handler(req, res) {
     case 'status-whatsapp':
     case 'status-deal':
       return handleSendWhatsAppStatus(req, res);
+
+    case 'send-vip-invite':
+    case 'vip-invite':
+    case 'invite':
+    case 'convite-vip':
+    case 'convite':
+      return handleSendVipGroupInvite(req, res);
 
     case 'send-instagram-post':
     case 'instagram-post':
