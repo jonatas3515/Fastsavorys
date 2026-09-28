@@ -85,7 +85,7 @@
     "functions": {
         "api/cron.js": {
             "maxDuration": 60,
-            "includeFiles": "assets/img/**"
+            "includeFiles": "assets/**"
         },
         "api/check-affiliate-links.js": {
             "maxDuration": 60
