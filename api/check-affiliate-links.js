@@ -95,23 +95,66 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
       isPaused = true;
     }
 
-    // 1. Check aok-offscreen with priceToPay label (Amazon Pix / Cash price)
-    const pixMatch = html.match(/class=["'][^"']*aok-offscreen[^"']*["'][^>]*>\s*(R\$\s*[0-9.,]+)\s*<\/span>/i);
-    if (pixMatch && pixMatch[1]) {
-      const clean = pixMatch[1].replace(/&nbsp;/g, ' ').replace(/[^\d.,]/g, '').trim();
-      if (clean) price = `R$ ${clean}`;
+    // 1. Authoritative Twister Plus BuyBox State (Exact current BuyBox price, ignores used/collectible options)
+    const twisterMatch = html.match(/(?:"|&quot;)desktop_buybox_group_1(?:"|&quot;)\s*:\s*\[\{\s*(?:"|&quot;)displayPrice(?:"|&quot;)\s*:\s*(?:"|&quot;)([^"&]+)(?:"|&quot;)/i) ||
+                         html.match(/(?:"|&quot;)desktop_buybox_group_1(?:"|&quot;)[\s\S]*?(?:"|&quot;)displayPrice(?:"|&quot;)\s*:\s*(?:"|&quot;)([^"&]+)(?:"|&quot;)/i);
+    if (twisterMatch && twisterMatch[1]) {
+      const clean = twisterMatch[1].replace(/&nbsp;/g, ' ').replace(/\u00a0/g, ' ').trim();
+      if (clean) price = clean;
     }
 
-    // 2. Targeted Amazon BuyBox / Apex Price Classes
     if (!price) {
-      const targetedOffscreen = html.match(/class=["'][^"']*(?:apex-pricetopay-value|apexPriceToPay|priceToPay|reinventPricePriceToPayMargin|corePriceDisplay)[^"']*["'][\s\S]*?class=["'][^"']*a-offscreen[^"']*["']>([^<]+)</i);
-      if (targetedOffscreen && targetedOffscreen[1]) {
-        const clean = targetedOffscreen[1].replace(/&nbsp;/g, ' ').replace(/[^\d.,]/g, '').trim();
+      const twisterAmount = html.match(/(?:"|&quot;)desktop_buybox_group_1(?:"|&quot;)\s*:\s*\[\{\s*[^}]*?(?:"|&quot;)priceAmount(?:"|&quot;)\s*:\s*([0-9.]+)/i);
+      if (twisterAmount && twisterAmount[1]) {
+        const val = parseFloat(twisterAmount[1]);
+        if (!isNaN(val) && val > 0) price = formatBrlNumber(val);
+      }
+    }
+
+    // 2. Scoped BuyBox Container (desktop_buybox / buyBoxAccordion / priceblock_total_price_ww)
+    if (!price) {
+      const bbSection = html.match(/id=["'](?:desktop_buybox|buyBoxAccordion)["'][\s\S]*?<\/form>/i);
+      if (bbSection) {
+        const bbText = bbSection[0];
+        const offscreen = bbText.match(/class=["']a-offscreen["']>\s*(R\$\s*[0-9.,]+)\s*<\/span>/i);
+        if (offscreen && offscreen[1]) {
+          price = offscreen[1].replace(/&nbsp;/g, ' ').replace(/\u00a0/g, ' ').trim();
+        } else {
+          const whole = bbText.match(/class=["'][^"']*a-price-whole[^"']*["']>([0-9.,]+)<[\s\S]*?class=["'][^"']*a-price-fraction[^"']*["']>([0-9]{2})</i);
+          if (whole && whole[1] && whole[2]) {
+            price = `R$ ${whole[1].replace(/[^\d.]/g, '')},${whole[2]}`;
+          }
+        }
+      }
+    }
+
+    // 3. Subtotal / Tooltip / Priceblock WW
+    if (!price) {
+      const tpMatch = html.match(/id=["'](?:priceblock_total_price_ww|tp-tool-tip-subtotal-price-value)["'][\s\S]*?class=["']a-offscreen["']>\s*(R\$\s*[0-9.,]+)\s*<\/span>/i);
+      if (tpMatch && tpMatch[1]) {
+        price = tpMatch[1].replace(/&nbsp;/g, ' ').replace(/\u00a0/g, ' ').trim();
+      }
+    }
+
+    // 4. Check aok-offscreen with priceToPay label (Amazon Pix / Cash price)
+    if (!price) {
+      const pixMatch = html.match(/class=["'][^"']*aok-offscreen[^"']*["'][^>]*>\s*(R\$\s*[0-9.,]+)\s*<\/span>/i);
+      if (pixMatch && pixMatch[1]) {
+        const clean = pixMatch[1].replace(/&nbsp;/g, ' ').replace(/\u00a0/g, ' ').replace(/[^\d.,]/g, '').trim();
         if (clean) price = `R$ ${clean}`;
       }
     }
 
-    // 3. Whole + Fraction combination
+    // 5. Targeted Amazon BuyBox / Apex Price Classes
+    if (!price) {
+      const targetedOffscreen = html.match(/class=["'][^"']*(?:apex-pricetopay-value|apexPriceToPay|priceToPay|reinventPricePriceToPayMargin|corePriceDisplay)[^"']*["'][\s\S]*?class=["'][^"']*a-offscreen[^"']*["']>([^<]+)</i);
+      if (targetedOffscreen && targetedOffscreen[1]) {
+        const clean = targetedOffscreen[1].replace(/&nbsp;/g, ' ').replace(/\u00a0/g, ' ').replace(/[^\d.,]/g, '').trim();
+        if (clean) price = `R$ ${clean}`;
+      }
+    }
+
+    // 6. Whole + Fraction combination
     if (!price) {
       const wholeMatch = html.match(/class=["'][^"']*a-price-whole[^"']*["']>([0-9.,]+)<[\s\S]*?class=["'][^"']*a-price-fraction[^"']*["']>([0-9]{2})</i);
       if (wholeMatch && wholeMatch[1] && wholeMatch[2]) {
@@ -121,11 +164,11 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
       }
     }
 
-    // 4. Classic Amazon Price Block IDs
+    // 7. Classic Amazon Price Block IDs
     if (!price) {
-      const classicMatch = html.match(/id=["'](?:priceblock_ourprice|priceblock_dealprice|priceblock_saleprice|price_inside_buybox|tp-tool-tip-subtotal-price-value)["'][^>]*>([^<]+)</i);
+      const classicMatch = html.match(/id=["'](?:priceblock_ourprice|priceblock_dealprice|priceblock_saleprice|price_inside_buybox)["'][^>]*>([^<]+)</i);
       if (classicMatch && classicMatch[1]) {
-        const clean = classicMatch[1].replace(/&nbsp;/g, ' ').replace(/[^\d.,]/g, '').trim();
+        const clean = classicMatch[1].replace(/&nbsp;/g, ' ').replace(/\u00a0/g, ' ').replace(/[^\d.,]/g, '').trim();
         if (clean) price = `R$ ${clean}`;
       }
     }
@@ -461,21 +504,29 @@ async function fetchProductDetails(rawUrl) {
   // 2. Fetch page HTML if needed
   if (!html || (!html.includes('og:title') && !html.includes('productTitle') && !html.includes('ui-pdp-title'))) {
     try {
+      const requestHeaders = (platform === 'amazon' || isShopeeTarget)
+        ? {
+            'User-Agent': fetchUa,
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+            'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7'
+          }
+        : {
+            'User-Agent': fetchUa,
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+            'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+            'Sec-Ch-Ua': '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+            'Sec-Ch-Ua-Mobile': '?0',
+            'Sec-Ch-Ua-Platform': '"Windows"',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'none',
+            'Sec-Fetch-User': '?1',
+            'Upgrade-Insecure-Requests': '1'
+          };
+
       const pageRes = await fetch(targetUrl, {
         method: 'GET',
-        headers: {
-          'User-Agent': fetchUa,
-          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-          'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
-          'Sec-Ch-Ua': '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
-          'Sec-Ch-Ua-Mobile': '?0',
-          'Sec-Ch-Ua-Platform': '"Windows"',
-          'Sec-Fetch-Dest': 'document',
-          'Sec-Fetch-Mode': 'navigate',
-          'Sec-Fetch-Site': 'none',
-          'Sec-Fetch-User': '?1',
-          'Upgrade-Insecure-Requests': '1'
-        }
+        headers: requestHeaders
       });
       html = await pageRes.text();
     } catch (e) {

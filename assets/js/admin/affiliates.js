@@ -246,7 +246,10 @@ window.AffiliatesModule = (function () {
       const matchCat = matchesCategoryFilter(item, categoryFilter);
       const matchStatus = statusFilter === 'all' || 
         (statusFilter === 'active' && item.is_active !== false) ||
-        (statusFilter === 'paused' && item.is_active === false);
+        (statusFilter === 'paused' && item.is_active === false) ||
+        (statusFilter === 'platform_amazon' && detectPlatform(item.affiliate_url).id === 'amazon') ||
+        (statusFilter === 'platform_shopee' && detectPlatform(item.affiliate_url).id === 'shopee') ||
+        (statusFilter === 'platform_mercadolivre' && detectPlatform(item.affiliate_url).id === 'mercadolivre');
       const matchSearch = !searchQuery || 
         (item.title && item.title.toLowerCase().includes(searchQuery)) ||
         (item.description && item.description.toLowerCase().includes(searchQuery)) ||
