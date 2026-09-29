@@ -405,13 +405,15 @@ async function fetchProductDetails(rawUrl) {
     targetUrl.includes('shope.ee')
   ) {
     try {
-      const ua = (platform === 'amazon' || targetUrl.includes('amazon') || targetUrl.includes('amzn') || targetUrl.includes('amzlinks'))
+      const isAmz = platform === 'amazon' || targetUrl.includes('amazon') || targetUrl.includes('amzn') || targetUrl.includes('amzlinks');
+      const isShopee = platform === 'shopee' || targetUrl.includes('shopee') || targetUrl.includes('s.shopee') || targetUrl.includes('shope.ee');
+      const ua = (isAmz || isShopee)
         ? 'WhatsApp/2.24.8.85 i'
         : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
       const headRes = await fetch(targetUrl, {
         method: 'GET',
-        redirect: 'follow',
+        redirect: isShopee ? 'manual' : 'follow',
         headers: {
           'User-Agent': ua,
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
@@ -419,43 +421,67 @@ async function fetchProductDetails(rawUrl) {
         }
       });
 
-      initialHtml = await headRes.text();
-      const btnMatch = initialHtml.match(/btn_url=([^"&'\s]+)/i);
-      if (btnMatch && btnMatch[1]) {
-        try { targetUrl = decodeURIComponent(btnMatch[1]); } catch (e) {}
-      } else if (headRes.url) {
-        targetUrl = headRes.url;
+      if (isShopee && headRes.status >= 300 && headRes.status < 400) {
+        const loc = headRes.headers.get('location') || '';
+        const idMatch = loc.match(/opaanlp\/(\d+)\/(\d+)/) || loc.match(/-i\.(\d+)\.(\d+)/) || loc.match(/product\/(\d+)\/(\d+)/);
+        if (idMatch) {
+          targetUrl = `https://shopee.com.br/product/${idMatch[1]}/${idMatch[2]}`;
+        } else if (loc) {
+          targetUrl = loc;
+        }
+      } else {
+        initialHtml = await headRes.text();
+        const btnMatch = initialHtml.match(/btn_url=([^"&'\s]+)/i);
+        if (btnMatch && btnMatch[1]) {
+          try { targetUrl = decodeURIComponent(btnMatch[1]); } catch (e) {}
+        } else if (headRes.url && !isShopee) {
+          targetUrl = headRes.url;
+        }
       }
     } catch (e) {
       console.warn('[Auto-Fetch] Falha no redirect follow:', e);
     }
   }
 
+  // Se for Shopee com rota opaanlp, converte para rota canônica de produto
+  const opaanlpMatch = targetUrl.match(/opaanlp\/(\d+)\/(\d+)/);
+  if (opaanlpMatch) {
+    targetUrl = `https://shopee.com.br/product/${opaanlpMatch[1]}/${opaanlpMatch[2]}`;
+  }
+
   platform = detectPlatform(targetUrl);
 
-  const fetchUa = platform === 'amazon'
+  const isShopeeTarget = platform === 'shopee' || targetUrl.includes('shopee') || targetUrl.includes('s.shopee') || targetUrl.includes('shope.ee');
+  const fetchUa = (platform === 'amazon' || isShopeeTarget)
     ? 'WhatsApp/2.24.8.85 i'
     : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
-  // 2. Fetch page HTML
-  const pageRes = await fetch(targetUrl, {
-    method: 'GET',
-    headers: {
-      'User-Agent': fetchUa,
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-      'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
-      'Sec-Ch-Ua': '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
-      'Sec-Ch-Ua-Mobile': '?0',
-      'Sec-Ch-Ua-Platform': '"Windows"',
-      'Sec-Fetch-Dest': 'document',
-      'Sec-Fetch-Mode': 'navigate',
-      'Sec-Fetch-Site': 'none',
-      'Sec-Fetch-User': '?1',
-      'Upgrade-Insecure-Requests': '1'
-    }
-  });
+  let html = initialHtml;
 
-  const html = await pageRes.text();
+  // 2. Fetch page HTML if needed
+  if (!html || (!html.includes('og:title') && !html.includes('productTitle') && !html.includes('ui-pdp-title'))) {
+    try {
+      const pageRes = await fetch(targetUrl, {
+        method: 'GET',
+        headers: {
+          'User-Agent': fetchUa,
+          'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
+          'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+          'Sec-Ch-Ua': '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+          'Sec-Ch-Ua-Mobile': '?0',
+          'Sec-Ch-Ua-Platform': '"Windows"',
+          'Sec-Fetch-Dest': 'document',
+          'Sec-Fetch-Mode': 'navigate',
+          'Sec-Fetch-Site': 'none',
+          'Sec-Fetch-User': '?1',
+          'Upgrade-Insecure-Requests': '1'
+        }
+      });
+      html = await pageRes.text();
+    } catch (e) {
+      console.warn('[Auto-Fetch] Falha no fetch da página:', e);
+    }
+  }
 
   let title = '';
   let imageUrl = '';
@@ -465,9 +491,11 @@ async function fetchProductDetails(rawUrl) {
     html.match(/<h1[^>]*class=["'][^"']*(?:ui-pdp-title|poly-component__title)[^"']*["'][^>]*>([\s\S]*?)<\/h1>/i) ||
     html.match(/class=["'][^"']*poly-component__title[^"']*["'][^>]*><a[^>]*>([\s\S]*?)<\/a>/i) ||
     html.match(/class=["'][^"']*poly-component__title[^"']*["'][^>]*>([\s\S]*?)<\//i) ||
-    html.match(/<meta\s+property=["']og:title["']\s+content=["'](.*?)["']/i) ||
+    html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i) ||
+    html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:title["']/i) ||
     html.match(/<title>([\s\S]*?)<\/title>/i) ||
-    initialHtml.match(/<meta\s+property=["']og:title["']\s+content=["'](.*?)["']/i) ||
+    initialHtml.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i) ||
+    initialHtml.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:title["']/i) ||
     initialHtml.match(/<title>([\s\S]*?)<\/title>/i);
   if (titleMatch && titleMatch[1]) {
     title = cleanTitle(titleMatch[1], platform);
@@ -476,10 +504,12 @@ async function fetchProductDetails(rawUrl) {
   const imageMatch =
     html.match(/id=["']landingImage["'][^>]*src=["']([^"']+)["']/i) ||
     html.match(/id=["']landingImage["'][^>]*data-old-hires=["']([^"']+)["']/i) ||
-    html.match(/<meta\s+property=["']og:image["']\s+content=["'](.*?)["']/i) ||
+    html.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i) ||
+    html.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i) ||
     html.match(/class=["'][^"']*ui-pdp-image[^"']*["'][\s\S]*?src=["']([^"']+)["']/i) ||
     html.match(/class=["'][^"']*poly-component__picture[^"']*["'][\s\S]*?src=["']([^"']+)["']/i) ||
-    initialHtml.match(/<meta\s+property=["']og:image["']\s+content=["'](.*?)["']/i);
+    initialHtml.match(/<meta[^>]*property=["']og:image["'][^>]*content=["']([^"']+)["']/i) ||
+    initialHtml.match(/<meta[^>]*content=["']([^"']+)["'][^>]*property=["']og:image["']/i);
   if (imageMatch && imageMatch[1]) {
     imageUrl = platform === 'amazon' ? cleanAmazonImageUrl(imageMatch[1]) : imageMatch[1];
   }
@@ -827,7 +857,8 @@ async function handler(req, res) {
           const timeoutId = setTimeout(() => controller.abort(), 8000);
 
           const isAmz = url.includes('amazon') || url.includes('amzn') || url.includes('a.co') || url.includes('amzlinks');
-          const fetchUa = isAmz
+          const isShopee = url.includes('shopee') || url.includes('s.shopee') || url.includes('shope.ee');
+          const fetchUa = (isAmz || isShopee)
             ? 'WhatsApp/2.24.8.85 i'
             : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
