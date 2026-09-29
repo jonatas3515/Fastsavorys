@@ -338,17 +338,21 @@ async function handleSendWhatsAppDeal(req, res) {
   // Identificação do modo e Horário de Brasília (UTC-3)
   const now = new Date();
   const utcHours = now.getUTCHours();
-  const brtHours = (utcHours - 3 + 24) % 24;
   const utcMinutes = now.getUTCMinutes();
-  // Arredonda para o slot de 30 min mais próximo (:00 ou :30)
-  const slotMinute = (utcMinutes >= 15 && utcMinutes < 45) ? '30' : '00';
-  const timeKey = `${String(brtHours).padStart(2, '0')}:${slotMinute}`;
+  // Converte para minutos totais do dia no Horário de Brasília (UTC-3)
+  const totalBrtMinutes = ((utcHours - 3 + 24) % 24) * 60 + utcMinutes;
+
+  // Arredonda para o intervalo de 15 minutos mais próximo (tolerância de +/- 7 minutos para atrasos de rede/cron)
+  const roundedMinutes = Math.round(totalBrtMinutes / 15) * 15;
+  const roundedBrtHours = Math.floor(roundedMinutes / 60) % 24;
+  const roundedSlotMinute = roundedMinutes % 60;
+  const timeKey = `${String(roundedBrtHours).padStart(2, '0')}:${String(roundedSlotMinute).padStart(2, '0')}`;
 
   const mode = req.query.mode || (req.body && req.body.mode) || 'auto';
   let targetType = mode;
 
-  // 8 Horários estratégicos da FastSavory's (Almoço das 10h30 às 14h30 e Lanche/Jantar das 15h30 às 17h30)
-  const fastSavorysSlots = ['10:30', '11:30', '12:30', '13:30', '14:30', '15:30', '16:30', '17:30'];
+  // 9 Horários estratégicos da FastSavory's intercalados (Almoço, Sobremesas, Fornadas, Lanche e Encomendas da tarde)
+  const fastSavorysSlots = ['11:30', '12:00', '12:45', '13:30', '14:00', '15:00', '15:45', '16:30', '17:30'];
 
   if (mode === 'auto') {
     const isFastSavorysSlot = fastSavorysSlots.includes(timeKey);
@@ -394,11 +398,11 @@ async function handleSendWhatsAppDeal(req, res) {
         const fallbackVisible = storeProducts.filter(p => p.visible === true && !p.unavailable_today && p.catalog_enabled !== false);
         const pool = validStoreProducts.length > 0 ? validStoreProducts : (fallbackVisible.length > 0 ? fallbackVisible : storeProducts);
         
-        // Rotação inteligente por dia e horário para nunca repetir o mesmo produto nos 8 disparos do dia
+        // Rotação inteligente por dia e horário para nunca repetir o mesmo produto nos 9 disparos do dia
         const daySeed = now.getDate();
         const monthSeed = now.getMonth() + 1;
         const hourIndex = fastSavorysSlots.indexOf(timeKey);
-        const slotIdx = hourIndex >= 0 ? hourIndex : (brtHours % 8);
+        const slotIdx = hourIndex >= 0 ? hourIndex : (roundedBrtHours % fastSavorysSlots.length);
         const selectedIndex = (daySeed * 5 + monthSeed * 3 + slotIdx) % pool.length;
 
         product = pool[selectedIndex];
@@ -465,6 +469,7 @@ async function handleSendWhatsAppDeal(req, res) {
       type: isFastSavorysStore ? 'fastsavorys_store' : 'affiliate_deal',
       productId: product.id,
       productTitle: product.title || product.name,
+      timeKey,
       postedAt: nowIso,
       evolutionResponse: sendResponse
     });
