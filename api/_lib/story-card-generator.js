@@ -37,32 +37,27 @@ function loadFont() {
   throw new Error('Fonte Roboto-Bold.ttf não encontrada nos diretórios do projeto.');
 }
 
-function getUprightPath(text, x, y, fontSize, align = 'center') {
+function getCenteredPath(text, targetCenterX, targetCenterY, fontSize) {
   if (!text) return '';
   const font = loadFont();
   const clean = String(text).trim();
 
-  let startX = x;
   try {
     const pMeasure = font.getPath(clean, 0, 0, fontSize);
-    const box = pMeasure.getBoundingBox();
-    const textWidth = box.x2 - box.x1;
-    if (align === 'center') {
-      startX = x - (textWidth / 2);
-    } else if (align === 'right') {
-      startX = x - textWidth;
-    }
-  } catch (e) {
-    if (align === 'center') startX = x - (clean.length * fontSize * 0.28);
-  }
+    const bb = pMeasure.getBoundingBox();
 
-  const p = font.getPath(clean, startX, y, fontSize);
-  p.commands.forEach(cmd => {
-    if (cmd.y !== undefined) cmd.y = 2 * y - cmd.y;
-    if (cmd.y1 !== undefined) cmd.y1 = 2 * y - cmd.y1;
-    if (cmd.y2 !== undefined) cmd.y2 = 2 * y - cmd.y2;
-  });
-  return p.toPathData();
+    const textCenterX = (bb.x1 + bb.x2) / 2;
+    const textCenterY = (bb.y1 + bb.y2) / 2;
+
+    const startX = targetCenterX - textCenterX;
+    const baselineY = targetCenterY - textCenterY;
+
+    const pFinal = font.getPath(clean, startX, baselineY, fontSize);
+    return pFinal.toPathData({ flipY: false });
+  } catch (e) {
+    console.error('[Story Generator] getCenteredPath error:', e);
+    return '';
+  }
 }
 
 function splitTitleToTwoLines(title, maxPerLine = 24) {
@@ -190,16 +185,25 @@ async function generateStoryCard({ channel, product, deal }) {
     throw new Error(`URL de imagem do produto inválida para o story: "${productImageUrl}"`);
   }
 
-  const [line1, line2] = splitTitleToTwoLines(rawTitle, 24);
+  const [line1, line2] = splitTitleToTwoLines(rawTitle, 26);
   const price = formatPrice(rawPrice);
 
-  // Posicionamento vetorial preciso
-  const badgePath = getUprightPath(theme.badgeLabel, 540, 178, 30, 'center');
-  const line1Path = getUprightPath(line1, 540, line2 ? 1230 : 1260, 44, 'center');
-  const line2Path = line2 ? getUprightPath(line2, 540, 1290, 44, 'center') : '';
-  const pricePath = getUprightPath(price, 540, 1456, 62, 'center');
-  const ctaPath = getUprightPath(theme.ctaLabel, 540, 1608, 25, 'center');
-  const footerPath = getUprightPath('FASTSAVORYS.VERCEL.APP', 540, 1750, 22, 'center');
+  // Centralização vetorial matemática perfeita (Target Centers)
+  // Badge: rect y=130, h=80 -> centerY = 170
+  const badgePath = getCenteredPath(theme.badgeLabel, 540, 170, 32);
+
+  // Title: entre a imagem e a pílula de preço
+  const line1Path = getCenteredPath(line1, 540, line2 ? 1230 : 1260, 44);
+  const line2Path = line2 ? getCenteredPath(line2, 540, 1290, 44) : '';
+
+  // Pílula de preço: rect y=1380, h=124 -> centerY = 1442
+  const pricePath = getCenteredPath(price, 540, 1442, 64);
+
+  // CTA: rect y=1560, h=76 -> centerY = 1598
+  const ctaPath = getCenteredPath(theme.ctaLabel, 540, 1598, 25);
+
+  // Rodapé: centerY = 1750
+  const footerPath = getCenteredPath('FASTSAVORYS.VERCEL.APP', 540, 1750, 22);
 
   const svgTemplate = `
   <svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">
