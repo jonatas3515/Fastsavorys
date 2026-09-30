@@ -1,8 +1,7 @@
 /**
- * FastSavory's - Gerador de Cards 9:16 para Instagram Stories
- * Converte fotos quadradas (1:1) em Stories verticais (9:16 - 576x1024)
- * Desenha Nome e Preço do produto como CAMINHOS VETORIAIS (OpenType.js),
- * eliminando 100% de dependência das fontes do sistema operacional (zero risco de "tofu" ▯▯▯).
+ * FastSavory's - Gerador Minimalista de Cards 9:16 para Instagram Stories
+ * Design limpo baseado em cores da marca (sem templates de fundo pesados/distorcidos).
+ * 100% vetorial, alta resolução (1080x1920) e ultra leve.
  */
 
 const opentype = require('opentype.js');
@@ -58,7 +57,6 @@ function getUprightPath(text, x, y, fontSize, align = 'center') {
   }
 
   const p = font.getPath(clean, startX, y, fontSize);
-  // Converte orientação de TrueType (+Y cima) para SVG (+Y baixo)
   p.commands.forEach(cmd => {
     if (cmd.y !== undefined) cmd.y = 2 * y - cmd.y;
     if (cmd.y1 !== undefined) cmd.y1 = 2 * y - cmd.y1;
@@ -67,17 +65,36 @@ function getUprightPath(text, x, y, fontSize, align = 'center') {
   return p.toPathData();
 }
 
-function formatTitle(title, maxLen = 24) {
-  if (!title) return '';
-  const clean = String(title).trim().toUpperCase();
-  if (clean.length <= maxLen) return clean;
-  return clean.slice(0, maxLen - 1).trim() + '...';
+function splitTitleToTwoLines(title, maxPerLine = 24) {
+  if (!title) return ['', ''];
+  const words = String(title).trim().toUpperCase().split(/\s+/);
+  let line1 = '';
+  let line2 = '';
+
+  for (const w of words) {
+    if ((line1 + ' ' + w).trim().length <= maxPerLine && !line2) {
+      line1 = (line1 + ' ' + w).trim();
+    } else {
+      if ((line2 + ' ' + w).trim().length <= maxPerLine) {
+        line2 = (line2 + ' ' + w).trim();
+      } else {
+        if (!line2) {
+          line2 = w.slice(0, maxPerLine - 3) + '...';
+        } else if (!line2.endsWith('...')) {
+          line2 = line2.slice(0, maxPerLine - 3) + '...';
+        }
+        break;
+      }
+    }
+  }
+  return [line1, line2];
 }
 
 function formatPrice(price) {
   if (price === null || price === undefined) return '';
-  if (typeof price === 'number') return price.toFixed(2).replace('.', ',');
-  return String(price).replace(/R\$\s*/gi, '').trim();
+  if (typeof price === 'number') return `R$ ${price.toFixed(2).replace('.', ',')}`;
+  const s = String(price).trim();
+  return s.startsWith('R$') ? s : `R$ ${s}`;
 }
 
 function detectPlatform(url = '') {
@@ -85,107 +102,149 @@ function detectPlatform(url = '') {
   if (u.includes('amazon.com.br') || u.includes('amzn.to') || u.includes('a.co') || u.includes('amazon.')) {
     return 'amazon';
   }
+  if (u.includes('shopee.com.br') || u.includes('s.shopee.com.br') || u.includes('shope.ee') || u.includes('shopee.')) {
+    return 'shopee';
+  }
   return 'mercadolivre';
 }
 
-async function loadTemplateBuffer(templateType) {
-  const fileName = `story_template_${templateType}.jpg`;
-  const localCandidates = [
-    path.join(__dirname, '../../assets/img', fileName),
-    path.join(process.cwd(), 'assets/img', fileName),
-    path.join(__dirname, '../assets/img', fileName)
-  ];
-
-  for (const p of localCandidates) {
-    if (fs.existsSync(p)) {
-      return fs.readFileSync(p);
-    }
+const THEMES = {
+  store: {
+    bgStart: '#181412',
+    bgEnd: '#0a0807',
+    badgeBg: '#f59e0b',
+    badgeText: '#181412',
+    badgeLabel: "FASTSAVORY'S LANCHONETE",
+    titleColor: '#ffffff',
+    priceBg: '#ea580c',
+    priceText: '#ffffff',
+    ctaBg: '#27201c',
+    ctaBorder: '#443730',
+    ctaText: '#fbbf24',
+    ctaLabel: 'PECA PELO CARDAPIO OU WHATSAPP',
+    glow: '#f59e0b'
+  },
+  amazon: {
+    bgStart: '#131921',
+    bgEnd: '#090d12',
+    badgeBg: '#ff9900',
+    badgeText: '#131921',
+    badgeLabel: 'ACHADINHO AMAZON',
+    titleColor: '#ffffff',
+    priceBg: '#ff9900',
+    priceText: '#131921',
+    ctaBg: '#232f3e',
+    ctaBorder: '#37475a',
+    ctaText: '#ff9900',
+    ctaLabel: 'VEJA O LINK NOS STORIES OU DIRECT',
+    glow: '#ff9900'
+  },
+  mercadolivre: {
+    bgStart: '#0f172a',
+    bgEnd: '#020617',
+    badgeBg: '#ffe600',
+    badgeText: '#002882',
+    badgeLabel: 'MERCADO LIVRE OFERTAS',
+    titleColor: '#ffffff',
+    priceBg: '#ffe600',
+    priceText: '#002882',
+    ctaBg: '#1e293b',
+    ctaBorder: '#334155',
+    ctaText: '#ffe600',
+    ctaLabel: 'VEJA O LINK NOS STORIES OU DIRECT',
+    glow: '#ffe600'
+  },
+  shopee: {
+    bgStart: '#1a100e',
+    bgEnd: '#0d0605',
+    badgeBg: '#ee4d2d',
+    badgeText: '#ffffff',
+    badgeLabel: 'SHOPEE ACHADINHOS',
+    titleColor: '#ffffff',
+    priceBg: '#ee4d2d',
+    priceText: '#ffffff',
+    ctaBg: '#2d1815',
+    ctaBorder: '#4a2520',
+    ctaText: '#ee4d2d',
+    ctaLabel: 'VEJA O LINK NOS STORIES OU DIRECT',
+    glow: '#ee4d2d'
   }
-
-  // Fallback via URL pública
-  const remoteUrl = `https://fastsavorys.vercel.app/assets/img/${fileName}`;
-  const resp = await fetch(remoteUrl);
-  if (!resp.ok) {
-    throw new Error(`Falha ao carregar template ${templateType}: ${resp.statusText}`);
-  }
-  return Buffer.from(await resp.arrayBuffer());
-}
+};
 
 /**
- * Gera o Story Card 9:16 com Foto, Nome e Preço em Alta Definição (Vetores)
- * @param {Object} params
- * @param {'store'|'deal'} params.channel
- * @param {Object} [params.product] - Objeto do produto da loja
- * @param {Object} [params.deal] - Objeto do produto de achadinhos
- * @returns {Promise<string>} URL pública no Supabase Storage pronta para o Instagram
+ * Gera o Story Card 9:16 Minimalista (Cores puras, sem card de fundo fixo)
  */
 async function generateStoryCard({ channel, product, deal }) {
-  const W = 576;
-  const H = 1024;
+  const W = 1080;
+  const H = 1920;
 
-  let templateType = 'store';
-  let productImageUrl = '';
-  let rawTitle = '';
-  let rawPrice = '';
-  let fitMode = 'contain';
+  const isStore = channel === 'store' || Boolean(product);
+  const platform = isStore ? 'store' : detectPlatform(deal?.affiliate_url);
+  const theme = THEMES[platform] || THEMES.store;
 
-  let frame;
-  let titleX = 288;
-  let titleY = 726;
-  let titleColor = '#002882';
-  let priceX = 232;
-  let priceY = 848;
-  let priceColor = '#ffffff';
-  let priceShadowColor = '#00195a';
-
-  if (channel === 'store' || product) {
-    templateType = 'store';
-    rawTitle = product?.name || 'FastSavory\'s';
-    rawPrice = product?.price;
-    productImageUrl = product?.image || product?.image_url;
-    fitMode = 'cover';
-
-    frame = { left: 63, top: 103, width: 450, height: 450, radius: 30 };
-    titleY = 685;
-    titleColor = '#1a1a1a';
-    priceX = 235;
-    priceY = 820;
-    priceColor = '#ffffff';
-    priceShadowColor = '#4a1500';
-  } else {
-    templateType = detectPlatform(deal?.affiliate_url);
-    rawTitle = deal?.title || 'Oferta Imperdível';
-    rawPrice = deal?.price_display || deal?.price;
-    productImageUrl = deal?.image_url;
-    fitMode = 'contain';
-
-    frame = { left: 65, top: 204, width: 445, height: 455, radius: 32 };
-    titleY = 726;
-
-    if (templateType === 'amazon') {
-      titleColor = '#141419';
-      priceX = 185;
-      priceY = 848;
-      priceColor = '#d66000';
-      priceShadowColor = null;
-    } else {
-      templateType = 'mercadolivre';
-      titleColor = '#002882';
-      priceX = 232;
-      priceY = 848;
-      priceColor = '#ffffff';
-      priceShadowColor = '#00195a';
-    }
-  }
+  const rawTitle = isStore ? (product?.name || 'FastSavory\'s') : (deal?.title || 'Oferta Imperdível');
+  const rawPrice = isStore ? product?.price : (deal?.price_display || deal?.price);
+  const productImageUrl = isStore ? (product?.image || product?.image_url) : deal?.image_url;
 
   if (!productImageUrl || !productImageUrl.startsWith('http')) {
     throw new Error(`URL de imagem do produto inválida para o story: "${productImageUrl}"`);
   }
 
-  // 1. Carrega o template de fundo oficial 9:16
-  const templateBuffer = await loadTemplateBuffer(templateType);
+  const [line1, line2] = splitTitleToTwoLines(rawTitle, 24);
+  const price = formatPrice(rawPrice);
 
-  // 2. Baixa a foto do produto
+  // Posicionamento vetorial preciso
+  const badgePath = getUprightPath(theme.badgeLabel, 540, 178, 30, 'center');
+  const line1Path = getUprightPath(line1, 540, line2 ? 1230 : 1260, 44, 'center');
+  const line2Path = line2 ? getUprightPath(line2, 540, 1290, 44, 'center') : '';
+  const pricePath = getUprightPath(price, 540, 1456, 62, 'center');
+  const ctaPath = getUprightPath(theme.ctaLabel, 540, 1608, 25, 'center');
+  const footerPath = getUprightPath('FASTSAVORYS.VERCEL.APP', 540, 1750, 22, 'center');
+
+  const svgTemplate = `
+  <svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="bgGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" stop-color="${theme.bgStart}"/>
+        <stop offset="100%" stop-color="${theme.bgEnd}"/>
+      </linearGradient>
+      <filter id="cardShadow" x="-10%" y="-10%" width="120%" height="120%">
+        <feDropShadow dx="0" dy="18" stdDeviation="24" flood-color="#000" flood-opacity="0.5"/>
+      </filter>
+      <filter id="pillShadow" x="-10%" y="-10%" width="120%" height="120%">
+        <feDropShadow dx="0" dy="8" stdDeviation="16" flood-color="#000" flood-opacity="0.4"/>
+      </filter>
+    </defs>
+
+    <!-- Fundo Limpo e Gradiente Suave da Marca -->
+    <rect width="${W}" height="${H}" fill="url(#bgGrad)"/>
+    <circle cx="540" cy="700" r="480" fill="${theme.glow}" opacity="0.08"/>
+
+    <!-- Badge Superior -->
+    <rect x="230" y="130" width="620" height="80" rx="40" fill="${theme.badgeBg}"/>
+    <path d="${badgePath}" fill="${theme.badgeText}"/>
+
+    <!-- Moldura Branca Limpa com Cantos Arredondados para a Foto -->
+    <rect x="90" y="250" width="900" height="900" rx="48" fill="#ffffff" filter="url(#cardShadow)"/>
+
+    <!-- Título do Produto -->
+    <path d="${line1Path}" fill="${theme.titleColor}"/>
+    ${line2Path ? `<path d="${line2Path}" fill="${theme.titleColor}"/>` : ''}
+
+    <!-- Pílula de Preço em Destaque -->
+    <rect x="280" y="1380" width="520" height="124" rx="62" fill="${theme.priceBg}" filter="url(#pillShadow)"/>
+    <path d="${pricePath}" fill="${theme.priceText}"/>
+
+    <!-- Chamada para Ação (CTA) -->
+    <rect x="190" y="1560" width="700" height="76" rx="38" fill="${theme.ctaBg}" stroke="${theme.ctaBorder}" stroke-width="2"/>
+    <path d="${ctaPath}" fill="${theme.ctaText}"/>
+
+    <!-- Rodapé Sutil do Site -->
+    <path d="${footerPath}" fill="#78716c"/>
+  </svg>
+  `;
+
+  // Baixa imagem do produto
   const imgResp = await fetch(productImageUrl, {
     headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
   });
@@ -194,54 +253,28 @@ async function generateStoryCard({ channel, product, deal }) {
   }
   const prodRawBuffer = Buffer.from(await imgResp.arrayBuffer());
 
-  // 3. Aplica máscara com cantos arredondados na foto do produto
+  // Máscara com cantos arredondados na foto
   const maskSvg = Buffer.from(`
-    <svg width="${frame.width}" height="${frame.height}">
-      <rect x="0" y="0" width="${frame.width}" height="${frame.height}" rx="${frame.radius}" ry="${frame.radius}" fill="#fff"/>
+    <svg width="840" height="840">
+      <rect x="0" y="0" width="840" height="840" rx="36" ry="36" fill="#fff"/>
     </svg>
   `);
 
-  const resizeOptions = {
-    fit: fitMode,
-    background: { r: 255, g: 255, b: 255, alpha: 1 }
-  };
-
   const roundedProductBuffer = await sharp(prodRawBuffer)
-    .resize(frame.width, frame.height, resizeOptions)
+    .resize(840, 840, { fit: 'contain', background: '#ffffff' })
     .composite([{ input: maskSvg, blend: 'dest-in' }])
     .png()
     .toBuffer();
 
-  // 4. Gera os caminhos vetoriais do Nome e do Preço
-  const cleanTitle = formatTitle(rawTitle, 24);
-  const cleanPrice = formatPrice(rawPrice);
-
-  const titlePath = getUprightPath(cleanTitle, titleX, titleY, 23, 'center');
-
-  let priceShadowPath = '';
-  if (priceShadowColor && cleanPrice) {
-    priceShadowPath = `<path d="${getUprightPath(cleanPrice, priceX + 2, priceY + 2, 44, 'left')}" fill="${priceShadowColor}"/>`;
-  }
-  const pricePath = cleanPrice ? `<path d="${getUprightPath(cleanPrice, priceX, priceY, 44, 'left')}" fill="${priceColor}"/>` : '';
-
-  const textOverlaySvg = Buffer.from(`
-    <svg width="${W}" height="${H}" xmlns="http://www.w3.org/2000/svg">
-      <path d="${titlePath}" fill="${titleColor}"/>
-      ${priceShadowPath}
-      ${pricePath}
-    </svg>
-  `);
-
-  // 5. Compõe imagem final 9:16 (576 x 1024)
-  const compositeBuffer = await sharp(templateBuffer)
+  // Compõe imagem final 9:16 (1080x1920)
+  const compositeBuffer = await sharp(Buffer.from(svgTemplate))
     .composite([
-      { input: roundedProductBuffer, top: frame.top, left: frame.left },
-      { input: textOverlaySvg, top: 0, left: 0 }
+      { input: roundedProductBuffer, top: 280, left: 120 }
     ])
     .jpeg({ quality: 95 })
     .toBuffer();
 
-  // 6. Upload seguro para o Supabase Storage (bucket fast-images)
+  // Upload para Supabase Storage
   const fileName = `stories/story_${Date.now()}_${Math.random().toString(36).slice(2, 7)}.jpg`;
   const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
     .from('fast-images')
@@ -260,7 +293,7 @@ async function generateStoryCard({ channel, product, deal }) {
     .getPublicUrl(fileName);
 
   const publicUrl = urlData.publicUrl;
-  console.log(`[Story Generator] ✅ Card 9:16 com Título e Preço gerado com sucesso: ${publicUrl}`);
+  console.log(`[Story Generator] ✅ Card 9:16 minimalista gerado com sucesso: ${publicUrl}`);
   return publicUrl;
 }
 

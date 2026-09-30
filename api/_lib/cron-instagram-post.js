@@ -96,6 +96,23 @@ function getStoreContext() {
   return { isSunday, isOperatingHours, isMorningBooking, isNightBooking, dayOfWeek, brtHours };
 }
 
+function isAdvanceOrderProduct(product) {
+  const name = (product?.name || '').toLowerCase();
+  const desc = (product?.description || '').toLowerCase();
+  const cat = (product?.category || '').toLowerCase();
+  return (
+    name.includes('bolo') ||
+    name.includes('torta') ||
+    name.includes('kit') ||
+    name.includes('empadão') ||
+    name.includes('empadao') ||
+    desc.includes('antecedência') ||
+    desc.includes('encomenda') ||
+    cat.includes('bolo') ||
+    cat.includes('kit')
+  );
+}
+
 /**
  * Gera legenda do Instagram para Produtos da FastSavory's com Gatilho do ManyChat e Contexto de Horário
  */
@@ -103,22 +120,41 @@ function buildInstagramStoreCaption(product) {
   const price = typeof product.price === 'number' ? `R$ ${product.price.toFixed(2).replace('.', ',')}` : (product.price || '');
   const desc = product.description ? `\n${product.description}\n` : '';
   const { isSunday, isOperatingHours, isMorningBooking } = getStoreContext();
+  const isAdvance = isAdvanceOrderProduct(product);
 
   let header = `😋 BATEU AQUELA FOME? DIRETO DA COZINHA FASTSAVORY'S! 🥟🔥`;
-  let orderInfo = `🛵 COMO FAZER SEU PEDIDO?\n🕒 Horário de funcionamento: Segunda a Sábado das 14h às 18h (Agendamentos a partir das 12h)!\n👇 Comente "CARDAPIO" ou "QUERO" aqui nos comentários que te enviamos nosso cardápio completo no direct!`;
+  let orderInfo = '';
 
-  if (isSunday) {
+  if (isAdvance) {
+    header = `🎂 PLANEJANDO SUA FESTA OU CELEBRAÇÃO? DIRETO DA FASTSAVORY'S! 🎉✨`;
+    orderInfo = `📅 PRODUTO PREPARADO EXCLUSIVAMENTE SOB ENCOMENDA!
+🕒 ATENÇÃO: Bolos, Kits Festa, Tortas e Empadões são feitos sob medida e necessitam de pelo menos 1 dia (24h) de antecedência!
+👇 Comente "CARDAPIO" ou "ENCOMENDA" aqui nos comentários que te enviamos todas as opções direto no direct!`;
+  } else if (isSunday) {
     header = `😋 PLANEJANDO O LANCHE DA SEMANA? DIRETO DA FASTSAVORY'S! 🥟📅`;
-    orderInfo = `📅 COMO AGENDAR SEU PEDIDO?\n🕒 Aos domingos estamos fechados para recarregar as energias. Funcionamos de Segunda a Sábado das 14h às 18h (com agendamentos a partir das 12h)!\n👇 Comente "CARDAPIO" ou "QUERO" aqui nos comentários para agendar com antecedência e receber nosso cardápio no direct!`;
+    orderInfo = `📅 COMO FAZER SEU PEDIDO?
+🕒 Aos domingos estamos fechados recarregando as energias.
+🕒 De Segunda a Sábado atendemos pedidos de salgados do dia a partir das 12h, com entregas das 14h às 18h!
+🎂 (Bolos, Kits Festa e Empadões exigem 24h de antecedência).
+👇 Comente "CARDAPIO" ou "QUERO" aqui nos comentários para receber no direct!`;
   } else if (isOperatingHours) {
     header = `😋 FORNADA SAINDO AGORA! DIRETO DA COZINHA FASTSAVORY'S! 🥟🔥`;
-    orderInfo = `🛵 PEDIDOS ABERTOS AGORA!\n🕒 Estamos funcionando a todo vapor (das 14h às 18h)!\n👇 Comente "CARDAPIO" ou "QUERO" aqui nos comentários para pedir quentinho agora mesmo!`;
+    orderInfo = `🛵 PEDIDOS DO DIA ABERTOS AGORA!
+🕒 Salgados e lanches quentinhos para entrega hoje (atendimento a todo vapor até as 18h)!
+🎂 (Bolos, Kits Festa e Empadões exigem 24h de antecedência).
+👇 Comente "CARDAPIO" ou "QUERO" aqui nos comentários para pedir quentinho agora mesmo!`;
   } else if (isMorningBooking) {
     header = `😋 BATEU AQUELA FOME? DIRETO DA COZINHA FASTSAVORY'S! 🥟✨`;
-    orderInfo = `📅 AGENDAMENTO ABERTO PARA HOJE!\n🕒 Nosso atendimento de pedidos começa às 12h e as entregas quentinhas saem das 14h às 18h!\n👇 Comente "CARDAPIO" ou "QUERO" aqui nos comentários para agendar o seu antecipadamente!`;
+    orderInfo = `🛵 PEDIDOS DO DIA (SALGADOS & LANCHES):
+🕒 Atendimento para pedidos de salgados a partir das 12h, com entregas e fornadas saindo das 14h às 18h!
+🎂 ATENÇÃO: Bolos, Kits Festa e Empadões exigem encomenda com no mínimo 1 dia (24h) de antecedência!
+👇 Comente "CARDAPIO" ou "QUERO" aqui nos comentários para pedir pelo direct!`;
   } else {
     header = `😋 PLANEJANDO SEU LANCHE PARA AMANHÃ? DIRETO DA FASTSAVORY'S! 🥟✨`;
-    orderInfo = `📅 AGENDAMENTO PARA O PRÓXIMO DIA!\n🕒 Funcionamos de Segunda a Sábado das 14h às 18h (agendamentos a partir das 12h)!\n👇 Comente "CARDAPIO" ou "QUERO" aqui nos comentários para garantir sua encomenda no direct!`;
+    orderInfo = `📅 AGENDAMENTO PARA O PRÓXIMO DIA!
+🕒 Funcionamos de Segunda a Sábado das 14h às 18h (pedidos do dia a partir das 12h).
+🎂 Bolos, Kits Festa e Empadões: encomendas com 24h de antecedência!
+👇 Comente "CARDAPIO" ou "QUERO" aqui nos comentários para garantir seu pedido no direct!`;
   }
 
   return `${header}
