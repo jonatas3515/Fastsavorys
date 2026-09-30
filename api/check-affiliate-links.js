@@ -1028,8 +1028,8 @@ async function handleAutoSyncLinks(req, res) {
   const SUPABASE_URL = process.env.SUPABASE_URL || 'https://vqjyjdllapqbqpylshkw.supabase.co';
   const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxanlqZGxsYXBxYnFweWxzaGt3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY0MzgyNDUsImV4cCI6MjA4MjAxNDI0NX0.tfTR9YnM5l0do7FJfxML6i05KTSrMInQMqFrWXx6aAU';
 
-  // Limite por ciclo para responder em menos de 3-4 segundos e nunca estourar o timeout do cron-job
-  const limit = Math.min(Math.max(parseInt(req.query?.limit || req.body?.limit || '12', 10), 1), 30);
+  // Limite por ciclo para responder em menos de 3-4 segundos e nunca estourar o timeout da Serverless Function
+  const limit = Math.min(Math.max(parseInt(req.query?.limit || req.body?.limit || '15', 10), 1), 30);
 
   try {
     console.log(`[AutoSync Affiliate Links] Verificando lote de ${limit} links (Round-robin pelos mais antigos)...`);
@@ -1056,6 +1056,7 @@ async function handleAutoSyncLinks(req, res) {
     let unchangedCount = 0;
     let errorCount = 0;
     const updates = [];
+    const priceDropCandidates = [];
 
     // Executa em paralelo de forma ultra rápida com timeout individual de 4s
     await Promise.all(items.map(async (item) => {
@@ -1079,6 +1080,8 @@ async function handleAutoSyncLinks(req, res) {
           const patchPayload = { updated_at: new Date().toISOString() };
           let hasPriceChange = false;
           let isPriceDrop = false;
+          let dropPct = 0;
+          let diff = 0;
 
           if (details.price_display && details.price_display !== item.price_display) {
             patchPayload.price_display = details.price_display;
@@ -1088,10 +1091,20 @@ async function handleAutoSyncLinks(req, res) {
             const newNum = parsePrice(details.price_display);
             if (oldNum > 0 && newNum > 0 && newNum < oldNum) {
               isPriceDrop = true;
+              diff = oldNum - newNum;
+              dropPct = Math.round((diff / oldNum) * 100);
               patchPayload.badge_color = 'rose';
               if (!patchPayload.discount_tag && !details.discount_tag) {
                 patchPayload.discount_tag = 'Menor Preço';
               }
+
+              priceDropCandidates.push({
+                item,
+                oldPrice: item.price_display,
+                newPrice: details.price_display,
+                dropPercent: dropPct,
+                diffAmount: diff
+              });
             }
           }
           if (details.original_price && details.original_price !== item.original_price) {
@@ -1119,19 +1132,14 @@ async function handleAutoSyncLinks(req, res) {
 
           if (hasPriceChange) {
             priceUpdatedCount++;
-            updates.push({ id: item.id, title: item.title, action: isPriceDrop ? 'price_dropped' : 'price_updated', old_price: item.price_display, new_price: details.price_display });
-            
-            // Dispara alerta VIP de queda de preço para o grupo do WhatsApp de forma assíncrona
-            if (isPriceDrop) {
-              try {
-                const { sendPriceDropAlertToWhatsApp } = require('./_lib/cron-whatsapp-deal');
-                if (typeof sendPriceDropAlertToWhatsApp === 'function') {
-                  sendPriceDropAlertToWhatsApp(item, item.price_display, details.price_display).catch(e => console.warn('[Price Drop Alert Error]:', e.message));
-                }
-              } catch (alertErr) {
-                console.warn('[Price Drop Alert Dispatch] Erro:', alertErr.message);
-              }
-            }
+            updates.push({
+              id: item.id,
+              title: item.title,
+              action: isPriceDrop ? 'price_dropped' : 'price_updated',
+              old_price: item.price_display,
+              new_price: details.price_display,
+              drop_percent: dropPct
+            });
           } else {
             unchangedCount++;
           }
@@ -1153,13 +1161,53 @@ async function handleAutoSyncLinks(req, res) {
       }
     }));
 
-    console.log(`[AutoSync Affiliate Links] Lote concluído: ${items.length} verificados | ${priceUpdatedCount} preços atualizados | ${pausedCount} pausados`);
+    // REGRA DE OURO VIP: Limita o envio de alertas de queda de preço para no máximo os 2 maiores descontos em %
+    let priceDropAlertsSent = 0;
+    if (priceDropCandidates.length > 0) {
+      // Ordena por maior percentual de queda (e maior valor em R$ como desempate)
+      priceDropCandidates.sort((a, b) => b.dropPercent - a.dropPercent || b.diffAmount - a.diffAmount);
+
+      // Pega estritamente os top 2
+      const topDrops = priceDropCandidates.slice(0, 2);
+
+      // Apenas dispara alertas no WhatsApp entre 07h00 e 22h30 para não incomodar de madrugada
+      const now = new Date();
+      const brtHours = (now.getUTCHours() - 3 + 24) % 24;
+      const isAllowedAlertHour = brtHours >= 7 && brtHours <= 22;
+
+      if (isAllowedAlertHour) {
+        try {
+          const { sendPriceDropAlertToWhatsApp } = require('./_lib/cron-whatsapp-deal');
+          if (typeof sendPriceDropAlertToWhatsApp === 'function') {
+            for (const drop of topDrops) {
+              try {
+                console.log(`[Price Drop Alert] 📉 Enviando alerta VIP (${drop.dropPercent}% OFF): ${drop.item.title}`);
+                await sendPriceDropAlertToWhatsApp(drop.item, drop.oldPrice, drop.newPrice);
+                priceDropAlertsSent++;
+                if (topDrops.length > 1) {
+                  await new Promise(r => setTimeout(r, 2000));
+                }
+              } catch (dropErr) {
+                console.warn('[Price Drop Alert Dispatch] Falha ao enviar:', dropErr.message);
+              }
+            }
+          }
+        } catch (alertModuleErr) {
+          console.warn('[Price Drop Alert] Erro ao carregar módulo:', alertModuleErr.message);
+        }
+      } else {
+        console.log(`[Price Drop Alert] Alertas silenciados na madrugada (${brtHours}h BRT).`);
+      }
+    }
+
+    console.log(`[AutoSync Affiliate Links] Lote concluído: ${items.length} verificados | ${priceUpdatedCount} preços atualizados | ${priceDropAlertsSent} alertas de queda enviados`);
 
     return res.status(200).json({
       success: true,
-      message: `✅ Lote verificado com sucesso (${items.length} links). Preços atualizados: ${priceUpdatedCount} | Pausados: ${pausedCount} | Inalterados: ${unchangedCount}`,
+      message: `✅ Lote verificado com sucesso (${items.length} links). Preços atualizados: ${priceUpdatedCount} | Quedas enviadas (máx 2): ${priceDropAlertsSent} | Pausados: ${pausedCount} | Inalterados: ${unchangedCount}`,
       total_checked: items.length,
       price_updated_count: priceUpdatedCount,
+      price_drop_alerts_sent: priceDropAlertsSent,
       paused_count: pausedCount,
       unchanged_count: unchangedCount,
       error_count: errorCount,
