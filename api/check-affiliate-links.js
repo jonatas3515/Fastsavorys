@@ -801,6 +801,16 @@ async function handler(req, res) {
         } catch (e) {}
       }
 
+      // Auto-tag e encurtador oficial da Shopee
+      if (affiliate_url.includes('shopee') && !affiliate_url.includes('s.shopee.com.br')) {
+        try {
+          const shortLink = await shopeeApi.generateShopeeShortLink(affiliate_url);
+          if (shortLink) affiliate_url = shortLink;
+        } catch (e) {
+          console.warn('[Quick-Save] Falha ao gerar link oficial Shopee:', e.message);
+        }
+      }
+
       const SUPABASE_URL = process.env.SUPABASE_URL || 'https://vqjyjdllapqbqpylshkw.supabase.co';
       const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxanlqZGxsYXBxYnFweWxzaGt3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY0MzgyNDUsImV4cCI6MjA4MjAxNDI0NX0.tfTR9YnM5l0do7FJfxML6i05KTSrMInQMqFrWXx6aAU';
 
