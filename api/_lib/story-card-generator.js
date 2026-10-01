@@ -100,6 +100,12 @@ function detectPlatform(url = '') {
   if (u.includes('shopee.com.br') || u.includes('s.shopee.com.br') || u.includes('shope.ee') || u.includes('shopee.')) {
     return 'shopee';
   }
+  if (u.includes('natura.com.br') || (u.includes('scvald.com') && !u.includes('avon'))) {
+    return 'natura';
+  }
+  if (u.includes('avon.com.br') || u.includes('avon')) {
+    return 'avon';
+  }
   return 'mercadolivre';
 }
 
@@ -163,6 +169,36 @@ const THEMES = {
     ctaText: '#ee4d2d',
     ctaLabel: 'VEJA O LINK NOS STORIES OU DIRECT',
     glow: '#ee4d2d'
+  },
+  natura: {
+    bgStart: '#1b120c',
+    bgEnd: '#0d0805',
+    badgeBg: '#ff6a13',
+    badgeText: '#ffffff',
+    badgeLabel: 'ACHADINHO NATURA',
+    titleColor: '#ffffff',
+    priceBg: '#ff6a13',
+    priceText: '#ffffff',
+    ctaBg: '#2a1a10',
+    ctaBorder: '#4a2c1a',
+    ctaText: '#ff8c42',
+    ctaLabel: 'VEJA O LINK NOS STORIES OU DIRECT',
+    glow: '#ff6a13'
+  },
+  avon: {
+    bgStart: '#1f0d14',
+    bgEnd: '#0f0509',
+    badgeBg: '#e40046',
+    badgeText: '#ffffff',
+    badgeLabel: 'ACHADINHO AVON',
+    titleColor: '#ffffff',
+    priceBg: '#e40046',
+    priceText: '#ffffff',
+    ctaBg: '#2f121d',
+    ctaBorder: '#4f1a2e',
+    ctaText: '#ff4d79',
+    ctaLabel: 'VEJA O LINK NOS STORIES OU DIRECT',
+    glow: '#e40046'
   }
 };
 

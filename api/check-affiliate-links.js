@@ -5,6 +5,8 @@
  * 2. High-precision Health & Price Check of affiliate links (detects exact price drops and increases)
  */
 
+const shopeeApi = require('./_lib/shopee-api');
+
 function detectPlatform(url = '') {
   const u = (url || '').toLowerCase();
   if (u.includes('amazon') || u.includes('amzn') || u.includes('a.co') || u.includes('amzlinks')) {
@@ -12,6 +14,12 @@ function detectPlatform(url = '') {
   }
   if (u.includes('shopee') || u.includes('s.shopee') || u.includes('shope.ee')) {
     return 'shopee';
+  }
+  if (u.includes('natura') || (u.includes('scvald') && !u.includes('avon'))) {
+    return 'natura';
+  }
+  if (u.includes('avon')) {
+    return 'avon';
   }
   if (u.includes('mercadolivre') || u.includes('mercadolibre') || u.includes('meli.la')) {
     return 'mercadolivre';
@@ -35,6 +43,14 @@ function cleanTitle(title = '', platform = '') {
   if (platform === 'shopee' || !platform) {
     clean = clean.replace(/\s*\|\s*Shopee\s*Brasil.*$/i, '')
                  .replace(/\s*-\s*Shopee.*$/i, '');
+  }
+  if (platform === 'natura' || !platform) {
+    clean = clean.replace(/\s*\|\s*Natura.*$/i, '')
+                 .replace(/\s*-\s*Natura.*$/i, '');
+  }
+  if (platform === 'avon' || !platform) {
+    clean = clean.replace(/\s*\|\s*Avon.*$/i, '')
+                 .replace(/\s*-\s*Avon.*$/i, '');
   }
   return clean.trim();
 }
@@ -435,8 +451,44 @@ async function fetchProductDetails(rawUrl) {
   let targetUrl = rawUrl.trim();
   let platform = detectPlatform(targetUrl);
 
+  // 1. SHOPEE: Integração direta com a API Oficial GraphQL da Shopee
+  if (platform === 'shopee') {
+    try {
+      const shopeeData = await shopeeApi.getShopeeProductDetails(targetUrl);
+      if (shopeeData && shopeeData.title && shopeeData.price_display) {
+        return {
+          title: cleanTitle(shopeeData.title, 'shopee'),
+          price_display: shopeeData.price_display,
+          original_price: shopeeData.original_price || '',
+          discount_tag: shopeeData.discount_tag || '',
+          coupon_code: '',
+          image_url: shopeeData.image_url || '',
+          affiliate_url: shopeeData.affiliate_url || targetUrl,
+          is_active: shopeeData.is_active !== false,
+          platform: 'shopee',
+          sales: shopeeData.sales,
+          rating: shopeeData.rating
+        };
+      }
+    } catch (err) {
+      console.warn('[Shopee API] Erro ao buscar produto via API GraphQL:', err.message);
+    }
+  }
+
+  // 2. NATURA / AVON: Desempacota o link de rastreio scvald.com para ler o produto real
+  if (targetUrl.includes('scvald.com')) {
+    try {
+      const parsedUrl = new URL(targetUrl);
+      const destUrl = parsedUrl.searchParams.get('url');
+      if (destUrl && destUrl.startsWith('http')) {
+        targetUrl = destUrl;
+        platform = detectPlatform(targetUrl);
+      }
+    } catch (e) {}
+  }
+
   let initialHtml = '';
-  // 1. Follow redirect for shortened links
+  // 3. Follow redirect for shortened links
   if (
     targetUrl.includes('meli.la') ||
     targetUrl.includes('mercadolivre.com/sec/') ||
