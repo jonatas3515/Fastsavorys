@@ -9,13 +9,13 @@ const shopeeApi = require('./_lib/shopee-api');
 
 function detectPlatform(url = '') {
   const u = (url || '').toLowerCase();
-  if (u.includes('amazon') || u.includes('amzn') || u.includes('a.co') || u.includes('amzlinks')) {
+  if (u.includes('amazon') || u.includes('amzn') || /(?:^|\/\/|\.)a\.co(?:\/|$)/.test(u) || u.includes('amzlinks')) {
     return 'amazon';
   }
   if (u.includes('shopee') || u.includes('s.shopee') || u.includes('shope.ee')) {
     return 'shopee';
   }
-  if (u.includes('natura') || (u.includes('scvald') && !u.includes('avon'))) {
+  if (u.includes('natura') || u.includes('sovsls') || (u.includes('scvald') && !u.includes('avon'))) {
     return 'natura';
   }
   if (u.includes('avon')) {
@@ -329,9 +329,9 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
       couponCode = cCode;
     }
 
-    // LAYER 2: Structured JSON-LD Schema (Fallback)
+    // LAYER 2: Structured JSON-LD Schema (Fallback & Primary for stores with LD-JSON)
     if (!price) {
-      const jsonLdRegex = /<script\s+type=["']application\/ld\+json["']>([\s\S]*?)<\/script>/gi;
+      const jsonLdRegex = /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
       let jsonMatch;
       while ((jsonMatch = jsonLdRegex.exec(html)) !== null) {
         try {
@@ -475,13 +475,13 @@ async function fetchProductDetails(rawUrl) {
     }
   }
 
-  // 2. NATURA / AVON: Desempacota o link de rastreio scvald.com para ler o produto real
-  if (targetUrl.includes('scvald.com')) {
+  // 2. NATURA / AVON: Desempacota links de rastreio (sovsls.com ou scvald.com) para ler o produto real
+  if (targetUrl.includes('sovsls.com') || targetUrl.includes('scvald.com')) {
     try {
       const parsedUrl = new URL(targetUrl);
       const destUrl = parsedUrl.searchParams.get('url');
       if (destUrl && destUrl.startsWith('http')) {
-        targetUrl = destUrl;
+        targetUrl = decodeURIComponent(destUrl);
         platform = detectPlatform(targetUrl);
       }
     } catch (e) {}
@@ -627,6 +627,43 @@ async function fetchProductDetails(rawUrl) {
     }
   }
 
+  // Se a imagem for nula ou um logo genérico (como a logo da Natura), busca a foto real do JSON-LD
+  if (!imageUrl || imageUrl.includes('LOGO') || imageUrl.includes('logo')) {
+    const jsonLdImgRegex = /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+    let jMatch;
+    while ((jMatch = jsonLdImgRegex.exec(html)) !== null) {
+      try {
+        const schema = JSON.parse(jMatch[1]);
+        const item = Array.isArray(schema) ? schema[0] : schema;
+        if (item && (item['@type'] === 'Product' || item.image)) {
+          if (Array.isArray(item.image) && item.image[0]) {
+            imageUrl = item.image[0];
+            break;
+          } else if (typeof item.image === 'string' && item.image) {
+            imageUrl = item.image;
+            break;
+          }
+        }
+      } catch (e) {}
+    }
+  }
+
+  // Fallback de título a partir do JSON-LD
+  if (!title) {
+    const jsonLdTitleRegex = /<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+    let jMatch;
+    while ((jMatch = jsonLdTitleRegex.exec(html)) !== null) {
+      try {
+        const schema = JSON.parse(jMatch[1]);
+        const item = Array.isArray(schema) ? schema[0] : schema;
+        if (item && item.name && (item['@type'] === 'Product' || item.offers)) {
+          title = cleanTitle(item.name, platform);
+          break;
+        }
+      } catch (e) {}
+    }
+  }
+
   const { price, originalPrice, discountTag, couponCode, isPaused } = extractProductPriceAndStatus(html, platform);
 
   let discountPercent = 0;
@@ -653,6 +690,7 @@ async function fetchProductDetails(rawUrl) {
     category: detectedCategory,
     platform: platform,
     is_active: !isPaused,
+    affiliate_url: rawUrl,
     final_url: targetUrl
   };
 }

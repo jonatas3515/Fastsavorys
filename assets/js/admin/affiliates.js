@@ -282,13 +282,13 @@ window.AffiliatesModule = (function () {
 
   function detectPlatform(url = '') {
     const u = (url || '').toLowerCase();
-    if (u.includes('amazon') || u.includes('amzn') || u.includes('a.co') || u.includes('amzlinks')) {
+    if (u.includes('amazon') || u.includes('amzn') || /(?:^|\/\/|\.)a\.co(?:\/|$)/.test(u) || u.includes('amzlinks')) {
       return { id: 'amazon', name: 'Amazon', icon: '📦', badge: 'bg-amber-100 text-amber-900 border-amber-300' };
     }
     if (u.includes('shopee') || u.includes('s.shopee') || u.includes('shope.ee')) {
       return { id: 'shopee', name: 'Shopee', icon: '🧡', badge: 'bg-orange-100 text-orange-900 border-orange-300' };
     }
-    if (u.includes('natura') || (u.includes('scvald') && !u.includes('avon'))) {
+    if (u.includes('natura') || u.includes('sovsls') || (u.includes('scvald') && !u.includes('avon'))) {
       return { id: 'natura', name: 'Natura', icon: '🌿', badge: 'bg-orange-100 text-orange-900 border-orange-300' };
     }
     if (u.includes('avon')) {
@@ -770,6 +770,11 @@ window.AffiliatesModule = (function () {
       }
 
       const info = data.data;
+
+      // Se a API gerou ou retornou link oficial encurtado (ex: Shopee s.shopee.com.br), atualiza o campo de link
+      if (info.affiliate_url && info.affiliate_url.startsWith('http') && info.affiliate_url !== rawUrl) {
+        document.getElementById('affiliateUrlInput').value = info.affiliate_url;
+      }
 
       // Preenche automaticamente o título
       const titleEl = document.getElementById('affiliateTitleInput');

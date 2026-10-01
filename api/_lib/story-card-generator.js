@@ -94,13 +94,13 @@ function formatPrice(price) {
 
 function detectPlatform(url = '') {
   const u = (url || '').toLowerCase();
-  if (u.includes('amazon.com.br') || u.includes('amzn.to') || u.includes('a.co') || u.includes('amazon.')) {
+  if (u.includes('amazon.com.br') || u.includes('amzn.to') || /(?:^|\/\/|\.)a\.co(?:\/|$)/.test(u) || u.includes('amazon.')) {
     return 'amazon';
   }
   if (u.includes('shopee.com.br') || u.includes('s.shopee.com.br') || u.includes('shope.ee') || u.includes('shopee.')) {
     return 'shopee';
   }
-  if (u.includes('natura.com.br') || (u.includes('scvald.com') && !u.includes('avon'))) {
+  if (u.includes('natura.com.br') || u.includes('sovsls.com') || (u.includes('scvald.com') && !u.includes('avon'))) {
     return 'natura';
   }
   if (u.includes('avon.com.br') || u.includes('avon')) {
