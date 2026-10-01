@@ -304,7 +304,7 @@
 
   function detectPlatform(url = '') {
     const u = (url || '').toLowerCase();
-    if (u.includes('amazon') || u.includes('amzn') || u.includes('a.co') || u.includes('amzlinks')) {
+    if (u.includes('amazon') || u.includes('amzn') || /(?:^|\/\/|\.)a\.co(?:\/|$)/.test(u) || u.includes('amzlinks')) {
       return { 
         id: 'amazon', 
         name: 'Amazon', 
@@ -314,7 +314,7 @@
         icon: '📦'
       };
     }
-    if (u.includes('shopee.com.br') || u.includes('s.shopee.com.br') || u.includes('shope.ee') || u.includes('shopee.')) {
+    if (u.includes('shopee') || u.includes('s.shopee') || u.includes('shope.ee')) {
       return { 
         id: 'shopee', 
         name: 'Shopee', 
@@ -322,6 +322,26 @@
         btnClass: 'bg-gradient-to-r from-orange-500 via-rose-500 to-orange-500 hover:from-orange-600 hover:to-rose-600 text-white group-hover:ring-orange-400',
         badge: 'bg-orange-100 text-orange-950 border-orange-300',
         icon: '🧡'
+      };
+    }
+    if (u.includes('natura') || u.includes('sovsls') || (u.includes('scvald') && !u.includes('avon'))) {
+      return { 
+        id: 'natura', 
+        name: 'Natura', 
+        btnText: 'Comprar na Natura', 
+        btnClass: 'bg-gradient-to-r from-orange-500 via-amber-600 to-orange-500 hover:from-orange-600 hover:to-amber-600 text-white group-hover:ring-orange-400',
+        badge: 'bg-orange-100 text-orange-950 border-orange-300',
+        icon: '🌿'
+      };
+    }
+    if (u.includes('avon')) {
+      return { 
+        id: 'avon', 
+        name: 'Avon', 
+        btnText: 'Comprar na Avon', 
+        btnClass: 'bg-gradient-to-r from-rose-500 via-pink-600 to-rose-500 hover:from-rose-600 hover:to-pink-600 text-white group-hover:ring-rose-400',
+        badge: 'bg-rose-100 text-rose-950 border-rose-300',
+        icon: '💄'
       };
     }
     return { 

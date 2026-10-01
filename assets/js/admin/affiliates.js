@@ -1658,7 +1658,7 @@ window.AffiliatesModule = (function () {
 
       // 👗 Moda & Beleza
       { category: 'acessorios', keywords: ['relogio', 'relógio', 'smartwatch', 'bolsa', 'mochila', 'carteira', 'cinto', 'pulseira', 'colar', 'brinco', 'anel', 'corrente', 'pingente', 'oculos de sol', 'óculos de sol', 'joia', 'jóia', 'semijoia'] },
-      { category: 'beleza', keywords: ['perfume', 'colonia', 'colônia', 'eau de parfum', 'desodorante', 'hidratante', 'sabonete', 'shampoo', 'condicionador', 'mascara capilar', 'oleo capilar', 'skincare', 'serum facial', 'protetor solar', 'maquiagem', 'batom', 'base facial', 'rimel', 'delineador', 'esmalte', 'secador de cabelo', 'chapinha', 'modelador de cachos'] },
+      { category: 'beleza', keywords: ['perfume', 'colonia', 'colônia', 'parfum', 'deo parfum', 'eau de parfum', 'una somos', 'natura una', 'kaiak', 'essencial', 'humor', 'biografia', 'ilia', 'ilía', 'luna', 'tododia', 'desodorante', 'hidratante', 'sabonete', 'shampoo', 'condicionador', 'mascara capilar', 'oleo capilar', 'skincare', 'serum facial', 'protetor solar', 'maquiagem', 'batom', 'base facial', 'rimel', 'delineador', 'esmalte', 'secador de cabelo', 'chapinha', 'modelador de cachos'] },
       { category: 'moda', keywords: ['camisa', 'camiseta', 'calca', 'calça', 'vestido', 'saia', 'bermuda', 'short', 'tenis', 'tênis', 'sapato', 'sandalia', 'sandália', 'bota', 'chinelo', 'havaianas', 'jaqueta', 'moletom', 'casaco', 'biquini', 'biquíni', 'lingerie', 'meia', 'cueca', 'sutia'] },
 
       // 💊 Saúde & Fitness
