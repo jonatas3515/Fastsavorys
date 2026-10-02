@@ -49,7 +49,16 @@ function calcDiscountPercent(origStr, currStr) {
   return pct > 0 && pct < 100 ? pct : 0;
 }
 
-function buildWhatsAppDealText(product) {
+function getDoubleDayContext(referenceDate = new Date()) {
+  const brtTime = new Date(referenceDate.getTime() - 3 * 3600 * 1000);
+  const day = brtTime.getUTCDate();
+  const month = brtTime.getUTCMonth() + 1; // 1 a 12
+  const isDoubleDay = day === month;
+  const eventLabel = `${day}.${month}`;
+  return { isDoubleDay, day, month, eventLabel };
+}
+
+function buildWhatsAppDealText(product, customContext = null) {
   const isFastPick = Boolean(product.is_fast_pick || product.badge_color === 'fast_seal');
   const sealHeader = isFastPick ? '👑 *PRODUTO TESTADO E RECOMENDADO PELA FASTSAVORY\'S* ✨\n' : '';
   const platform = detectPlatform(product.affiliate_url).name.toUpperCase();
@@ -57,9 +66,24 @@ function buildWhatsAppDealText(product) {
   const discountText = pct > 0 ? ` (${pct}% OFF)` : (product.discount_tag ? ` (${product.discount_tag})` : '');
   const origPriceText = product.original_price ? `~${product.original_price}~ ➔ ` : '';
   const descText = product.description ? `\n${product.description}\n` : '';
-  const couponText = product.coupon_code ? `\n🎟️ *CUPOM DISPONÍVEL:* Use o cupom *${product.coupon_code}* na finalização!\n` : '';
+  
+  let couponText = '';
+  if (product.coupon_code) {
+    const raw = String(product.coupon_code).trim();
+    if (/ativar|resgatar|anúncio|anuncio|página|pagina|aplicar/i.test(raw)) {
+      const formatted = raw.replace(/^Ativar\s*(?:o\s*)?(?:cupom\s*)?/i, 'Ative o cupom ');
+      couponText = `\n🎟️ *CUPOM DISPONÍVEL:* ${formatted} antes de comprar para garantir o menor preço!\n`;
+    } else {
+      couponText = `\n🎟️ *CUPOM DISPONÍVEL:* Use o cupom *${raw}* na finalização!\n`;
+    }
+  }
 
-  return `${sealHeader}🛍️ *ACHADINHO ${platform}* ⭐\n🔥 *${product.title}*\n${descText}\n💰 *Preço:* ${origPriceText}*${product.price_display || 'Confira no link'}*${discountText}${couponText}\n\n👉 *COMPRE COM DESCONTO AQUI:*\n${product.affiliate_url}\n\n💬 *Entre no canal VIP de ofertas da FastSavory's:*\nhttps://chat.whatsapp.com/C7dT0ZWaUZKHm7atI3eOLE`;
+  const { isDoubleDay, eventLabel } = customContext || getDoubleDayContext();
+  const eventHeader = isDoubleDay
+    ? `🔥🎯 *MEGA EVENTO ${eventLabel} | DIA DE SUPER OFERTAS!* 🏷️⚡\n💥 *Aproveite os cupons liberados e os maiores descontos do mês!*\n\n`
+    : '';
+
+  return `${eventHeader}${sealHeader}🛍️ *ACHADINHO ${platform}* ⭐\n🔥 *${product.title}*\n${descText}\n💰 *Preço:* ${origPriceText}*${product.price_display || 'Confira no link'}*${discountText}${couponText}\n\n👉 *COMPRE COM DESCONTO AQUI:*\n${product.affiliate_url}\n\n💬 *Entre no canal VIP de ofertas da FastSavory's:*\nhttps://chat.whatsapp.com/C7dT0ZWaUZKHm7atI3eOLE`;
 }
 
 function getStoreContext() {
@@ -120,14 +144,19 @@ function buildWhatsAppStatusDealText(product) {
   return `🛍️ ACHADINHO ${platform}\n🔥 ${price} 👉 GARANTA COM O MENOR PREÇO AQUI:\n${product.affiliate_url}`;
 }
 
-function buildPriceDropAlertText(product, oldPrice, newPrice) {
+function buildPriceDropAlertText(product, oldPrice, newPrice, customContext = null) {
   const isFastPick = Boolean(product.is_fast_pick || product.badge_color === 'fast_seal');
   const sealHeader = isFastPick ? '👑 *PRODUTO TESTADO E RECOMENDADO PELA FASTSAVORY\'S* ✨\n' : '';
   const platform = detectPlatform(product.affiliate_url).name.toUpperCase();
   const pct = calcDiscountPercent(oldPrice, newPrice);
   const discountText = pct > 0 ? ` (${pct}% DE QUEDA)` : '';
 
-  return `🚨 *ALERTA DE QUEDA DE PREÇO NO AR!* 📉⚡\n${sealHeader}\n🛍️ *ACHADINHO ${platform}*\n🔥 *${product.title}*\n\n💥 *BAIXOU AGORA:* de ~${oldPrice}~ por apenas *${newPrice}*!${discountText}\n\n👉 *GARANTA COM O MENOR PREÇO AQUI:*\n${product.affiliate_url}\n\n💬 *Entre no canal VIP de ofertas da FastSavory's:*\nhttps://chat.whatsapp.com/C7dT0ZWaUZKHm7atI3eOLE`;
+  const { isDoubleDay, eventLabel } = customContext || getDoubleDayContext();
+  const alertHeader = isDoubleDay
+    ? `🚨 *QUEDA DE PREÇO RELÂMPAGO NO ${eventLabel}!* 📉⚡\n🔥🎯 *SUPER DESCONTO DETECTADO AGORA!*\n`
+    : `🚨 *ALERTA DE QUEDA DE PREÇO NO AR!* 📉⚡\n`;
+
+  return `${alertHeader}${sealHeader}🛍️ *ACHADINHO ${platform}*\n🔥 *${product.title}*\n\n💥 *BAIXOU AGORA:* de ~${oldPrice}~ por apenas *${newPrice}*!${discountText}\n\n👉 *GARANTA COM O MENOR PREÇO AQUI:*\n${product.affiliate_url}\n\n💬 *Entre no canal VIP de ofertas da FastSavory's:*\nhttps://chat.whatsapp.com/C7dT0ZWaUZKHm7atI3eOLE`;
 }
 
 async function fetchImageAsBase64(imageUrl) {
@@ -349,14 +378,46 @@ async function handleSendWhatsAppDeal(req, res) {
   const timeKey = `${String(roundedBrtHours).padStart(2, '0')}:${String(roundedSlotMinute).padStart(2, '0')}`;
 
   const mode = req.query.mode || (req.body && req.body.mode) || 'auto';
+  const force = req.query.force === 'true' || (req.body && req.body.force === true);
   let targetType = mode;
 
   // 9 Horários estratégicos da FastSavory's intercalados (Almoço, Sobremesas, Fornadas, Lanche e Encomendas da tarde)
   const fastSavorysSlots = ['11:30', '12:00', '12:45', '13:30', '14:00', '15:00', '15:45', '16:30', '17:30'];
 
-  if (mode === 'auto') {
-    const isFastSavorysSlot = fastSavorysSlots.includes(timeKey);
-    targetType = isFastSavorysSlot ? 'fastsavorys' : 'affiliate';
+  const { isDoubleDay, eventLabel } = getDoubleDayContext();
+
+  if (mode === 'auto' && !force) {
+    if (isDoubleDay) {
+      // MEGA EVENTO (ex: 09/09, 10/10, 11/11, 12/12):
+      // Disparos a cada 15 min das 07h00 às 22h00
+      const isWithinEventHours = roundedBrtHours >= 7 && roundedBrtHours <= 22;
+      if (!isWithinEventHours) {
+        return res.status(200).json({
+          success: true,
+          skipped: true,
+          message: `Horário ${timeKey} fora da janela do Mega Evento ${eventLabel} (07h às 22h).`,
+          isDoubleDay: true,
+          eventLabel
+        });
+      }
+      const isFastSavorysSlot = fastSavorysSlots.includes(timeKey);
+      targetType = isFastSavorysSlot ? 'fastsavorys' : 'affiliate';
+    } else {
+      // DIAS NORMAIS:
+      // Apenas slots de 30 min (:00 e :30) ou os horários estratégicos da FastSavory's
+      const isStandardSlot = (roundedSlotMinute === 0 || roundedSlotMinute === 30);
+      const isFastSavorysSlot = fastSavorysSlots.includes(timeKey);
+
+      if (!isStandardSlot && !isFastSavorysSlot) {
+        return res.status(200).json({
+          success: true,
+          skipped: true,
+          message: `Horário ${timeKey} (:15/:45) reservado exclusivamente para Mega Eventos (dias duplos). Em dias normais, disparos ocorrem a cada 30 min.`,
+          isDoubleDay: false
+        });
+      }
+      targetType = isFastSavorysSlot ? 'fastsavorys' : 'affiliate';
+    }
   }
 
   try {
@@ -751,5 +812,6 @@ module.exports = {
   buildWhatsAppDealText,
   buildFastSavorysStatusText,
   buildWhatsAppStatusDealText,
-  buildPriceDropAlertText
+  buildPriceDropAlertText,
+  getDoubleDayContext
 };

@@ -252,13 +252,22 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
       if (!discountTag.toUpperCase().includes('OFF')) discountTag += ' OFF';
     }
 
-    // Amazon Coupon / Voucher Detection
+    // Amazon Coupon / Voucher Detection (Codes or Clip Coupons)
     const amzCouponMatch = html.match(/id=["']couponBadgeV2["'][\s\S]*?>([^<]+)</i) ||
                            html.match(/class=["'][^"']*a-color-success[^"']*["'][^>]*>([^<]*Economize\s*[^<]+com cupom[^<]*)</i) ||
                            html.match(/data-cpc-coupon=["']([^"']+)["']/i) ||
-                           html.match(/<label[^>]*class=["'][^"']*a-form-label[^"']*["'][^>]*>\s*(Aplicar cupom de\s*[^<]+)<\/label>/i);
+                           html.match(/<label[^>]*class=["'][^"']*a-form-label[^"']*["'][^>]*>\s*(Aplicar cupom de\s*[^<]+)<\/label>/i) ||
+                           html.match(/class=["'][^"']*(?:couponBadge|reinventPriceSavingsPercentageMargin|savingsPercentage)[^"']*["'][^>]*>([^<]*cupom[^<]*)/i) ||
+                           html.match(/([0-9.,]+%\s*OFF\s*com\s*cupom|Economize\s*R\$\s*[0-9.,]+\s*com\s*cupom|Aplicar\s*cupom\s*de\s*(?:R\$\s*)?[0-9.,]+%?)/i);
     if (amzCouponMatch && amzCouponMatch[1]) {
-      couponCode = amzCouponMatch[1].replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+      const rawAmzCoupon = amzCouponMatch[1].replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+      const valMatch = rawAmzCoupon.match(/(?:Economize|cupom\s*de)\s*(R\$\s*[0-9.,]+|[0-9]+%)/i) ||
+                       rawAmzCoupon.match(/(R\$\s*[0-9.,]+|[0-9]+%)\s*(?:OFF|com\s*cupom)/i);
+      if (valMatch && valMatch[1]) {
+        couponCode = `Ativar no anúncio (${valMatch[1]} OFF)`;
+      } else {
+        couponCode = 'Ativar cupom no anúncio';
+      }
     }
 
   } else if (platform === 'shopee') {
@@ -282,7 +291,12 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
                               html.match(/"voucherDescription"\s*:\s*"([^"]+)"/i) ||
                               html.match(/class=["'][^"']*voucher-ticket[^"']*["'][\s\S]*?>([^<]+)</i);
     if (shopeeCouponMatch && shopeeCouponMatch[1]) {
-      couponCode = shopeeCouponMatch[1].trim();
+      const rawShopee = shopeeCouponMatch[1].trim();
+      if (/^[A-Z0-9_-]{4,20}$/i.test(rawShopee)) {
+        couponCode = rawShopee;
+      } else {
+        couponCode = 'Resgatar cupom no app';
+      }
     }
 
   } else {
@@ -314,11 +328,10 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
       discountTag = discLabelMatch[1].trim();
     }
 
-    // Mercado Livre Coupon Detection (JSON state or PDP pills)
+    // Mercado Livre Coupon Detection (JSON state or PDP pills or poly-cards)
     const mlCouponCodeMatch = html.match(/"coupon_code"\s*:\s*"([^"]+)"/i) ||
                               html.match(/"coupon"\s*:\s*\{\s*"code"\s*:\s*"([^"]+)"/i) ||
                               html.match(/"campaign_code"\s*:\s*"([^"]+)"/i) ||
-                              html.match(/class=["'][^"']*ui-pdp-promotions-pill__label[^"']*["']>([^<]+)<\/span>/i) ||
                               html.match(/class=["'][^"']*ui-pdp-promotions-pill[^"']*["'][\s\S]*?>([A-Z0-9_-]{4,20})</i);
     if (mlCouponCodeMatch && mlCouponCodeMatch[1]) {
       let cCode = mlCouponCodeMatch[1].trim();
@@ -326,7 +339,30 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
         const m = cCode.match(/cupom:?\s*([A-Z0-9_-]+)/i);
         if (m && m[1]) cCode = m[1];
       }
-      couponCode = cCode;
+      if (/^[A-Z0-9_-]{4,20}$/i.test(cCode)) {
+        couponCode = cCode;
+      }
+    }
+
+    if (!couponCode) {
+      // Detecção de pílulas de cupom / tags de promoção (sem código digitável explícito)
+      const mlPillMatch = html.match(/class=["'][^"']*poly-coupons__pill[^"']*["']([\s\S]*?)<\/div>/i) ||
+                          html.match(/class=["'][^"']*ui-pdp-promotions-pill[^"']*["']([\s\S]*?)<\/span>/i) ||
+                          html.match(/(?:id|type)["']:\s*["']coupon["'][\s\S]{0,120}?["']text["']:\s*["']([^"']+)["']/i) ||
+                          html.match(/([0-9.,]+%?\s*OFF\s*com\s*[Cc]upom|R\$\s*[0-9.,]+\s*OFF\s*com\s*[Cc]upom|[Cc]upom\s*de\s*R\$\s*[0-9.,]+)/i);
+
+      if (mlPillMatch) {
+        const pillContent = (mlPillMatch[1] || mlPillMatch[0]).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+        const valMatch = pillContent.match(/(R\$\s*[0-9.,]+|[0-9]+%)\s*OFF/i) ||
+                         pillContent.match(/([0-9]+)\s*OFF/i) ||
+                         pillContent.match(/cupom\s*de\s*(R\$\s*[0-9.,]+|[0-9]+%)/i);
+        if (valMatch && valMatch[1]) {
+          const discountStr = valMatch[1].includes('R$') || valMatch[1].includes('%') ? valMatch[1] : `${valMatch[1]}%`;
+          couponCode = `Ativar no anúncio (${discountStr} OFF)`;
+        } else {
+          couponCode = 'Ativar cupom no anúncio';
+        }
+      }
     }
 
     // LAYER 2: Structured JSON-LD Schema (Fallback & Primary for stores with LD-JSON)
@@ -1127,6 +1163,36 @@ async function handler(req, res) {
 async function handleAutoSyncLinks(req, res) {
   const SUPABASE_URL = process.env.SUPABASE_URL || 'https://vqjyjdllapqbqpylshkw.supabase.co';
   const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxanlqZGxsYXBxYnFweWxzaGt3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY0MzgyNDUsImV4cCI6MjA4MjAxNDI0NX0.tfTR9YnM5l0do7FJfxML6i05KTSrMInQMqFrWXx6aAU';
+
+  // Validação de agendamento: XXh25min é reservado exclusivamente para Mega Eventos (dias duplos: 09.09, 10.10, 11.11, etc.)
+  const now = new Date();
+  const utcMinutes = now.getUTCMinutes();
+  const isSlot25 = utcMinutes >= 15 && utcMinutes <= 35;
+  const isForce = req.query?.force === 'true' || req.body?.force === true;
+
+  let isDoubleDay = false;
+  let eventLabel = '';
+  try {
+    const { getDoubleDayContext } = require('./_lib/cron-whatsapp-deal');
+    const ctx = getDoubleDayContext(now);
+    isDoubleDay = ctx.isDoubleDay;
+    eventLabel = ctx.eventLabel;
+  } catch (e) {
+    const brtTime = new Date(now.getTime() - 3 * 3600 * 1000);
+    const day = brtTime.getUTCDate();
+    const month = brtTime.getUTCMonth() + 1;
+    isDoubleDay = day === month;
+    eventLabel = `${day}.${month}`;
+  }
+
+  if (isSlot25 && !isDoubleDay && !isForce) {
+    return res.status(200).json({
+      success: true,
+      skipped: true,
+      message: `Verificação das XXh25min ignorada: horário das XXh25 é ativado apenas em dias de Mega Eventos (ex: 10.10, 11.11). Próxima verificação geral às XXh55min.`,
+      isDoubleDay: false
+    });
+  }
 
   // Limite por ciclo para responder em menos de 3-4 segundos e nunca estourar o timeout da Serverless Function
   const limit = Math.min(Math.max(parseInt(req.query?.limit || req.body?.limit || '15', 10), 1), 30);

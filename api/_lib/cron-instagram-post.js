@@ -65,7 +65,16 @@ function buildInstagramDealCaption(product) {
   const discountText = pct > 0 ? ` (${pct}% DE DESCONTO)` : (product.discount_tag ? ` (${product.discount_tag})` : '');
   const origPriceText = product.original_price ? `De ${product.original_price} por apenas ` : '';
   const descText = product.description ? `\n${product.description}\n` : '';
-  const couponText = product.coupon_code ? `\n🎟️ Cupom disponível: use ${product.coupon_code} no fechamento do pedido!\n` : '';
+  let couponText = '';
+  if (product.coupon_code) {
+    const raw = String(product.coupon_code).trim();
+    if (/ativar|resgatar|anúncio|anuncio|página|pagina|aplicar/i.test(raw)) {
+      const formatted = raw.replace(/^Ativar\s*(?:o\s*)?(?:cupom\s*)?/i, 'Ative o cupom ');
+      couponText = `\n🎟️ Cupom disponível: ${formatted} antes de finalizar para garantir o desconto!\n`;
+    } else {
+      couponText = `\n🎟️ Cupom disponível: use ${raw} no fechamento do pedido!\n`;
+    }
+  }
 
   return `${sealHeader}🚨 ACHADINHO IMPERDÍVEL ${platform}! 📉⚡
 
