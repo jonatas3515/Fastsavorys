@@ -399,25 +399,48 @@ window.AffiliatesModule = (function () {
         : (categoryMap[item.category] || item.category || 'Geral');
 
       const pct = calcDiscountPercent(item.original_price, item.price_display);
-      const discountBadge = pct > 0 
-        ? `<span class="inline-block text-[10px] bg-emerald-600 text-white font-extrabold px-1.5 py-0.2 rounded mt-0.5 shadow-sm">🔥 ${pct}% OFF</span>`
+      const rawDisc = (item.discount_tag || '').trim();
+      let formattedDisc = '';
+      if (/no pix c(om|\/)?\s*cupom/i.test(rawDisc)) {
+        formattedDisc = pct > 0 ? `🔥 ${pct}% OFF no Pix c/ Cupom` : `🔥 No Pix c/ Cupom`;
+      } else if (/no pix/i.test(rawDisc)) {
+        formattedDisc = pct > 0 ? `🔥 ${pct}% OFF no Pix` : `🔥 No Pix`;
+      } else if (/c(om|\/)?\s*cupom/i.test(rawDisc)) {
+        formattedDisc = pct > 0 ? `🔥 ${pct}% OFF c/ Cupom` : `🔥 Com Cupom`;
+      } else if (pct > 0) {
+        formattedDisc = `🔥 ${pct}% OFF`;
+      } else if (rawDisc && (/off/i.test(rawDisc) || /^\d+%/.test(rawDisc))) {
+        formattedDisc = `🔥 ${rawDisc}`;
+      }
+
+      const discountBadge = formattedDisc 
+        ? `<span class="inline-block text-[10px] bg-emerald-600 text-white font-extrabold px-1.5 py-0.2 rounded mt-0.5 shadow-sm">${escapeHtml(formattedDisc)}</span>` 
         : '';
 
       const platformInfo = detectPlatform(item.affiliate_url);
       const platformBadge = `<span class="inline-flex items-center gap-1 text-[10px] ${platformInfo.badge} font-bold px-1.5 py-0.2 rounded border">${platformInfo.icon} ${platformInfo.name}</span>`;
+
+      const isPrime = Boolean(item.is_prime);
+      const primeBadge = isPrime
+        ? `<span class="inline-flex items-center gap-0.5 text-[10px] bg-[#00a8e1] text-white font-black px-1.5 py-0.2 rounded shadow-2xs" title="Produto Amazon Prime">✓ prime</span>`
+        : '';
+
+      const isImported = Boolean(item.is_imported);
+      const importedBadge = isImported
+        ? `<span class="inline-flex items-center gap-1 text-[10px] bg-slate-900 text-cyan-300 font-bold px-1.5 py-0.2 rounded border border-slate-700 shadow-2xs" title="Produto Importado / Compra Internacional">✈️ Importado</span>`
+        : '';
 
       const isFastPick = Boolean(item.is_fast_pick || item.badge_color === 'fast_seal');
       const fastPickBadge = isFastPick
         ? `<span class="inline-flex items-center gap-1 text-[10px] bg-gradient-to-r from-pink-600 via-purple-600 to-indigo-600 text-white font-black px-2 py-0.5 rounded-full shadow-xs">✨ Selo Fast</span>`
         : '';
 
-      // Evita duplicidade de tag se já for apenas a indicação de desconto
-      let showCustomTag = false;
-      const customTagText = item.discount_tag ? item.discount_tag.trim() : '';
-      if (customTagText) {
-        const isDiscountOnly = /^[⚡🔥\s]*\d+%\s*OFF/i.test(customTagText);
-        if (!isDiscountOnly || pct === 0) {
-          showCustomTag = true;
+      // Tag de destaque (badge_tag ou discount_tag caso este não seja desconto puro)
+      let customTagText = item.badge_tag ? item.badge_tag.trim() : '';
+      if (!customTagText && rawDisc) {
+        const isDiscOnly = /^[⚡🔥\s]*\d+%\s*OFF/i.test(rawDisc) || /no pix|cupom/i.test(rawDisc);
+        if (!isDiscOnly) {
+          customTagText = rawDisc;
         }
       }
 
@@ -426,6 +449,7 @@ window.AffiliatesModule = (function () {
       const normTag = customTagText.toLowerCase();
       if (normTag.includes('escolha da amazon') || normTag.includes("amazon's choice")) resolvedColor = 'black';
       else if (normTag.includes('menor preco') || normTag.includes('menor preço')) resolvedColor = 'rose';
+      else if (normTag.includes('indicado')) resolvedColor = 'orange';
       else if (normTag === 'oferta' || (normTag.includes('oferta') && !normTag.includes('imperd'))) resolvedColor = 'pink';
       else if (normTag.includes('imperd') || normTag.includes('oferta imperdivel')) resolvedColor = 'blue';
       else if (normTag.includes('mais vendido')) resolvedColor = 'orange';
@@ -433,6 +457,13 @@ window.AffiliatesModule = (function () {
       else if (normTag.includes('pratico') || normTag.includes('prático')) resolvedColor = 'amber';
       else if (normTag.includes('loja oficial') || normTag.includes('oficial')) resolvedColor = 'black';
       else if (normTag.includes('relampago') || normTag.includes('relâmpago') || resolvedColor === 'flash_deal') resolvedColor = 'flash_deal';
+
+      let displayTagText = customTagText;
+      if (customTagText.toLowerCase() === 'oferta' || customTagText.toLowerCase() === '🌸 oferta') {
+        displayTagText = '🩷 Oferta';
+      } else if (customTagText.toLowerCase() === 'indicado' || customTagText.toLowerCase() === 'indicado (laranja)') {
+        displayTagText = '🟠 Indicado';
+      }
 
       let badgeStyle = 'bg-orange-100 text-orange-950 border-orange-300 font-bold';
       if (resolvedColor === 'flash_deal') badgeStyle = 'bg-red-100 text-red-900 border-red-300 font-black animate-pulse';
@@ -444,8 +475,8 @@ window.AffiliatesModule = (function () {
       if (resolvedColor === 'pink') badgeStyle = 'bg-pink-100 text-pink-950 border-pink-300 font-bold';
       if (resolvedColor === 'black') badgeStyle = 'bg-gray-900 text-white border-gray-950 font-bold';
 
-      const customTagBadge = showCustomTag
-        ? `<span class="inline-block text-[10px] ${badgeStyle} px-1.5 py-0.2 rounded border">${escapeHtml(customTagText)}</span>`
+      const customTagBadge = customTagText
+        ? `<span class="inline-block text-[10px] ${badgeStyle} px-1.5 py-0.2 rounded border">${escapeHtml(displayTagText)}</span>`
         : '';
 
       const clicksBadge = (item.clicks_count && item.clicks_count > 0)
@@ -472,6 +503,8 @@ window.AffiliatesModule = (function () {
             </div>
             <div class="flex items-center gap-1.5 mt-1 flex-wrap">
               ${platformBadge}
+              ${primeBadge}
+              ${importedBadge}
               ${discountBadge}
               ${couponBadge}
               ${customTagBadge}
@@ -510,7 +543,8 @@ window.AffiliatesModule = (function () {
     const norm = tag.toLowerCase().trim();
     if (norm.includes('escolha da amazon') || norm.includes("amazon's choice") || norm === 'escolha da amazon') return 'Escolha da Amazon|black';
     if (norm.includes('menor preco') || norm.includes('menor preço') || norm === 'menor preço' || norm === '🔴 menor preço') return 'Menor Preço|rose';
-    if (norm === 'oferta' || norm === '🌸 oferta' || (norm.includes('oferta') && !norm.includes('imperd') && !norm.includes('oficial'))) return 'Oferta|pink';
+    if (norm.includes('indicado') || norm === 'indicado' || norm === '🟠 indicado') return 'Indicado|orange';
+    if (norm === 'oferta' || norm === '🩷 oferta' || norm === '🌸 oferta' || (norm.includes('oferta') && !norm.includes('imperd') && !norm.includes('oficial'))) return 'Oferta|pink';
     if (norm.includes('imperd') || norm === '💥 oferta imperdível' || norm === 'oferta imperdível') return '💥 Oferta Imperdível|blue';
     if (norm.includes('mais vendido') || norm === '🔥 mais vendido' || norm === 'mais vendido') return '🔥 Mais Vendido|orange';
     if (norm.includes('buscado') || norm === '➕ buscado' || norm === '➕ mais buscado' || norm === 'mais buscado') return '➕ Buscado|purple';
@@ -614,6 +648,10 @@ window.AffiliatesModule = (function () {
 
     const isFastPickEl = document.getElementById('affiliateIsFastPickInput');
     if (isFastPickEl) isFastPickEl.checked = false;
+    const isPrimeEl = document.getElementById('affiliateIsPrimeInput');
+    if (isPrimeEl) isPrimeEl.checked = false;
+    const isImportedEl = document.getElementById('affiliateIsImportedInput');
+    if (isImportedEl) isImportedEl.checked = false;
     const flashBox = document.getElementById('affiliateFlashDealBox');
     if (flashBox) flashBox.classList.add('hidden');
     const flashInput = document.getElementById('affiliateFlashDealEndInput');
@@ -691,42 +729,32 @@ window.AffiliatesModule = (function () {
 
     const typeSelect = document.getElementById('affiliateDiscountTypeSelect');
     const discountEl = document.getElementById('affiliateDiscountInput');
-    const rawTag = (item.discount_tag || '').trim();
+    const rawDiscount = (item.discount_tag || '').trim();
 
-    // Calcula o percentual de desconto se houver preço riscado e preço atual
-    const origP = parsePrice(item.original_price);
-    const currP = parsePrice(item.price_display);
-    let calculatedPct = 0;
-    if (origP > 0 && currP > 0 && origP > currP) {
-      calculatedPct = Math.round(((origP - currP) / origP) * 100);
-    }
-
+    // Detecta o tipo de desconto de forma precisa
     let detectedType = 'OFF';
-    if (/no pix c(om|\/)?\s*cupom/i.test(rawTag)) {
+    if (/no pix c(om|\/)?\s*cupom/i.test(rawDiscount)) {
       detectedType = 'No Pix com Cupom';
-    } else if (/no pix/i.test(rawTag)) {
+    } else if (/no pix/i.test(rawDiscount)) {
       detectedType = 'No Pix';
-    } else if (/c(om|\/)?\s*cupom/i.test(rawTag)) {
+    } else if (/c(om|\/)?\s*cupom/i.test(rawDiscount)) {
       detectedType = 'Com Cupom';
-    } else if (rawTag && !/off/i.test(rawTag) && calculatedPct === 0) {
+    } else if (rawDiscount && !/off/i.test(rawDiscount) && !/\d+%/.test(rawDiscount)) {
       detectedType = 'manual';
     }
 
     if (typeSelect) typeSelect.value = detectedType;
-
-    if (calculatedPct > 0) {
-      let label = `${calculatedPct}% OFF`;
-      if (detectedType === 'Com Cupom') label = `${calculatedPct}% OFF com Cupom`;
-      else if (detectedType === 'No Pix') label = `${calculatedPct}% OFF no Pix`;
-      else if (detectedType === 'No Pix com Cupom') label = `${calculatedPct}% OFF no Pix com Cupom`;
-      if (discountEl) discountEl.value = label;
-    } else {
-      if (discountEl) discountEl.value = rawTag;
-    }
+    if (discountEl) discountEl.value = rawDiscount;
     recalculateDiscount();
 
-    const isDiscountOnly = /^[⚡🔥\s]*\d+%\s*OFF/i.test(rawTag) || /no pix|cupom/i.test(rawTag);
-    const actualTag = isDiscountOnly ? '' : rawTag;
+    // Tag Destaque (respeita badge_tag isolada ou recupera discount_tag se for nome de tag)
+    let actualTag = (item.badge_tag || '').trim();
+    if (!actualTag && rawDiscount) {
+      const isPureDiscount = /^[⚡🔥\s]*\d+%\s*OFF/i.test(rawDiscount) || /no pix|cupom/i.test(rawDiscount);
+      if (!isPureDiscount) {
+        actualTag = rawDiscount;
+      }
+    }
 
     const preset = detectBadgePreset(actualTag, item.badge_color);
     const presetSelect = document.getElementById('affiliateTagPresetSelect');
@@ -749,7 +777,13 @@ window.AffiliatesModule = (function () {
     const isFastPickEl = document.getElementById('affiliateIsFastPickInput');
     if (isFastPickEl) isFastPickEl.checked = isFastPick;
 
-    const isFlash = (item.badge_color === 'flash_deal') || (item.discount_tag && /rel[âa]mpago/i.test(item.discount_tag));
+    const isPrimeEl = document.getElementById('affiliateIsPrimeInput');
+    if (isPrimeEl) isPrimeEl.checked = Boolean(item.is_prime);
+
+    const isImportedEl = document.getElementById('affiliateIsImportedInput');
+    if (isImportedEl) isImportedEl.checked = Boolean(item.is_imported);
+
+    const isFlash = (item.badge_color === 'flash_deal') || (item.discount_tag && /rel[âa]mpago/i.test(item.discount_tag)) || (item.badge_tag && /rel[âa]mpago/i.test(item.badge_tag));
     const flashBox = document.getElementById('affiliateFlashDealBox');
     const flashInput = document.getElementById('affiliateFlashDealEndInput');
     if (item.flash_deal_end) {
@@ -862,6 +896,16 @@ window.AffiliatesModule = (function () {
         document.getElementById('affiliateCouponInput').value = info.coupon_code;
       }
 
+      // Preenche indicação Amazon Prime se detectada
+      if (info.is_prime !== undefined && document.getElementById('affiliateIsPrimeInput')) {
+        document.getElementById('affiliateIsPrimeInput').checked = Boolean(info.is_prime);
+      }
+
+      // Preenche indicação de produto importado se detectada
+      if (info.is_imported !== undefined && document.getElementById('affiliateIsImportedInput')) {
+        document.getElementById('affiliateIsImportedInput').checked = Boolean(info.is_imported);
+      }
+
       // Preenche categoria detectada automaticamente
       const detectedCat = info.category || detectCategoryClient(info.title || '');
       if (detectedCat && document.getElementById('affiliateCategoryInput')) {
@@ -904,21 +948,23 @@ window.AffiliatesModule = (function () {
     const assignedPosition = currentItem && currentItem.position ? currentItem.position : (productsList.length + 1);
 
     const isFastPick = document.getElementById('affiliateIsFastPickInput') ? document.getElementById('affiliateIsFastPickInput').checked : false;
+    const isPrime = document.getElementById('affiliateIsPrimeInput') ? document.getElementById('affiliateIsPrimeInput').checked : false;
+    const isImported = document.getElementById('affiliateIsImportedInput') ? document.getElementById('affiliateIsImportedInput').checked : false;
 
-    const discountVal = document.getElementById('affiliateDiscountInput')?.value?.trim() || '';
+    const discountVal = document.getElementById('affiliateDiscountInput')?.value?.trim() || null;
     const couponVal = document.getElementById('affiliateCouponInput')?.value?.trim() || null;
     const presetSelect = document.getElementById('affiliateTagPresetSelect');
     const presetVal = presetSelect ? presetSelect.value : '';
-    let finalTag = discountVal || null;
+    let badgeTag = null;
     let finalColor = 'orange';
 
     if (presetVal === 'custom') {
       const customTag = document.getElementById('affiliateTagInput')?.value?.trim();
-      if (customTag) finalTag = customTag;
+      if (customTag) badgeTag = customTag;
       finalColor = document.getElementById('affiliateBadgeColorInput')?.value || 'orange';
     } else if (presetVal) {
       const [tag, color] = presetVal.split('|');
-      if (tag) finalTag = tag;
+      if (tag) badgeTag = tag;
       finalColor = color || 'orange';
     }
 
@@ -939,11 +985,14 @@ window.AffiliatesModule = (function () {
       price_display: document.getElementById('affiliatePriceInput').value.trim() || null,
       original_price: document.getElementById('affiliateOriginalPriceInput').value.trim() || null,
       category: document.getElementById('affiliateCategoryInput').value || 'cozinha',
-      discount_tag: finalTag,
+      discount_tag: discountVal,
+      badge_tag: badgeTag,
       coupon_code: couponVal,
       badge_color: finalColor || 'orange',
       flash_deal_end: flashDealEndIso,
       is_fast_pick: isFastPick,
+      is_prime: isPrime,
+      is_imported: isImported,
       position: Number(assignedPosition) || 1,
       is_active: document.getElementById('affiliateActiveInput').checked,
       updated_at: new Date().toISOString()
@@ -2228,7 +2277,42 @@ window.AffiliatesModule = (function () {
   // 1-CLICK QUICK CLIP (BOOKMARKLET)
   // ==========================================
   function getBookmarkletCode() {
-    return `javascript:(function(){try{const host=window.location.hostname;let payload={platform:'unknown',url:window.location.href,title:'',image_url:'',price_display:'',original_price:'',discount_tag:''};if(host.includes('amazon')){payload.platform='amazon';payload.title=(document.getElementById('productTitle')?.innerText||document.title||'').trim();const img=document.getElementById('landingImage')||document.querySelector('#imgTagWrapperId img')||document.querySelector('#main-image-container img')||document.querySelector('.a-dynamic-image');payload.image_url=img?.src||img?.getAttribute('data-old-hires')||'';const pw=document.querySelector('.a-price .a-price-whole')?.innerText?.replace(/[\\r\\n\\t]/g,'').trim();const pf=document.querySelector('.a-price .a-price-fraction')?.innerText?.trim();if(pw){payload.price_display='R$ '+pw+(pf?','+pf:',00');}const basis=document.querySelector('.basisPrice .a-offscreen, .a-text-price .a-offscreen, .apex-basisprice-value .a-offscreen')?.innerText?.trim();if(basis)payload.original_price=basis;const sav=document.querySelector('.savingsPercentage, .reinventPriceSavingsPercentageMargin')?.innerText?.trim();if(sav)payload.discount_tag=sav.replace('-','').trim()+' OFF';}else if(host.includes('mercadolivre')||host.includes('mercadolibre')){payload.platform='mercadolivre';payload.title=(document.querySelector('h1.ui-pdp-title')?.innerText||document.title||'').trim();const img=document.querySelector('.ui-pdp-gallery__figure img, .ui-pdp-image, img.ui-pdp-image');payload.image_url=img?.src||'';const frac=document.querySelector('.ui-pdp-price__second-line .andes-money-amount__fraction')?.innerText?.trim();const cents=document.querySelector('.ui-pdp-price__second-line .andes-money-amount__cents')?.innerText?.trim();if(frac){payload.price_display='R$ '+frac+(cents?','+cents:',00');}const origFrac=document.querySelector('.ui-pdp-price__original-value .andes-money-amount__fraction')?.innerText?.trim();if(origFrac){const origCents=document.querySelector('.ui-pdp-price__original-value .andes-money-amount__cents')?.innerText?.trim();payload.original_price='R$ '+origFrac+(origCents?','+origCents:',00');}const disc=document.querySelector('.ui-pdp-price__second-line .andes-money-amount__discount')?.innerText?.trim();if(disc)payload.discount_tag=disc+' OFF';}else if(host.includes('shopee')){payload.platform='shopee';payload.title=(document.querySelector('.product-briefing ._44qnta')?.innerText||document.querySelector('.product-briefing h1')?.innerText||document.querySelector('h1')?.innerText||document.querySelector('meta[property=\"og:title\"]')?.content||document.title||'').replace(/\\s*\\|\\s*Shopee.*$/i,'').trim();const img=document.querySelector('.product-briefing img')||document.querySelector('._39-Y7e img')||document.querySelector('.image-carousel img')||document.querySelector('img[src*=\"down-br.img.susercontent.com\"]');payload.image_url=img?.src||document.querySelector('meta[property=\"og:image\"]')?.content||'';const priceCandidates=Array.from(document.querySelectorAll('.product-briefing div, .product-briefing span, .product-briefing p'));const foundPriceEl=priceCandidates.find(el=>{const t=(el.innerText||'').trim();return /^R\\$\\s*[0-9.,]+$/i.test(t);})||document.querySelector('.product-briefing .pqTWkA, .product-briefing ._3n5z6N, .product-briefing ._2Sh71d, .product-briefing [class*=\"price\"]');if(foundPriceEl){const pMatch=(foundPriceEl.innerText||'').match(/R\\$\\s*[0-9.,]+/i);if(pMatch)payload.price_display=pMatch[0];}const origEl=document.querySelector('.product-briefing ._1G_B1p, .product-briefing [style*=\"line-through\"], .product-briefing del, .product-briefing s');if(origEl){const oMatch=(origEl.innerText||'').match(/R\\$\\s*[0-9.,]+/i);if(oMatch)payload.original_price=oMatch[0];}const discEl=document.querySelector('.product-briefing [class*=\"discount\"], .product-briefing ._10uUv7');if(discEl&&discEl.innerText.includes('OFF')){payload.discount_tag=discEl.innerText.trim();}}else if(host.includes('natura')||host.includes('avon')){payload.platform=host.includes('avon')?'avon':'natura';payload.title=(document.querySelector('h1')?.innerText||document.querySelector('meta[property=\"og:title\"]')?.content||document.title||'').replace(/\\s*\\|\\s*(Natura|Avon).*$/i,'').trim();payload.image_url=document.querySelector('meta[property=\"og:image\"]')?.content||document.querySelector('img[src*=\"natura\"], img[src*=\"avon\"]')?.src||'';const priceMeta=document.querySelector('meta[property=\"product:price:amount\"]')?.content;if(priceMeta){payload.price_display='R$ '+parseFloat(priceMeta).toFixed(2).replace('.',',');}else{const pEl=Array.from(document.querySelectorAll('span, p, div')).find(e=>/^R\\$\\s*[0-9.,]+$/.test(e.innerText.trim()));if(pEl)payload.price_display=pEl.innerText.trim();}}else{alert('⚠️ Use este botão em uma página de produto da Amazon, Mercado Livre, Shopee ou Natura!');return;}if(!payload.title){alert('⚠️ Não foi possível identificar o título do produto.');return;}const toast=document.createElement('div');toast.style.cssText='position:fixed;top:20px;right:20px;z-index:99999999;background:#6366f1;color:#fff;padding:16px 22px;border-radius:12px;font-family:sans-serif;font-weight:bold;font-size:14px;box-shadow:0 10px 25px rgba(0,0,0,0.3);';toast.innerText='⚡ Enviando para FastSavory\\'s Achadinhos...';document.body.appendChild(toast);fetch('https://fastsavorys.vercel.app/api/check-affiliate-links?action=quick-save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).then(r=>r.json()).then(data=>{if(data.success){toast.style.background='#10b981';toast.innerHTML='🎉 Salvo com Sucesso no Site!<br><span style=\"font-size:11px;font-weight:normal;\">'+(payload.title.substring(0,40))+'...</span>';setTimeout(()=>toast.remove(),3500);}else{toast.style.background='#e11d48';toast.innerText='❌ '+(data.error||'Erro ao salvar');setTimeout(()=>toast.remove(),4000);}}).catch(e=>{toast.style.background='#e11d48';toast.innerText='❌ Erro de conexão: '+e.message;setTimeout(()=>toast.remove(),4000);});}catch(e){alert('Erro Quick Clip: '+e.message);}})();`;
+    return `javascript:(function(){try{const host=window.location.hostname;let payload={platform:'unknown',url:window.location.href,title:'',image_url:'',price_display:'',original_price:'',discount_tag:'',is_prime:false,is_imported:false};if(host.includes('amazon')){payload.platform='amazon';payload.title=(document.getElementById('productTitle')?.innerText||document.title||'').trim();const img=document.getElementById('landingImage')||document.querySelector('#imgTagWrapperId img')||document.querySelector('#main-image-container img')||document.querySelector('.a-dynamic-image');payload.image_url=img?.src||img?.getAttribute('data-old-hires')||'';const priceEl=document.querySelector('#corePriceDisplay_desktop_feature_div .a-price:not(.a-text-price)')||document.querySelector('#corePrice_desktop .a-price:not(.a-text-price)')||document.querySelector('#apex_desktop .a-price:not(.a-text-price)')||document.querySelector('.priceToPay')||document.querySelector('#priceblock_ourprice')||document.querySelector('#priceblock_dealprice')||document.querySelector('.a-price:not(.a-text-price)');const pw=priceEl?.querySelector('.a-price-whole')?.innerText?.replace(/[\\r\\n\\t]/g,'').trim();const pf=priceEl?.querySelector('.a-price-fraction')?.innerText?.trim();if(pw){payload.price_display='R$ '+pw+(pf?','+pf:',00');}const basis=document.querySelector('.basisPrice .a-offscreen, #corePriceDisplay_desktop_feature_div .a-text-price .a-offscreen, .apex-basisprice-value .a-offscreen, #corePrice_desktop .a-text-price .a-offscreen, .a-text-price .a-offscreen')?.innerText?.trim();if(basis)payload.original_price=basis;const sav=document.querySelector('#corePriceDisplay_desktop_feature_div .savingsPercentage, .savingsPercentage, .reinventPriceSavingsPercentageMargin')?.innerText?.trim();if(sav)payload.discount_tag=sav.replace('-','').trim()+' OFF';payload.is_prime=Boolean(document.querySelector('.a-icon-prime,#prime-accordion,[id*=\"prime\"],.badge_delivery_prime,[aria-label*=\"Prime\"]')||/prime/i.test(document.body.innerText.substring(0,4000)));payload.is_imported=Boolean(document.body.innerText.match(/Amazon Global Store|Compra internacional|Tributos de importa|Vendido por Amazon Estados Unidos/i));}else if(host.includes('mercadolivre')||host.includes('mercadolibre')){payload.platform='mercadolivre';payload.title=(document.querySelector('h1.ui-pdp-title')?.innerText||document.title||'').trim();const img=document.querySelector('.ui-pdp-gallery__figure img, .ui-pdp-image, img.ui-pdp-image');payload.image_url=img?.src||'';const frac=document.querySelector('.ui-pdp-price__second-line .andes-money-amount__fraction')?.innerText?.trim();const cents=document.querySelector('.ui-pdp-price__second-line .andes-money-amount__cents')?.innerText?.trim();if(frac){payload.price_display='R$ '+frac+(cents?','+cents:',00');}const origFrac=document.querySelector('.ui-pdp-price__original-value .andes-money-amount__fraction')?.innerText?.trim();if(origFrac){const origCents=document.querySelector('.ui-pdp-price__original-value .andes-money-amount__cents')?.innerText?.trim();payload.original_price='R$ '+origFrac+(origCents?','+origCents:',00');}const disc=document.querySelector('.ui-pdp-price__second-line .andes-money-amount__discount')?.innerText?.trim();if(disc)payload.discount_tag=disc+' OFF';payload.is_imported=Boolean(document.body.innerText.match(/Compra internacional|Vendedor internacional|Tributos inclusos/i));}else if(host.includes('shopee')){payload.platform='shopee';payload.title=(document.querySelector('.product-briefing ._44qnta')?.innerText||document.querySelector('.product-briefing h1')?.innerText||document.querySelector('h1')?.innerText||document.querySelector('meta[property=\"og:title\"]')?.content||document.title||'').replace(/\\s*\\|\\s*Shopee.*$/i,'').trim();const img=document.querySelector('.product-briefing img')||document.querySelector('._39-Y7e img')||document.querySelector('.image-carousel img')||document.querySelector('img[src*=\"down-br.img.susercontent.com\"]');payload.image_url=img?.src||document.querySelector('meta[property=\"og:image\"]')?.content||'';const metaPriceVal=document.querySelector('meta[property=\"product:price:amount\"]')?.content||document.querySelector('meta[property=\"og:price:amount\"]')?.content||document.querySelector('meta[name=\"twitter:data1\"]')?.content;if(metaPriceVal&&!isNaN(parseFloat(metaPriceVal))){payload.price_display='R$ '+parseFloat(metaPriceVal).toFixed(2).replace('.',',');}if(!payload.price_display){const priceCandidates=Array.from(document.querySelectorAll('.product-briefing div, .product-briefing span, .product-briefing p, [class*=\"price\"], [class*=\"Price\"], ._2v0W9x, .pqTWkA, ._3n5z6N, ._2Sh71d'));const foundPriceEl=priceCandidates.find(el=>{const t=(el.innerText||'').trim();return /^R\\$\\s*[0-9]{1,3}(?:\\.[0-9]{3})*(?:,[0-9]{2})?$/i.test(t);})||priceCandidates.find(el=>{const t=(el.innerText||'').trim();return /R\\$\\s*[0-9.,]+/i.test(t)&&t.length<25;});if(foundPriceEl){const pMatch=(foundPriceEl.innerText||'').match(/R\\$\\s*[0-9.,]+/i);if(pMatch)payload.price_display=pMatch[0].trim();}}const origEl=document.querySelector('.product-briefing ._1G_B1p, .product-briefing [style*=\"line-through\"], .product-briefing del, .product-briefing s, del, s, [style*=\"line-through\"]');if(origEl){const oMatch=(origEl.innerText||'').match(/R\\$\\s*[0-9.,]+/i);if(oMatch)payload.original_price=oMatch[0].trim();}const discEl=document.querySelector('.product-briefing [class*=\"discount\"], .product-briefing ._10uUv7, [class*=\"discount\"]');if(discEl&&discEl.innerText.includes('OFF')){payload.discount_tag=discEl.innerText.trim();};payload.is_imported=Boolean(document.body.innerText.match(/Internacional|Vendedor Internacional|Envio do exterior/i));}else if(host.includes('natura')||host.includes('avon')){payload.platform=host.includes('avon')?'avon':'natura';payload.title=(document.querySelector('h1')?.innerText||document.querySelector('meta[property=\"og:title\"]')?.content||document.title||'').replace(/\\s*\\|\\s*(Natura|Avon).*$/i,'').trim();payload.image_url=document.querySelector('meta[property=\"og:image\"]')?.content||document.querySelector('img[src*=\"natura\"], img[src*=\"avon\"]')?.src||'';const priceMeta=document.querySelector('meta[property=\"product:price:amount\"]')?.content;if(priceMeta){payload.price_display='R$ '+parseFloat(priceMeta).toFixed(2).replace('.',',');}else{const pEl=Array.from(document.querySelectorAll('span, p, div')).find(e=>/^R\\$\\s*[0-9.,]+$/.test(e.innerText.trim()));if(pEl)payload.price_display=pEl.innerText.trim();}}else{alert('⚠️ Use este botão em uma página de produto da Amazon, Mercado Livre, Shopee ou Natura!');return;}if(!payload.title){alert('⚠️ Não foi possível identificar o título do produto.');return;}const toast=document.createElement('div');toast.style.cssText='position:fixed;top:20px;right:20px;z-index:99999999;background:#6366f1;color:#fff;padding:16px 22px;border-radius:12px;font-family:sans-serif;font-weight:bold;font-size:14px;box-shadow:0 10px 25px rgba(0,0,0,0.3);';toast.innerText='⚡ Enviando para FastSavory\\'s Achadinhos...';document.body.appendChild(toast);fetch('https://fastsavorys.vercel.app/api/check-affiliate-links?action=quick-save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).then(r=>r.json()).then(data=>{if(data.success){toast.style.background='#10b981';toast.innerHTML='🎉 Salvo com Sucesso no Site!<br><span style=\"font-size:11px;font-weight:normal;\">'+(payload.title.substring(0,40))+'...</span>';setTimeout(()=>toast.remove(),3500);}else{toast.style.background='#e11d48';toast.innerText='❌ '+(data.error||'Erro ao salvar');setTimeout(()=>toast.remove(),4000);}}).catch(e=>{toast.style.background='#e11d48';toast.innerText='❌ Erro de conexão: '+e.message;setTimeout(()=>toast.remove(),4000);});}catch(e){alert('Erro Quick Clip: '+e.message);}})();`;
+  }
+
+  async function syncExpiredFlashDeals() {
+    if (window.showToast) {
+      window.showToast('⚡ Verificando ofertas relâmpago expiradas...', 'info');
+    }
+    try {
+      const res = await fetch('/api/check-affiliate-links?action=sync-flash-expired');
+      const data = await res.json();
+      if (data.success) {
+        if (data.count > 0) {
+          if (window.showToast) {
+            window.showToast(`🎉 ${data.count} oferta(s) relâmpago atualizada(s) com preços normais!`, 'success');
+          } else {
+            alert(`🎉 ${data.count} oferta(s) relâmpago atualizada(s) com preços normais!`);
+          }
+          await loadProducts();
+        } else {
+          if (window.showToast) {
+            window.showToast('✅ Nenhuma oferta relâmpago expirada pendente.', 'success');
+          } else {
+            alert('✅ Nenhuma oferta relâmpago expirada pendente.');
+          }
+        }
+      } else {
+        throw new Error(data.error || 'Erro na verificação');
+      }
+    } catch (err) {
+      console.error('[Sync Flash Error]:', err);
+      if (window.showToast) {
+        window.showToast('❌ Erro: ' + err.message, 'error');
+      } else {
+        alert('❌ Erro ao verificar ofertas relâmpago: ' + err.message);
+      }
+    }
   }
 
   function openBookmarkletModal() {
@@ -2363,6 +2447,7 @@ window.AffiliatesModule = (function () {
     closeBookmarkletModal,
     copyBookmarkletCode,
     getBookmarkletCode,
+    syncExpiredFlashDeals,
     goToPage
   };
 })();

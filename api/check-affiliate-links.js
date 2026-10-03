@@ -98,6 +98,8 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
   let isPaused = false;
   let isFlashDeal = false;
   let flashDealEnd = null;
+  let isPrime = false;
+  let isImported = false;
 
   // Detecção Automática Global de Oferta Relâmpago (Shopee, Mercado Livre, Amazon)
   if (/(?:OFERTAS?\s*(?:⏰\s*)?REL[ÂA]MPAGO|flash[-_]sale|lightning[-_]deal)/i.test(html)) {
@@ -125,7 +127,7 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
   }
 
   if (platform === 'amazon') {
-    // 1. Availability check
+    // 1. Availability & Import check
     if (
       html.includes('Atualmente indisponível') ||
       html.includes('Currently unavailable') ||
@@ -138,12 +140,41 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
       isPaused = true;
     }
 
-    // 1. Authoritative Twister Plus BuyBox State (Exact current BuyBox price, ignores used/collectible options)
-    const twisterMatch = html.match(/(?:"|&quot;)desktop_buybox_group_1(?:"|&quot;)\s*:\s*\[\{\s*(?:"|&quot;)displayPrice(?:"|&quot;)\s*:\s*(?:"|&quot;)([^"&]+)(?:"|&quot;)/i) ||
-                         html.match(/(?:"|&quot;)desktop_buybox_group_1(?:"|&quot;)[\s\S]*?(?:"|&quot;)displayPrice(?:"|&quot;)\s*:\s*(?:"|&quot;)([^"&]+)(?:"|&quot;)/i);
-    if (twisterMatch && twisterMatch[1]) {
-      const clean = twisterMatch[1].replace(/&nbsp;/g, ' ').replace(/\u00a0/g, ' ').trim();
-      if (clean) price = clean;
+    // Detecção segura de produto importado (remove comentários HTML e menus/rodapés para evitar falso-positivo)
+    const cleanForImport = html
+      .replace(/<!--[\s\S]*?-->/g, '')
+      .replace(/<footer[\s\S]*?<\/footer>/gi, '')
+      .replace(/id=["'](?:navFooter|nav-subnav|navbar)["'][\s\S]*?<\/div>/gi, '');
+
+    if (
+      /tributos\s+de\s+importa[çc][ãa]o/i.test(cleanForImport) ||
+      /compra\s+internacional/i.test(cleanForImport) ||
+      /enviado\s+de\s+fora\s+do\s+brasil/i.test(cleanForImport) ||
+      /vendido\s+por\s+amazon\s+(?:estados\s+unidos|us)/i.test(cleanForImport) ||
+      /id=["']exports_desktop_qualified_buybox["']/i.test(cleanForImport) ||
+      /id=["']agsk-detail-bullets["']/i.test(cleanForImport) ||
+      /(?:vendido|enviado)\s+por[^<]*amazon\s+global\s+store/i.test(cleanForImport) ||
+      /produtos?\s+importados?\s+dos?\s+estados\s+unidos/i.test(cleanForImport)
+    ) {
+      isImported = true;
+    }
+
+    // 1. input hidden attach-base-product-price (Preço exato oficial do produto principal selecionado)
+    const attachPrice = html.match(/id=["']attach-base-product-price["'][^>]*value=["']([0-9.]+)["']/i) ||
+                        html.match(/value=["']([0-9.]+)["'][^>]*id=["']attach-base-product-price["']/i);
+    if (attachPrice && attachPrice[1]) {
+      const val = parseFloat(attachPrice[1]);
+      if (!isNaN(val) && val > 0) price = formatBrlNumber(val);
+    }
+
+    // 2. Authoritative Twister Plus BuyBox State (Exact current BuyBox price, ignores used/collectible options)
+    if (!price) {
+      const twisterMatch = html.match(/(?:"|&quot;)desktop_buybox_group_1(?:"|&quot;)\s*:\s*\[\{\s*(?:"|&quot;)displayPrice(?:"|&quot;)\s*:\s*(?:"|&quot;)([^"&]+)(?:"|&quot;)/i) ||
+                           html.match(/(?:"|&quot;)desktop_buybox_group_1(?:"|&quot;)[\s\S]*?(?:"|&quot;)displayPrice(?:"|&quot;)\s*:\s*(?:"|&quot;)([^"&]+)(?:"|&quot;)/i);
+      if (twisterMatch && twisterMatch[1]) {
+        const clean = twisterMatch[1].replace(/&nbsp;/g, ' ').replace(/\u00a0/g, ' ').trim();
+        if (clean) price = clean;
+      }
     }
 
     if (!price) {
@@ -154,7 +185,17 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
       }
     }
 
-    // 2. Scoped BuyBox Container (desktop_buybox / buyBoxAccordion / priceblock_total_price_ww)
+    // 3. Apex core price identifier & targeted BuyBox price classes
+    if (!price) {
+      const apexMatch = html.match(/apex-core-price-identifier[\s\S]*?class=["'][^"']*a-offscreen[^"']*["']>\s*(R\$\s*[0-9.,]+)\s*</i) ||
+                        html.match(/class=["'][^"']*(?:apex-pricetopay-value|apexPriceToPay|priceToPay|reinventPricePriceToPayMargin|corePriceDisplay)[^"']*["'][\s\S]*?class=["'][^"']*a-offscreen[^"']*["']>\s*(R\$\s*[0-9.,]+)\s*</i);
+      if (apexMatch && apexMatch[1]) {
+        const clean = apexMatch[1].replace(/&nbsp;/g, ' ').replace(/\u00a0/g, ' ').trim();
+        if (clean) price = clean;
+      }
+    }
+
+    // 4. Scoped BuyBox Container (desktop_buybox / buyBoxAccordion / priceblock_total_price_ww)
     if (!price) {
       const bbSection = html.match(/id=["'](?:desktop_buybox|buyBoxAccordion)["'][\s\S]*?<\/form>/i);
       if (bbSection) {
@@ -171,7 +212,7 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
       }
     }
 
-    // 3. Subtotal / Tooltip / Priceblock WW
+    // 5. Subtotal / Tooltip / Priceblock WW
     if (!price) {
       const tpMatch = html.match(/id=["'](?:priceblock_total_price_ww|tp-tool-tip-subtotal-price-value)["'][\s\S]*?class=["']a-offscreen["']>\s*(R\$\s*[0-9.,]+)\s*<\/span>/i);
       if (tpMatch && tpMatch[1]) {
@@ -179,31 +220,12 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
       }
     }
 
-    // 4. Check aok-offscreen with priceToPay label (Amazon Pix / Cash price)
+    // 6. Check aok-offscreen with priceToPay label (Amazon Pix / Cash price)
     if (!price) {
       const pixMatch = html.match(/class=["'][^"']*aok-offscreen[^"']*["'][^>]*>\s*(R\$\s*[0-9.,]+)\s*<\/span>/i);
       if (pixMatch && pixMatch[1]) {
         const clean = pixMatch[1].replace(/&nbsp;/g, ' ').replace(/\u00a0/g, ' ').replace(/[^\d.,]/g, '').trim();
         if (clean) price = `R$ ${clean}`;
-      }
-    }
-
-    // 5. Targeted Amazon BuyBox / Apex Price Classes
-    if (!price) {
-      const targetedOffscreen = html.match(/class=["'][^"']*(?:apex-pricetopay-value|apexPriceToPay|priceToPay|reinventPricePriceToPayMargin|corePriceDisplay)[^"']*["'][\s\S]*?class=["'][^"']*a-offscreen[^"']*["']>([^<]+)</i);
-      if (targetedOffscreen && targetedOffscreen[1]) {
-        const clean = targetedOffscreen[1].replace(/&nbsp;/g, ' ').replace(/\u00a0/g, ' ').replace(/[^\d.,]/g, '').trim();
-        if (clean) price = `R$ ${clean}`;
-      }
-    }
-
-    // 6. Whole + Fraction combination
-    if (!price) {
-      const wholeMatch = html.match(/class=["'][^"']*a-price-whole[^"']*["']>([0-9.,]+)<[\s\S]*?class=["'][^"']*a-price-fraction[^"']*["']>([0-9]{2})</i);
-      if (wholeMatch && wholeMatch[1] && wholeMatch[2]) {
-        const whole = wholeMatch[1].replace(/[^\d.]/g, '');
-        const frac = wholeMatch[2];
-        price = `R$ ${whole},${frac}`;
       }
     }
 
@@ -213,6 +235,27 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
       if (classicMatch && classicMatch[1]) {
         const clean = classicMatch[1].replace(/&nbsp;/g, ' ').replace(/\u00a0/g, ' ').replace(/[^\d.,]/g, '').trim();
         if (clean) price = `R$ ${clean}`;
+      }
+    }
+
+    // 8. Scoped fallback isolando centerCol e limpando caixas de ofertas usadas / de terceiros
+    if (!price) {
+      const centerColMatch = html.match(/id=["'](?:centerCol|apex_desktop)["'][\s\S]*?id=["'](?:rightCol|desktop_buybox|navFooter)/i);
+      const zone = centerColMatch ? centerColMatch[0] : html;
+      const cleanZone = zone
+        .replace(/class=["'][^"']*(?:olp-touch|aod-ingress|aod-wrapper|olpLink)[^"']*["'][\s\S]*?<\/div>/gi, '')
+        .replace(/id=["'](?:olpLinkWidget_feature_div|all-offers-display|dynamic-aod-ingress-box|moreBuyingChoices_feature_div)["'][\s\S]*?<\/div>/gi, '');
+
+      const offMatch = cleanZone.match(/class=["'][^"']*a-price[^"']*["'][\s\S]*?class=["'][^"']*a-offscreen[^"']*["']>\s*(R\$\s*[0-9.,]+)\s*</i);
+      if (offMatch && offMatch[1]) {
+        price = offMatch[1].replace(/&nbsp;/g, ' ').replace(/\u00a0/g, ' ').trim();
+      } else {
+        const wholeMatch = cleanZone.match(/class=["'][^"']*a-price-whole[^"']*["']>([0-9.,]+)<[\s\S]*?class=["'][^"']*a-price-fraction[^"']*["']>([0-9]{2})</i);
+        if (wholeMatch && wholeMatch[1] && wholeMatch[2]) {
+          const whole = wholeMatch[1].replace(/[^\d.]/g, '');
+          const frac = wholeMatch[2];
+          price = `R$ ${whole},${frac}`;
+        }
       }
     }
 
@@ -297,6 +340,21 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
       }
     }
 
+    // Amazon Prime Membership Detection (Exclusive badge, Prime accordion or free shipping)
+    isPrime = Boolean(
+      html.match(/id=["']prime-accordion["']/i) ||
+      html.match(/a-icon-prime/i) ||
+      html.match(/icon-prime/i) ||
+      html.match(/primeExclusivePrice/i) ||
+      html.match(/"isPrime"\s*:\s*true/i) ||
+      html.match(/"prime"\s*:\s*true/i) ||
+      html.match(/badge_delivery_prime/i) ||
+      html.match(/amazon\.com\.br\/prime/i) ||
+      html.match(/frete grátis com (o )?prime/i) ||
+      html.match(/frete grátis com o amazon prime/i) ||
+      html.match(/entrega grátis.*amazon prime/i)
+    );
+
   } else if (platform === 'shopee') {
     if (
       html.includes('Produto esgotado') ||
@@ -326,6 +384,15 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
       }
     }
 
+    if (
+      /vendedor\s+internacional/i.test(html) ||
+      /envio\s+de[:\s]+internacional/i.test(html) ||
+      /compra\s+internacional/i.test(html) ||
+      (/exterior/i.test(html) && /envio/i.test(html))
+    ) {
+      isImported = true;
+    }
+
   } else {
     // Mercado Livre - Multi-layer High Precision Engine
     if (
@@ -335,6 +402,15 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
       html.includes('Produto esgotado')
     ) {
       isPaused = true;
+    }
+
+    if (
+      /compra\s+internacional/i.test(html) ||
+      /vendedor\s+internacional/i.test(html) ||
+      /tributos\s+(?:de\s+importa[çc][ãa]o\s+)?inclusos/i.test(html) ||
+      html.includes('cbt')
+    ) {
+      isImported = true;
     }
 
     // LAYER 1: Authoritative Nordic / Initial State JSON (100% precise catalog price)
@@ -507,7 +583,7 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
     }
   }
 
-  return { price, originalPrice, discountTag, couponCode, isPaused, isFlashDeal, flashDealEnd };
+  return { price, originalPrice, discountTag, couponCode, isPaused, isFlashDeal, flashDealEnd, isPrime, isImported };
 }
 
 async function fetchProductDetails(rawUrl) {
@@ -528,6 +604,7 @@ async function fetchProductDetails(rawUrl) {
           image_url: shopeeData.image_url || '',
           affiliate_url: shopeeData.affiliate_url || targetUrl,
           is_active: shopeeData.is_active !== false,
+          is_imported: Boolean(shopeeData.is_imported || (shopeeData.title && /internacional|importad/i.test(shopeeData.title))),
           platform: 'shopee',
           sales: shopeeData.sales,
           rating: shopeeData.rating
@@ -727,7 +804,7 @@ async function fetchProductDetails(rawUrl) {
     }
   }
 
-  const { price, originalPrice, discountTag, couponCode, isPaused, isFlashDeal, flashDealEnd } = extractProductPriceAndStatus(html, platform);
+  const { price, originalPrice, discountTag, couponCode, isPaused, isFlashDeal, flashDealEnd, isPrime, isImported } = extractProductPriceAndStatus(html, platform);
 
   let discountPercent = 0;
   if (price && originalPrice) {
@@ -753,6 +830,8 @@ async function fetchProductDetails(rawUrl) {
     category: detectedCategory,
     platform: platform,
     is_active: !isPaused,
+    is_prime: Boolean(isPrime),
+    is_imported: Boolean(isImported),
     affiliate_url: rawUrl,
     final_url: targetUrl
   };
@@ -886,14 +965,36 @@ async function handler(req, res) {
         original_price: payload.original_price ? String(payload.original_price).trim() : null,
         category: payload.category || detectCategory(title, payload.description || '', affiliate_url),
         discount_tag: payload.discount_tag || payload.tag || null,
+        badge_tag: payload.badge_tag || null,
         coupon_code: payload.coupon_code ? String(payload.coupon_code).trim() : null,
         badge_color: payload.badge_color || payload.color || 'orange',
         is_fast_pick: payload.is_fast_pick === true || payload.is_fast_pick === 'true',
+        is_prime: payload.is_prime === true || payload.is_prime === 'true' || false,
+        is_imported: payload.is_imported === true || payload.is_imported === 'true' || false,
+        flash_deal_end: payload.flash_deal_end || null,
         position: 1,
         is_active: true,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
+
+      // Se o preço não veio ou veio em branco pelo navegador/Quick Clip, busca automaticamente no backend
+      if (!itemToInsert.price_display || itemToInsert.price_display === 'R$ ' || itemToInsert.price_display === 'R$ 0,00') {
+        try {
+          const autoDetails = await fetchProductDetails(affiliate_url);
+          if (autoDetails) {
+            if (autoDetails.price_display) itemToInsert.price_display = autoDetails.price_display;
+            if (!itemToInsert.original_price && autoDetails.original_price) itemToInsert.original_price = autoDetails.original_price;
+            if (!itemToInsert.discount_tag && autoDetails.discount_tag) itemToInsert.discount_tag = autoDetails.discount_tag;
+            if (!itemToInsert.image_url && autoDetails.image_url) itemToInsert.image_url = autoDetails.image_url;
+            if (autoDetails.coupon_code && !itemToInsert.coupon_code) itemToInsert.coupon_code = autoDetails.coupon_code;
+            if (autoDetails.is_prime) itemToInsert.is_prime = true;
+            if (autoDetails.is_imported) itemToInsert.is_imported = true;
+          }
+        } catch (e) {
+          console.warn('[Quick-Save] Falha no fallback auto-fetch:', e.message);
+        }
+      }
 
       const insertRes = await fetch(`${SUPABASE_URL}/rest/v1/fast_affiliate_products`, {
         method: 'POST',
@@ -1025,6 +1126,11 @@ async function handler(req, res) {
     // Action 0.5: Automatic Link Health, Status & Price Synchronizer
     if (action === 'auto-sync' || action === 'auto-sync-links' || action === 'sync-prices') {
       return handleAutoSyncLinks(req, res);
+    }
+
+    // Action 0.6: Immediate Sync of Expired Flash Deals
+    if (action === 'sync-flash-expired' || action === 'sync-expired-flash') {
+      return handleSyncExpiredFlashDeals(req, res);
     }
 
     // Action 1: Auto-fetch single product details with high precision
@@ -1187,6 +1293,79 @@ async function handler(req, res) {
   }
 }
 
+async function handleSyncExpiredFlashDeals(req, res) {
+  const SUPABASE_URL = process.env.SUPABASE_URL || 'https://vqjyjdllapqbqpylshkw.supabase.co';
+  const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxanlqZGxsYXBxYnFweWxzaGt3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY0MzgyNDUsImV4cCI6MjA4MjAxNDI0NX0.tfTR9YnM5l0do7FJfxML6i05KTSrMInQMqFrWXx6aAU';
+
+  try {
+    const nowIso = new Date().toISOString();
+    console.log('[Sync Expired Flash Deals] Buscando ofertas relâmpago expiradas...');
+    const dbRes = await fetch(`${SUPABASE_URL}/rest/v1/fast_affiliate_products?select=*&is_active=eq.true&or=(badge_color.eq.flash_deal,flash_deal_end.lte.${nowIso})&limit=30`, {
+      headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+    });
+
+    if (!dbRes.ok) {
+      throw new Error(`Erro ao buscar do Supabase: HTTP ${dbRes.status}`);
+    }
+
+    const items = await dbRes.json();
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(200).json({ success: true, message: 'Nenhuma oferta relâmpago expirada para atualizar.', count: 0, items: [] });
+    }
+
+    const results = [];
+    await Promise.all(items.map(async (item) => {
+      try {
+        const details = await fetchProductDetails(item.affiliate_url);
+        if (details.is_active === false) {
+          await fetch(`${SUPABASE_URL}/rest/v1/fast_affiliate_products?id=eq.${item.id}`, {
+            method: 'PATCH',
+            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ is_active: false, updated_at: new Date().toISOString() })
+          });
+          results.push({ id: item.id, title: item.title, action: 'paused', reason: 'Esgotado na loja de origem' });
+        } else {
+          const patchPayload = {
+            updated_at: new Date().toISOString(),
+            flash_deal_end: null,
+            badge_color: 'orange'
+          };
+          if (details.price_display) patchPayload.price_display = details.price_display;
+          if (details.original_price !== undefined) patchPayload.original_price = details.original_price || null;
+          if (item.badge_tag && /rel[âa]mpago/i.test(item.badge_tag)) patchPayload.badge_tag = null;
+          if (item.discount_tag && /rel[âa]mpago/i.test(item.discount_tag)) patchPayload.discount_tag = details.discount_tag || null;
+          if (details.is_imported !== undefined) patchPayload.is_imported = details.is_imported;
+
+          await fetch(`${SUPABASE_URL}/rest/v1/fast_affiliate_products?id=eq.${item.id}`, {
+            method: 'PATCH',
+            headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify(patchPayload)
+          });
+          results.push({
+            id: item.id,
+            title: item.title,
+            action: 'updated',
+            old_price: item.price_display,
+            new_price: details.price_display || item.price_display
+          });
+        }
+      } catch (err) {
+        results.push({ id: item.id, title: item.title, action: 'error', error: err.message });
+      }
+    }));
+
+    return res.status(200).json({
+      success: true,
+      message: `Revalidação de relâmpagos concluída: ${results.length} produtos atualizados com novos preços.`,
+      count: results.length,
+      results
+    });
+  } catch (e) {
+    console.error('[Sync Flash Expired Error]:', e);
+    return res.status(500).json({ success: false, error: e.message });
+  }
+}
+
 async function handleAutoSyncLinks(req, res) {
   const SUPABASE_URL = process.env.SUPABASE_URL || 'https://vqjyjdllapqbqpylshkw.supabase.co';
   const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxanlqZGxsYXBxYnFweWxzaGt3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY0MzgyNDUsImV4cCI6MjA4MjAxNDI0NX0.tfTR9YnM5l0do7FJfxML6i05KTSrMInQMqFrWXx6aAU';
@@ -1225,21 +1404,43 @@ async function handleAutoSyncLinks(req, res) {
   const limit = Math.min(Math.max(parseInt(req.query?.limit || req.body?.limit || '15', 10), 1), 30);
 
   try {
-    console.log(`[AutoSync Affiliate Links] Verificando lote de ${limit} links (Round-robin pelos mais antigos)...`);
+    console.log(`[AutoSync Affiliate Links] Verificando lote de ${limit} links (Prioridade Relâmpagos Expirados + Round-robin)...`);
     
-    // Busca os produtos ativos que foram atualizados há mais tempo (fila rotativa)
-    const dbRes = await fetch(`${SUPABASE_URL}/rest/v1/fast_affiliate_products?select=*&is_active=eq.true&order=updated_at.asc&limit=${limit}`, {
-      headers: {
-        'apikey': SUPABASE_KEY,
-        'Authorization': `Bearer ${SUPABASE_KEY}`
+    // 1. Prioridade Máxima: busca produtos ativos com oferta relâmpago que já expiraram
+    let expiredFlashItems = [];
+    try {
+      const nowIso = new Date().toISOString();
+      const flashRes = await fetch(`${SUPABASE_URL}/rest/v1/fast_affiliate_products?select=*&is_active=eq.true&badge_color=eq.flash_deal&flash_deal_end=lte.${nowIso}&limit=10`, {
+        headers: { 'apikey': SUPABASE_KEY, 'Authorization': `Bearer ${SUPABASE_KEY}` }
+      });
+      if (flashRes.ok) {
+        expiredFlashItems = await flashRes.json();
       }
-    });
-
-    if (!dbRes.ok) {
-      throw new Error(`Erro ao buscar produtos do banco: HTTP ${dbRes.status}`);
+    } catch (e) {
+      console.warn('[AutoSync] Erro ao buscar relâmpagos expirados:', e.message);
     }
 
-    const items = await dbRes.json();
+    let items = Array.isArray(expiredFlashItems) ? [...expiredFlashItems] : [];
+    const remainingLimit = limit - items.length;
+
+    // 2. Complementa a fila com os produtos ativos atualizados há mais tempo (fila rotativa)
+    if (remainingLimit > 0) {
+      const dbRes = await fetch(`${SUPABASE_URL}/rest/v1/fast_affiliate_products?select=*&is_active=eq.true&order=updated_at.asc&limit=${remainingLimit}`, {
+        headers: {
+          'apikey': SUPABASE_KEY,
+          'Authorization': `Bearer ${SUPABASE_KEY}`
+        }
+      });
+
+      if (dbRes.ok) {
+        const roundRobinItems = await dbRes.json();
+        const existingIds = new Set(items.map(x => x.id));
+        for (const it of roundRobinItems) {
+          if (!existingIds.has(it.id)) items.push(it);
+        }
+      }
+    }
+
     if (!Array.isArray(items) || items.length === 0) {
       return res.status(200).json({ success: true, message: 'Nenhum produto ativo para verificar.', total_checked: 0 });
     }
@@ -1275,6 +1476,23 @@ async function handleAutoSyncLinks(req, res) {
           let isPriceDrop = false;
           let dropPct = 0;
           let diff = 0;
+
+          // Se for produto com oferta relâmpago cujo tempo encerrou:
+          const isExpiredFlash = (item.badge_color === 'flash_deal' || item.flash_deal_end) && 
+                                 item.flash_deal_end && new Date(item.flash_deal_end) <= new Date();
+          if (isExpiredFlash) {
+            patchPayload.flash_deal_end = null;
+            if (patchPayload.badge_color === undefined || patchPayload.badge_color === 'flash_deal' || item.badge_color === 'flash_deal') {
+              patchPayload.badge_color = 'orange';
+            }
+            if (item.badge_tag && /rel[âa]mpago/i.test(item.badge_tag)) {
+              patchPayload.badge_tag = null;
+            }
+            if (item.discount_tag && /rel[âa]mpago/i.test(item.discount_tag)) {
+              patchPayload.discount_tag = details.discount_tag || null;
+            }
+            hasPriceChange = true;
+          }
 
           if (details.price_display && details.price_display !== item.price_display) {
             patchPayload.price_display = details.price_display;
@@ -1312,6 +1530,14 @@ async function handleAutoSyncLinks(req, res) {
             patchPayload.coupon_code = details.coupon_code;
             hasPriceChange = true;
           }
+          if (details.is_prime !== undefined && details.is_prime !== item.is_prime) {
+            patchPayload.is_prime = details.is_prime;
+            hasPriceChange = true;
+          }
+          if (details.is_imported !== undefined && details.is_imported !== item.is_imported) {
+            patchPayload.is_imported = details.is_imported;
+            hasPriceChange = true;
+          }
 
           await fetch(`${SUPABASE_URL}/rest/v1/fast_affiliate_products?id=eq.${item.id}`, {
             method: 'PATCH',
@@ -1328,7 +1554,7 @@ async function handleAutoSyncLinks(req, res) {
             updates.push({
               id: item.id,
               title: item.title,
-              action: isPriceDrop ? 'price_dropped' : 'price_updated',
+              action: isPriceDrop ? 'price_dropped' : (isExpiredFlash ? 'flash_expired_updated' : 'price_updated'),
               old_price: item.price_display,
               new_price: details.price_display,
               drop_percent: dropPct

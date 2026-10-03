@@ -1803,6 +1803,11 @@
                                 class="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-1.5 text-xs sm:text-sm shadow-md transition">
                                 <span>📌</span> 1-Clique Quick Clip
                             </button>
+                            <button onclick="AffiliatesModule.syncExpiredFlashDeals()"
+                                class="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-1.5 text-xs sm:text-sm shadow-md transition"
+                                title="Revalida preços de ofertas relâmpago cujo tempo encerrou">
+                                <span>⚡</span> Revalidar Relâmpagos
+                            </button>
                             <button onclick="AffiliatesModule.checkAllLinksHealth()"
                                 class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold flex items-center gap-1.5 text-xs sm:text-sm shadow-md transition">
                                 <span>🩺</span> Verificar Links
@@ -2315,12 +2320,13 @@
                         <option value="" style="background:#ffffff; color:#4b5563; font-size:12px;">(Sem Selo / Nenhuma Tag)</option>
                         <option value="⚡ Oferta Relâmpago|flash_deal" style="background:#fee2e2; color:#b91c1c; font-weight:bold; font-size:12px;">⚡ Oferta Relâmpago (Contador)</option>
                         <option value="💥 Oferta Imperdível|blue" style="background:#eff6ff; color:#1d4ed8; font-size:12px;">💥 Oferta Imperdível</option>
+                        <option value="Indicado|orange" style="background:#fff7ed; color:#c2410c; font-size:12px;">🟠 Indicado</option>
                         <option value="🔥 Mais Vendido|orange" style="background:#fff7ed; color:#c2410c; font-size:12px;">🔥 Mais Vendido</option>
                         <option value="➕ Buscado|purple" style="background:#faf5ff; color:#7e22ce; font-size:12px;">➕ Mais Buscado</option>
                         <option value="⭐ Prático|amber" style="background:#fffbeb; color:#b45309; font-size:12px;">⭐ Prático</option>
                         <option value="🛡️ Loja Oficial|black" style="background:#f1f5f9; color:#334155; font-size:12px;">🛡️ Loja Oficial</option>
                         <option value="Escolha da Amazon|black" style="background:#f1f5f9; color:#334155; font-size:12px;">🏷️ Escolha da Amazon</option>
-                        <option value="Oferta|pink" style="background:#fdf2f8; color:#be185d; font-size:12px;">🌸 Oferta</option>
+                        <option value="Oferta|pink" style="background:#fdf2f8; color:#be185d; font-size:12px;">🩷 Oferta</option>
                         <option value="Menor Preço|rose" style="background:#fff1f2; color:#be123c; font-size:12px;">🔴 Menor Preço</option>
                         <option value="custom" style="background:#f9fafb; color:#374151; font-size:12px;">✏️ Outra tag personalizada...</option>
                     </select>
@@ -2390,6 +2396,34 @@
                                 <span class="text-[10px] bg-gradient-to-r from-pink-500 to-purple-600 text-white px-2 py-0.5 rounded-full font-black shadow-2xs">Já usei / Recomendo</span>
                             </label>
                             <p class="text-xs text-gray-500 mt-0.5">Aplica a moldura rosa/roxa especial e o selo de recomendação oficial na vitrine.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Selo Amazon Prime -->
+                <div class="p-3 rounded-xl bg-gradient-to-r from-sky-50 via-blue-50 to-sky-50 border border-sky-200 flex items-center justify-between shadow-2xs">
+                    <div class="flex items-center gap-3">
+                        <input type="checkbox" id="affiliateIsPrimeInput" class="w-5 h-5 text-sky-600 rounded focus:ring-sky-500 cursor-pointer" />
+                        <div>
+                            <label for="affiliateIsPrimeInput" class="font-bold text-gray-900 text-sm cursor-pointer flex items-center gap-1.5">
+                                <span class="inline-flex items-center gap-0.5 px-2 py-0.5 text-xs rounded-full bg-[#00a8e1] text-white font-black shadow-xs">✓ prime</span>
+                                <span class="text-xs text-sky-950 font-bold">Produto Amazon Prime</span>
+                            </label>
+                            <p class="text-xs text-gray-500 mt-0.5">Exibe o selo oficial Prime na vitrine e o aviso de frete grátis Prime no WhatsApp.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Selo Produto Importado / Compra Internacional -->
+                <div class="p-3 rounded-xl bg-gradient-to-r from-slate-50 via-cyan-50/50 to-slate-50 border border-slate-300 flex items-center justify-between shadow-2xs">
+                    <div class="flex items-center gap-3">
+                        <input type="checkbox" id="affiliateIsImportedInput" class="w-5 h-5 text-slate-800 rounded focus:ring-slate-700 cursor-pointer" />
+                        <div>
+                            <label for="affiliateIsImportedInput" class="font-bold text-gray-900 text-sm cursor-pointer flex items-center gap-1.5">
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-slate-900 text-cyan-300 font-bold shadow-xs">✈️ Compra Internacional</span>
+                                <span class="text-xs text-slate-800 font-bold">Produto Importado</span>
+                            </label>
+                            <p class="text-xs text-gray-500 mt-0.5">Exibe a tag ✈️ Importado na vitrine para o cliente saber que é compra internacional.</p>
                         </div>
                     </div>
                 </div>

@@ -63,9 +63,36 @@ function buildWhatsAppDealText(product, customContext = null) {
   const sealHeader = isFastPick ? '👑 *PRODUTO TESTADO E RECOMENDADO PELA FASTSAVORY\'S* ✨\n' : '';
   const platform = detectPlatform(product.affiliate_url).name.toUpperCase();
   const pct = calcDiscountPercent(product.original_price, product.price_display);
-  const discountText = pct > 0 ? ` (${pct}% OFF)` : (product.discount_tag ? ` (${product.discount_tag})` : '');
+  
+  // Desconto formatado com suporte a No Pix, No Pix c/ Cupom, Com Cupom ou OFF
+  const rawDisc = (product.discount_tag || '').trim();
+  let discountText = '';
+  if (/no pix c(om|\/)?\s*cupom/i.test(rawDisc)) {
+    discountText = pct > 0 ? ` (${pct}% OFF no Pix c/ Cupom)` : ` (No Pix c/ Cupom)`;
+  } else if (/no pix/i.test(rawDisc)) {
+    discountText = pct > 0 ? ` (${pct}% OFF no Pix)` : ` (No Pix)`;
+  } else if (/c(om|\/)?\s*cupom/i.test(rawDisc)) {
+    discountText = pct > 0 ? ` (${pct}% OFF c/ Cupom)` : ` (c/ Cupom)`;
+  } else if (pct > 0) {
+    discountText = ` (${pct}% OFF)`;
+  } else if (rawDisc && (/off/i.test(rawDisc) || /^\d+%/.test(rawDisc))) {
+    discountText = ` (${rawDisc})`;
+  }
+
+  // Tag Destaque (ex: Indicado, Mais Vendido, Oferta)
+  let tagText = '';
+  const rawBadge = (product.badge_tag || '').trim();
+  if (rawBadge) {
+    if (rawBadge.toLowerCase().includes('indicado')) tagText = `🏷️ *Destaque:* 🟠 Indicado\n`;
+    else if (rawBadge.toLowerCase().includes('oferta')) tagText = `🏷️ *Destaque:* 🩷 Oferta\n`;
+    else tagText = `🏷️ *Destaque:* ${rawBadge}\n`;
+  }
+
+  // Destaque Amazon Prime
+  const isPrime = Boolean(product.is_prime);
+  const primeLine = isPrime ? '🚚 *Entrega Rápida e Grátis com Amazon Prime!* ✓\n' : '';
+
   const origPriceText = product.original_price ? `~${product.original_price}~ ➔ ` : '';
-  const descText = product.description ? `\n${product.description}\n` : '';
   
   let couponText = '';
   if (product.coupon_code) {
@@ -96,7 +123,7 @@ function buildWhatsAppDealText(product, customContext = null) {
   const pricePrefix = isFlashDeal ? '💥 *Preço Relâmpago:* ' : '💰 *Preço:* ';
   const ctaLine = isFlashDeal ? '👉 *GARANTA COM O PREÇO RELÂMPAGO AQUI:*' : '👉 *COMPRE COM DESCONTO AQUI:*';
 
-  return `${eventHeader}${flashHeader}${sealHeader}🛍️ *ACHADINHO ${platform}* ⭐\n🔥 *${product.title}*\n${descText}\n${pricePrefix}${origPriceText}*${product.price_display || 'Confira no link'}*${discountText}${couponText}\n\n${ctaLine}\n${product.affiliate_url}\n\n💬 *Entre no canal VIP de ofertas da FastSavory's:*\nhttps://chat.whatsapp.com/C7dT0ZWaUZKHm7atI3eOLE`;
+  return `${eventHeader}${flashHeader}${sealHeader}🛍️ *ACHADINHO ${platform}* ⭐\n${tagText}🔥 *${product.title}*\n\n${pricePrefix}${origPriceText}*${product.price_display || 'Confira no link'}*${discountText}\n${primeLine}${couponText}\n\n${ctaLine}\n${product.affiliate_url}\n\n💬 *Entre no canal VIP de ofertas da FastSavory's:*\nhttps://chat.whatsapp.com/C7dT0ZWaUZKHm7atI3eOLE`;
 }
 
 function getStoreContext() {
@@ -530,6 +557,74 @@ async function handleSendWhatsAppDeal(req, res) {
       }
 
         product = affiliateProducts[0];
+      }
+
+      // Validação em tempo real do preço e disponibilidade antes do disparo
+      if (product && product.affiliate_url) {
+        try {
+          const { fetchProductDetails } = require('../check-affiliate-links');
+          if (typeof fetchProductDetails === 'function') {
+            const fresh = await fetchProductDetails(product.affiliate_url);
+            if (fresh) {
+              if (fresh.is_active === false) {
+                console.log(`[WhatsApp Deal] Produto ${product.id} pausado/esgotado na loja de origem. Desativando no banco.`);
+                await supabaseAdmin
+                  .from('fast_affiliate_products')
+                  .update({ is_active: false, updated_at: new Date().toISOString() })
+                  .eq('id', product.id);
+                return res.status(200).json({
+                  success: false,
+                  skipped: true,
+                  message: `Produto "${product.title}" pausado/esgotado na loja de origem. Produto desativado no banco para proteger o grupo VIP.`
+                });
+              }
+
+              let changed = false;
+              const updateFields = {};
+              if (fresh.price_display && fresh.price_display !== product.price_display) {
+                console.log(`[WhatsApp Deal] Preço atualizado para ${product.id}: de "${product.price_display}" para "${fresh.price_display}"`);
+                product.price_display = fresh.price_display;
+                updateFields.price_display = fresh.price_display;
+                changed = true;
+              }
+              if (fresh.original_price && fresh.original_price !== product.original_price) {
+                product.original_price = fresh.original_price;
+                updateFields.original_price = fresh.original_price;
+                changed = true;
+              }
+              if (fresh.discount_tag && fresh.discount_tag !== product.discount_tag) {
+                product.discount_tag = fresh.discount_tag;
+                updateFields.discount_tag = fresh.discount_tag;
+                changed = true;
+              }
+              if (fresh.is_prime !== undefined && fresh.is_prime !== product.is_prime) {
+                product.is_prime = fresh.is_prime;
+                updateFields.is_prime = fresh.is_prime;
+                changed = true;
+              }
+              if (fresh.coupon_code && fresh.coupon_code !== product.coupon_code) {
+                product.coupon_code = fresh.coupon_code;
+                updateFields.coupon_code = fresh.coupon_code;
+                changed = true;
+              }
+              if (fresh.is_imported !== undefined && fresh.is_imported !== product.is_imported) {
+                product.is_imported = fresh.is_imported;
+                updateFields.is_imported = fresh.is_imported;
+                changed = true;
+              }
+
+              if (changed) {
+                updateFields.updated_at = new Date().toISOString();
+                await supabaseAdmin
+                  .from('fast_affiliate_products')
+                  .update(updateFields)
+                  .eq('id', product.id);
+              }
+            }
+          }
+        } catch (fetchErr) {
+          console.warn('[WhatsApp Deal] Rechecagem em tempo real falhou, mantendo dados do banco:', fetchErr.message);
+        }
       }
 
       isFastSavorysStore = false;

@@ -498,40 +498,67 @@
 
     grid.innerHTML = paginatedItems.map(item => {
       const isFastPick = Boolean(item.is_fast_pick || item.badge_color === 'fast_seal');
-      const isFlashDeal = Boolean(
+      const isExpiredFlash = Boolean(
+        item.flash_deal_end && new Date(item.flash_deal_end) <= new Date()
+      );
+      const isFlashDeal = !isExpiredFlash && Boolean(
         item.badge_color === 'flash_deal' || 
         (item.discount_tag && /rel[âa]mpago/i.test(item.discount_tag)) ||
         (item.flash_deal_end && new Date(item.flash_deal_end) > new Date())
       );
       const platformInfo = detectPlatform(item.affiliate_url);
 
-      // Cálculo automático de porcentagem de desconto (Verde)
+      // Formatação rica e precisa do desconto (Verde)
       const pct = calcDiscountPercent(item.original_price, item.price_display);
-      const discountBadgeHtml = pct > 0 
-        ? `<span class="inline-flex items-center px-2 py-0.5 text-xs font-black rounded-full bg-gradient-to-r from-emerald-600 to-green-600 text-white shadow-sm tracking-wide flex-shrink-0 animate-pulse">🔥 ${pct}% OFF</span>`
+      const rawDisc = (item.discount_tag || '').trim();
+      let formattedDisc = '';
+      if (/no pix c(om|\/)?\s*cupom/i.test(rawDisc)) {
+        formattedDisc = pct > 0 ? `🔥 ${pct}% OFF no Pix c/ Cupom` : `🔥 No Pix c/ Cupom`;
+      } else if (/no pix/i.test(rawDisc)) {
+        formattedDisc = pct > 0 ? `🔥 ${pct}% OFF no Pix` : `🔥 No Pix`;
+      } else if (/c(om|\/)?\s*cupom/i.test(rawDisc)) {
+        formattedDisc = pct > 0 ? `🔥 ${pct}% OFF c/ Cupom` : `🔥 Com Cupom`;
+      } else if (pct > 0) {
+        formattedDisc = `🔥 ${pct}% OFF`;
+      } else if (rawDisc && (/off/i.test(rawDisc) || /^\d+%/.test(rawDisc))) {
+        formattedDisc = `🔥 ${rawDisc}`;
+      }
+
+      const discountBadgeHtml = formattedDisc 
+        ? `<span class="inline-flex items-center px-2 py-0.5 text-xs font-black rounded-full bg-gradient-to-r from-emerald-600 to-green-600 text-white shadow-sm tracking-wide flex-shrink-0 animate-pulse">${escapeHtml(formattedDisc)}</span>`
         : '';
 
-      // Evita duplicidade de badge se a tag for apenas a indicação do mesmo desconto
-      let showTag = false;
-      const rawTag = item.discount_tag ? item.discount_tag.trim() : '';
-      if (rawTag) {
-        const isOnlyDiscountTag = /^[⚡🔥\s]*\d+%\s*OFF/i.test(rawTag);
-        if (!isOnlyDiscountTag || pct === 0) {
-          showTag = true;
+      // Tag de destaque (badge_tag ou discount_tag caso não seja texto de desconto)
+      let customTagText = item.badge_tag ? item.badge_tag.trim() : '';
+      if (!customTagText && rawDisc) {
+        const isDiscOnly = /^[⚡🔥\s]*\d+%\s*OFF/i.test(rawDisc) || /no pix|cupom/i.test(rawDisc);
+        if (!isDiscOnly) {
+          customTagText = rawDisc;
         }
       }
 
+      const showTag = Boolean(customTagText);
+
       // Resolução inteligente de cor do selo (respeitando os presets oficiais)
       let resolvedColor = item.badge_color || 'orange';
-      const normTag = rawTag.toLowerCase();
+      const normTag = customTagText.toLowerCase();
       if (normTag.includes('escolha da amazon') || normTag.includes("amazon's choice")) resolvedColor = 'black';
       else if (normTag.includes('menor preco') || normTag.includes('menor preço')) resolvedColor = 'rose';
+      else if (normTag.includes('indicado')) resolvedColor = 'orange';
       else if (normTag === 'oferta' || (normTag.includes('oferta') && !normTag.includes('imperd'))) resolvedColor = 'pink';
       else if (normTag.includes('imperd') || normTag.includes('oferta imperdivel')) resolvedColor = 'blue';
       else if (normTag.includes('mais vendido')) resolvedColor = 'orange';
       else if (normTag.includes('buscado')) resolvedColor = 'purple';
       else if (normTag.includes('pratico') || normTag.includes('prático')) resolvedColor = 'amber';
       else if (normTag.includes('loja oficial') || normTag.includes('oficial')) resolvedColor = 'black';
+
+      // Substituição da flor 🌸 por bolinha rosa na tag "Oferta" e formatação do "Indicado"
+      let displayTag = customTagText;
+      if (normTag === 'oferta' || normTag === '🌸 oferta') {
+        displayTag = '🩷 Oferta';
+      } else if (normTag === 'indicado' || normTag === 'indicado (laranja)') {
+        displayTag = '🟠 Indicado';
+      }
 
       // Cores para as badges secundárias
       let badgeStyle = 'bg-orange-100 text-orange-950 border-orange-300 font-bold';
@@ -544,7 +571,17 @@
       if (resolvedColor === 'black') badgeStyle = 'bg-gray-900 text-white border-gray-950 font-bold shadow-xs';
 
       const tagHtml = showTag 
-        ? `<span class="inline-flex items-center px-2 py-0.5 text-xs rounded-full border ${badgeStyle} flex-shrink-0 whitespace-nowrap">${escapeHtml(rawTag)}</span>` 
+        ? `<span class="inline-flex items-center px-2 py-0.5 text-xs rounded-full border ${badgeStyle} flex-shrink-0 whitespace-nowrap">${escapeHtml(displayTag)}</span>` 
+        : '';
+
+      const isPrime = Boolean(item.is_prime || (platformInfo.name === 'Amazon' && item.is_prime));
+      const primeBadgeHtml = isPrime 
+        ? `<span class="inline-flex items-center gap-0.5 px-2 py-0.5 text-[11px] rounded-full bg-[#00a8e1] text-white font-black shadow-xs flex-shrink-0 whitespace-nowrap" title="Entrega rápida e grátis com Amazon Prime">✓ prime</span>`
+        : '';
+
+      const isImported = Boolean(item.is_imported);
+      const importedBadgeHtml = isImported
+        ? `<span class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] rounded-full bg-slate-900 text-cyan-300 border border-slate-700 font-bold shadow-xs flex-shrink-0 whitespace-nowrap" title="Produto Importado / Compra Internacional">✈️ Importado</span>`
         : '';
 
       const platformBadgeHtml = `<span class="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] rounded-full border ${platformInfo.badge} font-bold shadow-xs flex-shrink-0 whitespace-nowrap">${platformInfo.icon} ${platformInfo.name}</span>`;
@@ -579,6 +616,8 @@
             <div class="absolute top-2 left-2 flex flex-row flex-wrap items-center gap-1.5 z-10 ${isFastPick ? 'max-w-[calc(100%-54px)]' : 'max-w-[calc(100%-16px)]'}">
               ${discountBadgeHtml}
               ${tagHtml}
+              ${primeBadgeHtml}
+              ${importedBadgeHtml}
               ${platformBadgeHtml}
             </div>
             <!-- Medalha Oficial FastSavory's no topo direito -->
@@ -648,10 +687,16 @@
 
             <!-- Preço e Botão de Ação -->
             <div class="mt-4 pt-3 border-t border-gray-100">
-              <div class="flex items-baseline gap-1 mb-3">
+              <div class="flex items-baseline gap-1 mb-1">
                 ${originalPriceHtml}
                 <span class="text-lg sm:text-xl font-extrabold text-gray-900">${escapeHtml(item.price_display || 'Ver Preço')}</span>
               </div>
+              ${isPrime ? `
+                <div class="flex items-center gap-1.5 mb-2.5">
+                  <span class="inline-flex items-center px-1.5 py-0.2 rounded bg-[#00a8e1] text-white text-[10px] font-black tracking-tight shadow-2xs">✓ prime</span>
+                  <span class="text-[11px] font-semibold text-slate-600">Frete GRÁTIS</span>
+                </div>
+              ` : '<div class="mb-2"></div>'}
 
               <div class="flex items-center gap-1.5">
                 <a 
@@ -738,10 +783,13 @@
           const parent = el.closest('.bg-gradient-to-r');
           if (parent && !parent.getAttribute('data-expired')) {
             parent.setAttribute('data-expired', 'true');
-            parent.classList.remove('from-red-600', 'via-orange-600', 'to-red-600');
-            parent.classList.add('from-gray-700', 'to-gray-800');
-            const label = parent.querySelector('.uppercase');
-            if (label) label.textContent = '⚠️ OFERTA ENCERRADA';
+            parent.style.transition = 'all 0.5s ease';
+            parent.style.opacity = '0';
+            setTimeout(() => {
+              parent.style.display = 'none';
+              // Notifica o backend para buscar o preço atualizado da loja e limpar status relâmpago
+              fetch('/api/check-affiliate-links?action=sync-flash-expired').catch(() => {});
+            }, 500);
           }
         }
       });
@@ -763,9 +811,10 @@
     const couponText = item.coupon_code ? `\n🎟️ *CUPOM DISPONÍVEL:* Use o cupom *${item.coupon_code}* na finalização!\n` : '';
     const isFastPick = Boolean(item.is_fast_pick || item.badge_color === 'fast_seal');
     const sealHeader = isFastPick ? '👑 *PRODUTO TESTADO E RECOMENDADO PELA FASTSAVORY\'S* ✨\n' : '';
+    const importedText = item.is_imported ? '✈️ *PRODUTO IMPORTADO (COMPRA INTERNACIONAL)*\n' : '';
     const platformInfo = detectPlatform(item.affiliate_url);
 
-    return `${sealHeader}🛍️ *ACHADINHO ${platformInfo.name.toUpperCase()}* ⭐\n🔥 *${item.title}*\n${descText}\n💰 *Preço:* ${origPriceText}*${item.price_display || 'Confira no link'}*${discountText}${couponText}\n\n👉 *COMPRE COM DESCONTO AQUI:*\n${item.affiliate_url}\n\n💬 *Entre no canal de avisos Achadinhos Fast no WhatsApp:*\nhttps://chat.whatsapp.com/C7dT0ZWaUZKHm7atI3eOLE`;
+    return `${sealHeader}${importedText}🛍️ *ACHADINHO ${platformInfo.name.toUpperCase()}* ⭐\n🔥 *${item.title}*\n${descText}\n💰 *Preço:* ${origPriceText}*${item.price_display || 'Confira no link'}*${discountText}${couponText}\n\n👉 *COMPRE COM DESCONTO AQUI:*\n${item.affiliate_url}\n\n💬 *Entre no canal de avisos Achadinhos Fast no WhatsApp:*\nhttps://chat.whatsapp.com/C7dT0ZWaUZKHm7atI3eOLE`;
   }
 
   window.openShareModal = function (id) {
