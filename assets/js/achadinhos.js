@@ -498,6 +498,11 @@
 
     grid.innerHTML = paginatedItems.map(item => {
       const isFastPick = Boolean(item.is_fast_pick || item.badge_color === 'fast_seal');
+      const isFlashDeal = Boolean(
+        item.badge_color === 'flash_deal' || 
+        (item.discount_tag && /rel[âa]mpago/i.test(item.discount_tag)) ||
+        (item.flash_deal_end && new Date(item.flash_deal_end) > new Date())
+      );
       const platformInfo = detectPlatform(item.affiliate_url);
 
       // Cálculo automático de porcentagem de desconto (Verde)
@@ -548,9 +553,12 @@
         ? `<span class="text-xs text-gray-400 line-through mr-1.5">${escapeHtml(item.original_price)}</span>` 
         : '';
 
-      const cardBorder = isFastPick 
-        ? 'border-4 border-pink-500 shadow-lg shadow-pink-100/50 ring-2 ring-purple-400/20' 
-        : 'border border-gray-100 shadow-sm';
+      let cardBorder = 'border border-gray-100 shadow-sm';
+      if (isFastPick) {
+        cardBorder = 'border-4 border-pink-500 shadow-lg shadow-pink-100/50 ring-2 ring-purple-400/20';
+      } else if (isFlashDeal) {
+        cardBorder = 'border-2 border-red-500 shadow-md shadow-red-200/50 ring-1 ring-red-400/20';
+      }
 
       const sealMedalHtml = isFastPick 
         ? `<img src="../assets/img/fast-seal.png" alt="Selo FastSavory's" class="absolute top-1.5 right-1.5 w-11 h-15 sm:w-13 sm:h-17 object-contain drop-shadow-md z-20 pointer-events-none transform rotate-2 hover:rotate-0 transition-transform" />`
@@ -576,6 +584,25 @@
             <!-- Medalha Oficial FastSavory's no topo direito -->
             ${sealMedalHtml}
           </div>
+
+          <!-- Banner Oferta Relâmpago com Contador Regressivo Shopee/ML Style -->
+          ${isFlashDeal ? `
+            <div class="bg-gradient-to-r from-red-600 via-orange-600 to-red-600 text-white py-1.5 px-3 flex items-center justify-between shadow-xs">
+              <div class="flex items-center gap-1.5 text-[11px] sm:text-xs font-black uppercase tracking-wider">
+                <span class="animate-bounce">⚡</span> <span>OFERTA RELÂMPAGO</span>
+              </div>
+              <div class="flex items-center gap-1 text-[10px] sm:text-[11px] font-bold">
+                <span class="text-red-100 uppercase tracking-tight hidden xs:inline">Termina em:</span>
+                <div class="flex items-center gap-0.5 font-mono font-black" data-flash-end="${item.flash_deal_end || ''}" data-created-at="${item.updated_at || item.created_at || ''}">
+                  <span class="bg-gray-950 text-white px-1.5 py-0.5 rounded text-[11px] flash-hh">--</span>
+                  <span>:</span>
+                  <span class="bg-gray-950 text-white px-1.5 py-0.5 rounded text-[11px] flash-mm">--</span>
+                  <span>:</span>
+                  <span class="bg-gray-950 text-white px-1.5 py-0.5 rounded text-[11px] flash-ss">--</span>
+                </div>
+              </div>
+            </div>
+          ` : ''}
 
           <!-- Selo FastSavory's em destaque no meio (2 linhas exatas) -->
           ${isFastPick ? `
@@ -663,6 +690,65 @@
         </div>
       `;
     }).join('');
+
+    initFlashDealsTicker();
+  }
+
+  let flashDealsInterval = null;
+  function initFlashDealsTicker() {
+    if (flashDealsInterval) clearInterval(flashDealsInterval);
+
+    function updateTimers() {
+      const timerEls = document.querySelectorAll('[data-flash-end]');
+      if (!timerEls || timerEls.length === 0) return;
+
+      const now = Date.now();
+
+      timerEls.forEach(el => {
+        const rawEnd = el.getAttribute('data-flash-end');
+        const rawCreated = el.getAttribute('data-created-at');
+        let endTime = 0;
+
+        if (rawEnd) {
+          endTime = new Date(rawEnd).getTime();
+        } else if (rawCreated) {
+          endTime = new Date(rawCreated).getTime() + 4 * 3600 * 1000;
+        } else {
+          endTime = now + 3 * 3600 * 1000;
+        }
+
+        const diff = endTime - now;
+        const hhEl = el.querySelector('.flash-hh');
+        const mmEl = el.querySelector('.flash-mm');
+        const ssEl = el.querySelector('.flash-ss');
+
+        if (diff > 0) {
+          const totalSec = Math.floor(diff / 1000);
+          const hh = String(Math.floor(totalSec / 3600)).padStart(2, '0');
+          const mm = String(Math.floor((totalSec % 3600) / 60)).padStart(2, '0');
+          const ss = String(totalSec % 60).padStart(2, '0');
+
+          if (hhEl) hhEl.textContent = hh;
+          if (mmEl) mmEl.textContent = mm;
+          if (ssEl) ssEl.textContent = ss;
+        } else {
+          if (hhEl) hhEl.textContent = '00';
+          if (mmEl) mmEl.textContent = '00';
+          if (ssEl) ssEl.textContent = '00';
+          const parent = el.closest('.bg-gradient-to-r');
+          if (parent && !parent.getAttribute('data-expired')) {
+            parent.setAttribute('data-expired', 'true');
+            parent.classList.remove('from-red-600', 'via-orange-600', 'to-red-600');
+            parent.classList.add('from-gray-700', 'to-gray-800');
+            const label = parent.querySelector('.uppercase');
+            if (label) label.textContent = '⚠️ OFERTA ENCERRADA';
+          }
+        }
+      });
+    }
+
+    updateTimers();
+    flashDealsInterval = setInterval(updateTimers, 1000);
   }
 
   // --- SHARE FUNCTIONALITY ---

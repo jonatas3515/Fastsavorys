@@ -2313,6 +2313,7 @@
                     <select id="affiliateTagPresetSelect" onchange="AffiliatesModule.handleTagPresetChange(this.value)"
                         class="w-full px-2.5 py-1.5 border rounded-lg bg-white outline-none font-medium text-xs focus:ring-2 focus:ring-amber-400 transition-all shadow-sm">
                         <option value="" style="background:#ffffff; color:#4b5563; font-size:12px;">(Sem Selo / Nenhuma Tag)</option>
+                        <option value="⚡ Oferta Relâmpago|flash_deal" style="background:#fee2e2; color:#b91c1c; font-weight:bold; font-size:12px;">⚡ Oferta Relâmpago (Contador)</option>
                         <option value="💥 Oferta Imperdível|blue" style="background:#eff6ff; color:#1d4ed8; font-size:12px;">💥 Oferta Imperdível</option>
                         <option value="🔥 Mais Vendido|orange" style="background:#fff7ed; color:#c2410c; font-size:12px;">🔥 Mais Vendido</option>
                         <option value="➕ Buscado|purple" style="background:#faf5ff; color:#7e22ce; font-size:12px;">➕ Mais Buscado</option>
@@ -2341,6 +2342,27 @@
                                 <option value="rose" style="background:#fff1f2; color:#be123c; font-size:12px;">🔴 Vermelho suave</option>
                                 <option value="pink" style="background:#fdf2f8; color:#be185d; font-size:12px;">🌸 Rosa suave</option>
                             </select>
+                        </div>
+                    </div>
+
+                    <!-- Flash Deal Countdown Settings (shown if 'flash_deal' is selected) -->
+                    <div id="affiliateFlashDealBox" class="p-3 bg-red-50/90 border border-red-200 rounded-xl mt-2 hidden animate-fade-in shadow-2xs">
+                        <div class="flex items-center justify-between mb-1.5">
+                            <label class="block font-bold text-red-900 text-xs flex items-center gap-1">
+                                <span>⚡</span> <span>Término da Oferta Relâmpago</span>
+                            </label>
+                            <span class="text-[10px] text-red-600 font-semibold">Gera o contador na vitrine</span>
+                        </div>
+                        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                            <input type="datetime-local" id="affiliateFlashDealEndInput" 
+                                class="px-2.5 py-1.5 border border-red-300 rounded-lg text-xs font-mono bg-white text-gray-800 flex-1 outline-none focus:ring-2 focus:ring-red-400 shadow-2xs" />
+                            <div class="flex items-center gap-1 justify-end flex-wrap">
+                                <button type="button" onclick="AffiliatesModule.setFlashHours(2)" class="px-2 py-1 bg-white hover:bg-red-100 text-red-800 border border-red-300 rounded text-[11px] font-bold shadow-2xs active:scale-95 transition cursor-pointer">+2h</button>
+                                <button type="button" onclick="AffiliatesModule.setFlashHours(3)" class="px-2 py-1 bg-white hover:bg-red-100 text-red-800 border border-red-300 rounded text-[11px] font-bold shadow-2xs active:scale-95 transition cursor-pointer">+3h</button>
+                                <button type="button" onclick="AffiliatesModule.setFlashHours(4)" class="px-2 py-1 bg-white hover:bg-red-100 text-red-800 border border-red-300 rounded text-[11px] font-bold shadow-2xs active:scale-95 transition cursor-pointer">+4h</button>
+                                <button type="button" onclick="AffiliatesModule.setFlashHours(6)" class="px-2 py-1 bg-white hover:bg-red-100 text-red-800 border border-red-300 rounded text-[11px] font-bold shadow-2xs active:scale-95 transition cursor-pointer">+6h</button>
+                                <button type="button" onclick="AffiliatesModule.setFlashHours(12)" class="px-2 py-1 bg-white hover:bg-red-100 text-red-800 border border-red-300 rounded text-[11px] font-bold shadow-2xs active:scale-95 transition cursor-pointer">+12h</button>
+                            </div>
                         </div>
                     </div>
                 </div>

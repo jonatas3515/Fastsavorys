@@ -83,7 +83,20 @@ function buildWhatsAppDealText(product, customContext = null) {
     ? `🔥🎯 *MEGA EVENTO ${eventLabel} | DIA DE SUPER OFERTAS!* 🏷️⚡\n💥 *Aproveite os cupons liberados e os maiores descontos do mês!*\n\n`
     : '';
 
-  return `${eventHeader}${sealHeader}🛍️ *ACHADINHO ${platform}* ⭐\n🔥 *${product.title}*\n${descText}\n💰 *Preço:* ${origPriceText}*${product.price_display || 'Confira no link'}*${discountText}${couponText}\n\n👉 *COMPRE COM DESCONTO AQUI:*\n${product.affiliate_url}\n\n💬 *Entre no canal VIP de ofertas da FastSavory's:*\nhttps://chat.whatsapp.com/C7dT0ZWaUZKHm7atI3eOLE`;
+  const isFlashDeal = Boolean(
+    product.badge_color === 'flash_deal' || 
+    (product.discount_tag && /rel[âa]mpago/i.test(product.discount_tag)) ||
+    (product.flash_deal_end && new Date(product.flash_deal_end) > new Date())
+  );
+
+  const flashHeader = isFlashDeal
+    ? `⚡⏰ *OFERTA RELÂMPAGO ${platform}!* ⏰⚡\n⏳ *CORRE! Válida por tempo limitado (ou até esgotar o estoque promocional)!*\n\n`
+    : '';
+
+  const pricePrefix = isFlashDeal ? '💥 *Preço Relâmpago:* ' : '💰 *Preço:* ';
+  const ctaLine = isFlashDeal ? '👉 *GARANTA COM O PREÇO RELÂMPAGO AQUI:*' : '👉 *COMPRE COM DESCONTO AQUI:*';
+
+  return `${eventHeader}${flashHeader}${sealHeader}🛍️ *ACHADINHO ${platform}* ⭐\n🔥 *${product.title}*\n${descText}\n${pricePrefix}${origPriceText}*${product.price_display || 'Confira no link'}*${discountText}${couponText}\n\n${ctaLine}\n${product.affiliate_url}\n\n💬 *Entre no canal VIP de ofertas da FastSavory's:*\nhttps://chat.whatsapp.com/C7dT0ZWaUZKHm7atI3eOLE`;
 }
 
 function getStoreContext() {
@@ -475,13 +488,35 @@ async function handleSendWhatsAppDeal(req, res) {
 
     // 2. Se for modo afiliado ou se não encontrou produto de loja, busca nos achadinhos
     if (!product) {
-      const { data: affiliateProducts, error: affErr } = await supabaseAdmin
+      // 2.1 PRIORIDADE RELÂMPAGO: Se houver oferta relâmpago ativa que não foi enviada nas últimas 3h, fura a fila!
+      const threeHoursAgo = new Date(Date.now() - 3 * 3600 * 1000).toISOString();
+      const { data: flashCandidates } = await supabaseAdmin
         .from('fast_affiliate_products')
         .select('*')
         .eq('is_active', true)
+        .or('badge_color.eq.flash_deal,discount_tag.ilike.%relâmpago%,discount_tag.ilike.%relampago%')
+        .or(`last_posted_at.is.null,last_posted_at.lt.${threeHoursAgo}`)
         .order('last_posted_at', { ascending: true, nullsFirst: true })
-        .order('position', { ascending: true })
         .limit(1);
+
+      if (flashCandidates && flashCandidates.length > 0) {
+        const candidate = flashCandidates[0];
+        // Verifica se ainda está no prazo de expiração (se definido)
+        if (!candidate.flash_deal_end || new Date(candidate.flash_deal_end) > new Date()) {
+          product = candidate;
+          console.log(`[WhatsApp Deal] ⚡ Prioridade Relâmpago ativada: furando fila para "${product.title}"`);
+        }
+      }
+
+      // 2.2 Rotação padrão se não houver oferta relâmpago prioritária
+      if (!product) {
+        const { data: affiliateProducts, error: affErr } = await supabaseAdmin
+          .from('fast_affiliate_products')
+          .select('*')
+          .eq('is_active', true)
+          .order('last_posted_at', { ascending: true, nullsFirst: true })
+          .order('position', { ascending: true })
+          .limit(1);
 
       if (affErr) {
         throw new Error(`Erro no banco Supabase: ${affErr.message}`);
@@ -494,7 +529,9 @@ async function handleSendWhatsAppDeal(req, res) {
         });
       }
 
-      product = affiliateProducts[0];
+        product = affiliateProducts[0];
+      }
+
       isFastSavorysStore = false;
       messageCaption = buildWhatsAppDealText(product);
       mediaUrl = product.image_url || product.image;

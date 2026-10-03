@@ -96,6 +96,33 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
   let discountTag = '';
   let couponCode = '';
   let isPaused = false;
+  let isFlashDeal = false;
+  let flashDealEnd = null;
+
+  // Detecção Automática Global de Oferta Relâmpago (Shopee, Mercado Livre, Amazon)
+  if (/(?:OFERTAS?\s*(?:⏰\s*)?REL[ÂA]MPAGO|flash[-_]sale|lightning[-_]deal)/i.test(html)) {
+    isFlashDeal = true;
+    discountTag = '⚡ Oferta Relâmpago';
+    
+    // Tenta encontrar o tempo restante no HTML (ex: termina em 03:12:16 ou end_time)
+    const timeMatch = html.match(/termina\s*em\s*[:\s]*(\d{1,2})\s*[:\s](\d{2})(?:\s*[:\s](\d{2}))?/i) ||
+                      html.match(/"end_time"\s*:\s*(\d{10,13})/i) ||
+                      html.match(/"flash_sale_end"\s*:\s*(\d{10,13})/i);
+    if (timeMatch) {
+      if (timeMatch[1] && timeMatch[1].length > 9) {
+        const ts = Number(timeMatch[1]);
+        flashDealEnd = new Date(ts > 1e11 ? ts : ts * 1000).toISOString();
+      } else if (timeMatch[1] && timeMatch[2]) {
+        const hours = parseInt(timeMatch[1], 10) || 0;
+        const mins = parseInt(timeMatch[2], 10) || 0;
+        const totalMs = (hours * 3600 + mins * 60) * 1000;
+        flashDealEnd = new Date(Date.now() + totalMs).toISOString();
+      }
+    }
+    if (!flashDealEnd) {
+      flashDealEnd = new Date(Date.now() + 4 * 3600 * 1000).toISOString();
+    }
+  }
 
   if (platform === 'amazon') {
     // 1. Availability check
@@ -480,7 +507,7 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
     }
   }
 
-  return { price, originalPrice, discountTag, couponCode, isPaused };
+  return { price, originalPrice, discountTag, couponCode, isPaused, isFlashDeal, flashDealEnd };
 }
 
 async function fetchProductDetails(rawUrl) {
@@ -700,7 +727,7 @@ async function fetchProductDetails(rawUrl) {
     }
   }
 
-  const { price, originalPrice, discountTag, couponCode, isPaused } = extractProductPriceAndStatus(html, platform);
+  const { price, originalPrice, discountTag, couponCode, isPaused, isFlashDeal, flashDealEnd } = extractProductPriceAndStatus(html, platform);
 
   let discountPercent = 0;
   if (price && originalPrice) {

@@ -432,8 +432,10 @@ window.AffiliatesModule = (function () {
       else if (normTag.includes('buscado')) resolvedColor = 'purple';
       else if (normTag.includes('pratico') || normTag.includes('prático')) resolvedColor = 'amber';
       else if (normTag.includes('loja oficial') || normTag.includes('oficial')) resolvedColor = 'black';
+      else if (normTag.includes('relampago') || normTag.includes('relâmpago') || resolvedColor === 'flash_deal') resolvedColor = 'flash_deal';
 
       let badgeStyle = 'bg-orange-100 text-orange-950 border-orange-300 font-bold';
+      if (resolvedColor === 'flash_deal') badgeStyle = 'bg-red-100 text-red-900 border-red-300 font-black animate-pulse';
       if (resolvedColor === 'amber' || resolvedColor === 'yellow') badgeStyle = 'bg-yellow-100 text-yellow-950 border-yellow-300 font-bold';
       if (resolvedColor === 'rose' || resolvedColor === 'red') badgeStyle = 'bg-rose-100 text-rose-950 border-rose-300 font-bold';
       if (resolvedColor === 'emerald' || resolvedColor === 'green') badgeStyle = 'bg-emerald-100 text-emerald-950 border-emerald-300 font-bold';
@@ -503,6 +505,7 @@ window.AffiliatesModule = (function () {
   }
 
   function detectBadgePreset(tag, color) {
+    if (color === 'flash_deal' || (tag && /rel[âa]mpago/i.test(tag))) return '⚡ Oferta Relâmpago|flash_deal';
     if (!tag) return '';
     const norm = tag.toLowerCase().trim();
     if (norm.includes('escolha da amazon') || norm.includes("amazon's choice") || norm === 'escolha da amazon') return 'Escolha da Amazon|black';
@@ -528,7 +531,8 @@ window.AffiliatesModule = (function () {
     }
 
     const color = val.includes('|') ? val.split('|')[1] : val;
-    if (color === 'blue') sel.classList.add('bg-blue-50', 'text-blue-700', 'border-blue-200');
+    if (color === 'flash_deal') sel.classList.add('bg-red-50', 'text-red-700', 'border-red-300', 'font-black');
+    else if (color === 'blue') sel.classList.add('bg-blue-50', 'text-blue-700', 'border-blue-200');
     else if (color === 'orange') sel.classList.add('bg-orange-50', 'text-orange-700', 'border-orange-200');
     else if (color === 'purple') sel.classList.add('bg-purple-50', 'text-purple-700', 'border-purple-200');
     else if (color === 'amber' || color === 'yellow') sel.classList.add('bg-amber-50', 'text-amber-700', 'border-amber-200');
@@ -539,10 +543,32 @@ window.AffiliatesModule = (function () {
     else sel.classList.add('bg-white', 'text-gray-700', 'border-gray-200');
   }
 
+  function setFlashHours(hours) {
+    const end = new Date(Date.now() + hours * 3600 * 1000);
+    const tzOffset = end.getTimezoneOffset() * 60000;
+    const localISOTime = (new Date(end.getTime() - tzOffset)).toISOString().slice(0, 16);
+    const input = document.getElementById('affiliateFlashDealEndInput');
+    if (input) input.value = localISOTime;
+  }
+
   function handleTagPresetChange(val) {
     const customBox = document.getElementById('affiliateCustomTagBox');
+    const flashBox = document.getElementById('affiliateFlashDealBox');
     const tagInput = document.getElementById('affiliateTagInput');
     const colorInput = document.getElementById('affiliateBadgeColorInput');
+
+    const isFlash = (val || '').includes('flash_deal');
+    if (flashBox) {
+      if (isFlash) {
+        flashBox.classList.remove('hidden');
+        const flashInput = document.getElementById('affiliateFlashDealEndInput');
+        if (flashInput && !flashInput.value) {
+          setFlashHours(4);
+        }
+      } else {
+        flashBox.classList.add('hidden');
+      }
+    }
 
     if (val === 'custom') {
       if (customBox) customBox.classList.remove('hidden');
@@ -588,6 +614,10 @@ window.AffiliatesModule = (function () {
 
     const isFastPickEl = document.getElementById('affiliateIsFastPickInput');
     if (isFastPickEl) isFastPickEl.checked = false;
+    const flashBox = document.getElementById('affiliateFlashDealBox');
+    if (flashBox) flashBox.classList.add('hidden');
+    const flashInput = document.getElementById('affiliateFlashDealEndInput');
+    if (flashInput) flashInput.value = '';
     const couponEl = document.getElementById('affiliateCouponInput');
     if (couponEl) couponEl.value = '';
     document.getElementById('affiliateDescriptionInput').value = '🔸 ';
@@ -718,6 +748,23 @@ window.AffiliatesModule = (function () {
     const isFastPick = Boolean(item.is_fast_pick || item.badge_color === 'fast_seal');
     const isFastPickEl = document.getElementById('affiliateIsFastPickInput');
     if (isFastPickEl) isFastPickEl.checked = isFastPick;
+
+    const isFlash = (item.badge_color === 'flash_deal') || (item.discount_tag && /rel[âa]mpago/i.test(item.discount_tag));
+    const flashBox = document.getElementById('affiliateFlashDealBox');
+    const flashInput = document.getElementById('affiliateFlashDealEndInput');
+    if (item.flash_deal_end) {
+      const end = new Date(item.flash_deal_end);
+      const tzOffset = end.getTimezoneOffset() * 60000;
+      const localISOTime = (new Date(end.getTime() - tzOffset)).toISOString().slice(0, 16);
+      if (flashInput) flashInput.value = localISOTime;
+      if (flashBox) flashBox.classList.remove('hidden');
+    } else {
+      if (flashInput) flashInput.value = '';
+      if (flashBox) {
+        if (isFlash) flashBox.classList.remove('hidden');
+        else flashBox.classList.add('hidden');
+      }
+    }
 
     const couponEl = document.getElementById('affiliateCouponInput');
     if (couponEl) couponEl.value = item.coupon_code || '';
@@ -875,6 +922,15 @@ window.AffiliatesModule = (function () {
       finalColor = color || 'orange';
     }
 
+    const flashEndVal = document.getElementById('affiliateFlashDealEndInput')?.value;
+    let flashDealEndIso = null;
+    const isFlashPreset = (presetVal && presetVal.includes('flash_deal')) || (finalColor === 'flash_deal');
+    if (flashEndVal) {
+      flashDealEndIso = new Date(flashEndVal).toISOString();
+    } else if (isFlashPreset) {
+      flashDealEndIso = new Date(Date.now() + 4 * 3600 * 1000).toISOString();
+    }
+
     const payload = {
       title,
       description: document.getElementById('affiliateDescriptionInput').value.trim() || null,
@@ -886,6 +942,7 @@ window.AffiliatesModule = (function () {
       discount_tag: finalTag,
       coupon_code: couponVal,
       badge_color: finalColor || 'orange',
+      flash_deal_end: flashDealEndIso,
       is_fast_pick: isFastPick,
       position: Number(assignedPosition) || 1,
       is_active: document.getElementById('affiliateActiveInput').checked,
@@ -2291,6 +2348,7 @@ window.AffiliatesModule = (function () {
     openShareModal,
     closeShareModal,
     handleTagPresetChange,
+    setFlashHours,
     shareToWhatsApp,
     shareToTelegram,
     shareToFacebook,
