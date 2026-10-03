@@ -4,10 +4,10 @@
  */
 
 window.AchadinhosCategories = (function () {
-  const STORAGE_KEY = 'fast_achadinhos_categories_v3';
+  const STORAGE_KEY = 'fast_achadinhos_categories_v5';
   const VERSION_KEY = 'fast_achadinhos_categories_version';
 
-  // Árvore Padrão (12 Macro Grupos e Novas Subcategorias Otimizadas)
+  // Árvore Padrão (12 Macro Grupos e Subcategorias Otimizadas)
   const DEFAULT_TREE = [
     {
       id: 'group_supermercado',
@@ -39,6 +39,7 @@ window.AchadinhosCategories = (function () {
       label: 'Eletros, TV & Climatização',
       icon: '📺',
       subcategories: [
+        { slug: 'aspiradores_limpeza', label: 'Aspiradores & Limpeza', aliases: ['robo_aspiradores_de_po', 'aspiradores', 'extratoras', 'aspirador'] },
         { slug: 'grandes_eletros', label: 'Grandes Eletrodomésticos', aliases: [] },
         { slug: 'lavagem_secagem', label: 'Lavagem & Secagem', aliases: ['lavanderia'] },
         { slug: 'climatizacao', label: 'Climatização & Ar-Condicionado', aliases: ['ar_condicionado'] },
@@ -54,7 +55,7 @@ window.AchadinhosCategories = (function () {
         { slug: 'cabelos', label: 'Cabelos', aliases: ['cabelo'] },
         { slug: 'pele_rosto', label: 'Cuidados com a Pele & Rosto', aliases: ['pele', 'rosto'] },
         { slug: 'maquiagem_unhas', label: 'Maquiagem & Unhas', aliases: ['maquiagem', 'unhas'] },
-        { slug: 'perfumaria_higiene', label: 'Perfumaria & Higiene', aliases: ['beleza', 'perfumaria', 'higiene'] },
+        { slug: 'perfumaria_higiene', label: 'Perfumaria & Higiene', aliases: ['beleza', 'perfumaria', 'higiene', 'higiene_pessoal'] },
         { slug: 'barbear_depilacao', label: 'Barbear & Depilação', aliases: ['barbear', 'depilacao', 'barba'] }
       ]
     },
@@ -74,6 +75,8 @@ window.AchadinhosCategories = (function () {
       label: 'Móveis & Decoração',
       icon: '🛋️',
       subcategories: [
+        { slug: 'cama_mesa_banho', label: 'Cama, Mesa & Banho', aliases: ['banho', 'mesa'] },
+        { slug: 'decoracao_iluminacao', label: 'Decoração & Iluminação', aliases: ['decoracao_basica', 'iluminacao', 'quadros', 'luminarias'] },
         { slug: 'quarto', label: 'Quarto', aliases: [] },
         { slug: 'sala_estar', label: 'Sala de Estar', aliases: [] },
         { slug: 'sala_jantar', label: 'Sala de Jantar', aliases: [] },
@@ -88,7 +91,8 @@ window.AchadinhosCategories = (function () {
         { slug: 'celulares', label: 'Celulares & Smartphones', aliases: [] },
         { slug: 'smart_home', label: 'Smart Home & Segurança', aliases: [] },
         { slug: 'informatica', label: 'Informática & Periféricos', aliases: [] },
-        { slug: 'audio_gadgets', label: 'Áudio Portátil & Acessórios', aliases: ['eletronicos'] }
+        { slug: 'audio_gadgets', label: 'Áudio Portátil & Instrumentos', aliases: ['eletronicos', 'instrumentos_musicais'] },
+        { slug: 'pilhas_baterias', label: 'Pilhas, Baterias & Carregadores', aliases: ['pilhas', 'carregador_pilhas', 'baterias', 'pilha'] }
       ]
     },
     {
@@ -97,7 +101,7 @@ window.AchadinhosCategories = (function () {
       icon: '🎮',
       subcategories: [
         { slug: 'consoles', label: 'Consoles & Aparelhos', aliases: ['games'] },
-        { slug: 'jogos_midias', label: 'Jogos & Mídias', aliases: [] },
+        { slug: 'jogos_midias', label: 'Jogos & Mídias Digitais', aliases: [] },
         { slug: 'controles_acessorios_gamer', label: 'Controles & Acessórios Gamer', aliases: [] },
         { slug: 'colecionaveis_geek', label: 'Colecionáveis & Universo Geek', aliases: [] }
       ]
@@ -107,8 +111,8 @@ window.AchadinhosCategories = (function () {
       label: 'Ferramentas, Auto & Pet',
       icon: '🛠️',
       subcategories: [
-        { slug: 'ferramentas', label: 'Ferramentas Elétricas & Manuais', aliases: ['construcao'] },
-        { slug: 'construcao_eletrica', label: 'Construção, Elétrica & Hidráulica', aliases: [] },
+        { slug: 'ferramentas', label: 'Ferramentas Elétricas & Manuais', aliases: ['construcao', 'ferramentas_manuais', 'ferramentas_eletricas'] },
+        { slug: 'construcao_eletrica', label: 'Construção, Elétrica & Hidráulica', aliases: ['casa_construcao', 'eletrica'] },
         { slug: 'automotivo', label: 'Automotivo & Moto', aliases: ['veiculos'] },
         { slug: 'petshop', label: 'Pet Shop', aliases: [] }
       ]
@@ -131,6 +135,7 @@ window.AchadinhosCategories = (function () {
       subcategories: [
         { slug: 'suplementos', label: 'Suplementos & Nutrição', aliases: [] },
         { slug: 'treino_funcional', label: 'Treino & Equipamentos Funcionais', aliases: ['fitness'] },
+        { slug: 'esportes_lazer', label: 'Esportes & Lazer', aliases: ['esportes_e_lazer', 'lazer'] },
         { slug: 'monitoramento_saude', label: 'Monitoramento & Saúde', aliases: ['saude'] }
       ]
     },
@@ -139,10 +144,11 @@ window.AchadinhosCategories = (function () {
       label: 'Brinquedos & Papelaria',
       icon: '🧸',
       subcategories: [
-        { slug: 'brinquedos_pedagogicos', label: 'Brinquedos Pedagógicos & Bebês', aliases: ['brinquedos', 'bebes'] },
-        { slug: 'jogos_tabuleiro', label: 'Jogos de Tabuleiro & Quebra-Cabeças', aliases: [] },
-        { slug: 'papelaria_escolar', label: 'Papelaria & Material Escolar', aliases: ['papelaria', 'livros'] },
-        { slug: 'escritorio_envelopamento', label: 'Escritório & Envelopamento', aliases: [] }
+        { slug: 'bebes_cuidados', label: 'Bebês & Primeiros Passos', aliases: ['bebes', 'puericultura', 'fraldas'] },
+        { slug: 'brinquedos_pedagogicos', label: 'Brinquedos & Pedagógicos', aliases: ['brinquedos'] },
+        { slug: 'jogos_tabuleiro', label: 'Jogos de Cartas, Tabuleiro & Família', aliases: ['jogos', 'tabuleiro', 'cartas', 'baralho', 'uno', 'domino'] },
+        { slug: 'livros_leitura', label: 'Livros, Bíblias & Leitura', aliases: ['livros_e_revistas', 'livros', 'biblia'] },
+        { slug: 'papelaria_escolar', label: 'Papelaria & Material de Escritório', aliases: ['papelaria', 'escritorio_envelopamento', 'envelopamento', 'material_escritorio'] }
       ]
     }
   ];

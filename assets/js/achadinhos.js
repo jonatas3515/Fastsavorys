@@ -308,7 +308,7 @@
       return { 
         id: 'amazon', 
         name: 'Amazon', 
-        btnText: 'Comprar na Amazon', 
+        btnText: 'Amazon', 
         btnClass: 'bg-gradient-to-r from-amber-500 via-amber-600 to-amber-500 hover:from-amber-600 hover:to-amber-700 text-white group-hover:ring-amber-400',
         badge: 'bg-amber-100 text-amber-950 border-amber-300',
         icon: '📦'
@@ -318,7 +318,7 @@
       return { 
         id: 'shopee', 
         name: 'Shopee', 
-        btnText: 'Comprar na Shopee', 
+        btnText: 'Shopee', 
         btnClass: 'bg-gradient-to-r from-orange-500 via-rose-500 to-orange-500 hover:from-orange-600 hover:to-rose-600 text-white group-hover:ring-orange-400',
         badge: 'bg-orange-100 text-orange-950 border-orange-300',
         icon: '🧡'
@@ -328,7 +328,7 @@
       return { 
         id: 'natura', 
         name: 'Natura', 
-        btnText: 'Comprar na Natura', 
+        btnText: 'Natura', 
         btnClass: 'bg-gradient-to-r from-orange-500 via-amber-600 to-orange-500 hover:from-orange-600 hover:to-amber-600 text-white group-hover:ring-orange-400',
         badge: 'bg-orange-100 text-orange-950 border-orange-300',
         icon: '🌿'
@@ -338,7 +338,7 @@
       return { 
         id: 'avon', 
         name: 'Avon', 
-        btnText: 'Comprar na Avon', 
+        btnText: 'Avon', 
         btnClass: 'bg-gradient-to-r from-rose-500 via-pink-600 to-rose-500 hover:from-rose-600 hover:to-pink-600 text-white group-hover:ring-rose-400',
         badge: 'bg-rose-100 text-rose-950 border-rose-300',
         icon: '💄'
@@ -347,7 +347,7 @@
     return { 
       id: 'mercadolivre', 
       name: 'Mercado Livre', 
-      btnText: 'Ver no Mercado Livre', 
+      btnText: 'Mercado Livre', 
       btnClass: 'bg-gradient-to-r from-yellow-400 via-amber-400 to-yellow-500 hover:from-yellow-500 hover:to-amber-500 text-gray-900 group-hover:ring-yellow-400',
       badge: 'bg-yellow-100 text-yellow-950 border-yellow-300',
       icon: '💛'
@@ -513,19 +513,19 @@
       const rawDisc = (item.discount_tag || '').trim();
       let formattedDisc = '';
       if (/no pix c(om|\/)?\s*cupom/i.test(rawDisc)) {
-        formattedDisc = pct > 0 ? `🔥 ${pct}% OFF no Pix c/ Cupom` : `🔥 No Pix c/ Cupom`;
+        formattedDisc = pct > 0 ? `${pct}% OFF no Pix c/ Cupom` : `No Pix c/ Cupom`;
       } else if (/no pix/i.test(rawDisc)) {
-        formattedDisc = pct > 0 ? `🔥 ${pct}% OFF no Pix` : `🔥 No Pix`;
+        formattedDisc = pct > 0 ? `${pct}% OFF no Pix` : `No Pix`;
       } else if (/c(om|\/)?\s*cupom/i.test(rawDisc)) {
-        formattedDisc = pct > 0 ? `🔥 ${pct}% OFF c/ Cupom` : `🔥 Com Cupom`;
+        formattedDisc = pct > 0 ? `${pct}% OFF c/ Cupom` : `Com Cupom`;
       } else if (pct > 0) {
-        formattedDisc = `🔥 ${pct}% OFF`;
+        formattedDisc = `${pct}% OFF`;
       } else if (rawDisc && (/off/i.test(rawDisc) || /^\d+%/.test(rawDisc))) {
-        formattedDisc = `🔥 ${rawDisc}`;
+        formattedDisc = `${rawDisc.replace(/^[⚡🔥\s]+/, '')}`;
       }
 
       const discountBadgeHtml = formattedDisc 
-        ? `<span class="inline-flex items-center px-2 py-0.5 text-xs font-black rounded-full bg-gradient-to-r from-emerald-600 to-green-600 text-white shadow-sm tracking-wide flex-shrink-0 animate-pulse">${escapeHtml(formattedDisc)}</span>`
+        ? `<span class="inline-flex items-center px-1.5 py-0.5 text-[10.5px] sm:text-[11px] font-medium rounded-md bg-emerald-50 text-emerald-800 border border-emerald-300 flex-shrink-0 tracking-tight whitespace-nowrap">${escapeHtml(formattedDisc)}</span>`
         : '';
 
       // Tag de destaque (badge_tag ou discount_tag caso não seja texto de desconto)
@@ -614,9 +614,7 @@
             />
             <!-- Badges no topo esquerdo da imagem -->
             <div class="absolute top-2 left-2 flex flex-row flex-wrap items-center gap-1.5 z-10 ${isFastPick ? 'max-w-[calc(100%-54px)]' : 'max-w-[calc(100%-16px)]'}">
-              ${discountBadgeHtml}
               ${tagHtml}
-              ${primeBadgeHtml}
               ${importedBadgeHtml}
               ${platformBadgeHtml}
             </div>
@@ -687,9 +685,10 @@
 
             <!-- Preço e Botão de Ação -->
             <div class="mt-4 pt-3 border-t border-gray-100">
-              <div class="flex items-baseline gap-1 mb-1">
+              <div class="flex items-baseline flex-wrap gap-1.5 mb-1">
                 ${originalPriceHtml}
                 <span class="text-lg sm:text-xl font-extrabold text-gray-900">${escapeHtml(item.price_display || 'Ver Preço')}</span>
+                ${discountBadgeHtml}
               </div>
               ${isPrime ? `
                 <div class="flex items-center gap-1.5 mb-2.5">
@@ -704,10 +703,10 @@
                   target="_blank" 
                   rel="noopener"
                   onclick="window.trackAffiliateClick(${item.id})"
-                  class="flex-1 py-2.5 px-3 ${platformInfo.btnClass} font-extrabold text-xs sm:text-sm rounded-xl shadow-sm hover:shadow-md transition-all flex items-center justify-center gap-1.5 text-center group-hover:ring-2 group-hover:ring-offset-1"
+                  class="flex-1 py-1.5 px-2.5 sm:py-2 sm:px-3 ${platformInfo.btnClass} font-black text-xs rounded-xl shadow-xs hover:shadow-md transition-all flex items-center justify-center gap-1.5 text-center group-hover:ring-2 group-hover:ring-offset-1"
                 >
                   <span>${platformInfo.btnText}</span>
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                   </svg>
                 </a>
@@ -715,7 +714,7 @@
                   type="button" 
                   onclick="window.openPriceAlertModal(${item.id})"
                   title="Avise-me no WhatsApp se o preço baixar"
-                  class="p-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-950 border border-rose-200 hover:border-rose-300 rounded-xl transition flex items-center justify-center flex-shrink-0 shadow-sm active:scale-95 text-xs font-bold"
+                  class="p-1.5 sm:p-2 bg-rose-50 hover:bg-rose-100 text-rose-700 hover:text-rose-950 border border-rose-200 hover:border-rose-300 rounded-xl transition flex items-center justify-center flex-shrink-0 shadow-2xs active:scale-95 text-xs font-bold"
                 >
                   <span>🔔</span>
                 </button>
@@ -723,9 +722,9 @@
                   type="button" 
                   onclick="window.openShareModal(${item.id})"
                   title="Compartilhar no WhatsApp, Telegram, etc."
-                  class="p-2.5 bg-gray-100 hover:bg-yellow-100 text-gray-700 hover:text-gray-950 border border-gray-200 hover:border-yellow-300 rounded-xl transition flex items-center justify-center flex-shrink-0 shadow-sm active:scale-95"
+                  class="p-1.5 sm:p-2 bg-gray-100 hover:bg-yellow-100 text-gray-700 hover:text-gray-950 border border-gray-200 hover:border-yellow-300 rounded-xl transition flex items-center justify-center flex-shrink-0 shadow-2xs active:scale-95"
                 >
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
                   </svg>
                 </button>

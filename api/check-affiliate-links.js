@@ -101,13 +101,19 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
   let isPrime = false;
   let isImported = false;
 
-  // Detecção Automática Global de Oferta Relâmpago (Shopee, Mercado Livre, Amazon)
-  if (/(?:OFERTAS?\s*(?:⏰\s*)?REL[ÂA]MPAGO|flash[-_]sale|lightning[-_]deal)/i.test(html)) {
+  // Limpeza de scripts e estilos para detecção segura de texto visível na página
+  const htmlNoScripts = html
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
+    .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '');
+
+  // Detecção Automática de Oferta Relâmpago (Apenas em texto/badges visíveis para evitar nós de telemetria interna de JS)
+  const isLightningDealText = /(?:OFERTAS?\s*(?:⏰\s*)?REL[ÂA]MPAGO|dealBadge|deal-badge|badge_deal)/i.test(htmlNoScripts);
+  if (isLightningDealText) {
     isFlashDeal = true;
     discountTag = '⚡ Oferta Relâmpago';
     
     // Tenta encontrar o tempo restante no HTML (ex: termina em 03:12:16 ou end_time)
-    const timeMatch = html.match(/termina\s*em\s*[:\s]*(\d{1,2})\s*[:\s](\d{2})(?:\s*[:\s](\d{2}))?/i) ||
+    const timeMatch = htmlNoScripts.match(/termina\s*em\s*[:\s]*(\d{1,2})\s*[:\s](\d{2})(?:\s*[:\s](\d{2}))?/i) ||
                       html.match(/"end_time"\s*:\s*(\d{10,13})/i) ||
                       html.match(/"flash_sale_end"\s*:\s*(\d{10,13})/i);
     if (timeMatch) {
@@ -140,21 +146,25 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
       isPaused = true;
     }
 
-    // Detecção segura de produto importado (remove comentários HTML e menus/rodapés para evitar falso-positivo)
+    // Detecção segura de produto importado na Amazon (isolando BuyBox e merchant info de rodapés/carrosséis)
     const cleanForImport = html
       .replace(/<!--[\s\S]*?-->/g, '')
       .replace(/<footer[\s\S]*?<\/footer>/gi, '')
-      .replace(/id=["'](?:navFooter|nav-subnav|navbar)["'][\s\S]*?<\/div>/gi, '');
+      .replace(/id=["'](?:navFooter|nav-subnav|navbar)["'][\s\S]*?<\/div>/gi, '')
+      .replace(/class=["'][^"']*(?:rhf-frame|sims-carousel|p13n)[^"']*["'][\s\S]*?<\/div>/gi, '');
+
+    const amzBuyboxMatch = cleanForImport.match(/id=["'](?:desktop_buybox|buyBoxAccordion|tabular-buybox|merchant-info|exports_desktop_qualified_buybox|agsk-detail-bullets)["'][\s\S]*?<\/div>/gi) || [];
+    const amzBuyboxText = amzBuyboxMatch.join(' ');
 
     if (
-      /tributos\s+de\s+importa[çc][ãa]o/i.test(cleanForImport) ||
-      /compra\s+internacional/i.test(cleanForImport) ||
-      /enviado\s+de\s+fora\s+do\s+brasil/i.test(cleanForImport) ||
-      /vendido\s+por\s+amazon\s+(?:estados\s+unidos|us)/i.test(cleanForImport) ||
       /id=["']exports_desktop_qualified_buybox["']/i.test(cleanForImport) ||
       /id=["']agsk-detail-bullets["']/i.test(cleanForImport) ||
-      /(?:vendido|enviado)\s+por[^<]*amazon\s+global\s+store/i.test(cleanForImport) ||
-      /produtos?\s+importados?\s+dos?\s+estados\s+unidos/i.test(cleanForImport)
+      /tributos\s+de\s+importa[çc][ãa]o/i.test(amzBuyboxText) ||
+      /compra\s+internacional/i.test(amzBuyboxText) ||
+      /enviado\s+de\s+fora\s+do\s+brasil/i.test(amzBuyboxText) ||
+      /vendido\s+por\s+amazon\s+(?:estados\s+unidos|us)/i.test(amzBuyboxText) ||
+      /(?:vendido|enviado)\s+por[^<]*amazon\s+global\s+store/i.test(amzBuyboxText) ||
+      /produtos?\s+importados?\s+dos?\s+estados\s+unidos/i.test(amzBuyboxText)
     ) {
       isImported = true;
     }
@@ -404,11 +414,16 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
       isPaused = true;
     }
 
+    // Detecção segura de produto importado no Mercado Livre (BuyBox, Shipping e flags CBT oficiais)
+    const mlClean = html.replace(/<footer[\s\S]*?<\/footer>/gi, '').replace(/class=["']nav-footer[\s\S]*?<\/div>/gi, '');
+    const buyboxMatch = mlClean.match(/class=["'][^"']*(?:ui-pdp-buybox|ui-pdp-container__row--shipping|ui-pdp-promotions-pill|ui-pdp-seller)[^"']*["'][\s\S]*?<\/div>/gi) || [];
+    const buyboxText = buyboxMatch.join(' ');
     if (
-      /compra\s+internacional/i.test(html) ||
-      /vendedor\s+internacional/i.test(html) ||
-      /tributos\s+(?:de\s+importa[çc][ãa]o\s+)?inclusos/i.test(html) ||
-      html.includes('cbt')
+      /compra\s+internacional/i.test(buyboxText) ||
+      /vendedor\s+internacional/i.test(buyboxText) ||
+      /tributos\s+(?:de\s+importa[çc][ãa]o\s+)?inclusos/i.test(buyboxText) ||
+      /"is_cbt"\s*:\s*true/i.test(html) ||
+      /"cbt_flag"\s*:\s*true/i.test(html)
     ) {
       isImported = true;
     }
@@ -583,6 +598,15 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
     }
   }
 
+  // Validação estrita: Preço riscado NUNCA pode ser menor ou igual ao preço atual (evita pegar parcelas de 6x ou erros de scraping)
+  if (originalPrice && price) {
+    const pOrig = parsePrice(originalPrice);
+    const pCurr = parsePrice(price);
+    if (pOrig <= pCurr) {
+      originalPrice = '';
+    }
+  }
+
   return { price, originalPrice, discountTag, couponCode, isPaused, isFlashDeal, flashDealEnd, isPrime, isImported };
 }
 
@@ -602,7 +626,7 @@ async function fetchProductDetails(rawUrl) {
           discount_tag: shopeeData.discount_tag || '',
           coupon_code: '',
           image_url: shopeeData.image_url || '',
-          affiliate_url: shopeeData.affiliate_url || targetUrl,
+          affiliate_url: shopeeData.affiliate_url || rawUrl,
           is_active: shopeeData.is_active !== false,
           is_imported: Boolean(shopeeData.is_imported || (shopeeData.title && /internacional|importad/i.test(shopeeData.title))),
           platform: 'shopee',
@@ -961,8 +985,8 @@ async function handler(req, res) {
         description: payload.description ? String(payload.description).trim() : null,
         affiliate_url,
         image_url: payload.image_url ? String(payload.image_url).trim() : '',
-        price_display: payload.price_display ? String(payload.price_display).trim() : (payload.price ? String(payload.price).trim() : null),
-        original_price: payload.original_price ? String(payload.original_price).trim() : null,
+        price_display: payload.price_display ? String(payload.price_display).replace(/,+/g, ',').trim() : (payload.price ? String(payload.price).replace(/,+/g, ',').trim() : null),
+        original_price: payload.original_price ? String(payload.original_price).replace(/,+/g, ',').trim() : null,
         category: payload.category || detectCategory(title, payload.description || '', affiliate_url),
         discount_tag: payload.discount_tag || payload.tag || null,
         badge_tag: payload.badge_tag || null,
