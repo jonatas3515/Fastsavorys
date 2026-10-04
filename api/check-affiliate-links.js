@@ -1528,9 +1528,9 @@ async function handleAutoSyncLinks(req, res) {
               isPriceDrop = true;
               diff = oldNum - newNum;
               dropPct = Math.round((diff / oldNum) * 100);
-              patchPayload.badge_color = 'rose';
-              if (!patchPayload.discount_tag && !details.discount_tag) {
-                patchPayload.discount_tag = 'Menor Preço';
+              // Não injeta tag de selo 'Menor Preço' sem autorização: coloca apenas o desconto percentual
+              if (dropPct > 0 && !patchPayload.discount_tag && !details.discount_tag) {
+                patchPayload.discount_tag = `${dropPct}% OFF`;
               }
 
               priceDropCandidates.push({

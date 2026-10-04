@@ -435,13 +435,10 @@ window.AffiliatesModule = (function () {
         ? `<span class="inline-flex items-center gap-1 text-[10px] bg-gradient-to-r from-pink-600 via-purple-600 to-indigo-600 text-white font-black px-2 py-0.5 rounded-full shadow-xs">✨ Selo Fast</span>`
         : '';
 
-      // Tag de destaque (badge_tag ou discount_tag caso este não seja desconto puro)
+      // Tag de destaque oficial (apenas se houver badge_tag cadastrado)
       let customTagText = item.badge_tag ? item.badge_tag.trim() : '';
-      if (!customTagText && rawDisc) {
-        const isDiscOnly = /^[⚡🔥\s]*\d+%\s*OFF/i.test(rawDisc) || /no pix|cupom/i.test(rawDisc);
-        if (!isDiscOnly) {
-          customTagText = rawDisc;
-        }
+      if (customTagText === 'none' || customTagText === 'null') {
+        customTagText = '';
       }
 
       // Resolução inteligente de cor do selo (respeitando os presets oficiais)
@@ -617,6 +614,11 @@ window.AffiliatesModule = (function () {
       if (customBox) customBox.classList.add('hidden');
       if (tagInput) tagInput.value = '';
       if (colorInput) colorInput.value = 'orange';
+      const discInput = document.getElementById('affiliateDiscountInput');
+      if (discInput && !/off|pix|cupom|\d+%/i.test(discInput.value)) {
+        discInput.value = '';
+        recalculateDiscount();
+      }
     } else {
       if (customBox) customBox.classList.add('hidden');
       const [tag, color] = val.split('|');
@@ -754,13 +756,15 @@ window.AffiliatesModule = (function () {
     if (discountEl) discountEl.value = rawDiscount;
     recalculateDiscount();
 
-    // Tag Destaque (respeita badge_tag isolada ou recupera discount_tag se for nome de tag)
+    // Tag Destaque (respeita estritamente a escolha do administrador)
     let actualTag = (item.badge_tag || '').trim();
-    if (!actualTag && rawDiscount) {
-      const isPureDiscount = /^[⚡🔥\s]*\d+%\s*OFF/i.test(rawDiscount) || /no pix|cupom/i.test(rawDiscount);
-      if (!isPureDiscount) {
-        actualTag = rawDiscount;
-      }
+    if (actualTag === 'none' || actualTag === 'null') {
+      actualTag = '';
+    }
+
+    // Se o produto estiver sem selo e discount_tag contiver texto antigo de tag, limpa para não reintroduzir tag
+    if (!actualTag && rawDiscount && !/off|pix|cupom|\d+%/i.test(rawDiscount)) {
+      if (discountEl) discountEl.value = '';
     }
 
     const preset = detectBadgePreset(actualTag, item.badge_color);
@@ -995,6 +999,9 @@ window.AffiliatesModule = (function () {
 
     let cleanDiscountVal = discountVal;
     if (!isFlashPreset && cleanDiscountVal && /rel[âa]mpago/i.test(cleanDiscountVal)) {
+      cleanDiscountVal = null;
+    }
+    if (!presetVal && cleanDiscountVal && !/off|pix|cupom|\d+%/i.test(cleanDiscountVal)) {
       cleanDiscountVal = null;
     }
 

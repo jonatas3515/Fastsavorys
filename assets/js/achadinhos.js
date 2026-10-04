@@ -528,13 +528,10 @@
         ? `<span class="inline-flex items-center px-1.5 py-0.5 text-[10.5px] sm:text-[11px] font-medium rounded-md bg-emerald-50 text-emerald-800 border border-emerald-300 flex-shrink-0 tracking-tight whitespace-nowrap">${escapeHtml(formattedDisc)}</span>`
         : '';
 
-      // Tag de destaque (badge_tag ou discount_tag caso não seja texto de desconto)
+      // Tag de destaque: respeita ESTRITAMENTE o badge_tag cadastrado. Se estiver sem selo, não exibe nada.
       let customTagText = item.badge_tag ? item.badge_tag.trim() : '';
-      if (!customTagText && rawDisc) {
-        const isDiscOnly = /^[⚡🔥\s]*\d+%\s*OFF/i.test(rawDisc) || /no pix|cupom/i.test(rawDisc);
-        if (!isDiscOnly) {
-          customTagText = rawDisc;
-        }
+      if (customTagText === 'none' || customTagText === 'null') {
+        customTagText = '';
       }
 
       const showTag = Boolean(customTagText);
