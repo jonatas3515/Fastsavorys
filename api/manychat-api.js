@@ -930,13 +930,14 @@ function buildScheduleFactHint(history, currentMessage) {
     const allText = (history || []).map(m => m.text).join(' ') + ' ' + (currentMessage || '');
     const isScheduleCtx = /\b(retirada|retirar|entrega|entregar|buscar|pegar|agendar|agendamento|horário|hora)\b/i.test(allText);
     if (!isScheduleCtx) return '';
-    // Detecta se é pedido para domingo/feriado (limite 17:30) ou dia normal (limite 18:00)
+    // Detecta se é pedido para domingo/feriado (limite 9:00 às 17:30) ou dia normal (limite 18:00)
     const isDomingo = /\bdomingo\b/i.test(allText);
     const isFeriado = /\bferiado\b/i.test(allText);
     const maxHour = (isDomingo || isFeriado) ? 17 : 18;
     const maxMin = (isDomingo || isFeriado) ? 30 : 0;
     const totalMinutes = latestHour * 60 + latestMin;
     const maxTotalMinutes = maxHour * 60 + maxMin;
+
     if (totalMinutes > maxTotalMinutes) {
         const maxLabel = (isDomingo || isFeriado) ? '17h30' : '18h';
         const dayLabel = isDomingo ? 'domingos' : (isFeriado ? 'feriados' : 'segunda a sábado');
@@ -944,7 +945,32 @@ function buildScheduleFactHint(history, currentMessage) {
         console.log(`[schedule-hint] ${hint.replace(/\n/g, ' | ')}`);
         return hint;
     }
+
+    // Aos domingos/feriados, início estrito a partir das 9h00 (nunca antes das 9h)
+    if ((isDomingo || isFeriado) && totalMinutes < 9 * 60) {
+        const dayLabel = isDomingo ? 'domingos' : 'feriados';
+        const hint = `\n[⛔ FATO VERIFICADO (horário domingo/feriado): O cliente solicitou horário "${latestRaw}" que é ANTES das 9h da manhã (${dayLabel}). ⛔ REJEITE este horário. Aos domingos e feriados, nosso horário de atendimento para encomendas começa estritamente a partir das 9h (das 9h às 17h30). Diga educadamente que no domingo os pedidos começam a partir das 9h e pergunte se gostaria de agendar para as 9h ou outro horário dentro da faixa.]`;
+        console.log(`[schedule-hint-early] ${hint.replace(/\n/g, ' | ')}`);
+        return hint;
+    }
+
     return '';
+}
+
+// Guard específico para Domingo e Feriado (valor mínimo de R$ 39,00 e aprovação da proprietária)
+function buildSundayFactHint(history, currentMessage) {
+    const allText = (history || []).map(m => m.text).join(' ') + ' ' + (currentMessage || '');
+    const isDomingo = /\bdomingo\b/i.test(allText);
+    const isFeriado = /\bferiado\b/i.test(allText);
+    if (!isDomingo && !isFeriado) return '';
+
+    // Verifica se há menção ou valor detectado
+    // Se há intenção de pedir/agendar para domingo:
+    let hint = `\n[⛔ REGRAS MANDATÓRIAS PARA DOMINGO/FERIADO:
+1. VALOR MÍNIMO: R$ 39,00 em produtos. Se o cliente estiver pedindo algo de valor menor (ex: 20 salgados por R$ 20,00), REJEITE educadamente e informe que para domingo o valor mínimo para agendamento é de R$ 39,00, convidando a adicionar mais itens.
+2. HORÁRIO: Estritamente entre 9h e 17h30. Nunca antes das 9h nem depois das 17h30.
+3. APROVAÇÃO DA JÉSSICA: SEMPRE avise que como é domingo, o agendamento depende da aprovação da proprietária Jéssica e que ela irá confirmar. Defina "needs_owner_approval": true no ORDER_JSON.]`;
+    return hint;
 }
 
 // Guard de fita/laço do bolo: detecta quando a personalização (massa + recheio) já foi feita
@@ -2379,15 +2405,21 @@ function getBrazilTime() {
         intentHint += paymentFactHint;
     }
 
-    // --- Guard de horário (rejeitar horários após 18h seg-sáb / 17h30 dom-feriado) ---
+    // --- Guard de horário (rejeitar horários fora da faixa: seg-sáb 7h-18h / dom-feriado 9h-17h30) ---
     const scheduleFactHint = buildScheduleFactHint(session.history, effectiveMessage);
     if (scheduleFactHint) {
         intentHint += scheduleFactHint;
     }
 
+    // --- Guard de Domingo / Feriado (valor mínimo de R$ 39,00, horário 9h-17h30, aprovação da Jéssica) ---
+    const sundayFactHint = buildSundayFactHint(session.history, effectiveMessage);
+    if (sundayFactHint) {
+        intentHint += sundayFactHint;
+    }
+
     // --- Guard de "pegar agora" / retirada imediata / tempo de montagem na hora ---
     if (/\b(pegar?\s*agora|buscar?\s*agora|passar?\s*a[ií]\s*agora|pronta\s*entrega|j[aá]\s*t[aá]\s*pronto|sair?\s*agora)\b/i.test(effectiveMessage)) {
-        intentHint += '\n[⚠️ ALERTA DE PREPARO (MONTAGEM NA HORA): O cliente quer "pegar agora" ou perguntou sobre pronta entrega. LEMBRE-SE: NENHUM produto fica pronto esperando na prateleira. Bolos Vulcão Mini e Bolo no Pote levam de 15 a 20 minutos para montagem após a confirmação, e salgados são fritos na hora. ⛔ NUNCA diga "pode vir pegar agora" nem "te espero aqui". Explique que é preparado/montado fresquinho na hora e leva cerca de 15 a 20 minutinhos para ficar pronto após a confirmação do pedido!]';
+        intentHint += '\n[⚠️ ALERTA DE PREPARO (MONTAGEM NA HORA): O cliente quer "pegar agora" ou perguntou sobre pronta entrega. LEMBRE-SE: NENHUM produto fica pronto esperando na prateleira. Bolos Vulcão Mini e Bolo no Pote levam de 15 a 20 minutos para montagem após a confirmação, e salgados são fritos fresquinhos na hora sob encomenda. ⛔ NUNCA diga "pode vir pegar agora" nem "te espero aqui". ⛔ NUNCA prometa tempo fixo de fritura (como 15 ou 20 minutos para salgados), pois depende da quantidade (acima de 40 unidades leva mais tempo) e da fila de pedidos. Explique que é preparado/frito fresquinho na hora e que a atendente confirmará a previsão certinha assim que o pedido for enviado!]';
     }
 
     // --- Guard de fita/laço do bolo (perguntar cor após personalização completa) ---
