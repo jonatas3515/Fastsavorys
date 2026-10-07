@@ -1317,11 +1317,9 @@ async function buildBusinessContext(intents, forceRefresh = false) {
                 ctx += `\n  Hoje é ${todayWeekday} e estamos fechados.`;
             }
             ctx += '\n  Comportamento:';
-            ctx += '\n  - Informe UMA VEZ de forma curta: "Encerramos por hoje! Gostaria de agendar para outro dia?" (máx 2 linhas).';
-            ctx += '\n  - Se o cliente insistir que queria para hoje: "Que pena! Amanhã estaremos na ativa das 14h às 18h 😊" — NÃO repita a oferta de agendamento.';
-            ctx += '\n  - Se o cliente quiser agendar: siga o roteiro normalmente (pergunte data, produto, etc).';
+            ctx += '\n  - Não aceitamos pedidos para hoje. Apenas agendamentos para datas futuras.';
+            ctx += '\n  - ⛔ REGRA DE FLUXO: Se o cliente escolher um produto (ex: "quero 20 salgados"), confirme o preço e PERGUNTE A DATA DO AGENDAMENTO antes de coletar sabores ou entrega ("Para qual dia você gostaria de agendar?"). Só colete sabores e entrega após a data futura estar definida!';
             ctx += '\n  - Responda preços, cardápio e regras NORMALMENTE.';
-            ctx += '\n  - ⛔ NÃO fique repetindo que está fechado a cada mensagem. Uma vez basta.';
         } else if (todayHours && todayHours.is_open) {
             // Loja está aberta hoje — calcula se AGORA está dentro do expediente
             const nowBA = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Bahia' }));
@@ -1333,7 +1331,10 @@ async function buildBusinessContext(intents, forceRefresh = false) {
             if (nowMinutes >= openMinutes && nowMinutes < closeMinutes) {
                 ctx += `\n\nSITUAÇÃO DE HOJE: LOJA ABERTA AGORA (${todayHours.open_time} às ${todayHours.close_time}). Pedidos para hoje são aceitos normalmente até ${todayHours.close_time}.`;
             } else if (nowMinutes >= closeMinutes) {
-                ctx += `\n\nSITUAÇÃO DE HOJE: Expediente de hoje (${todayHours.open_time} às ${todayHours.close_time}) já encerrou. Se o cliente pedir para HOJE, informe UMA VEZ de forma curta e simpática (ex: "Já encerramos por hoje! Amanhã estaremos na ativa das 14h às 18h 😊"). NÃO repita essa informação a cada mensagem. Se o cliente quiser agendar, ajude normalmente.`;
+                ctx += `\n\nSITUAÇÃO DE HOJE: Expediente de hoje (${todayHours.open_time} às ${todayHours.close_time}) JÁ ENCERROU. Não aceitamos pedidos para hoje.`;
+                ctx += '\n  ⛔ REGRA OBRIGATÓRIA DE AGENDAMENTO: Se o cliente escolher um produto (ex: "quero 20 mini salgados"), informe o preço e PERGUNTE IMEDIATAMENTE: "Para qual dia você gostaria de agendar seu pedido?".';
+                ctx += '\n  ⛔ NUNCA colete sabores, NUNCA passe endereço de retirada ("pode vir buscar a partir das 12h") e NUNCA combine entrega antes do cliente definir e confirmar expressamente a DATA FUTURA do agendamento!';
+                ctx += '\n  Se o cliente disser que quer buscar hoje, esclareça educadamente que o expediente de hoje já acabou e que precisa agendar para amanhã ou outro dia.';
             } else {
                 ctx += `\n\nSITUAÇÃO DE HOJE: Loja ainda não abriu (abre às ${todayHours.open_time}). Aceite agendamentos.`;
             }
