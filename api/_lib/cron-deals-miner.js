@@ -90,9 +90,9 @@ async function scrapeMercadoLivreDeals() {
     try {
       const res = await fetch(url, {
         headers: {
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+          'User-Agent': 'WhatsApp/2.24.8.85 i',
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-          'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8',
+          'Accept-Language': 'pt-BR,pt;q=0.9',
           'Cache-Control': 'no-cache'
         }
       });
@@ -100,7 +100,9 @@ async function scrapeMercadoLivreDeals() {
       if (!res.ok) continue;
 
       const html = await res.text();
-      const cardChunks = html.split(/<(?:div|li)\s+class=["'][^"']*(?:poly-card\b(?!__)|ui-search-result\b(?!__)|promotion-item\b(?!__))[^"']*["']/i);
+      // O Mercado Livre coloca atributos como id="..." antes de class="poly-card...",
+      // por isso precisamos aceitar qualquer atributo antes de class=["']...
+      const cardChunks = html.split(/<(?:div|li)\b[^>]*\bclass=["'][^"']*(?:poly-card\b(?!__)|ui-search-result\b(?!__)|promotion-item\b(?!__))[^"']*["']/i);
       cardChunks.shift(); // Remove header
 
       for (const chunk of cardChunks) {
@@ -108,13 +110,14 @@ async function scrapeMercadoLivreDeals() {
                           chunk.match(/class=["'][^"']*(?:poly-component__title|ui-search-item__title)[^"']*["'][^>]*><a\s+[^>]*href=["'](https:\/\/[^"'\s]+)["']/i) ||
                           chunk.match(/<a\s+[^>]*href=["'](https:\/\/[^"'\s]+)["']/i);
         if (!linkMatch) continue;
-        const cleanUrl = linkMatch[1].split('#')[0].split('?')[0];
+        const rawUrl = linkMatch[1].replace(/&amp;/g, '&');
+        const cleanUrl = rawUrl.split('#')[0].split('?')[0];
         if (seenUrls.has(cleanUrl)) continue;
 
         const titleMatch = chunk.match(/class=["'][^"']*(?:poly-component__title|ui-search-item__title)[^"']*["'][^>]*><a[^>]*>([\s\S]*?)<\/a>/i) ||
                            chunk.match(/class=["'][^"']*(?:poly-component__title|ui-search-item__title)[^"']*["'][^>]*>([\s\S]*?)<\//i) ||
                            chunk.match(/aria-label=["']([^"']+)["']/i);
-        const rawTitle = titleMatch ? titleMatch[1].replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&#39;/g, "'").trim() : '';
+        const rawTitle = titleMatch ? titleMatch[1].replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&#39;/g, "'").replace(/<[^>]+>/g, '').trim() : '';
 
         let imageUrl = '';
         const imgMatch = chunk.match(/data-src=["'](https?:\/\/[^"'\s]+)["']/i) ||
@@ -132,10 +135,12 @@ async function scrapeMercadoLivreDeals() {
 
         let price = '';
         const currentAmountMatch = chunk.match(/class=["'][^"']*(?:poly-price__current|andes-money-amount)[^"']*["'][\s\S]*?aria-label=["']([0-9.]+)\s*reais(?:\s*com\s*([0-9]{1,2})\s*centavos)?["']/i) ||
+                                   chunk.match(/class=["'][^"']*poly-price__current[^"']*["'][\s\S]*?class=["'][^"']*andes-money-amount__fraction[^"']*["']>([0-9.]+)</i) ||
                                    chunk.match(/<span\s+class=["'][^"']*andes-money-amount__fraction[^"']*["']>([0-9.]+)<\/span>/i);
         if (currentAmountMatch) {
           const frac = currentAmountMatch[1];
-          const cents = currentAmountMatch[2] ? currentAmountMatch[2].padStart(2, '0') : '00';
+          const centsMatch = chunk.match(/class=["'][^"']*poly-price__current[^"']*["'][\s\S]*?class=["'][^"']*andes-money-amount__cents[^"']*["']>([0-9]{2})</i);
+          const cents = centsMatch ? centsMatch[1] : (currentAmountMatch[2] ? currentAmountMatch[2].padStart(2, '0') : '00');
           price = `R$ ${frac},${cents}`;
         }
 
