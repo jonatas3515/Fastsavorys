@@ -85,12 +85,11 @@ async function scrapeMercadoLivreDeals() {
 
   const deals = [];
   const seenUrls = new Set();
+  const debugInfo = [];
 
   const userAgents = [
-    'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
-    'Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)',
-    'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)',
-    'WhatsApp/2.24.8.85 i'
+    'WhatsApp/2.24.8.85 i',
+    'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)'
   ];
 
   for (let i = 0; i < targetUrls.length; i++) {
@@ -108,24 +107,28 @@ async function scrapeMercadoLivreDeals() {
       });
 
       if (!res.ok) {
+        debugInfo.push({ url, status: res.status, chosenUa });
         console.warn(`[Deals Miner Scraper] HTTP ${res.status} na URL: ${url}`);
         continue;
       }
 
       const html = await res.text();
+      const hasPolyCard = html.includes('poly-card');
+      const isBlocked = html.includes('suspicious-traffic-frontend') || html.includes('robot');
+      debugInfo.push({ url, status: res.status, len: html.length, hasPolyCard, isBlocked, chosenUa });
       // O Mercado Livre coloca atributos como id="..." antes de class="poly-card...",
       // por isso precisamos aceitar qualquer atributo antes de class=["']...
       const cardChunks = html.split(/<(?:div|li)\b[^>]*\bclass=["'][^"']*(?:poly-card\b(?!__)|ui-search-result\b(?!__)|promotion-item\b(?!__))[^"']*["']/i);
       cardChunks.shift(); // Remove header
 
       for (const chunk of cardChunks) {
-        const linkMatch = chunk.match(/<a\s+[^>]*href=["'](https:\/\/[^"'\s]+)["'][^>]*class=["'][^"']*(?:poly-component__title|ui-search-item__title|ui-search-link)[^"']*["']/i) ||
-                          chunk.match(/class=["'][^"']*(?:poly-component__title|ui-search-item__title)[^"']*["'][^>]*><a\s+[^>]*href=["'](https:\/\/[^"'\s]+)["']/i) ||
-                          chunk.match(/<a\s+[^>]*href=["'](https:\/\/[^"'\s]+)["']/i);
+        const linkMatch = chunk.match(/<a\s+[^>]*href=["'](https:\/\/(?:www\.|produto\.)?mercadolivre\.com\.br\/[^"'\s]+)["'][^>]*class=["'][^"']*(?:poly-component__title|ui-search-item__title|ui-search-link)[^"']*["']/i) ||
+                          chunk.match(/class=["'][^"']*(?:poly-component__title|ui-search-item__title)[^"']*["'][^>]*><a\s+[^>]*href=["'](https:\/\/(?:www\.|produto\.)?mercadolivre\.com\.br\/[^"'\s]+)["']/i) ||
+                          chunk.match(/<a\s+[^>]*href=["'](https:\/\/(?:www\.|produto\.)?mercadolivre\.com\.br\/[^"'\s]+)["']/i);
         if (!linkMatch) continue;
         const rawUrl = linkMatch[1].replace(/&amp;/g, '&');
         const cleanUrl = rawUrl.split('#')[0].split('?')[0];
-        if (seenUrls.has(cleanUrl)) continue;
+        if (cleanUrl.includes('_blank') || seenUrls.has(cleanUrl)) continue;
 
         const titleMatch = chunk.match(/class=["'][^"']*(?:poly-component__title|ui-search-item__title)[^"']*["'][^>]*><a[^>]*>([\s\S]*?)<\/a>/i) ||
                            chunk.match(/class=["'][^"']*(?:poly-component__title|ui-search-item__title)[^"']*["'][^>]*>([\s\S]*?)<\//i) ||
@@ -147,30 +150,31 @@ async function scrapeMercadoLivreDeals() {
         const rating = ratingMatch ? parseFloat(ratingMatch[1]) : 0;
 
         let price = '';
-        const currentAmountMatch = chunk.match(/class=["'][^"']*(?:poly-price__current|andes-money-amount)[^"']*["'][\s\S]*?aria-label=["']([0-9.]+)\s*reais(?:\s*com\s*([0-9]{1,2})\s*centavos)?["']/i) ||
-                                   chunk.match(/class=["'][^"']*poly-price__current[^"']*["'][\s\S]*?class=["'][^"']*andes-money-amount__fraction[^"']*["']>([0-9.]+)</i) ||
-                                   chunk.match(/<span\s+class=["'][^"']*andes-money-amount__fraction[^"']*["']>([0-9.]+)<\/span>/i);
-        if (currentAmountMatch) {
-          const frac = currentAmountMatch[1];
-          const centsMatch = chunk.match(/class=["'][^"']*poly-price__current[^"']*["'][\s\S]*?class=["'][^"']*andes-money-amount__cents[^"']*["']>([0-9]{2})</i);
-          const cents = centsMatch ? centsMatch[1] : (currentAmountMatch[2] ? currentAmountMatch[2].padStart(2, '0') : '00');
+        const currentSection = chunk.match(/class=["'][^"']*poly-price__current[^"']*["'][\s\S]*?<\/div>/i) || [chunk];
+        const curText = currentSection[0];
+
+        const fracMatch = curText.match(/class=["'][^"']*andes-money-amount__fraction[^"']*["'][^>]*>([0-9.]+)</i);
+        const centsMatch = curText.match(/class=["'][^"']*andes-money-amount__cents[^"']*["'][^>]*>([0-9]{2})</i);
+        if (fracMatch) {
+          const frac = fracMatch[1];
+          const cents = centsMatch ? centsMatch[1] : '00';
           price = `R$ ${frac},${cents}`;
         }
 
         let originalPrice = '';
-        const prevAmountMatch = chunk.match(/class=["'][^"']*(?:andes-money-amount--previous|andes-money-amount--strike)[^"']*["'][^>]*aria-label=["']Antes:\s*([0-9.]+)\s*reais(?:\s*com\s*([0-9]{1,2})\s*centavos)?["']/i) ||
-                                chunk.match(/<s>[\s\S]*?([0-9.,]+)<\/s>/i);
-        if (prevAmountMatch) {
-          const frac = prevAmountMatch[1];
-          const cents = prevAmountMatch[2] ? prevAmountMatch[2].padStart(2, '0') : '00';
-          originalPrice = `R$ ${frac},${cents}`;
+        const prevSection = chunk.match(/class=["'][^"']*(?:andes-money-amount--previous|andes-money-amount--strike)[^"']*["'][\s\S]*?<\/(?:s|span|div)>/i);
+        if (prevSection) {
+          const pFrac = prevSection[0].match(/class=["'][^"']*andes-money-amount__fraction[^"']*["'][^>]*>([0-9.]+)</i);
+          const pCents = prevSection[0].match(/class=["'][^"']*andes-money-amount__cents[^"']*["'][^>]*>([0-9]{2})</i);
+          if (pFrac) {
+            originalPrice = `R$ ${pFrac[1]},${pCents ? pCents[1] : '00'}`;
+          }
         }
 
-        const discMatch = chunk.match(/class=["'][^"']*(?:poly-price__discount|polylabel-pill|andes-money-amount__discount|ui-search-price__discount)[^"']*["'][^>]*>([0-9]+)%\s*OFF</i) ||
-                          chunk.match(/([0-9]+)%\s*OFF/i);
+        const discMatch = chunk.match(/([0-9]+)%\s*OFF/i);
         const discountPercent = discMatch ? parseInt(discMatch[1], 10) : 0;
 
-        const badgeMatch = chunk.match(/class=["'][^"']*(?:polylabel-fs-xs|ui-search-item__highlight-label)[^"']*["']>([^<]+)</i);
+        const badgeMatch = chunk.match(/class=["'][^"']*(?:polylabel-fs-xs|polylabel-fs-xxs|ui-search-item__highlight-label)[^"']*["']>([^<]+)</i);
         const badgeText = badgeMatch ? badgeMatch[1].trim() : '';
 
         if (rawTitle && price && cleanUrl) {
@@ -196,7 +200,7 @@ async function scrapeMercadoLivreDeals() {
     }
   }
 
-  return deals;
+  return { deals, debugInfo };
 }
 
 async function handleMineDeals(req, res) {
@@ -210,7 +214,7 @@ async function handleMineDeals(req, res) {
     console.log(`[Deals Miner] Iniciando mineração no Mercado Livre (Min ${minDiscount}% OFF, Limite: ${limit})...`);
 
     // 1. Scrape all current promotion cards
-    const allDeals = await scrapeMercadoLivreDeals();
+    const { deals: allDeals, debugInfo } = await scrapeMercadoLivreDeals();
     console.log(`[Deals Miner] Total de ofertas varridas: ${allDeals.length}`);
 
     // 2. Filter qualified deals
@@ -236,7 +240,8 @@ async function handleMineDeals(req, res) {
         duplicate_count: 0,
         ignored_discount_count: allDeals.length,
         deals: [],
-        items: []
+        items: [],
+        debug: debugInfo
       });
     }
 
