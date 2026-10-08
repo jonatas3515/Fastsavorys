@@ -86,18 +86,31 @@ async function scrapeMercadoLivreDeals() {
   const deals = [];
   const seenUrls = new Set();
 
-  for (const url of targetUrls) {
+  const userAgents = [
+    'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
+    'Mozilla/5.0 (compatible; bingbot/2.0; +http://www.bing.com/bingbot.htm)',
+    'facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)',
+    'WhatsApp/2.24.8.85 i'
+  ];
+
+  for (let i = 0; i < targetUrls.length; i++) {
+    const url = targetUrls[i];
+    const chosenUa = userAgents[i % userAgents.length];
+
     try {
       const res = await fetch(url, {
         headers: {
-          'User-Agent': 'WhatsApp/2.24.8.85 i',
+          'User-Agent': chosenUa,
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
           'Accept-Language': 'pt-BR,pt;q=0.9',
           'Cache-Control': 'no-cache'
         }
       });
 
-      if (!res.ok) continue;
+      if (!res.ok) {
+        console.warn(`[Deals Miner Scraper] HTTP ${res.status} na URL: ${url}`);
+        continue;
+      }
 
       const html = await res.text();
       // O Mercado Livre coloca atributos como id="..." antes de class="poly-card...",
@@ -177,7 +190,7 @@ async function scrapeMercadoLivreDeals() {
         }
       }
 
-      if (deals.length >= 24) break;
+      if (deals.length >= 36) break;
     } catch (e) {
       console.warn('[Deals Miner Scraper] Erro na URL', url, e.message);
     }
