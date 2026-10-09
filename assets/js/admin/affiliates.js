@@ -79,6 +79,11 @@ window.AffiliatesModule = (function () {
   function handleStatusFilter(val) {
     statusFilter = val || 'all';
     adminCurrentPage = 1;
+    if (statusFilter === 'recent50' && searchQuery) {
+      searchQuery = '';
+      const sInput = document.getElementById('affiliateAdminSearchInput');
+      if (sInput) sInput.value = '';
+    }
     renderTable();
   }
 
@@ -320,6 +325,36 @@ window.AffiliatesModule = (function () {
 
     const filtered = getFilteredProducts();
 
+    const bannerEl = document.getElementById('affiliateActiveFilterBanner');
+    if (bannerEl) {
+      if (statusFilter === 'recent50') {
+        bannerEl.className = 'mb-3 p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between text-xs text-amber-900 shadow-xs animate-fade-in';
+        bannerEl.innerHTML = `
+          <div class="flex items-center gap-2">
+            <span class="text-base">🆕</span>
+            <div>
+              <strong class="font-bold">Filtro Ativo:</strong> Exibindo os <strong>50 produtos mais recentemente adicionados</strong> (${filtered.length} encontrados), ordenados do mais novo para o mais antigo.
+            </div>
+          </div>
+          <button type="button" onclick="AffiliatesModule.clearFilters()" class="text-amber-800 hover:text-amber-950 font-bold underline ml-3 whitespace-nowrap">✕ Limpar Filtro</button>
+        `;
+      } else if (statusFilter === 'suggestions') {
+        bannerEl.className = 'mb-3 p-3 bg-purple-50 border border-purple-200 rounded-xl flex items-center justify-between text-xs text-purple-900 shadow-xs animate-fade-in';
+        bannerEl.innerHTML = `
+          <div class="flex items-center gap-2">
+            <span class="text-base">📥</span>
+            <div>
+              <strong class="font-bold">Sugestões da IA:</strong> Exibindo produtos minerados (${filtered.length} encontrados).
+            </div>
+          </div>
+          <button type="button" onclick="AffiliatesModule.clearFilters()" class="text-purple-800 hover:text-purple-950 font-bold underline ml-3 whitespace-nowrap">✕ Limpar Filtro</button>
+        `;
+      } else {
+        bannerEl.className = 'hidden mb-3';
+        bannerEl.innerHTML = '';
+      }
+    }
+
     if (filtered.length === 0) {
       tbody.innerHTML = `
         <tr>
@@ -485,10 +520,15 @@ window.AffiliatesModule = (function () {
         : '';
 
       const lastUpdatedText = formatLastUpdated(item.updated_at || item.created_at);
+      const createdDateText = item.created_at ? formatLastUpdated(item.created_at) : '';
 
       return `
         <tr class="hover:bg-gray-50 transition-colors border-b border-gray-100 ${isFastPick ? 'bg-pink-50/20' : ''}">
-          <td class="p-3 text-center text-xs font-bold text-gray-500 w-12">${absoluteIdx}</td>
+          <td class="p-3 text-center text-xs font-bold text-gray-500 w-12">
+            ${statusFilter === 'recent50' 
+              ? `<span class="text-amber-700 font-black">#${absoluteIdx}</span><div class="text-[9px] text-gray-400 font-mono">ID ${item.id}</div>` 
+              : `${absoluteIdx}`}
+          </td>
           <td class="p-3 w-16">
             <img src="${escapeHtml(item.image_url)}" alt="" class="w-12 h-12 object-contain rounded-lg border-2 ${isFastPick ? 'border-pink-500 ring-2 ring-pink-100' : 'border-gray-200'} bg-white p-1" 
                  onerror="this.src='../assets/img/fast-logo.png'" />
@@ -512,7 +552,8 @@ window.AffiliatesModule = (function () {
           <td class="p-3 font-bold text-sm text-gray-800">
             <div>${escapeHtml(item.price_display || '-')}</div>
             ${item.original_price ? `<div class="text-[10px] text-gray-400 line-through">${escapeHtml(item.original_price)}</div>` : ''}
-            ${lastUpdatedText ? `<div class="text-[9.5px] text-gray-400 font-normal mt-1 flex items-center gap-1" title="Data da última verificação automática"><span>🕒</span><span>${escapeHtml(lastUpdatedText)}</span></div>` : ''}
+            ${statusFilter === 'recent50' && createdDateText ? `<div class="text-[9.5px] text-emerald-700 font-bold mt-1 flex items-center gap-1" title="Data de cadastro do produto"><span>🆕</span><span>${escapeHtml(createdDateText.replace('Atualizado em ', 'Cadastrado em '))}</span></div>` : ''}
+            ${lastUpdatedText && statusFilter !== 'recent50' ? `<div class="text-[9.5px] text-gray-400 font-normal mt-1 flex items-center gap-1" title="Data da última verificação automática"><span>🕒</span><span>${escapeHtml(lastUpdatedText)}</span></div>` : ''}
           </td>
           <td class="p-3 text-center">${activeBadge}</td>
           <td class="p-3 text-right">
@@ -2280,6 +2321,25 @@ window.AffiliatesModule = (function () {
         lines.push(`<div class="pl-3 text-white">⏩ Já existiam (Ignorados): <strong class="text-yellow-300">${data.duplicate_count || 0}</strong></div>`);
         lines.push(`<div class="pl-3 text-white">⏭️ Desconto menor que ${minDiscount}%: <strong class="text-gray-400">${data.ignored_discount_count || 0}</strong></div>`);
         
+        if (data.scraped_count === 0 || data.is_waf_blocked) {
+          lines.push(`
+            <div class="mt-3 p-3 bg-amber-950/90 border border-amber-600 rounded-lg text-amber-200 text-xs">
+              <div class="font-bold text-amber-300 flex items-center gap-1.5 mb-1 text-sm">
+                <span>🛡️</span> <span>Proteção Anti-Robô do Mercado Livre</span>
+              </div>
+              <p class="text-[11px] leading-relaxed text-amber-100">
+                O Mercado Livre bloqueou a varredura automática vinda dos servidores da nuvem (Vercel/EUA) com tela de captcha/verificação de tráfego.
+              </p>
+              <div class="mt-2.5 pt-2 border-t border-amber-700/60 flex items-center justify-between flex-wrap gap-2">
+                <span class="text-[11px] font-semibold text-white">💡 Solução 100% Livre de Bloqueio:</span>
+                <button type="button" onclick="AffiliatesModule.closeMinerModal(); AffiliatesModule.openBookmarkletModal();" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded-lg text-xs shadow transition cursor-pointer">
+                  ⚡ Usar 1-Click Quick Clip
+                </button>
+              </div>
+            </div>
+          `);
+        }
+
         if (data.items && data.items.length > 0) {
           lines.push(`<div class="mt-2 text-xs text-gray-300 border-t border-gray-700 pt-2 font-semibold">Itens processados recentemente:</div>`);
           data.items.slice(0, 5).forEach(item => {
@@ -2291,7 +2351,13 @@ window.AffiliatesModule = (function () {
       }
 
       if (window.showToast) {
-        window.showToast(`🤖 Mineração concluída! +${data.inserted_count || 0} novas ofertas inseridas.`, 'success');
+        if (data.inserted_count > 0) {
+          window.showToast(`🤖 Mineração concluída! +${data.inserted_count} novas ofertas inseridas.`, 'success');
+        } else if (data.scraped_count === 0 || data.is_waf_blocked) {
+          window.showToast(`⚠️ Mercado Livre bloqueou a varredura da nuvem. Use o 1-Click Quick Clip!`, 'warning');
+        } else {
+          window.showToast(`Nenhuma nova oferta precisou ser cadastrada.`, 'info');
+        }
       }
 
       await loadProducts();

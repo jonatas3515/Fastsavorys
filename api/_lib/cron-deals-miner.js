@@ -228,9 +228,13 @@ async function handleMineDeals(req, res) {
     console.log(`[Deals Miner] Ofertas qualificadas: ${qualified.length}`);
 
     if (qualified.length === 0) {
+      const isWafBlocked = debugInfo.some(d => d.isBlocked);
       return res.status(200).json({
         success: true,
-        message: 'Nenhuma oferta atendeu a todos os critérios de filtro nesta execução.',
+        is_waf_blocked: isWafBlocked,
+        message: isWafBlocked
+          ? 'O Mercado Livre bloqueou requisições automáticas diretas da nuvem (Vercel) com tela anti-robô. Utilize o botão ⚡ 1-Click Quick Clip para cadastrar ofertas diretamente pelo seu navegador.'
+          : 'Nenhuma oferta atendeu a todos os critérios de filtro nesta execução.',
         scraped_count: allDeals.length,
         totalScanned: allDeals.length,
         qualified_count: 0,

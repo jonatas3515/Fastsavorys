@@ -515,34 +515,51 @@ async function handleSendWhatsAppDeal(req, res) {
 
     // 2. Se for modo afiliado ou se não encontrou produto de loja, busca nos achadinhos
     if (!product) {
-      // 2.1 PRIORIDADE RELÂMPAGO: Se houver oferta relâmpago ativa que não foi enviada nas últimas 3h, fura a fila!
-      const threeHoursAgo = new Date(Date.now() - 3 * 3600 * 1000).toISOString();
+      // 2.1 PRIORIDADE RELÂMPAGO: Apenas produtos com contador REAL (flash_deal_end no futuro)
+      // e que NÃO foram postados nas últimas 24h furam a fila (evita repetições infinitas a cada 3h)
+      const twentyFourHoursAgo = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+      const nowIso = new Date().toISOString();
+
       const { data: flashCandidates } = await supabaseAdmin
         .from('fast_affiliate_products')
         .select('*')
         .eq('is_active', true)
-        .or('badge_color.eq.flash_deal,discount_tag.ilike.%relâmpago%,discount_tag.ilike.%relampago%')
-        .or(`last_posted_at.is.null,last_posted_at.lt.${threeHoursAgo}`)
+        .gt('flash_deal_end', nowIso)
+        .or(`last_posted_at.is.null,last_posted_at.lt.${twentyFourHoursAgo}`)
         .order('last_posted_at', { ascending: true, nullsFirst: true })
         .limit(1);
 
       if (flashCandidates && flashCandidates.length > 0) {
-        const candidate = flashCandidates[0];
-        // Verifica se ainda está no prazo de expiração (se definido)
-        if (!candidate.flash_deal_end || new Date(candidate.flash_deal_end) > new Date()) {
-          product = candidate;
-          console.log(`[WhatsApp Deal] ⚡ Prioridade Relâmpago ativada: furando fila para "${product.title}"`);
+        product = flashCandidates[0];
+        console.log(`[WhatsApp Deal] ⚡ Prioridade Relâmpago com contador ativo: furando fila para "${product.title}"`);
+      }
+
+      // 2.2 FILA 1 (INÉDITOS): Prioridade máxima para produtos que NUNCA foram postados no grupo VIP!
+      // Existem mais de 200 produtos cadastrados que nunca foram enviados.
+      if (!product) {
+        const { data: unpostedProducts } = await supabaseAdmin
+          .from('fast_affiliate_products')
+          .select('*')
+          .eq('is_active', true)
+          .is('last_posted_at', null)
+          .order('created_at', { ascending: false, nullsFirst: false })
+          .limit(15);
+
+        if (unpostedProducts && unpostedProducts.length > 0) {
+          // Sorteia dentro da amostra dos inéditos para garantir rotação e variedade de categorias
+          const randIdx = Math.floor(Math.random() * unpostedProducts.length);
+          product = unpostedProducts[randIdx];
+          console.log(`[WhatsApp Deal] 🆕 Produto INÉDITO selecionado (nunca postado): "${product.title}" (ID ${product.id})`);
         }
       }
 
-      // 2.2 Rotação padrão se não houver oferta relâmpago prioritária
+      // 2.3 FILA 2 (ROTAÇÃO GERAL): Apenas se TODOS os produtos já tiverem sido postados pelo menos 1 vez
       if (!product) {
         const { data: affiliateProducts, error: affErr } = await supabaseAdmin
           .from('fast_affiliate_products')
           .select('*')
           .eq('is_active', true)
           .order('last_posted_at', { ascending: true, nullsFirst: true })
-          .order('position', { ascending: true })
           .limit(1);
 
       if (affErr) {
@@ -557,6 +574,7 @@ async function handleSendWhatsAppDeal(req, res) {
       }
 
         product = affiliateProducts[0];
+        console.log(`[WhatsApp Deal] 🔄 Rotação regular (mais antigo sem disparo): "${product.title}" (ID ${product.id}, último envio: ${product.last_posted_at})`);
       }
 
       // Validação em tempo real do preço e disponibilidade antes do disparo
