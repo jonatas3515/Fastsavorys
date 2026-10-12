@@ -37,7 +37,8 @@ module.exports = async function handler(req, res) {
     'send-vip-invite', 'vip-invite', 'invite', 'convite-vip', 'convite',
     'send-instagram-post', 'instagram-post', 'instagram', 'post-instagram', 'insta', 'ig',
     'mine-deals', 'deals-miner', 'miner',
-    'auto-sync-links', 'auto-check-links', 'sync-links', 'check-sync-links', 'verify-links', 'check-links', 'sync'
+    'auto-sync-links', 'auto-check-links', 'sync-links', 'check-sync-links', 'verify-links', 'check-links', 'sync',
+    'sync-calendar', 'test-calendar', 'calendar'
   ].includes(action);
   const requiredCronSecret = process.env.CRON_SECRET;
   if (requiredCronSecret && !isPublicAction) {
@@ -107,6 +108,45 @@ module.exports = async function handler(req, res) {
     case 'birthday-broadcast':
     case 'birthday':
       return handleBirthdayBroadcast(req, res);
+
+    case 'sync-calendar':
+    case 'test-calendar':
+    case 'calendar': {
+      const { syncOrderToGoogleCalendar, getGoogleAccessToken, getServiceAccountCredentials } = require('./_lib/google-calendar');
+      const creds = getServiceAccountCredentials();
+      if (!creds.email || !creds.privateKey) {
+        return res.status(200).json({
+          success: false,
+          configured: false,
+          message: 'Google Calendar ainda não configurado. Adicione GOOGLE_SERVICE_ACCOUNT_EMAIL e GOOGLE_PRIVATE_KEY nas variáveis de ambiente da Vercel.'
+        });
+      }
+      try {
+        const token = await getGoogleAccessToken();
+        if (!token) throw new Error('Não foi possível obter token de acesso do Google.');
+
+        const orderCode = req.query.order_code || req.query.code;
+        if (orderCode) {
+          const { createClient } = require('@supabase/supabase-js');
+          const supa = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY);
+          const { data: orders } = await supa.from('fast_orders').select('*').eq('order_code', orderCode).limit(1);
+          if (orders && orders[0]) {
+            const syncRes = await syncOrderToGoogleCalendar(orders[0]);
+            return res.status(200).json({ success: true, tested_order: orders[0].order_code, syncResult: syncRes });
+          }
+        }
+
+        return res.status(200).json({
+          success: true,
+          configured: true,
+          calendarId: creds.calendarId,
+          serviceAccount: creds.email,
+          message: 'Autenticação com o Google Calendar testada e funcionando perfeitamente!'
+        });
+      } catch (e) {
+        return res.status(500).json({ success: false, error: e.message });
+      }
+    }
 
     default:
       return res.status(400).json({

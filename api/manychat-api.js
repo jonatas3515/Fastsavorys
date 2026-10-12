@@ -228,6 +228,19 @@ async function handleNotifyNewOrder(req, res) {
 
     console.log(`[manychat-api:notify-new-order] Processing order ${normalizedOrder.order_code || normalizedOrder.id}`);
     const result = await notifyNewOrder(normalizedOrder);
+
+    // Sincroniza pedidos com data futura (scheduled_date) no Google Calendar
+    if (normalizedOrder.scheduled_date) {
+        try {
+            const { syncOrderToGoogleCalendar } = require('./_lib/google-calendar');
+            syncOrderToGoogleCalendar(normalizedOrder).catch(e => {
+                console.warn('[manychat-api] Erro ao sincronizar Google Calendar em background:', e.message);
+            });
+        } catch (gcalErr) {
+            console.warn('[manychat-api] Erro ao carregar módulo do Google Calendar:', gcalErr.message);
+        }
+    }
+
     return res.status(200).json(result);
 }
 
@@ -359,6 +372,18 @@ async function _handleAccept(body, res) {
             if (!clientManychatId && clientPhone) {
                 const { data: c } = await supabaseAdmin.from('fast_clients').select('manychat_id').eq('phone', clientPhone).limit(1);
                 clientManychatId = c?.[0]?.manychat_id;
+            }
+
+            // Garante sincronização com Google Agenda se for encomenda agendada
+            if (order.scheduled_date) {
+                try {
+                    const { syncOrderToGoogleCalendar } = require('./_lib/google-calendar');
+                    syncOrderToGoogleCalendar(order).catch(e => {
+                        console.warn('[manychat-api] Erro ao sincronizar Google Calendar no aceite:', e.message);
+                    });
+                } catch (gcalErr) {
+                    console.warn('[manychat-api] Erro ao carregar módulo do Google Calendar:', gcalErr.message);
+                }
             }
         }
     }
