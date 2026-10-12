@@ -341,21 +341,13 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
       if (!discountTag.toUpperCase().includes('OFF')) discountTag += ' OFF';
     }
 
-    // Amazon Coupon / Voucher Detection (Codes or Clip Coupons)
-    const amzCouponMatch = html.match(/id=["']couponBadgeV2["'][\s\S]*?>([^<]+)</i) ||
-                           html.match(/class=["'][^"']*a-color-success[^"']*["'][^>]*>([^<]*Economize\s*[^<]+com cupom[^<]*)</i) ||
-                           html.match(/data-cpc-coupon=["']([^"']+)["']/i) ||
-                           html.match(/<label[^>]*class=["'][^"']*a-form-label[^"']*["'][^>]*>\s*(Aplicar cupom de\s*[^<]+)<\/label>/i) ||
-                           html.match(/class=["'][^"']*(?:couponBadge|reinventPriceSavingsPercentageMargin|savingsPercentage)[^"']*["'][^>]*>([^<]*cupom[^<]*)/i) ||
-                           html.match(/([0-9.,]+%\s*OFF\s*com\s*cupom|Economize\s*R\$\s*[0-9.,]+\s*com\s*cupom|Aplicar\s*cupom\s*de\s*(?:R\$\s*)?[0-9.,]+%?)/i);
-    if (amzCouponMatch && amzCouponMatch[1]) {
-      const rawAmzCoupon = amzCouponMatch[1].replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
-      const valMatch = rawAmzCoupon.match(/(?:Economize|cupom\s*de)\s*(R\$\s*[0-9.,]+|[0-9]+%)/i) ||
-                       rawAmzCoupon.match(/(R\$\s*[0-9.,]+|[0-9]+%)\s*(?:OFF|com\s*cupom)/i);
-      if (valMatch && valMatch[1]) {
-        couponCode = `Ativar no anúncio (${valMatch[1]} OFF)`;
-      } else {
-        couponCode = 'Ativar cupom no anúncio';
+    // Amazon Coupon Detection (Apenas código de cupom REAL explícito)
+    const amzCodeMatch = html.match(/data-cpc-coupon=["']([A-Z0-9_-]{4,20})["']/i) ||
+                         html.match(/id=["']couponBadgeV2["'][\s\S]*?([A-Z0-9_-]{4,20})/i);
+    if (amzCodeMatch && amzCodeMatch[1]) {
+      const code = amzCodeMatch[1].trim();
+      if (/^[A-Z0-9_-]{4,20}$/i.test(code) && !/^(TRUE|FALSE|NULL|OFF)$/i.test(code)) {
+        couponCode = code.toUpperCase();
       }
     }
 
@@ -390,16 +382,12 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
       if (!isNaN(val) && val > 0) price = formatBrlNumber(val);
     }
 
-    // Shopee Voucher Detection
-    const shopeeCouponMatch = html.match(/"voucher_code"\s*:\s*"([^"]+)"/i) ||
-                              html.match(/"voucherDescription"\s*:\s*"([^"]+)"/i) ||
-                              html.match(/class=["'][^"']*voucher-ticket[^"']*["'][\s\S]*?>([^<]+)</i);
+    // Shopee Voucher Detection (Apenas código de cupom REAL explícito)
+    const shopeeCouponMatch = html.match(/"voucher_code"\s*:\s*"([A-Z0-9_-]{4,20})"/i);
     if (shopeeCouponMatch && shopeeCouponMatch[1]) {
       const rawShopee = shopeeCouponMatch[1].trim();
-      if (/^[A-Z0-9_-]{4,20}$/i.test(rawShopee)) {
-        couponCode = rawShopee;
-      } else {
-        couponCode = 'Resgatar cupom no app';
+      if (/^[A-Z0-9_-]{4,20}$/i.test(rawShopee) && !/^(TRUE|FALSE|NULL)$/i.test(rawShopee)) {
+        couponCode = rawShopee.toUpperCase();
       }
     }
 
@@ -455,40 +443,14 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
       discountTag = discLabelMatch[1].trim();
     }
 
-    // Mercado Livre Coupon Detection (JSON state or PDP pills or poly-cards)
-    const mlCouponCodeMatch = html.match(/"coupon_code"\s*:\s*"([^"]+)"/i) ||
-                              html.match(/"coupon"\s*:\s*\{\s*"code"\s*:\s*"([^"]+)"/i) ||
-                              html.match(/"campaign_code"\s*:\s*"([^"]+)"/i) ||
-                              html.match(/class=["'][^"']*ui-pdp-promotions-pill[^"']*["'][\s\S]*?>([A-Z0-9_-]{4,20})</i);
+    // Mercado Livre Coupon Detection (Apenas códigos de cupom REAIS explícitos)
+    const mlCouponCodeMatch = html.match(/"coupon_code"\s*:\s*"([A-Z0-9_-]{4,20})"/i) ||
+                              html.match(/"coupon"\s*:\s*\{\s*"code"\s*:\s*"([A-Z0-9_-]{4,20})"/i) ||
+                              html.match(/class=["'][^"']*ui-pdp-promotions-pill[^"']*["'][\s\S]*?cupom[:\s]+([A-Z0-9_-]{4,20})</i);
     if (mlCouponCodeMatch && mlCouponCodeMatch[1]) {
-      let cCode = mlCouponCodeMatch[1].trim();
-      if (/cupom:?\s*([A-Z0-9_-]+)/i.test(cCode)) {
-        const m = cCode.match(/cupom:?\s*([A-Z0-9_-]+)/i);
-        if (m && m[1]) cCode = m[1];
-      }
-      if (/^[A-Z0-9_-]{4,20}$/i.test(cCode)) {
-        couponCode = cCode;
-      }
-    }
-
-    if (!couponCode) {
-      // Detecção de pílulas de cupom / tags de promoção (sem código digitável explícito)
-      const mlPillMatch = html.match(/class=["'][^"']*poly-coupons__pill[^"']*["']([\s\S]*?)<\/div>/i) ||
-                          html.match(/class=["'][^"']*ui-pdp-promotions-pill[^"']*["']([\s\S]*?)<\/span>/i) ||
-                          html.match(/(?:id|type)["']:\s*["']coupon["'][\s\S]{0,120}?["']text["']:\s*["']([^"']+)["']/i) ||
-                          html.match(/([0-9.,]+%?\s*OFF\s*com\s*[Cc]upom|R\$\s*[0-9.,]+\s*OFF\s*com\s*[Cc]upom|[Cc]upom\s*de\s*R\$\s*[0-9.,]+)/i);
-
-      if (mlPillMatch) {
-        const pillContent = (mlPillMatch[1] || mlPillMatch[0]).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
-        const valMatch = pillContent.match(/(R\$\s*[0-9.,]+|[0-9]+%)\s*OFF/i) ||
-                         pillContent.match(/([0-9]+)\s*OFF/i) ||
-                         pillContent.match(/cupom\s*de\s*(R\$\s*[0-9.,]+|[0-9]+%)/i);
-        if (valMatch && valMatch[1]) {
-          const discountStr = valMatch[1].includes('R$') || valMatch[1].includes('%') ? valMatch[1] : `${valMatch[1]}%`;
-          couponCode = `Ativar no anúncio (${discountStr} OFF)`;
-        } else {
-          couponCode = 'Ativar cupom no anúncio';
-        }
+      const cCode = mlCouponCodeMatch[1].trim();
+      if (/^[A-Z0-9_-]{4,20}$/i.test(cCode) && !/^(TRUE|FALSE|NULL|UNDEFINED|OFF)$/i.test(cCode)) {
+        couponCode = cCode.toUpperCase();
       }
     }
 
