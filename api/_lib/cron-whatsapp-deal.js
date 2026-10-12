@@ -643,6 +643,7 @@ async function handleSendWhatsAppDeal(req, res) {
         } catch (fetchErr) {
           console.warn('[WhatsApp Deal] Rechecagem em tempo real falhou, mantendo dados do banco:', fetchErr.message);
         }
+      }
       // GUARDA DE SANIDADE: Proteção de Credibilidade do Grupo VIP
       // Bloqueia qualquer produto com preço quebrado/irrisório para pacotes ou kits (ex: R$ 1,42 para 12 unidades)
       const numPrice = parsePrice(product.price_display);
