@@ -658,24 +658,16 @@
               </h3>
               ${item.description ? `<p class="text-xs text-gray-500 mt-1 line-clamp-2">${escapeHtml(item.description)}</p>` : ''}
               
-              <!-- Cupom de Desconto 1-Click Copy -->
+              <!-- Mensagem Informativa de Cupom (Sem botão de cópia) -->
               ${item.coupon_code ? `
-                <div class="mt-2.5 p-2 bg-gradient-to-r from-indigo-50/90 via-purple-50/80 to-indigo-50/90 border border-indigo-200/90 rounded-xl flex items-center justify-between gap-2 shadow-2xs">
-                  <div class="flex items-center gap-1.5 min-w-0">
-                    <span class="text-sm">🎟️</span>
-                    <div class="truncate">
-                      <span class="text-[9px] uppercase tracking-wider text-indigo-700 block font-bold leading-tight">Cupom Ativo:</span>
-                      <span class="text-xs font-black text-indigo-950 tracking-wider font-mono">${escapeHtml(item.coupon_code)}</span>
-                    </div>
+                <div class="mt-2.5 px-3 py-1.5 bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 border border-amber-200/90 rounded-xl flex items-center gap-2 shadow-2xs">
+                  <span class="text-sm flex-shrink-0">🎟️</span>
+                  <div class="min-w-0 flex-1">
+                    <span class="text-[9.5px] uppercase tracking-wider text-amber-850 font-extrabold block leading-tight text-amber-800">Cupom Disponível</span>
+                    <span class="text-xs font-bold text-gray-900 truncate block">
+                      ${/ativar|resgatar/i.test(item.coupon_code) ? escapeHtml(item.coupon_code) : `Ativar no anúncio: ${escapeHtml(item.coupon_code)}`}
+                    </span>
                   </div>
-                  <button 
-                    type="button" 
-                    onclick="window.copyAffiliateCoupon('${escapeHtml(item.coupon_code)}', this)"
-                    class="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-[11px] font-black transition shadow-xs flex items-center gap-1 flex-shrink-0 active:scale-95 cursor-pointer"
-                    title="Copiar cupom de desconto"
-                  >
-                    <span>📋</span> <span>Copiar</span>
-                  </button>
                 </div>
               ` : ''}
             </div>
@@ -803,8 +795,15 @@
     const pct = calcDiscountPercent(item.original_price, item.price_display);
     const discountText = pct > 0 ? ` (${pct}% OFF)` : '';
     const origPriceText = item.original_price ? `~${item.original_price}~ ➔ ` : '';
-    const descText = item.description ? `\n${item.description}\n` : '';
-    const couponText = item.coupon_code ? `\n🎟️ *CUPOM DISPONÍVEL:* Use o cupom *${item.coupon_code}* na finalização!\n` : '';
+    let couponText = '';
+    if (item.coupon_code) {
+      const raw = String(item.coupon_code).trim();
+      if (/ativar|resgatar/i.test(raw)) {
+        couponText = `\n🎟️ *CUPOM DISPONÍVEL:* ${raw}!\n`;
+      } else {
+        couponText = `\n🎟️ *CUPOM DISPONÍVEL:* Ative ou use *${raw}* no anúncio!\n`;
+      }
+    }
     const isFastPick = Boolean(item.is_fast_pick || item.badge_color === 'fast_seal');
     const sealHeader = isFastPick ? '👑 *PRODUTO TESTADO E RECOMENDADO PELA FASTSAVORY\'S* ✨\n' : '';
     const importedText = item.is_imported ? '✈️ *PRODUTO IMPORTADO (COMPRA INTERNACIONAL)*\n' : '';

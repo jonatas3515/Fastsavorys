@@ -24,12 +24,15 @@
                   document.querySelector('.a-dynamic-image');
       payload.image_url = img?.src || img?.getAttribute('data-old-hires') || '';
 
-      const pw = document.querySelector('.a-price .a-price-whole')?.innerText?.replace(/[\r\n\t]/g, '').trim();
-      const pf = document.querySelector('.a-price .a-price-fraction')?.innerText?.trim();
+      const priceEl = document.querySelector('#corePriceDisplay_desktop_feature_div .priceToPay, #corePrice_desktop .priceToPay, #apex_desktop .priceToPay, .priceToPay') ||
+                      document.querySelector('#corePriceDisplay_desktop_feature_div .a-price:not(.apex-priceperunit-value):not(.a-text-price), #corePrice_desktop .a-price:not(.apex-priceperunit-value):not(.a-text-price)') ||
+                      document.querySelector('.a-price:not(.apex-priceperunit-value):not([class*="priceperunit"]):not(.a-text-price)');
+      const pw = priceEl?.querySelector('.a-price-whole')?.innerText?.replace(/[\r\n\t]/g, '').replace(/[^\d.]/g, '').trim();
+      const pf = priceEl?.querySelector('.a-price-fraction')?.innerText?.replace(/[^\d]/g, '').trim();
       if (pw) {
         payload.price_display = 'R$ ' + pw + (pf ? ',' + pf : ',00');
       }
-      const basis = document.querySelector('.basisPrice .a-offscreen, .a-text-price .a-offscreen, .apex-basisprice-value .a-offscreen')?.innerText?.trim();
+      const basis = document.querySelector('.basisPrice .a-offscreen, #corePriceDisplay_desktop_feature_div .apex-basisprice-value .a-offscreen, .apex-basisprice-offscreen-label, #corePrice_desktop .apex-basisprice-value .a-offscreen')?.innerText?.trim();
       if (basis) payload.original_price = basis;
       const sav = document.querySelector('.savingsPercentage, .reinventPriceSavingsPercentageMargin')?.innerText?.trim();
       if (sav) payload.discount_tag = sav.replace('-', '').trim() + ' OFF';

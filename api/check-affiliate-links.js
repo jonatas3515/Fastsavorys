@@ -169,6 +169,14 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
       isImported = true;
     }
 
+    // 0. Remove blocos e textos de "preço por unidade" da Amazon (ex: "R$ 1,42 / unidade", "apex-priceperunit")
+    // Isso evita categoricamente que fardos/pacotes (papel higiênico, cápsulas, fraldas, latas) usem o valor fracionário como preço do produto!
+    html = html
+      .replace(/<span[^>]*class=["'][^"']*(?:apex-priceperunit|priceperunit|unitPrice)[^"']*["'][\s\S]*?<\/span>\s*<\/span>/gi, '')
+      .replace(/class=["'][^"']*(?:apex-priceperunit|priceperunit|unitPrice)[^"']*["'][\s\S]*?<\/span>/gi, '')
+      .replace(/<span[^>]*class=["'][^"']*apex-priceperunit-accessibility-label[^"']*["'][\s\S]*?<\/span>/gi, '')
+      .replace(/<span[^>]*class=["'][^"']*aok-offscreen[^"']*["'][^>]*>[^<]*(?:por\s+r\$|cada|unidade|rolo|c[áa]psula|kg|metro)[\s\S]*?<\/span>/gi, '');
+
     // 1. input hidden attach-base-product-price (Preço exato oficial do produto principal selecionado)
     const attachPrice = html.match(/id=["']attach-base-product-price["'][^>]*value=["']([0-9.]+)["']/i) ||
                         html.match(/value=["']([0-9.]+)["'][^>]*id=["']attach-base-product-price["']/i);
@@ -232,7 +240,7 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
 
     // 6. Check aok-offscreen with priceToPay label (Amazon Pix / Cash price)
     if (!price) {
-      const pixMatch = html.match(/class=["'][^"']*aok-offscreen[^"']*["'][^>]*>\s*(R\$\s*[0-9.,]+)\s*<\/span>/i);
+      const pixMatch = html.match(/class=["'][^"']*(?:priceToPay|apex-pricetopay-value|apexPriceToPay)[^"']*["'][\s\S]*?class=["'][^"']*aok-offscreen[^"']*["'][^>]*>\s*(R\$\s*[0-9.,]+)\s*<\/span>/i);
       if (pixMatch && pixMatch[1]) {
         const clean = pixMatch[1].replace(/&nbsp;/g, ' ').replace(/\u00a0/g, ' ').replace(/[^\d.,]/g, '').trim();
         if (clean) price = `R$ ${clean}`;
@@ -307,9 +315,10 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
     }
 
     // Amazon Original / Strike-through Price
-    const origOffscreen = html.match(/class=["'][^"']*(?:apex-basisprice-offscreen-label|apex-basisprice-value|a-text-price|basisPrice|savingPriceOverride)[^"']*["'][\s\S]*?(?:De:\s*)?(R\$\s*[0-9.,]+)/i) ||
+    const origOffscreen = html.match(/class=["'][^"']*(?:apex-basisprice-offscreen-label|apex-basisprice-value|basisPrice)[^"']*["'][\s\S]*?(?:De:\s*)?(R\$\s*[0-9.,]+)/i) ||
                           html.match(/data-basisprice-label="[^"]*"\s+class=["'][^"']*apex-basisprice-offscreen-label[^"']*["'][^>]*>(?:De:\s*)?(R\$\s*[0-9.,]+)</i) ||
-                          html.match(/class=["'][^"']*(?:apex-basisprice-offscreen-label|a-text-strike)[^"']*["'][^>]*>(?:De:\s*)?(R\$\s*[0-9.,]+)</i);
+                          html.match(/class=["'][^"']*(?:a-text-strike|savingPriceOverride)[^"']*["'][^>]*>(?:De:\s*)?(R\$\s*[0-9.,]+)</i) ||
+                          html.match(/id=["']corePriceDisplay_desktop_feature_div["'][\s\S]*?class=["'][^"']*a-text-price[^"']*["'][\s\S]*?class=["'][^"']*a-offscreen[^"']*["']>\s*(R\$\s*[0-9.,]+)\s*</i);
     if (origOffscreen && origOffscreen[1]) {
       const clean = origOffscreen[1].replace(/&nbsp;/g, ' ').replace(/[^\d.,]/g, '').trim();
       if (clean && clean !== price.replace(/[^\d.,]/g, '')) originalPrice = `R$ ${clean}`;
@@ -828,7 +837,24 @@ async function fetchProductDetails(rawUrl) {
     }
   }
 
-  const { price, originalPrice, discountTag, couponCode, isPaused, isFlashDeal, flashDealEnd, isPrime, isImported } = extractProductPriceAndStatus(html, platform);
+  let { price, originalPrice, discountTag, couponCode, isPaused, isFlashDeal, flashDealEnd, isPrime, isImported } = extractProductPriceAndStatus(html, platform);
+
+  const defaultPlatformName = platform === 'amazon' ? 'Amazon' : (platform === 'shopee' ? 'Shopee' : 'Mercado Livre');
+  const finalTitle = title || `Produto ${defaultPlatformName}`;
+
+  // SANITY CHECK: Proteção contra Preço Unitário Fracionado em Pacotes/Kits (Ex: R$ 1,42 para fardo de 12 unidades)
+  if (price) {
+    const numPrice = parsePrice(price);
+    const isMultiPack = /\b(\d+)\s*(unidades?|unids?|peças?|pecas?|rolos?|fraldas?|c[áa]psulas?|itens|sach[êe]s?|latas?|garrafas?)\b/i.test(finalTitle) ||
+                        /\bkit\s*(com|c\/)?\s*(\d+)/i.test(finalTitle);
+    if ((isMultiPack && numPrice < 4.0) || numPrice < 1.90) {
+      console.warn(`[Price Sanity Guard] Preço suspeito (${price}) para pacote/kit: "${finalTitle}".`);
+      if (originalPrice && parsePrice(originalPrice) >= 5.0) {
+        price = originalPrice;
+        originalPrice = '';
+      }
+    }
+  }
 
   let discountPercent = 0;
   if (price && originalPrice) {
@@ -839,8 +865,6 @@ async function fetchProductDetails(rawUrl) {
     }
   }
 
-  const defaultPlatformName = platform === 'amazon' ? 'Amazon' : (platform === 'shopee' ? 'Shopee' : 'Mercado Livre');
-  const finalTitle = title || `Produto ${defaultPlatformName}`;
   const detectedCategory = detectCategory(finalTitle, '', targetUrl);
 
   return {

@@ -643,6 +643,24 @@ async function handleSendWhatsAppDeal(req, res) {
         } catch (fetchErr) {
           console.warn('[WhatsApp Deal] Rechecagem em tempo real falhou, mantendo dados do banco:', fetchErr.message);
         }
+      // GUARDA DE SANIDADE: Proteção de Credibilidade do Grupo VIP
+      // Bloqueia qualquer produto com preço quebrado/irrisório para pacotes ou kits (ex: R$ 1,42 para 12 unidades)
+      const numPrice = parsePrice(product.price_display);
+      const isMultiPack = /\b(\d+)\s*(unidades?|unids?|peças?|pecas?|rolos?|fraldas?|c[áa]psulas?|itens|sach[êe]s?|latas?|garrafas?)\b/i.test(product.title) ||
+                          /\bkit\s*(com|c\/)?\s*(\d+)/i.test(product.title);
+
+      if ((isMultiPack && numPrice < 4.0) || (numPrice > 0 && numPrice < 1.90)) {
+        console.warn(`[WhatsApp Guard] Disparo bloqueado para ${product.id} ("${product.title}"): preço ${product.price_display} suspeito de erro de scraping/preço unitário.`);
+        await supabaseAdmin
+          .from('fast_affiliate_products')
+          .update({ last_posted_at: new Date().toISOString() })
+          .eq('id', product.id);
+
+        return res.status(200).json({
+          success: false,
+          skipped: true,
+          message: `Produto "${product.title}" bloqueado: preço ${product.price_display} suspeito de ser preço unitário fracionado. Protegendo a credibilidade do grupo VIP.`
+        });
       }
 
       isFastSavorysStore = false;
