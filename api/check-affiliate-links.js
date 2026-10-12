@@ -177,15 +177,25 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
       .replace(/<span[^>]*class=["'][^"']*apex-priceperunit-accessibility-label[^"']*["'][\s\S]*?<\/span>/gi, '')
       .replace(/<span[^>]*class=["'][^"']*aok-offscreen[^"']*["'][^>]*>[^<]*(?:por\s+r\$|cada|unidade|rolo|c[áa]psula|kg|metro)[\s\S]*?<\/span>/gi, '');
 
-    // 1. input hidden attach-base-product-price (Preço exato oficial do produto principal selecionado)
-    const attachPrice = html.match(/id=["']attach-base-product-price["'][^>]*value=["']([0-9.]+)["']/i) ||
-                        html.match(/value=["']([0-9.]+)["'][^>]*id=["']attach-base-product-price["']/i);
-    if (attachPrice && attachPrice[1]) {
-      const val = parseFloat(attachPrice[1]);
-      if (!isNaN(val) && val > 0) price = formatBrlNumber(val);
+    // 1. Apex core price identifier & targeted BuyBox price classes (Preço Real à Vista / Pix / Menor Preço)
+    const apexMatch = html.match(/class=["'][^"']*(?:apex-pricetopay-value|apexPriceToPay|priceToPay|reinventPricePriceToPayMargin|corePriceDisplay)[^"']*["'][\s\S]*?class=["'][^"']*(?:a-offscreen|aok-offscreen)[^"']*["']>\s*(R\$\s*[0-9.,]+)\s*</i) ||
+                      html.match(/apex-core-price-identifier[\s\S]*?class=["'][^"']*a-offscreen[^"']*["']>\s*(R\$\s*[0-9.,]+)\s*</i);
+    if (apexMatch && apexMatch[1]) {
+      const clean = apexMatch[1].replace(/&nbsp;/g, ' ').replace(/\u00a0/g, ' ').trim();
+      if (clean) price = clean;
     }
 
-    // 2. Authoritative Twister Plus BuyBox State (Exact current BuyBox price, ignores used/collectible options)
+    // 2. input hidden attach-base-product-price (Preço exato oficial do produto principal selecionado)
+    if (!price) {
+      const attachPrice = html.match(/id=["']attach-base-product-price["'][^>]*value=["']([0-9.]+)["']/i) ||
+                          html.match(/value=["']([0-9.]+)["'][^>]*id=["']attach-base-product-price["']/i);
+      if (attachPrice && attachPrice[1]) {
+        const val = parseFloat(attachPrice[1]);
+        if (!isNaN(val) && val > 0) price = formatBrlNumber(val);
+      }
+    }
+
+    // 3. Authoritative Twister Plus BuyBox State (Exact current BuyBox price, ignores used/collectible options)
     if (!price) {
       const twisterMatch = html.match(/(?:"|&quot;)desktop_buybox_group_1(?:"|&quot;)\s*:\s*\[\{\s*(?:"|&quot;)displayPrice(?:"|&quot;)\s*:\s*(?:"|&quot;)([^"&]+)(?:"|&quot;)/i) ||
                            html.match(/(?:"|&quot;)desktop_buybox_group_1(?:"|&quot;)[\s\S]*?(?:"|&quot;)displayPrice(?:"|&quot;)\s*:\s*(?:"|&quot;)([^"&]+)(?:"|&quot;)/i);
@@ -200,16 +210,6 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
       if (twisterAmount && twisterAmount[1]) {
         const val = parseFloat(twisterAmount[1]);
         if (!isNaN(val) && val > 0) price = formatBrlNumber(val);
-      }
-    }
-
-    // 3. Apex core price identifier & targeted BuyBox price classes
-    if (!price) {
-      const apexMatch = html.match(/apex-core-price-identifier[\s\S]*?class=["'][^"']*a-offscreen[^"']*["']>\s*(R\$\s*[0-9.,]+)\s*</i) ||
-                        html.match(/class=["'][^"']*(?:apex-pricetopay-value|apexPriceToPay|priceToPay|reinventPricePriceToPayMargin|corePriceDisplay)[^"']*["'][\s\S]*?class=["'][^"']*a-offscreen[^"']*["']>\s*(R\$\s*[0-9.,]+)\s*</i);
-      if (apexMatch && apexMatch[1]) {
-        const clean = apexMatch[1].replace(/&nbsp;/g, ' ').replace(/\u00a0/g, ' ').trim();
-        if (clean) price = clean;
       }
     }
 
@@ -341,12 +341,20 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
       if (!discountTag.toUpperCase().includes('OFF')) discountTag += ' OFF';
     }
 
+    // Amazon Pix / Cash discount detection (ex: "6% off à vista no Pix")
+    const pixDiscountMatch = html.match(/([0-9]+%\s*off\s*[àa]\s*vista(?:\s*no\s*Pix)?)/i) ||
+                             html.match(/([0-9]+%\s*de\s*desconto\s*no\s*Pix)/i);
+    if (pixDiscountMatch && pixDiscountMatch[1]) {
+      discountTag = pixDiscountMatch[1].trim();
+    }
+
     // Amazon Coupon Detection (Apenas código de cupom REAL explícito)
-    const amzCodeMatch = html.match(/data-cpc-coupon=["']([A-Z0-9_-]{4,20})["']/i) ||
+    const amzCodeMatch = html.match(/(?:Salve\s+o\s+cupom|cupom|c[oó]digo|insira\s+o\s+c[oó]digo)[\s\S]{0,120}?:\s*([A-Z0-9_-]{4,20})\b/i) ||
+                         html.match(/data-cpc-coupon=["']([A-Z0-9_-]{4,20})["']/i) ||
                          html.match(/id=["']couponBadgeV2["'][\s\S]*?([A-Z0-9_-]{4,20})/i);
     if (amzCodeMatch && amzCodeMatch[1]) {
       const code = amzCodeMatch[1].trim();
-      if (/^[A-Z0-9_-]{4,20}$/i.test(code) && !/^(TRUE|FALSE|NULL|OFF)$/i.test(code)) {
+      if (/^[A-Z0-9_-]{4,20}$/i.test(code) && !/^(TRUE|FALSE|NULL|OFF|PRIME)$/i.test(code)) {
         couponCode = code.toUpperCase();
       }
     }
@@ -355,15 +363,17 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
     isPrime = Boolean(
       html.match(/id=["']prime-accordion["']/i) ||
       html.match(/a-icon-prime/i) ||
+      html.match(/s-prime/i) ||
       html.match(/icon-prime/i) ||
+      html.match(/Exclusivo\s+Prime/i) ||
+      html.match(/aria-label=["'][^"']*prime[^"']*["']/i) ||
       html.match(/primeExclusivePrice/i) ||
       html.match(/"isPrime"\s*:\s*true/i) ||
       html.match(/"prime"\s*:\s*true/i) ||
       html.match(/badge_delivery_prime/i) ||
       html.match(/amazon\.com\.br\/prime/i) ||
-      html.match(/frete grátis com (o )?prime/i) ||
-      html.match(/frete grátis com o amazon prime/i) ||
-      html.match(/entrega grátis.*amazon prime/i)
+      html.match(/frete\s+gr[áa]tis\s+com\s+(o\s+)?(amazon\s+)?prime/i) ||
+      html.match(/entrega\s+gr[áa]tis.*amazon\s+prime/i)
     );
 
   } else if (platform === 'shopee') {
