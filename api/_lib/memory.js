@@ -66,7 +66,7 @@ function extractFactsFromConversation(history, existingMemories = null) {
     else if (/\bdinheiro\b/.test(allUserNorm)) facts.preferencia_pagamento = 'dinheiro';
 
     // 3. Bairro — detecta no texto do usuário ou na confirmação do bot
-    const invalidBairros = /\b(seria|qual|para|qualquer|entrega|retirada|loja|itamaraju|favor|por favor)\b/i;
+    const invalidBairros = /\b(seria|qual|para|qualquer|entrega|retirada|loja|itamaraju|favor|por favor|certo|obrigad[oa]|obg|valeu|sim|n[aã]o|ok|blz|beleza|bom dia|boa tarde|boa noite|tudo bem|nada|deixa|opa|ol[aá]|amigo|amiga|jessica|jssica|fast|salgado|salgados|cento|mini|bolo|tortas?|taxa|frete|pode ser|entendi|combinado|agrade[cç]o)\b/i;
     const bairroUserPatterns = [
         /(?:moro|fico|estou|sou)\s+(?:do|no|na|em)\s+([a-zA-Z\u00c0-\u00ff\s]{3,30}?)(?:\.|,|\n|!|$)/i,
         /(?:bairro|endere[cç]o)[:\s]+([a-zA-Z\u00c0-\u00ff\s]{3,30}?)(?:\.|,|\n|!|$)/i,
@@ -74,14 +74,20 @@ function extractFactsFromConversation(history, existingMemories = null) {
     for (const pattern of bairroUserPatterns) {
         const match = allUserText.match(pattern);
         if (match && match[1].trim().length > 2 && !invalidBairros.test(match[1].trim())) {
-            facts.bairro = match[1].trim().replace(/\s+/g, ' ');
-            break;
+            const b = match[1].trim().replace(/\s+/g, ' ');
+            if (!invalidBairros.test(b)) {
+                facts.bairro = b;
+                break;
+            }
         }
     }
     // Checa confirmação estruturada do bot (ex: "Bairro: Novo Prado" ou "bairro Novo Prado")
     const botBairroMatch = allBotText.match(/bairro:\s*([a-zA-Z\u00c0-\u00ff\s]{3,30}?)(?:\.|,|\n|taxa|pedido|entrega|$)/i);
     if (botBairroMatch && botBairroMatch[1].trim().length > 2 && !invalidBairros.test(botBairroMatch[1].trim())) {
-        facts.bairro = botBairroMatch[1].trim().replace(/\s+/g, ' ');
+        const b = botBairroMatch[1].trim().replace(/\s+/g, ' ');
+        if (!invalidBairros.test(b)) {
+            facts.bairro = b;
+        }
     }
 
     // 4. Endereço e Pontos de Referência Conhecidos

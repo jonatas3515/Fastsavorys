@@ -697,7 +697,7 @@ function buildDeliveryFactHint(history, currentMessage, priceMap = null, feeMap 
                 const hint = `\n[⛔ FATO VERIFICADO (pedido de entrega):
   PEDIDO ATUAL: ${description} | TOTAL PRODUTOS = R$ ${total.toFixed(2).replace('.', ',')}
   ✅ O total dos produtos (R$ ${total.toFixed(2).replace('.', ',')}) ATINGIU o pedido mínimo global de R$ 15,00 para entrega.
-  ⛔ NUNCA diga que faltam valores para entrega nem repita mensagens antigas de valor mínimo — o pedido JÁ atinge o mínimo!
+  ⛔ REGRA ABSOLUTA: NUNCA fale sobre valor mínimo ao cliente! O cliente não precisa saber de regras internas que já foram atendidas. NUNCA diga que faltam valores e NUNCA sugira completar itens.
   📍 O bairro ainda não foi informado ou identificado (termos como "na creche", "em casa", "aqui", etc. não são bairros).
   👉 PERGUNTE para qual bairro seria a entrega para calcular a taxa.]`;
                 console.log(`[delivery-hint] ${hint.replace(/\n/g, ' | ')}`);
@@ -722,6 +722,7 @@ function buildDeliveryFactHint(history, currentMessage, priceMap = null, feeMap 
             const totalComTaxa = total + bairroInfo.fee;
             hint += `\n  ✅ R$ ${total.toFixed(2)} ≥ R$ ${effectiveMin.toFixed(2)} → ENTREGA PERMITIDA.`;
             hint += ` Total com taxa: R$ ${total.toFixed(2)} + ${feeStr} = R$ ${totalComTaxa.toFixed(2)}`;
+            hint += `\n  ⛔ PROIBIÇÃO ABSOLUTA: O total já atinge o mínimo. NUNCA fale sobre regra de valor mínimo ao cliente, NUNCA diga que atingiu o mínimo e NUNCA pergunte se quer adicionar itens!`;
 
             // Verifica se o usuário já informou rua e número
             const hasStreetAndNumber = userMsgs.some(m => {
@@ -889,9 +890,9 @@ function buildPaymentFactHint(history, currentMessage, priceMap = null, feeMap =
 
     if (orderTotal > 50) {
         const entrada = (orderTotal * 0.5).toFixed(2).replace('.', ',');
-        hint += `Como o total é MAIOR que R$ 50,00, o pedido SÓ PODE SER CONFIRMADO após o cliente pagar no mínimo 50% de entrada (R$ ${entrada}). `;
-        hint += `⛔⛔ REGRA CRÍTICA: Se o cliente disser "pago na retirada", "pago amanhã", "pago depois", "deixa que pago lá" ou qualquer variação de ADIAR o pagamento integral sem dar entrada agora: REJEITE com educação. Diga que para pedidos acima de R$ 50,00 precisamos de 50% de entrada via Pix para confirmar a reserva, e que o restante pode ser pago no dia da retirada/entrega. `;
-        hint += `NÃO ofereça entrada abaixo de 50%. NÃO deixe o cliente pagar menos sem passar para a Jéssica. `;
+        hint += `Como o total é MAIOR que R$ 50,00, trabalhamos com 50% de entrada (R$ ${entrada}) via Pix para confirmar a reserva. `;
+        hint += `Ao apresentar as opções de pagamento, mencione a entrada de 50% de forma BREVE em apenas 1 frase (ex: "Como o valor é acima de R$ 50,00, precisamos de 50% de entrada de R$ ${entrada} via Pix para confirmar a reserva"). ⛔ NÃO repita essa explicação mais de uma vez na mesma resposta! `;
+        hint += `Se o cliente tentar adiar sem pagar a entrada (ex: "pago na retirada/depois"), recuse gentilmente explicando que a entrada garante a reserva. `;
         if (currentIsPix) {
             hint += `👉 O cliente escolheu PIX: se ele já concordou com a entrada de 50%, responda APENAS com [GERAR_PIX:${(orderTotal * 0.5).toFixed(2)}]. Se ainda não confirmou o valor da entrada, pergunte se prefere a entrada de 50% (R$ ${entrada}) ou valor integral.`;
         }
@@ -910,7 +911,7 @@ function buildPaymentFactHint(history, currentMessage, priceMap = null, feeMap =
 // Guard de horário: detecta quando o cliente menciona horário de retirada/entrega após 18h (seg-sáb)
 // ou após 17h30 (dom/feriado). A IA às vezes aceita horários como 18:50 ou 19:00 que estão fora do
 // permitido. Injeta fato verificado para a IA rejeitar e sugerir horário válido.
-function buildScheduleFactHint(history, currentMessage) {
+function buildScheduleFactHint(history, currentMessage, priceMap = null) {
     // Só analisa as ÚLTIMAS mensagens do CLIENTE (não do bot) para detectar horários propostos
     const userMsgs = (history || []).filter(m => m.role === 'user').map(m => m.text);
     userMsgs.push(currentMessage || '');
@@ -977,6 +978,27 @@ function buildScheduleFactHint(history, currentMessage) {
         const hint = `\n[⛔ FATO VERIFICADO (horário domingo/feriado): O cliente solicitou horário "${latestRaw}" que é ANTES das 9h da manhã (${dayLabel}). ⛔ REJEITE este horário. Aos domingos e feriados, nosso horário de atendimento para encomendas começa estritamente a partir das 9h (das 9h às 17h30). Diga educadamente que no domingo os pedidos começam a partir das 9h e pergunte se gostaria de agendar para as 9h ou outro horário dentro da faixa.]`;
         console.log(`[schedule-hint-early] ${hint.replace(/\n/g, ' | ')}`);
         return hint;
+    }
+
+    // Regra da Manhã: entre 07:00 e 12:59 (antes das 13h)
+    // O pedido mínimo para entrega ou retirada pela manhã é de R$ 40,00.
+    if (totalMinutes >= 7 * 60 && totalMinutes < 13 * 60 && priceMap) {
+        const { total, description } = estimateCartTotal([...(history || []), { role: 'user', text: currentMessage }], priceMap);
+        if (total > 0) {
+            if (total < 40) {
+                const falta = (40 - total).toFixed(2).replace('.', ',');
+                const totalFmt = total.toFixed(2).replace('.', ',');
+                const hint = `\n[⛔ FATO VERIFICADO (regra da manhã - horário ${latestRaw}): O cliente solicitou horário pela manhã (antes das 13h), onde o pedido mínimo é de R$ 40,00. O total atual de produtos é R$ ${totalFmt} (${description}), faltando R$ ${falta}. ⛔ NÃO confirme o agendamento, NÃO peça dados finais e NÃO gere Pix/pagamento. Informe com simpatia e clareza ao cliente: "Para entregas ou retiradas pela manhã (das 7h às 13h), nosso pedido mínimo é de R$ 40,00 (faltam R$ ${falta} em produtos). Você gostaria de adicionar mais algum item para completar ou prefere agendar para a tarde a partir das 14h?"]`;
+                console.log(`[schedule-hint-morning-under] ${hint.replace(/\n/g, ' | ')}`);
+                return hint;
+            } else {
+                // total >= 40: ATINGIU o mínimo com folga!
+                const totalFmt = total.toFixed(2).replace('.', ',');
+                const hint = `\n[✅ FATO VERIFICADO (regra da manhã atendida): O total de produtos é R$ ${totalFmt}, que ATINGE com folga o valor mínimo da manhã de R$ 40,00. ⛔ REGRA ABSOLUTA: O CLIENTE NÃO PRECISA SABER DE REGRAS INTERNAS. É TERMINANTEMENTE PROIBIDO mencionar a regra de R$ 40,00 ao cliente, PROIBIDO dizer que atingiu o mínimo e PROIBIDO perguntar se quer adicionar mais itens para completar nada. Siga com o atendimento normalmente sem citar regras de valor mínimo!]`;
+                console.log(`[schedule-hint-morning-ok] ${hint.replace(/\n/g, ' | ')}`);
+                return hint;
+            }
+        }
     }
 
     return '';
@@ -1057,7 +1079,10 @@ function detectIntent(msg) {
     // Handover direto: cliente pede para falar com humano/atendente
     if (/falar\s*(com)?\s*(atendente|algu[eé]m|humano|pessoa|gente)|atendente|atendimento\s*humano/i.test(m)) intents.push('handover_direto');
     // Confirmação de pedido (sim/pode/ok — verificado no handler se há orçamento pendente)
-    if (/^(sim|pode|confirmo|confirma|fecha|é isso|tá bom|ta bom|pode ser|isso mesmo|manda|certo|confirmar|fechar)\b/i.test(m.trim()) || /confirm|fecha(r)?\s*(o\s*)?pedido/i.test(m)) intents.push('confirmacao');
+    const isFlavorOrOption = /^pode\s*ser\s+(variad|sortid|de\s+|coxinha|kibe|quibe|bolinha|enroladinho|cazulo|pastel|risole|empada|carne|queijo|presunto|frango|amanh[aã]|hoje|segunda|ter[cç]a|quarta|quinta|sexta|s[aá]bado|domingo|\d)/i.test(m.trim());
+    if (!isFlavorOrOption && (/^(sim|confirmo|confirma|fecha|é isso|tá bom|ta bom|pode ser assim|isso mesmo|manda|confirmar|fechar)$/i.test(m.trim()) || /^(sim|pode fechar|pode confirmar|confirmo o pedido|fecha o pedido)\b/i.test(m.trim()) || /confirm|fecha(r)?\s*(o\s*)?pedido/i.test(m))) {
+        intents.push('confirmacao');
+    }
     // Mensagens sociais/pessoais (aniversário, elogios, carinho — NÃO é pedido de comida)
     if (/feliz\s*aniv|parab[eé]ns|anivers[aá]rio|deus\s*te\s*aben[cç]|deus\s*aben[cç]|felicidade|sa[uú]de\s*e|sucesso|maravilhos[aoe]|talentosa|muito\s*linda|linda\s*demais|te\s*amo|te\s*adoro|saudade|gratid[aã]o|aben[cç]o|ben[cç][aã]o|tudo\s*de\s*bom|arrasou|incr[ií]vel|amei|am[eé]i\s*(o|a|os|as|demais|muito)|perfeit[oa]\s*(demais|o\s*bolo|a\s*festa)|ficou\s*(lind|maravilhos|perfeit|incr[ií]vel)|elogio/.test(m) && !/quero|queria|pedir|pedido|quanto|pre[cç]o|card[aá]pio|entrega/.test(m)) intents.push('social');
     // Saudações e confirmações (não conta como "unclear")
@@ -2335,14 +2360,14 @@ async function handleGeminiCore(req, res) {
     );
     const isOrderConfirmation = intents.includes('confirmacao') && hasPendingOrder && !hasNewProductIntent;
     if (isOrderConfirmation) {
-        intentHint = '\n[CONFIRMAÇÃO DE PEDIDO DETECTADA. Verifique se TODOS os dados obrigatórios foram coletados:'
+        intentHint += '\n[CONFIRMAÇÃO DE PEDIDO DETECTADA. Verifique se TODOS os dados obrigatórios foram coletados:'
             + '\n✅ Itens + quantidades'
             + '\n✅ Retirada ou entrega'
             + '\n✅ Bairro E Rua E Número (se entrega) — EXIJA ESSA INFORMAÇÃO'
             + '\n✅ Data e horário exatos'
             + '\n✅ Forma de pagamento'
             + '\nSe FALTAR a Rua/Número para entrega, NÃO confirme — pergunte o que falta antes de prosseguir.'
-            + '\nSe TODOS os dados estão completos, confirme amigavelmente, resuma tudo, e no FINAL adicione (será removido antes de enviar ao cliente):'
+            + '\nSe TODOS os dados estão completos, confirme amigavelmente de forma CURTA e OBJETIVA (1 a 2 frases curtas), e no FINAL adicione (será removido antes de enviar ao cliente):'
             + '\n---ORDER_JSON---'
             + '\n{"items":"lista itens e qtd","subtotal":"R$ XX,XX","delivery_mode":"entrega ou retirada","neighborhood":"bairro ou vazio","delivery_fee":"R$ X,XX","payment":"forma pagamento","scheduled_date":"DD/MM/AAAA","scheduled_time":"HH:MM","total":"R$ XX,XX","needs_owner_approval":true|false}'
             + '\n---END_ORDER_JSON---'
@@ -2431,8 +2456,8 @@ function getBrazilTime() {
         intentHint += paymentFactHint;
     }
 
-    // --- Guard de horário (rejeitar horários fora da faixa: seg-sáb 7h-18h / dom-feriado 9h-17h30) ---
-    const scheduleFactHint = buildScheduleFactHint(session.history, effectiveMessage);
+    // --- Guard de horário (rejeitar horários fora da faixa: seg-sáb 7h-18h / dom-feriado 9h-17h30 / manhã < 13h mín. R$ 40) ---
+    const scheduleFactHint = buildScheduleFactHint(session.history, effectiveMessage, priceMap);
     if (scheduleFactHint) {
         intentHint += scheduleFactHint;
     }
@@ -2460,13 +2485,18 @@ function getBrazilTime() {
         intentHint += memoryHint;
     }
 
-    const userMessage = `[Hoje é ${now}. Amanhã é ${amanha}]${intentHint}` + (cleanName ? ` Cliente "${cleanName}" disse: ${effectiveMessage}` : ` ${effectiveMessage}`);
+    // Mensagem do usuário no contents: APENAS a mensagem real do cliente (sem poluição de sistema)
+    const userMessage = effectiveMessage;
 
     // --- Busca dados reais do Supabase e monta o prompt final ---
     const businessContext = await buildBusinessContext(intents);
 
-    // Monta prompt: BASE + SAUDAÇÃO + CONTEXTO DE NEGÓCIO
+    // Monta prompt: BASE + SAUDAÇÃO + CONTEXTO DE NEGÓCIO + INFORMAÇÕES DE SISTEMA/HINTS
     let fullPrompt = GEMINI_BASE_PROMPT + greetingInstruction + businessContext;
+    fullPrompt += `\n\n[CONTEXTO ATUAL: Hoje é ${now}. Amanhã é ${amanha}.${cleanName ? ` Nome do cliente: "${cleanName}".` : ''}]`;
+    if (intentHint) {
+        fullPrompt += `\n\n${intentHint}`;
+    }
 
     // Detecção de repetição de mensagem (mesma mensagem que a última do usuário)
     const normalizedAttempt = effectiveMessage.trim().toLowerCase();
@@ -2620,6 +2650,10 @@ function getBrazilTime() {
     // Detecta se o modelo ecoou histórico, contexto ou regras internas na resposta
     const leakDetectors = [
         /\[\d{2}\/\d{2}\/\d{4},?\s*\d{2}:\d{2}\]\s*(Cliente|Fast)/i,
+        /\[📋?\s*MEMÓRIA DO CLIENTE[\s\S]*?\]/i,
+        /Cliente\s*"[^"]*"\s*disse:/i,
+        /\[(⛔|✅)?\s*FATO VERIFICADO/i,
+        /\[CONTEXTO ATUAL/i,
         /REGRA RÍGIDA:/i,
         /INSTRUÇÃO MÁXIMA PRIORIDADE/i,
         /ETAPA OBRIGATÓRIA:/i,
@@ -2631,6 +2665,10 @@ function getBrazilTime() {
         console.warn('[gemini] ⚠️ VAZAMENTO DETECTADO: modelo ecoou instruções internas na resposta. Sanitizando...');
         let sanitized = reply
             .replace(/\[\d{2}\/\d{2}\/\d{4},?\s*\d{2}:\d{2}\]\s*(Cliente|Fast)\s*"?[^"]*"?:?\s*/gi, '')
+            .replace(/\[📋?\s*MEMÓRIA DO CLIENTE[\s\S]*?\]/gi, '')
+            .replace(/Cliente\s*"[^"]*"\s*disse:\s*/gi, '')
+            .replace(/\[CONTEXTO ATUAL[^\]]*\]/gi, '')
+            .replace(/\[(⛔|✅)?\s*(FATO VERIFICADO|DADOS VERIFICADOS|REGRAS MANDATÓRIAS|ALERTA|ETAPA OBRIGATÓRIA)[^\]]*\]/gi, '')
             .replace(/\[Hoje é[^\]]*\]/gi, '')
             .replace(/\[FOCO:[^\]]*\]/gi, '')
             .replace(/\[ATENÇÃO:[^\]]*\]/gi, '')
@@ -2650,22 +2688,43 @@ function getBrazilTime() {
     }
 
     // --- Extrai order_summary do bloco ORDER_JSON (se o Gemini incluiu) ---
-    // O bloco é inserido pela IA apenas quando detectamos confirmação de pedido
-    const ORDER_JSON_REGEX = /---ORDER_JSON---\s*([\s\S]*?)\s*---END_ORDER_JSON---/;
-    const jsonMatch = reply.match(ORDER_JSON_REGEX);
+    // BLINDAGEM ABSOLUTA: Remove ORDER_JSON e tudo após dele para NUNCA vazar ao cliente,
+    // mesmo se a resposta do Gemini tiver sido cortada antes de ---END_ORDER_JSON---.
     let orderReady = false;
     let orderSummary = { ...DEFAULT_ORDER_SUMMARY };
-    if (jsonMatch) {
-        try {
-            orderSummary = { ...DEFAULT_ORDER_SUMMARY, ...JSON.parse(jsonMatch[1].trim()) };
-        } catch (e) {
-            // Fallback: JSON inválido, usa texto bruto como resumo
-            orderSummary = { ...DEFAULT_ORDER_SUMMARY, raw_summary: jsonMatch[1].trim() };
+    if (reply.includes('---ORDER_JSON---')) {
+        const parts = reply.split('---ORDER_JSON---');
+        // Resposta que vai para o cliente no WhatsApp é SEMPRE o texto anterior a ---ORDER_JSON---
+        reply = parts[0].trim();
+
+        let jsonRaw = parts[1] || '';
+        if (jsonRaw.includes('---END_ORDER_JSON---')) {
+            jsonRaw = jsonRaw.split('---END_ORDER_JSON---')[0];
         }
-        orderSummary.client_name = name || 'Não informado';
-        orderReady = true;
-        // Remove o bloco JSON da resposta visível ao cliente
-        reply = reply.replace(ORDER_JSON_REGEX, '').trim();
+        jsonRaw = jsonRaw.trim();
+
+        const firstBrace = jsonRaw.indexOf('{');
+        if (firstBrace !== -1) {
+            let jsonCandidate = jsonRaw.substring(firstBrace).trim();
+            // Se o JSON foi cortado antes de fechar com }, tenta reparar
+            if (!jsonCandidate.endsWith('}')) {
+                const quoteCount = (jsonCandidate.match(/"/g) || []).length;
+                if (quoteCount % 2 !== 0) jsonCandidate += '"';
+                jsonCandidate += '}';
+            }
+            try {
+                orderSummary = { ...DEFAULT_ORDER_SUMMARY, ...JSON.parse(jsonCandidate) };
+                orderReady = true;
+            } catch (e) {
+                console.warn('[order-json] Falha no parse de JSON truncado:', e.message);
+                orderSummary = { ...DEFAULT_ORDER_SUMMARY, raw_summary: jsonRaw };
+                orderReady = true;
+            }
+        } else if (jsonRaw.length > 0) {
+            orderSummary = { ...DEFAULT_ORDER_SUMMARY, raw_summary: jsonRaw };
+            orderReady = true;
+        }
+        orderSummary.client_name = cleanName || name || 'Não informado';
 
         // --- CORREÇÃO PROGRAMÁTICA DO TOTAL (a IA erra contas) ---
         // A IA é ruim em aritmética. Quando a calculadora determinística consegue
