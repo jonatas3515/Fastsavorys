@@ -680,7 +680,20 @@ async function handleSendWhatsAppDeal(req, res) {
       targetJid: targetGroupJid
     });
 
-    // Atualiza data do último envio (last_posted_at) na tabela correspondente
+    const isSendOk = sendResponse && sendResponse.success !== false && (!sendResponse.status || sendResponse.status < 400);
+
+    if (!isSendOk) {
+      const errMsg = sendResponse?.error || (typeof sendResponse === 'object' ? JSON.stringify(sendResponse) : 'Falha desconhecida no WhatsApp');
+      console.error(`[WhatsApp Deal Cron] ❌ Falha no envio para o grupo VIP (${evolutionInstance}):`, errMsg);
+      return res.status(500).json({
+        success: false,
+        error: `Falha no envio da mensagem pelo WhatsApp: ${errMsg}`,
+        productId: product.id,
+        evolutionResponse: sendResponse
+      });
+    }
+
+    // Atualiza data do último envio (last_posted_at) na tabela correspondente apenas se o envio foi bem-sucedido
     const nowIso = new Date().toISOString();
     const targetTable = isFastSavorysStore ? 'fast_products' : 'fast_affiliate_products';
 
@@ -703,6 +716,7 @@ async function handleSendWhatsAppDeal(req, res) {
       postedAt: nowIso,
       evolutionResponse: sendResponse
     });
+
 
   } catch (error) {
     console.error('[WhatsApp Deal Cron] ❌ Erro:', error);

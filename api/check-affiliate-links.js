@@ -943,77 +943,121 @@ async function handler(req, res) {
   try {
     const action = req.query.action || req.body?.action || '';
 
-    // Action 0: 1-Click Quick Save from Bookmarklet or External Extensions
-    if (action === 'quick-save' || action === 'save') {
+    // Action 0: 1-Click Quick Save from Bookmarklet or External Extensions (Single or Batch)
+    if (action === 'quick-save' || action === 'quick-save-batch' || action === 'save') {
       const payload = req.method === 'POST' ? req.body : req.query;
-      const title = (payload.title || '').trim();
-      let affiliate_url = (payload.affiliate_url || payload.url || '').trim();
+      const isBatch = Array.isArray(payload) || Array.isArray(payload.items);
+      const rawList = isBatch ? (Array.isArray(payload) ? payload : payload.items) : [payload];
 
-      if (!title || !affiliate_url) {
-        return res.status(400).json({ success: false, error: 'Título e URL são obrigatórios.' });
-      }
-
-      // Auto-tag Amazon links
-      if (affiliate_url.includes('amazon.com.br') || affiliate_url.includes('amazon.com')) {
-        try {
-          const u = new URL(affiliate_url);
-          u.searchParams.set('tag', 'jonatas00a3-20');
-          u.searchParams.set('linkCode', 'sl2');
-          affiliate_url = u.toString();
-        } catch (e) {}
-      }
-
-      // Auto-tag e encurtador oficial da Shopee
-      if (affiliate_url.includes('shopee') && !affiliate_url.includes('s.shopee.com.br')) {
-        try {
-          const shortLink = await shopeeApi.generateShopeeShortLink(affiliate_url);
-          if (shortLink) affiliate_url = shortLink;
-        } catch (e) {
-          console.warn('[Quick-Save] Falha ao gerar link oficial Shopee:', e.message);
-        }
+      if (!rawList || rawList.length === 0) {
+        return res.status(400).json({ success: false, error: 'Nenhum produto enviado para salvamento.' });
       }
 
       const SUPABASE_URL = process.env.SUPABASE_URL || 'https://vqjyjdllapqbqpylshkw.supabase.co';
       const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxanlqZGxsYXBxYnFweWxzaGt3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY0MzgyNDUsImV4cCI6MjA4MjAxNDI0NX0.tfTR9YnM5l0do7FJfxML6i05KTSrMInQMqFrWXx6aAU';
 
-      const itemToInsert = {
-        title,
-        description: payload.description ? String(payload.description).trim() : null,
-        affiliate_url,
-        image_url: payload.image_url ? String(payload.image_url).trim() : '',
-        price_display: payload.price_display ? String(payload.price_display).replace(/,+/g, ',').trim() : (payload.price ? String(payload.price).replace(/,+/g, ',').trim() : null),
-        original_price: payload.original_price ? String(payload.original_price).replace(/,+/g, ',').trim() : null,
-        category: payload.category || detectCategory(title, payload.description || '', affiliate_url),
-        discount_tag: payload.discount_tag || payload.tag || null,
-        badge_tag: payload.badge_tag || null,
-        coupon_code: payload.coupon_code ? String(payload.coupon_code).trim() : null,
-        badge_color: payload.badge_color || payload.color || 'orange',
-        is_fast_pick: payload.is_fast_pick === true || payload.is_fast_pick === 'true',
-        is_prime: payload.is_prime === true || payload.is_prime === 'true' || false,
-        is_imported: payload.is_imported === true || payload.is_imported === 'true' || false,
-        flash_deal_end: payload.flash_deal_end || null,
-        position: 1,
-        is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
-
-      // Se o preço não veio ou veio em branco pelo navegador/Quick Clip, busca automaticamente no backend
-      if (!itemToInsert.price_display || itemToInsert.price_display === 'R$ ' || itemToInsert.price_display === 'R$ 0,00') {
-        try {
-          const autoDetails = await fetchProductDetails(affiliate_url);
-          if (autoDetails) {
-            if (autoDetails.price_display) itemToInsert.price_display = autoDetails.price_display;
-            if (!itemToInsert.original_price && autoDetails.original_price) itemToInsert.original_price = autoDetails.original_price;
-            if (!itemToInsert.discount_tag && autoDetails.discount_tag) itemToInsert.discount_tag = autoDetails.discount_tag;
-            if (!itemToInsert.image_url && autoDetails.image_url) itemToInsert.image_url = autoDetails.image_url;
-            if (autoDetails.coupon_code && !itemToInsert.coupon_code) itemToInsert.coupon_code = autoDetails.coupon_code;
-            if (autoDetails.is_prime) itemToInsert.is_prime = true;
-            if (autoDetails.is_imported) itemToInsert.is_imported = true;
+      // Carrega URLs e títulos existentes para proteção anti-duplicidade
+      const existingUrls = new Set();
+      const existingTitles = new Set();
+      try {
+        const getRes = await fetch(`${SUPABASE_URL}/rest/v1/fast_affiliate_products?select=id,title,affiliate_url&limit=600`, {
+          headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
+        });
+        if (getRes.ok) {
+          const exData = await getRes.json();
+          if (Array.isArray(exData)) {
+            exData.forEach(p => {
+              if (p.affiliate_url) existingUrls.add(p.affiliate_url.toLowerCase().split('?')[0].split('#')[0]);
+              if (p.title) existingTitles.add(p.title.toLowerCase().trim());
+            });
           }
-        } catch (e) {
-          console.warn('[Quick-Save] Falha no fallback auto-fetch:', e.message);
         }
+      } catch (dbErr) {
+        console.warn('[Quick-Save] Aviso ao checar duplicatas:', dbErr.message);
+      }
+
+      const itemsToInsert = [];
+      let duplicatesSkipped = 0;
+
+      for (const item of rawList) {
+        const title = (item.title || '').trim();
+        let affiliate_url = (item.affiliate_url || item.url || item.link || '').trim();
+
+        if (!title || !affiliate_url) continue;
+
+        const cleanUrlNorm = affiliate_url.toLowerCase().split('?')[0].split('#')[0];
+        const titleNorm = title.toLowerCase().trim();
+
+        if (existingTitles.has(titleNorm) || existingUrls.has(cleanUrlNorm)) {
+          duplicatesSkipped++;
+          continue;
+        }
+
+        // Auto-tag Amazon links
+        if (affiliate_url.includes('amazon.com.br') || affiliate_url.includes('amazon.com')) {
+          try {
+            const u = new URL(affiliate_url);
+            u.searchParams.set('tag', 'jonatas00a3-20');
+            u.searchParams.set('linkCode', 'sl2');
+            affiliate_url = u.toString();
+          } catch (e) {}
+        }
+
+        // Auto-tag e encurtador oficial da Shopee
+        if (affiliate_url.includes('shopee') && !affiliate_url.includes('s.shopee.com.br')) {
+          try {
+            const shortLink = await shopeeApi.generateShopeeShortLink(affiliate_url);
+            if (shortLink) affiliate_url = shortLink;
+          } catch (e) {
+            console.warn('[Quick-Save] Falha ao gerar link oficial Shopee:', e.message);
+          }
+        }
+
+        const priceDisplay = item.price_display ? String(item.price_display).replace(/,+/g, ',').trim() : (item.price ? String(item.price).replace(/,+/g, ',').trim() : null);
+        const originalPrice = item.original_price ? String(item.original_price).replace(/,+/g, ',').trim() : null;
+
+        let badgeColor = item.badge_color || item.color || 'orange';
+        const discTag = item.discount_tag || item.tag || null;
+        if (discTag && discTag.includes('%')) {
+          const num = parseInt(discTag, 10);
+          if (num >= 40) badgeColor = 'blue';
+          else if (num >= 25) badgeColor = 'pink';
+        }
+
+        itemsToInsert.push({
+          title,
+          description: item.description ? String(item.description).trim() : null,
+          affiliate_url,
+          image_url: item.image_url ? String(item.image_url).trim() : '',
+          price_display: priceDisplay,
+          original_price: originalPrice,
+          category: item.category || detectCategory(title, item.description || '', affiliate_url),
+          discount_tag: discTag,
+          badge_tag: item.badge_tag || item.badge || null,
+          coupon_code: item.coupon_code ? String(item.coupon_code).trim() : null,
+          badge_color: badgeColor,
+          is_fast_pick: item.is_fast_pick === true || item.is_fast_pick === 'true',
+          is_prime: item.is_prime === true || item.is_prime === 'true' || false,
+          is_imported: item.is_imported === true || item.is_imported === 'true' || false,
+          flash_deal_end: item.flash_deal_end || null,
+          position: 1,
+          is_active: true,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+
+        existingTitles.add(titleNorm);
+        existingUrls.add(cleanUrlNorm);
+      }
+
+      if (itemsToInsert.length === 0) {
+        return res.status(200).json({
+          success: true,
+          message: duplicatesSkipped > 0 ? `Todos os ${duplicatesSkipped} produtos já estavam cadastrados no catálogo!` : 'Nenhum produto válido para inserir.',
+          inserted_count: 0,
+          duplicate_count: duplicatesSkipped,
+          data: []
+        });
       }
 
       const insertRes = await fetch(`${SUPABASE_URL}/rest/v1/fast_affiliate_products`, {
@@ -1024,7 +1068,7 @@ async function handler(req, res) {
           'Content-Type': 'application/json',
           'Prefer': 'return=representation'
         },
-        body: JSON.stringify([itemToInsert])
+        body: JSON.stringify(itemsToInsert)
       });
 
       if (!insertRes.ok) {
@@ -1036,10 +1080,13 @@ async function handler(req, res) {
       const inserted = await insertRes.json();
       return res.status(200).json({
         success: true,
-        message: '🎉 Oferta salva no FastSavory\'s com sucesso!',
-        data: inserted?.[0] || itemToInsert
+        message: `🎉 ${itemsToInsert.length} oferta(s) salva(s) no FastSavory's com sucesso!`,
+        inserted_count: itemsToInsert.length,
+        duplicate_count: duplicatesSkipped,
+        data: inserted || itemsToInsert
       });
     }
+
 
     // Action 0.1: Click Tracker for Affiliate Analytics (Zero Cost)
     if (action === 'track-click' || action === 'click') {
