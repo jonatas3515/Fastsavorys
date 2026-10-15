@@ -689,7 +689,10 @@ async function handleSendWhatsAppDeal(req, res) {
       targetJid: targetGroupJid
     });
 
-    const isSendOk = sendResponse && sendResponse.success !== false && (!sendResponse.status || sendResponse.status < 400);
+    const isSendOk = sendResponse &&
+      sendResponse.success !== false &&
+      !sendResponse.error &&
+      (Boolean(sendResponse.key) || typeof sendResponse.status === 'string' || !sendResponse.status || (typeof sendResponse.status === 'number' && sendResponse.status < 400));
 
     if (!isSendOk) {
       const errMsg = sendResponse?.error || (typeof sendResponse === 'object' ? JSON.stringify(sendResponse) : 'Falha desconhecida no WhatsApp');
