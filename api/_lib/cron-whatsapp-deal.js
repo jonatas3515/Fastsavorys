@@ -297,7 +297,8 @@ async function dispatchWhatsAppMessage(messageCaption, mediaUrl, options = {}) {
   // 1. Se possuir URL de imagem, envia EXCLUSIVAMENTE via sendMedia (evita mensagens duplicadas)
   if (mediaUrl && mediaUrl.startsWith('http')) {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 12000);
+    // 35 segundos de timeout para acomodar cold-start do Render (Free Tier demora ~20-25s para acordar se inativo)
+    const timeoutId = setTimeout(() => controller.abort(), 35000);
 
     try {
       const mediaEndpoint = `${evolutionApiUrl}/message/sendMedia/${evolutionInstance}`;
@@ -338,7 +339,8 @@ async function dispatchWhatsAppMessage(messageCaption, mediaUrl, options = {}) {
 
   // 2. Se NÃO houver imagem ou se sendMedia falhar, envia texto formatado com link preview
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 12000);
+  // 18 segundos de timeout para envio de texto no fallback
+  const timeoutId = setTimeout(() => controller.abort(), 18000);
 
   try {
     const textEndpoint = `${evolutionApiUrl}/message/sendText/${evolutionInstance}`;

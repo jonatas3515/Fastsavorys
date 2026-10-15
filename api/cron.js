@@ -38,7 +38,8 @@ module.exports = async function handler(req, res) {
     'send-instagram-post', 'instagram-post', 'instagram', 'post-instagram', 'insta', 'ig',
     'mine-deals', 'deals-miner', 'miner',
     'auto-sync-links', 'auto-check-links', 'sync-links', 'check-sync-links', 'verify-links', 'check-links', 'sync',
-    'sync-calendar', 'test-calendar', 'calendar'
+    'sync-calendar', 'test-calendar', 'calendar',
+    'keep-alive', 'ping-evolution', 'ping'
   ].includes(action);
   const requiredCronSecret = process.env.CRON_SECRET;
   if (requiredCronSecret && !isPublicAction) {
@@ -145,6 +146,24 @@ module.exports = async function handler(req, res) {
         });
       } catch (e) {
         return res.status(500).json({ success: false, error: e.message });
+      }
+    }
+
+    case 'keep-alive':
+    case 'ping-evolution':
+    case 'ping': {
+      const evoUrl = 'https://fast-whatsapp-api.onrender.com';
+      try {
+        const start = Date.now();
+        const response = await fetch(evoUrl, { headers: { apikey: process.env.EVOLUTION_API_KEY || 'FastSavorysSecretKey2026' } });
+        return res.status(200).json({
+          success: true,
+          message: 'Evolution API mantida ativa com sucesso.',
+          durationMs: Date.now() - start,
+          status: response.status
+        });
+      } catch (err) {
+        return res.status(500).json({ success: false, error: err.message });
       }
     }
 
