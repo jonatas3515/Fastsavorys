@@ -225,9 +225,16 @@ async function fetchImageAsBase64(imageUrl) {
 }
 
 async function dispatchWhatsAppMessage(messageCaption, mediaUrl, options = {}) {
-  const evolutionApiUrl = (options.apiUrl || process.env.EVOLUTION_API_URL || '').trim().replace(/\/+$/, '');
-  const defaultApiKey = (process.env.EVOLUTION_API_KEY || '').trim();
-  const evolutionApiKey = (options.apiKey || defaultApiKey).trim();
+  let evolutionApiUrl = (options.apiUrl || process.env.EVOLUTION_API_URL || '').trim().replace(/\/+$/, '');
+  let defaultApiKey = (process.env.EVOLUTION_API_KEY || '').trim();
+  let evolutionApiKey = (options.apiKey || defaultApiKey).trim();
+
+  // Salvaguarda: Redireciona IP legado da VPS para a instância oficial no Render
+  if (evolutionApiUrl.includes('136.248.121.245') || !evolutionApiUrl) {
+    evolutionApiUrl = 'https://fast-whatsapp-api.onrender.com';
+    evolutionApiKey = 'FastSavorysSecretKey2026';
+  }
+
   const defaultInstance = (process.env.EVOLUTION_INSTANCE || 'fastsavorys').trim();
   const evolutionInstance = (options.instance || defaultInstance).trim();
   const defaultTargetJid = (process.env.WHATSAPP_DEALS_GROUP_JID || '').trim();
@@ -390,8 +397,12 @@ async function handleSendWhatsAppDeal(req, res) {
     return res.status(500).json({ success: false, error: 'Configuração do Supabase não encontrada.' });
   }
 
-  const evolutionApiUrl = (process.env.EVOLUTION_API_URL || '').replace(/\/+$/, '');
-  const evolutionApiKey = process.env.EVOLUTION_API_KEY || '';
+  let evolutionApiUrl = (process.env.EVOLUTION_API_URL || '').replace(/\/+$/, '');
+  let evolutionApiKey = process.env.EVOLUTION_API_KEY || '';
+  if (evolutionApiUrl.includes('136.248.121.245') || !evolutionApiUrl) {
+    evolutionApiUrl = 'https://fast-whatsapp-api.onrender.com';
+    evolutionApiKey = 'FastSavorysSecretKey2026';
+  }
   const evolutionInstance = process.env.EVOLUTION_INSTANCE || 'fastsavorys';
   const targetGroupJid = process.env.WHATSAPP_DEALS_GROUP_JID || '';
 
