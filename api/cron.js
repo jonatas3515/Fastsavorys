@@ -152,13 +152,15 @@ module.exports = async function handler(req, res) {
     case 'keep-alive':
     case 'ping-evolution':
     case 'ping': {
-      const evoUrl = 'https://fast-whatsapp-api.onrender.com';
+      const evoUrl = (process.env.EVOLUTION_API_URL || 'http://136.248.121.245:8080').replace(/\/+$/, '');
+      const evoKey = process.env.EVOLUTION_API_KEY || 'B6D711FCDE4D4FD5936544120E713976';
       try {
         const start = Date.now();
-        const response = await fetch(evoUrl, { headers: { apikey: process.env.EVOLUTION_API_KEY || 'FastSavorysSecretKey2026' } });
+        const response = await fetch(`${evoUrl}/instance/fetchInstances`, { headers: { apikey: evoKey } });
         return res.status(200).json({
           success: true,
-          message: 'Evolution API mantida ativa com sucesso.',
+          message: 'Oracle VPS Evolution API operacional e respondendo.',
+          server: evoUrl,
           durationMs: Date.now() - start,
           status: response.status
         });

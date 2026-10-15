@@ -15,18 +15,14 @@ jobs:
     name: Enviar Oferta para o Grupo do WhatsApp
     runs-on: ubuntu-latest
     steps:
-      - name: 🔔 Acordar Instância da Evolution API (Render Warm-up)
+      - name: 🔔 Verificar Saúde da Evolution API (Oracle VPS)
         run: |
-          echo "🌐 Verificando e acordando a API no Render..."
-          for i in {1..12}; do
-            STATUS_RENDER=$(curl -s -o /dev/null -w "%{http_code}" https://fast-whatsapp-api.onrender.com/ || true)
-            echo "Tentativa $i: HTTP Status $STATUS_RENDER"
-            if [ "$STATUS_RENDER" -eq 200 ] || [ "$STATUS_RENDER" -eq 401 ] || [ "$STATUS_RENDER" -eq 404 ]; then
-              echo "✅ Evolution API acordada e pronta!"
-              break
-            fi
-            sleep 5
-          done
+          echo "🌐 Verificando Evolution API na Oracle VPS..."
+          STATUS_API=$(curl -s -o /dev/null -w "%{http_code}" http://136.248.121.245:8080/ || true)
+          echo "HTTP Status Oracle: $STATUS_API"
+          if [ "$STATUS_API" -eq 200 ] || [ "$STATUS_API" -eq 401 ]; then
+            echo "✅ Oracle Evolution API online e pronta!"
+          fi
 
       - name: 🚀 Executar Endpoint de Disparo
         run: |
