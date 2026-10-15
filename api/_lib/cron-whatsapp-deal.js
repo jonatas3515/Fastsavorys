@@ -482,9 +482,13 @@ async function handleSendWhatsAppDeal(req, res) {
         .select('*');
 
       if (!storeErr && storeProducts && storeProducts.length > 0) {
-        // Filtra itens principais do cardápio: SOMENTE ATIVOS, VISÍVEIS e com FOTO REAL (exclui sachês, descartáveis, condimentos ou itens ocultos)
+        // Filtra itens principais do cardápio: SOMENTE ATIVOS, VISÍVEIS e com FOTO REAL
+        // Exclui sachês, descartáveis, condimentos, bebidas avulsas (a menos que seja combo/kit) e toppers
         const validStoreProducts = storeProducts.filter(p => {
           const name = (p.name || '').toLowerCase();
+          const cat = (p.category || '').toLowerCase();
+          const isCombo = name.includes('combo') || name.includes('kit');
+
           if (
             name.includes('sache') || 
             name.includes('sachê') || 
@@ -494,8 +498,14 @@ async function handleSendWhatsAppDeal(req, res) {
             name.includes('ketchup') ||
             name.includes('maionese') ||
             name.includes('mostarda') ||
-            name.includes('embalagem')
+            name.includes('embalagem') ||
+            name === 'topper'
           ) return false;
+
+          // Bebidas avulsas não devem ser protagonistas de disparo
+          if (!isCombo && (cat === 'bebidas' || name.includes('coca') || name.includes('fanta') || name.includes('guaran') || name.includes('refrigerante') || name.includes('água') || name.includes('agua'))) {
+            return false;
+          }
           
           const price = typeof p.price === 'number' ? p.price : parseFloat(p.price);
           const isVisible = p.visible === true && !p.unavailable_today && p.catalog_enabled !== false;
@@ -508,14 +518,16 @@ async function handleSendWhatsAppDeal(req, res) {
         const fallbackVisible = storeProducts.filter(p => p.visible === true && !p.unavailable_today && p.catalog_enabled !== false);
         const pool = validStoreProducts.length > 0 ? validStoreProducts : (fallbackVisible.length > 0 ? fallbackVisible : storeProducts);
         
-        // Rotação inteligente por dia e horário para nunca repetir o mesmo produto nos 9 disparos do dia
-        const daySeed = now.getDate();
-        const monthSeed = now.getMonth() + 1;
-        const hourIndex = fastSavorysSlots.indexOf(timeKey);
-        const slotIdx = hourIndex >= 0 ? hourIndex : (roundedBrtHours % fastSavorysSlots.length);
-        const selectedIndex = (daySeed * 5 + monthSeed * 3 + slotIdx) % pool.length;
+        // Rotação estrita por data do último envio (FIFO): quem nunca foi enviado ou foi enviado há mais tempo tem prioridade absoluta!
+        // Impede qualquer repetição do mesmo produto até que todos os outros salgados/bolos tenham sido enviados.
+        pool.sort((a, b) => {
+          if (!a.last_posted_at && b.last_posted_at) return -1;
+          if (a.last_posted_at && !b.last_posted_at) return 1;
+          if (!a.last_posted_at && !b.last_posted_at) return (a.id - b.id);
+          return new Date(a.last_posted_at).getTime() - new Date(b.last_posted_at).getTime();
+        });
 
-        product = pool[selectedIndex];
+        product = pool[0];
         isFastSavorysStore = true;
         messageCaption = buildFastSavorysProductText(product);
         mediaUrl = product.image || product.image_url;
@@ -827,13 +839,23 @@ async function handleSendWhatsAppStatus(req, res) {
 
         const validStoreProducts = storeProducts.filter(p => {
           const name = (p.name || '').toLowerCase();
+          const cat = (p.category || '').toLowerCase();
+          const isCombo = name.includes('combo') || name.includes('kit');
+
           if (
             name.includes('sache') || name.includes('sachê') || 
             name.includes('taxa') || name.includes('copo') || 
             name.includes('guardanapo') || name.includes('ketchup') || 
             name.includes('maionese') || name.includes('mostarda') ||
-            name.includes('embalagem')
+            name.includes('embalagem') ||
+            name === 'topper'
           ) return false;
+
+          // Bebidas avulsas não devem ser protagonistas de status/disparo
+          if (!isCombo && (cat === 'bebidas' || name.includes('coca') || name.includes('fanta') || name.includes('guaran') || name.includes('refrigerante') || name.includes('água') || name.includes('agua'))) {
+            return false;
+          }
+
           const price = typeof p.price === 'number' ? p.price : parseFloat(p.price);
           const isVisible = p.visible === true && !p.unavailable_today && p.catalog_enabled !== false;
           const hasValidImage = Boolean(p.image && typeof p.image === 'string' && p.image.startsWith('http'));
@@ -841,11 +863,16 @@ async function handleSendWhatsAppStatus(req, res) {
         });
 
         const pool = validStoreProducts.length > 0 ? validStoreProducts : storeProducts.filter(p => p.visible === true);
-        const daySeed = now.getDate();
-        const monthSeed = now.getMonth() + 1;
-        const slotIdx = storeSlots.indexOf(timeKey) >= 0 ? storeSlots.indexOf(timeKey) : (brtHours % 4);
-        const selectedIndex = (daySeed * 7 + monthSeed * 3 + slotIdx) % pool.length;
-        const product = pool[selectedIndex];
+        
+        // Rotação estrita por data do último envio (FIFO)
+        pool.sort((a, b) => {
+          if (!a.last_posted_at && b.last_posted_at) return -1;
+          if (a.last_posted_at && !b.last_posted_at) return 1;
+          if (!a.last_posted_at && !b.last_posted_at) return (a.id - b.id);
+          return new Date(a.last_posted_at).getTime() - new Date(b.last_posted_at).getTime();
+        });
+
+        const product = pool[0];
 
         const caption = buildFastSavorysStatusText(product);
         const mediaUrl = product.image || product.image_url;
@@ -855,6 +882,18 @@ async function handleSendWhatsAppStatus(req, res) {
           apiKey: storeApiKey,
           targetJid: 'status@broadcast'
         });
+
+        if (sendRes && sendRes.success !== false) {
+          const nowIso = new Date().toISOString();
+          try {
+            await supabaseAdmin
+              .from('fast_products')
+              .update({ last_posted_at: nowIso, updated_at: nowIso })
+              .eq('id', product.id);
+          } catch (e) {
+            console.warn('[WhatsApp Status] Erro ao atualizar last_posted_at:', e.message);
+          }
+        }
 
         results.push({
           channel: 'store_fastsavorys',
