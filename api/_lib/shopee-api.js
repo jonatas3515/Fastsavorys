@@ -193,12 +193,29 @@ async function getShopeeProductDetails(rawUrl) {
 }
 
 /**
- * Busca lista de ofertas e achadinhos em destaque da Shopee
+ * Busca lista de ofertas e achadinhos em destaque da Shopee com filtros rigorosos de qualidade
+ * sortType 2 = Mais vendidos / Popularidade
+ * shopType: 1 = Shopee Mall / Loja Oficial, 2 = Vendedor Indicado, 4 = Indicado+
  */
-async function getShopeeOffers({ page = 1, limit = 10, keyword = null } = {}) {
-  const args = [`page: ${page}`, `limit: ${limit}`];
+async function getShopeeOffers({
+  page = 1,
+  limit = 10,
+  keyword = null,
+  sortType = 2,
+  isKeySeller = null,
+  minSales = 0,
+  minRating = 0,
+  onlyVerifiedShops = false
+} = {}) {
+  const args = [`page: ${page}`, `limit: ${Math.min(limit * 3, 50)}`]; // busca margem maior para filtrar
   if (keyword) {
     args.push(`keyword: ${JSON.stringify(keyword)}`);
+  }
+  if (sortType !== null && sortType !== undefined) {
+    args.push(`sortType: ${sortType}`);
+  }
+  if (isKeySeller !== null && isKeySeller !== undefined) {
+    args.push(`isKeySeller: ${Boolean(isKeySeller)}`);
   }
 
   const query = {
@@ -211,19 +228,45 @@ async function getShopeeOffers({ page = 1, limit = 10, keyword = null } = {}) {
           price
           priceMin
           priceMax
+          priceDiscountRate
           sales
           ratingStar
           offerLink
           commissionRate
           commission
           shopName
+          shopType
         }
       }
     }`
   };
 
   const data = await shopeeRequest(query);
-  return data?.productOfferV2?.nodes || [];
+  let nodes = data?.productOfferV2?.nodes || [];
+
+  // Filtros rigorosos de qualidade pós-busca
+  if (minSales > 0 || minRating > 0 || onlyVerifiedShops) {
+    nodes = nodes.filter(node => {
+      const sales = parseInt(node.sales || '0', 10);
+      const rating = parseFloat(node.ratingStar || '0');
+      const shopType = parseInt(node.shopType || '0', 10);
+
+      // 1. Filtro de vendas mínimas
+      if (minSales > 0 && sales < minSales) return false;
+
+      // 2. Filtro de avaliação mínima
+      if (minRating > 0 && rating > 0 && rating < minRating) return false;
+
+      // 3. Filtro de Lojas Oficiais e Vendedores Indicados (shopType 1, 2 ou 4)
+      if (onlyVerifiedShops) {
+        if (![1, 2, 4].includes(shopType)) return false;
+      }
+
+      return true;
+    });
+  }
+
+  return nodes.slice(0, limit);
 }
 
 module.exports = {
@@ -236,3 +279,4 @@ module.exports = {
   getShopeeProductDetails,
   getShopeeOffers
 };
+

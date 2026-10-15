@@ -423,8 +423,209 @@ async function handleMineDeals(req, res) {
   }
 }
 
+/**
+ * FastSavory's - Autonomous Deals Miner for Shopee (GraphQL Open API)
+ * Filtra por Vendas Mínimas, Reputação (Rating), Lojas Oficiais e Vendedores Indicados
+ */
+async function handleMineShopeeDeals(req, res) {
+  const { getShopeeOffers } = require('./shopee-api');
+  const limit = Math.min(Math.max(parseInt(req.query?.limit || req.body?.limit || '12', 10), 1), 30);
+  const minDiscount = Math.max(parseInt(req.query?.min_discount || req.body?.min_discount || '15', 10), 0);
+  const minSales = Math.max(parseInt(req.query?.min_sales || req.body?.min_sales || '30', 10), 0);
+  const minRating = parseFloat(req.query?.min_rating || req.body?.min_rating || '4.6');
+  const onlyVerified = req.query?.only_verified !== 'false' && req.body?.only_verified !== false;
+  const customKeyword = (req.query?.keyword || req.body?.keyword || '').trim();
+  const dryRun = req.query?.dry_run === 'true' || req.body?.dry_run === true;
+
+  try {
+    console.log(`[Shopee Miner] Iniciando mineração Shopee (Limite: ${limit}, Min ${minDiscount}% OFF, Min ${minSales} vendas, ⭐ >= ${minRating})...`);
+
+    // 1. Carrega produtos existentes no Supabase para evitar duplicatas
+    let existingUrls = new Set();
+    let existingTitles = new Set();
+    try {
+      const getRes = await fetch(`${SUPABASE_URL}/rest/v1/fast_affiliate_products?select=id,title,affiliate_url&limit=600`, {
+        headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
+      });
+      if (getRes.ok) {
+        const existingData = await getRes.json();
+        if (Array.isArray(existingData)) {
+          existingData.forEach(p => {
+            if (p.affiliate_url) existingUrls.add(p.affiliate_url.toLowerCase().split('?')[0].split('#')[0]);
+            if (p.title) existingTitles.add(p.title.toLowerCase().trim());
+          });
+        }
+      }
+    } catch (dbErr) {
+      console.warn('[Shopee Miner] Aviso ao checar duplicatas:', dbErr.message);
+    }
+
+    const defaultKeywords = [
+      'air fryer', 'liquidificador', 'garrafa termica inox', 'escova secadora',
+      'organizador acrilico', 'fone bluetooth', 'potes hermeticos vidro', 'aspirador portatil',
+      'mini processador eletrico', 'luminaria led articulada', 'panela antiaderente', 'smartwatch'
+    ];
+    const searchTerms = customKeyword ? [customKeyword] : defaultKeywords;
+    const badWords = ['botão', 'botao', 'chave interruptor', 'peça de reposição', 'peca de reposicao', 'refil', 'hélice', 'helice', 'copo de liquidificador', 'jarra de cafeteira', 'cabo de forca', 'cabo de força'];
+
+    const candidateDeals = [];
+    const seenIds = new Set();
+    let totalScanned = 0;
+
+    for (const kw of searchTerms) {
+      if (candidateDeals.length >= limit) break;
+      try {
+        const nodes = await getShopeeOffers({
+          keyword: kw,
+          limit: 15,
+          sortType: 2, // Popularidade / Mais vendidos
+          minSales,
+          minRating,
+          onlyVerifiedShops: onlyVerified
+        });
+        totalScanned += nodes.length;
+
+        for (const node of nodes) {
+          if (seenIds.has(node.itemId)) continue;
+          seenIds.add(node.itemId);
+
+          const title = (node.productName || '').trim();
+          const titleNorm = title.toLowerCase();
+          const cleanUrl = (node.offerLink || '').toLowerCase().split('?')[0].split('#')[0];
+
+          // Filtro de peças de reposição/acessórios avulsos
+          if (badWords.some(bw => titleNorm.includes(bw))) continue;
+
+          // Filtro de duplicatas
+          if (existingTitles.has(titleNorm) || existingUrls.has(cleanUrl)) continue;
+
+          const priceVal = parseFloat(node.priceMin || node.price || '0');
+          if (priceVal < 20) continue; // evita itens irrelevantes
+
+          const priceMaxVal = parseFloat(node.priceMax || '0');
+          let discPct = parseInt(node.priceDiscountRate || '0', 10);
+          if (discPct <= 0 && priceMaxVal > priceVal) {
+            discPct = Math.round(((priceMaxVal - priceVal) / priceMaxVal) * 100);
+          }
+
+          if (minDiscount > 0 && discPct < minDiscount) continue;
+
+          const priceDisplay = `R$ ${priceVal.toFixed(2).replace('.', ',')}`;
+          let originalPrice = null;
+          let discountTag = 'Oferta Especial';
+
+          if (discPct > 0) {
+            discountTag = `${discPct}% OFF`;
+            if (priceMaxVal > priceVal) {
+              originalPrice = `R$ ${priceMaxVal.toFixed(2).replace('.', ',')}`;
+            }
+          }
+
+          let badgeColor = 'orange';
+          if (discPct >= 40) badgeColor = 'blue';
+          else if (discPct >= 25) badgeColor = 'pink';
+
+          const shopBadge = node.shopType === 1 ? 'Loja Oficial' : (node.shopType === 2 || node.shopType === 4 ? 'Vendedor Indicado' : '');
+          const descParts = [];
+          if (shopBadge) descParts.push(`🔸 ${shopBadge} Shopee`);
+          if (node.shopName) descParts.push(`🔸 Loja: ${node.shopName}`);
+          if (node.sales > 0) descParts.push(`🔸 ⭐ ${node.ratingStar || '4.8'} (${node.sales} vendidos)`);
+
+          candidateDeals.push({
+            title,
+            description: descParts.join('\n') || null,
+            affiliate_url: node.offerLink,
+            image_url: node.imageUrl,
+            price_display: priceDisplay,
+            original_price: originalPrice,
+            category: detectCategory(title, '', ''),
+            discount_tag: discountTag,
+            coupon_code: null,
+            badge_color: badgeColor,
+            is_fast_pick: false,
+            position: 1,
+            is_active: true,
+            is_prime: false,
+            is_imported: Boolean(titleNorm.includes('internacional') || titleNorm.includes('importad')),
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          });
+
+          existingTitles.add(titleNorm);
+          existingUrls.add(cleanUrl);
+
+          if (candidateDeals.length >= limit) break;
+        }
+      } catch (err) {
+        console.warn(`[Shopee Miner] Erro na busca por "${kw}":`, err.message);
+      }
+    }
+
+    if (candidateDeals.length === 0) {
+      return res.status(200).json({
+        success: true,
+        message: 'Nenhuma oferta atendeu a todos os critérios de filtro (vendas mínimas, reputação e selos).',
+        scraped_count: totalScanned,
+        qualified_count: 0,
+        inserted_count: 0,
+        duplicate_count: 0,
+        deals: [],
+        items: []
+      });
+    }
+
+    if (dryRun) {
+      return res.status(200).json({
+        success: true,
+        dryRun: true,
+        scraped_count: totalScanned,
+        qualified_count: candidateDeals.length,
+        inserted_count: 0,
+        items: candidateDeals
+      });
+    }
+
+    const insertRes = await fetch(`${SUPABASE_URL}/rest/v1/fast_affiliate_products`, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json',
+        'Prefer': 'return=representation'
+      },
+      body: JSON.stringify(candidateDeals)
+    });
+
+    if (!insertRes.ok) {
+      const errText = await insertRes.text();
+      throw new Error(`Falha ao inserir no banco: ${insertRes.status} - ${errText}`);
+    }
+
+    const insertedData = await insertRes.json();
+    return res.status(200).json({
+      success: true,
+      message: `🎉 ${candidateDeals.length} novas ofertas verificadas da Shopee cadastradas com sucesso!`,
+      scraped_count: totalScanned,
+      qualified_count: candidateDeals.length,
+      inserted_count: candidateDeals.length,
+      deals: insertedData,
+      items: candidateDeals
+    });
+
+  } catch (error) {
+    console.error('[Shopee Miner] ❌ Erro:', error);
+    return res.status(500).json({
+      success: false,
+      error: 'Erro durante a mineração da Shopee',
+      details: error.message
+    });
+  }
+}
+
 module.exports = {
   handleMineDeals,
+  handleMineShopeeDeals,
   scrapeMercadoLivreDeals,
   detectCategory
 };
+

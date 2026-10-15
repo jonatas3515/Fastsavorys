@@ -2378,6 +2378,95 @@ window.AffiliatesModule = (function () {
   }
 
   // ==========================================
+  // SHOPEE DEALS MINER (GRAPHQL OPEN API)
+  // ==========================================
+  function openShopeeMinerModal() {
+    const modal = document.getElementById('affiliateShopeeMinerModal');
+    if (modal) {
+      modal.classList.remove('hidden');
+      const logBox = document.getElementById('shopeeMinerLiveLogBox');
+      if (logBox) logBox.classList.add('hidden');
+    }
+  }
+
+  function closeShopeeMinerModal() {
+    const modal = document.getElementById('affiliateShopeeMinerModal');
+    if (modal) modal.classList.add('hidden');
+  }
+
+  async function runShopeeMiner() {
+    const btn = document.getElementById('shopeeMinerRunBtn');
+    const logBox = document.getElementById('shopeeMinerLiveLogBox');
+    const logEl = document.getElementById('shopeeMinerLiveLog');
+    const keyword = encodeURIComponent(document.getElementById('shopeeMinerKeyword')?.value || '');
+    const minDiscount = parseInt(document.getElementById('shopeeMinerMinDiscount')?.value || '15', 10);
+    const minSales = parseInt(document.getElementById('shopeeMinerMinSales')?.value || '30', 10);
+    const minRating = parseFloat(document.getElementById('shopeeMinerMinRating')?.value || '4.7');
+    const onlyVerified = document.getElementById('shopeeMinerOnlyVerified')?.checked !== false;
+    const limit = parseInt(document.getElementById('shopeeMinerLimit')?.value || '12', 10);
+
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = `<span class="animate-spin inline-block mr-1">⏳</span> Minerando Shopee...`;
+    }
+
+    if (logBox && logEl) {
+      logBox.classList.remove('hidden');
+      logEl.innerHTML = `<div class="text-amber-400 font-bold">[1/3] 📡 Conectando à API Oficial GraphQL da Shopee...</div>`;
+    }
+
+    try {
+      const url = `/api/affiliate-deals-miner?platform=shopee&keyword=${keyword}&min_discount=${minDiscount}&min_sales=${minSales}&min_rating=${minRating}&only_verified=${onlyVerified}&limit=${limit}`;
+      const resp = await fetch(url);
+      const data = await resp.json();
+
+      if (!resp.ok || !data.success) {
+        throw new Error(data.error || 'Falha ao executar mineração da Shopee');
+      }
+
+      if (logEl) {
+        let lines = [];
+        lines.push(`<div class="text-blue-400">[2/3] 🔍 Varridas ${data.scraped_count || 0} ofertas ativas de lojas verificadas.</div>`);
+        lines.push(`<div class="text-emerald-400 font-bold mt-1">[3/3] ✨ Resultado do Processamento:</div>`);
+        lines.push(`<div class="pl-3 text-white">✅ Novos Cadastrados: <strong class="text-green-400">${data.inserted_count || 0}</strong></div>`);
+        lines.push(`<div class="pl-3 text-white">⭐ Critérios Aplicados: <strong>Vendas >= ${minSales} | Avaliação >= ${minRating} | Selo Verificado</strong></div>`);
+
+        if (data.items && data.items.length > 0) {
+          lines.push(`<div class="mt-2 text-xs text-gray-300 border-t border-gray-700 pt-2 font-semibold">Ofertas cadastradas no FastSavory's:</div>`);
+          data.items.slice(0, 6).forEach(item => {
+            lines.push(`<div class="text-[11px] text-gray-300 truncate">🛍️ ${item.title || 'Produto'} - <span class="text-amber-400">${item.price_display}</span> (${item.discount_tag})</div>`);
+          });
+        }
+
+        logEl.innerHTML += lines.join('');
+      }
+
+      if (window.showToast) {
+        if (data.inserted_count > 0) {
+          window.showToast(`🛍️ Mineração Shopee concluída! +${data.inserted_count} novas ofertas cadastradas.`, 'success');
+        } else {
+          window.showToast(`Nenhuma nova oferta atendeu aos filtros estritos ou já estavam no banco.`, 'info');
+        }
+      }
+
+      await loadProducts();
+    } catch (err) {
+      console.error('[Shopee Miner Frontend] Erro:', err);
+      if (logEl) {
+        logEl.innerHTML += `<div class="text-rose-400 font-bold mt-2">❌ Erro: ${err.message}</div>`;
+      }
+      if (window.showToast) {
+        window.showToast(`Erro ao minerar Shopee: ${err.message}`, 'error');
+      }
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = `<span>🛍️ Iniciar Mineração Shopee</span>`;
+      }
+    }
+  }
+
+  // ==========================================
   // 1-CLICK QUICK CLIP (BOOKMARKLET)
   // ==========================================
   function getBookmarkletCode() {
@@ -2547,6 +2636,9 @@ window.AffiliatesModule = (function () {
     openMinerModal,
     closeMinerModal,
     runDealsMiner,
+    openShopeeMinerModal,
+    closeShopeeMinerModal,
+    runShopeeMiner,
     openBookmarkletModal,
     closeBookmarkletModal,
     copyBookmarkletCode,
