@@ -14,7 +14,7 @@ const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persist
 
 function detectPlatform(url = '') {
   const u = (url || '').toLowerCase();
-  if (u.includes('amazon.com.br') || u.includes('amzn.to') || u.includes('a.co') || u.includes('amazon.')) {
+  if (u.includes('amazon.com.br') || u.includes('link.amazon') || u.includes('amzn.to') || u.includes('a.co') || u.includes('amazon.')) {
     return { name: 'Amazon' };
   }
   if (u.includes('shopee.com.br') || u.includes('s.shopee.com.br') || u.includes('shope.ee') || u.includes('shopee.')) {
@@ -225,7 +225,7 @@ async function fetchImageAsBase64(imageUrl) {
 }
 
 async function dispatchWhatsAppMessage(messageCaption, mediaUrl, options = {}) {
-  const evolutionApiUrl = (process.env.EVOLUTION_API_URL || '').trim().replace(/\/+$/, '');
+  const evolutionApiUrl = (options.apiUrl || process.env.EVOLUTION_API_URL || '').trim().replace(/\/+$/, '');
   const defaultApiKey = (process.env.EVOLUTION_API_KEY || '').trim();
   const evolutionApiKey = (options.apiKey || defaultApiKey).trim();
   const defaultInstance = (process.env.EVOLUTION_INSTANCE || 'fastsavorys').trim();
@@ -321,17 +321,15 @@ async function dispatchWhatsAppMessage(messageCaption, mediaUrl, options = {}) {
         return await response.json();
       } else {
         const errText = await response.text();
-        console.warn(`[WhatsApp Dispatch] Resposta sendMedia (${evolutionInstance} -> ${targetRecipient}, HTTP ${response.status}):`, errText);
-        return { success: false, status: response.status, error: errText };
+        console.warn(`[WhatsApp Dispatch] Falha no sendMedia (${evolutionInstance} -> ${targetRecipient}, HTTP ${response.status}), tentando fallback para sendText:`, errText);
       }
     } catch (err) {
       clearTimeout(timeoutId);
-      console.warn(`[WhatsApp Dispatch] sendMedia (${evolutionInstance}) erro/timeout:`, err.message);
-      return { success: false, error: err.message };
+      console.warn(`[WhatsApp Dispatch] sendMedia (${evolutionInstance}) erro/timeout, tentando fallback para sendText:`, err.message);
     }
   }
 
-  // 2. Se NÃO houver imagem, envia apenas texto (se o destinatário aceitar texto)
+  // 2. Se NÃO houver imagem ou se sendMedia falhar, envia texto formatado com link preview
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 12000);
 
@@ -987,6 +985,7 @@ async function handleSendVipGroupInvite(req, res) {
 }
 
 module.exports = {
+  dispatchWhatsAppMessage,
   handleSendWhatsAppDeal,
   handleSendWhatsAppStatus,
   handleSendVipGroupInvite,
