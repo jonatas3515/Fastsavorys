@@ -184,21 +184,49 @@
         const linkEl = c.querySelector('a[href*="mercadolivre.com"], a[href*="MLB"], a[href*="/p/"]') || c.querySelector('a');
         let product_url = linkEl ? linkEl.href : '';
 
-        // Preço atual
-        let price_display = '';
-        const priceMatches = (c.innerText || '').match(/R\$\s*[0-9]+(?:\.[0-9]{3})*(?:,[0-9]{2})?/g) || [];
-        if (priceMatches.length > 0) {
-          price_display = priceMatches[priceMatches.length - 1].replace(/\s+/g, ' ');
-        }
-
         // Preço original (riscado)
         let original_price = '';
-        const origEl = c.querySelector('s, del, [class*="original"], [style*="line-through"]');
+        const origEl = c.querySelector('s, del, [class*="original"], [style*="line-through"], .andes-money-amount--previous');
         if (origEl) {
-          const m = (origEl.innerText || '').match(/R\$\s*[0-9.,]+/i);
-          if (m) original_price = m[0].replace(/\s+/g, ' ');
-        } else if (priceMatches.length > 1) {
-          original_price = priceMatches[0].replace(/\s+/g, ' ');
+          const frac = origEl.querySelector('.andes-money-amount__fraction')?.innerText?.replace(/[^\d.]/g, '').trim();
+          const cents = origEl.querySelector('.andes-money-amount__cents')?.innerText?.replace(/[^\d]/g, '').trim();
+          if (frac) {
+            original_price = 'R$ ' + frac + (cents ? ',' + cents : ',00');
+          } else {
+            const m = (origEl.innerText || '').match(/R\$\s*[0-9]+(?:\.[0-9]{3})*(?:,[0-9]{2})?/i);
+            if (m) original_price = m[0].replace(/\s+/g, ' ');
+          }
+        }
+
+        // Preço atual da oferta (ignora parcelas e comissões)
+        let price_display = '';
+        const currentPriceEl = c.querySelector('.poly-price__current .andes-money-amount, .ui-search-price__second-line .andes-money-amount, [class*="price__current"] .andes-money-amount') ||
+                               Array.from(c.querySelectorAll('.andes-money-amount')).find(el => {
+                                 return !el.closest('s, del, [class*="original"], [style*="line-through"], [class*="installment"], [class*="installments"]') &&
+                                        !/em\s+\d+x|\d+x\s+de/i.test(el.parentElement?.innerText || '');
+                               });
+
+        if (currentPriceEl) {
+          const frac = currentPriceEl.querySelector('.andes-money-amount__fraction')?.innerText?.replace(/[^\d.]/g, '').trim();
+          const cents = currentPriceEl.querySelector('.andes-money-amount__cents')?.innerText?.replace(/[^\d]/g, '').trim();
+          if (frac) {
+            price_display = 'R$ ' + frac + (cents ? ',' + cents : ',00');
+          }
+        }
+
+        // Fallback inteligente caso o layout do card seja diferente
+        if (!price_display) {
+          const cleanCardText = (c.innerText || '')
+            .replace(/(?:GANHOS\s+EXTRAS|COMISS[ÃA]O)[\s\S]*$/gi, '')
+            .replace(/(?:\d{1,2}x|em\s+\d{1,2}x\s+de)\s+R\$\s*[0-9.,]+/gi, '');
+          const rawMatches = cleanCardText.match(/R\$\s*[0-9]+(?:\.[0-9]{3})*(?:,[0-9]{2})?/g) || [];
+          if (rawMatches.length > 0) {
+            if (rawMatches.length >= 2 && original_price) {
+              price_display = rawMatches[1].replace(/\s+/g, ' ');
+            } else {
+              price_display = rawMatches[0].replace(/\s+/g, ' ');
+            }
+          }
         }
 
         // Desconto %
