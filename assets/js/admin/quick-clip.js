@@ -12,10 +12,17 @@
     // ============================================================
     // 1. MODO LOTE: HUB DE AFILIADOS MERCADO LIVRE OU OFERTAS
     // ============================================================
-    const isMLHub = (host.includes('mercadolivre') || host.includes('mercadolibre')) &&
-      (href.includes('/afiliados') || href.includes('/ofertas') || (!href.includes('/MLB') && !href.includes('/p/MLB')));
+    const isML = host.includes('mercadolivre') || host.includes('mercadolibre');
+    const isMLProduct = isML && (
+      document.querySelector('h1.ui-pdp-title, .ui-pdp-title, .ui-pdp-price') !== null ||
+      /\/MLB-|\/p\/MLB|\/up\/MLB|produto\.mercadolivre/i.test(href)
+    );
+    const isMLHubOrOffers = isML && !isMLProduct && (
+      href.includes('/afiliados') || href.includes('/ofertas') || href.includes('/hub') || href.includes('is_affiliate=true') ||
+      document.querySelector('.poly-card, .andes-card') !== null
+    );
 
-    if (isMLHub) {
+    if (isML && isMLHubOrOffers && !isMLProduct) {
       runMLHubBatchMiner();
       return;
     }
@@ -412,13 +419,17 @@
                   document.querySelector('.a-dynamic-image');
       payload.image_url = img?.src || img?.getAttribute('data-old-hires') || '';
 
-      const priceEl = document.querySelector('#corePriceDisplay_desktop_feature_div .priceToPay, #corePrice_desktop .priceToPay, #apex_desktop .priceToPay, .priceToPay') ||
-                      document.querySelector('#corePriceDisplay_desktop_feature_div .a-price:not(.apex-priceperunit-value):not(.a-text-price), #corePrice_desktop .a-price:not(.apex-priceperunit-value):not(.a-text-price)') ||
+      const priceEl = document.querySelector('#corePriceDisplay_desktop_feature_div .priceToPay, #corePrice_desktop .priceToPay, #apex_desktop .priceToPay, .priceToPay, #corePriceDisplay_desktop_feature_div .a-price, #corePrice_desktop .a-price, .a-price:not(.a-text-price)') ||
                       document.querySelector('.a-price:not(.apex-priceperunit-value):not([class*="priceperunit"]):not(.a-text-price)');
-      const pw = priceEl?.querySelector('.a-price-whole')?.innerText?.replace(/[\r\n\t]/g, '').replace(/[^\d.]/g, '').trim();
-      const pf = priceEl?.querySelector('.a-price-fraction')?.innerText?.replace(/[^\d]/g, '').trim();
-      if (pw) {
-        payload.price_display = 'R$ ' + pw + (pf ? ',' + pf : ',00');
+      const off = priceEl?.querySelector('.a-offscreen')?.innerText?.trim();
+      if (off && /R\$/i.test(off)) {
+        payload.price_display = off.replace(/\s+/g, ' ');
+      } else {
+        const pw = priceEl?.querySelector('.a-price-whole')?.innerText?.replace(/[\r\n\t]/g, '').replace(/[^\d.]/g, '').trim();
+        const pf = priceEl?.querySelector('.a-price-fraction')?.innerText?.replace(/[^\d]/g, '').trim();
+        if (pw) {
+          payload.price_display = 'R$ ' + pw + (pf ? ',' + pf : ',00');
+        }
       }
       const basis = document.querySelector('.basisPrice .a-offscreen, #corePriceDisplay_desktop_feature_div .apex-basisprice-value .a-offscreen, .apex-basisprice-offscreen-label, #corePrice_desktop .apex-basisprice-value .a-offscreen')?.innerText?.trim();
       if (basis) payload.original_price = basis;
@@ -429,12 +440,12 @@
 
     } else if (host.includes('mercadolivre') || host.includes('mercadolibre')) {
       payload.platform = 'mercadolivre';
-      payload.title = (document.querySelector('h1.ui-pdp-title')?.innerText || document.title || '').trim();
-      const img = document.querySelector('.ui-pdp-gallery__figure img, .ui-pdp-image, img.ui-pdp-image');
+      payload.title = (document.querySelector('h1.ui-pdp-title, h1')?.innerText || document.title || '').trim();
+      const img = document.querySelector('.ui-pdp-gallery__figure img, .ui-pdp-image, img.ui-pdp-image, img[data-zoom], .andes-carousel-snapped__slide img');
       payload.image_url = img?.src || '';
 
-      const frac = document.querySelector('.ui-pdp-price__second-line .andes-money-amount__fraction')?.innerText?.replace(/[^\d.]/g, '').trim();
-      const cents = document.querySelector('.ui-pdp-price__second-line .andes-money-amount__cents')?.innerText?.replace(/[^\d]/g, '').trim();
+      const frac = document.querySelector('.ui-pdp-price__second-line .andes-money-amount__fraction, .ui-pdp-price .andes-money-amount__fraction, .andes-money-amount--cents-superscript .andes-money-amount__fraction')?.innerText?.replace(/[^\d.]/g, '').trim();
+      const cents = document.querySelector('.ui-pdp-price__second-line .andes-money-amount__cents, .ui-pdp-price .andes-money-amount__cents')?.innerText?.replace(/[^\d]/g, '').trim();
       if (frac) {
         payload.price_display = 'R$ ' + frac + (cents ? ',' + cents : ',00');
       }
@@ -443,7 +454,7 @@
         const origCents = document.querySelector('.ui-pdp-price__original-value .andes-money-amount__cents')?.innerText?.replace(/[^\d]/g, '').trim();
         payload.original_price = 'R$ ' + origFrac + (origCents ? ',' + origCents : ',00');
       }
-      const disc = document.querySelector('.ui-pdp-price__second-line .andes-money-amount__discount')?.innerText?.trim();
+      const disc = document.querySelector('.ui-pdp-price__second-line .andes-money-amount__discount, .ui-pdp-price .andes-money-amount__discount')?.innerText?.trim();
       if (disc) payload.discount_tag = disc + ' OFF';
       payload.is_imported = Boolean(document.querySelector('.ui-pdp-buybox, #shipping-summary, .ui-pdp-promotions-pill, .ui-pdp-seller__header')?.innerText?.match(/compra\s+internacional|vendedor\s+internacional/i));
 
@@ -460,13 +471,13 @@
       const img = document.querySelector('.product-briefing img') ||
                   document.querySelector('._39-Y7e img') ||
                   document.querySelector('.image-carousel img') ||
-                  document.querySelector('img[src*="down-br.img.susercontent.com"]');
+                  document.querySelector('img[src*="down-br.img.susercontent.com"], img[src*="susercontent.com"]');
       payload.image_url = img?.src || document.querySelector('meta[property="og:image"]')?.content || '';
 
-      const priceCandidates = Array.from(document.querySelectorAll('.product-briefing div, .product-briefing span, .product-briefing p, [class*="flash-sale"] span, [class*="price"] span'));
+      const priceCandidates = Array.from(document.querySelectorAll('.product-briefing div, .product-briefing span, .product-briefing p, [class*="flash-sale"] span, [class*="price"] span, span, div'));
       const foundPriceEl = priceCandidates.find(el => {
         const t = (el.innerText || '').trim();
-        return /^R\$\s*[0-9.,]+$/i.test(t);
+        return /^R\$\s*[0-9.,]+$/i.test(t) && !el.closest('del, s, [style*="line-through"]');
       }) || document.querySelector('.product-briefing .pqTWkA, .product-briefing ._3n5z6N, .product-briefing ._2Sh71d, .product-briefing [class*="price"]');
 
       if (foundPriceEl) {
