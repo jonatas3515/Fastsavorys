@@ -916,7 +916,7 @@ window.AffiliatesModule = (function () {
 
       // Preenche automaticamente o título
       const titleEl = document.getElementById('affiliateTitleInput');
-      if (info.title && (!titleEl.value.trim() || titleEl.value.trim().startsWith('Produto '))) {
+      if (info.title && titleEl) {
         titleEl.value = info.title;
       }
 

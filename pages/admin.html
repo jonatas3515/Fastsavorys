@@ -2389,49 +2389,37 @@
                             <span>Inserir 🔸</span>
                         </button>
                     </div>
-                    <textarea id="affiliateDescriptionInput" rows="2" placeholder="🔸 Ex: Ideal para preparar receitas rápidas sem óleo."
-                        class="w-full px-3 py-2 border rounded-lg outline-none resize-none"></textarea>
+                    <textarea id="affiliateDescriptionInput" rows="3" placeholder="🔸 Ex: Ideal para preparar receitas rápidas sem óleo."
+                        class="w-full px-3 py-2 border rounded-lg outline-none resize-none min-h-[72px]"></textarea>
                 </div>
 
-                <!-- Selo FastSavory's (Eu uso / Recomendação Especial) -->
-                <div class="p-3 rounded-xl bg-gradient-to-r from-pink-50 via-purple-50 to-pink-50 border border-pink-200 flex items-center justify-between shadow-2xs">
-                    <div class="flex items-center gap-3">
-                        <input type="checkbox" id="affiliateIsFastPickInput" class="w-5 h-5 text-pink-600 rounded focus:ring-pink-500 cursor-pointer" />
-                        <div>
-                            <label for="affiliateIsFastPickInput" class="font-bold text-gray-900 text-sm cursor-pointer flex items-center gap-1.5">
-                                <span class="text-pink-600 font-extrabold">✨ Selo FastSavory's</span>
-                                <span class="text-[10px] bg-gradient-to-r from-pink-500 to-purple-600 text-white px-2 py-0.5 rounded-full font-black shadow-2xs">Já usei / Recomendo</span>
-                            </label>
-                            <p class="text-xs text-gray-500 mt-0.5">Aplica a moldura rosa/roxa especial e o selo de recomendação oficial na vitrine.</p>
-                        </div>
+                <!-- Selos / Destaques Compactos (FastSavory's, Prime, Importado) -->
+                <div class="space-y-1.5 pt-0.5">
+                    <!-- Selo FastSavory's -->
+                    <div class="px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-pink-50 via-purple-50 to-pink-50 border border-pink-200 flex items-center gap-2.5 shadow-2xs">
+                        <input type="checkbox" id="affiliateIsFastPickInput" class="w-4 h-4 text-pink-600 rounded focus:ring-pink-500 cursor-pointer" />
+                        <label for="affiliateIsFastPickInput" class="font-bold text-gray-800 text-xs cursor-pointer flex items-center gap-1.5 flex-wrap">
+                            <span class="text-pink-600 font-extrabold">✨ Selo FastSavory's</span>
+                            <span class="text-[9px] bg-gradient-to-r from-pink-500 to-purple-600 text-white px-1.5 py-0.2 rounded-full font-bold">Já usei / Recomendo</span>
+                        </label>
                     </div>
-                </div>
 
-                <!-- Selo Amazon Prime -->
-                <div class="p-3 rounded-xl bg-gradient-to-r from-sky-50 via-blue-50 to-sky-50 border border-sky-200 flex items-center justify-between shadow-2xs">
-                    <div class="flex items-center gap-3">
-                        <input type="checkbox" id="affiliateIsPrimeInput" class="w-5 h-5 text-sky-600 rounded focus:ring-sky-500 cursor-pointer" />
-                        <div>
-                            <label for="affiliateIsPrimeInput" class="font-bold text-gray-900 text-sm cursor-pointer flex items-center gap-1.5">
-                                <span class="inline-flex items-center gap-0.5 px-2 py-0.5 text-xs rounded-full bg-[#00a8e1] text-white font-black shadow-xs">✓ prime</span>
-                                <span class="text-xs text-sky-950 font-bold">Produto Amazon Prime</span>
-                            </label>
-                            <p class="text-xs text-gray-500 mt-0.5">Exibe o selo oficial Prime na vitrine e o aviso de frete grátis Prime no WhatsApp.</p>
-                        </div>
+                    <!-- Selo Amazon Prime -->
+                    <div class="px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-sky-50 via-blue-50 to-sky-50 border border-sky-200 flex items-center gap-2.5 shadow-2xs">
+                        <input type="checkbox" id="affiliateIsPrimeInput" class="w-4 h-4 text-sky-600 rounded focus:ring-sky-500 cursor-pointer" />
+                        <label for="affiliateIsPrimeInput" class="font-bold text-gray-800 text-xs cursor-pointer flex items-center gap-1.5 flex-wrap">
+                            <span class="inline-flex items-center px-1.5 py-0.2 text-[10px] rounded-full bg-[#00a8e1] text-white font-black">✓ prime</span>
+                            <span class="text-xs text-sky-950 font-bold">Produto Amazon Prime (Frete Grátis)</span>
+                        </label>
                     </div>
-                </div>
 
-                <!-- Selo Produto Importado / Compra Internacional -->
-                <div class="p-3 rounded-xl bg-gradient-to-r from-slate-50 via-cyan-50/50 to-slate-50 border border-slate-300 flex items-center justify-between shadow-2xs">
-                    <div class="flex items-center gap-3">
-                        <input type="checkbox" id="affiliateIsImportedInput" class="w-5 h-5 text-slate-800 rounded focus:ring-slate-700 cursor-pointer" />
-                        <div>
-                            <label for="affiliateIsImportedInput" class="font-bold text-gray-900 text-sm cursor-pointer flex items-center gap-1.5">
-                                <span class="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-full bg-slate-900 text-cyan-300 font-bold shadow-xs">✈️ Compra Internacional</span>
-                                <span class="text-xs text-slate-800 font-bold">Produto Importado</span>
-                            </label>
-                            <p class="text-xs text-gray-500 mt-0.5">Exibe a tag ✈️ Importado na vitrine para o cliente saber que é compra internacional.</p>
-                        </div>
+                    <!-- Selo Produto Importado / Compra Internacional -->
+                    <div class="px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-slate-50 via-cyan-50/40 to-slate-50 border border-slate-300 flex items-center gap-2.5 shadow-2xs">
+                        <input type="checkbox" id="affiliateIsImportedInput" class="w-4 h-4 text-slate-800 rounded focus:ring-slate-700 cursor-pointer" />
+                        <label for="affiliateIsImportedInput" class="font-bold text-gray-800 text-xs cursor-pointer flex items-center gap-1.5 flex-wrap">
+                            <span class="inline-flex items-center gap-1 px-1.5 py-0.2 text-[10px] rounded-full bg-slate-900 text-cyan-300 font-bold">✈️ Compra Internacional</span>
+                            <span class="text-xs text-slate-700 font-bold">Produto Importado</span>
+                        </label>
                     </div>
                 </div>
 

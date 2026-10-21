@@ -388,6 +388,47 @@ async function sendProductDealToWhatsApp(product) {
   return await dispatchWhatsAppMessage(caption, mediaUrl);
 }
 
+/**
+ * Seleciona um produto garantindo variedade e intercalação de categorias
+ * - Máximo de 1 ou 2 produtos consecutivos da mesma categoria
+ * - Preferência alta (75%) para trocar de categoria após 1 disparo
+ * - Se a mesma categoria já saiu 2 vezes seguidas, é 100% OBRIGATÓRIO trocar de categoria
+ */
+function selectDiverseProduct(candidates, lastCat, sameCategoryTwice) {
+  if (!candidates || candidates.length === 0) return null;
+
+  const normalizeCat = (c) => (c || 'outros').trim().toLowerCase();
+
+  // Se já foram enviados 2 seguidos da mesma categoria, proíbe essa categoria
+  if (sameCategoryTwice && lastCat) {
+    const diffCatPool = candidates.filter(p => normalizeCat(p.category) !== lastCat);
+    if (diffCatPool.length > 0) {
+      console.log(`[WhatsApp Deal] 🔀 Categoria '${lastCat}' já enviada 2x seguidas. Intercalando obrigatoriamente com outra categoria.`);
+      return diffCatPool[Math.floor(Math.random() * Math.min(diffCatPool.length, 10))];
+    }
+  }
+
+  // Se foi enviado 1 produto da categoria anterior:
+  // 75% das vezes intercala com outra categoria (1 por categoria);
+  // 25% das vezes permite um 2º produto consecutivo (no máximo 2 por categoria).
+  if (lastCat) {
+    const diffCatPool = candidates.filter(p => normalizeCat(p.category) !== lastCat);
+    const sameCatPool = candidates.filter(p => normalizeCat(p.category) === lastCat);
+
+    const shouldSwitch = Math.random() < 0.75;
+    if (shouldSwitch && diffCatPool.length > 0) {
+      return diffCatPool[Math.floor(Math.random() * Math.min(diffCatPool.length, 10))];
+    } else if (!shouldSwitch && sameCatPool.length > 0) {
+      return sameCatPool[Math.floor(Math.random() * Math.min(sameCatPool.length, 5))];
+    } else if (diffCatPool.length > 0) {
+      return diffCatPool[Math.floor(Math.random() * Math.min(diffCatPool.length, 10))];
+    }
+  }
+
+  // Fallback padrão se não houver histórico recente
+  return candidates[Math.floor(Math.random() * Math.min(candidates.length, 10))];
+}
+
 async function handleSendWhatsAppDeal(req, res) {
   if (!supabaseAdmin) {
     return res.status(500).json({ success: false, error: 'Configuração do Supabase não encontrada.' });
@@ -528,8 +569,31 @@ async function handleSendWhatsAppDeal(req, res) {
 
     // 2. Se for modo afiliado ou se não encontrou produto de loja, busca nos achadinhos
     if (!product) {
-      // 2.1 PRIORIDADE RELÂMPAGO: Apenas produtos com contador REAL (flash_deal_end no futuro)
-      // e que NÃO foram postados nas últimas 24h furam a fila (evita repetições infinitas a cada 3h)
+      // 2.0 HISTÓRICO DE DISPAROS: Busca as categorias dos 2 últimos produtos enviados para intercalar
+      let lastCat = null;
+      let secondLastCat = null;
+      let sameCategoryTwice = false;
+
+      try {
+        const { data: recentDispatches } = await supabaseAdmin
+          .from('fast_affiliate_products')
+          .select('id, category, last_posted_at')
+          .not('last_posted_at', 'is', null)
+          .order('last_posted_at', { ascending: false })
+          .limit(2);
+
+        if (recentDispatches && recentDispatches.length > 0) {
+          const recentCats = recentDispatches.map(p => (p.category || 'outros').trim().toLowerCase());
+          lastCat = recentCats[0] || null;
+          secondLastCat = recentCats[1] || null;
+          sameCategoryTwice = Boolean(lastCat && secondLastCat && lastCat === secondLastCat);
+          console.log(`[WhatsApp Deal] 📊 Categorias recentes: [${recentCats.join(', ')}] | Bloquear '${lastCat}': ${sameCategoryTwice}`);
+        }
+      } catch (histErr) {
+        console.warn('[WhatsApp Deal] Aviso ao consultar histórico de categorias:', histErr.message);
+      }
+
+      // 2.1 PRIORIDADE RELÂMPAGO: Produtos com contador REAL ativo que não foram postados nas últimas 24h
       const twentyFourHoursAgo = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
       const nowIso = new Date().toISOString();
 
@@ -540,15 +604,18 @@ async function handleSendWhatsAppDeal(req, res) {
         .gt('flash_deal_end', nowIso)
         .or(`last_posted_at.is.null,last_posted_at.lt.${twentyFourHoursAgo}`)
         .order('last_posted_at', { ascending: true, nullsFirst: true })
-        .limit(1);
+        .limit(5);
 
       if (flashCandidates && flashCandidates.length > 0) {
-        product = flashCandidates[0];
-        console.log(`[WhatsApp Deal] ⚡ Prioridade Relâmpago com contador ativo: furando fila para "${product.title}"`);
+        // Se a mesma categoria já saiu 2x seguidas, só usa oferta relâmpago se for de outra categoria
+        const chosenFlash = selectDiverseProduct(flashCandidates, lastCat, sameCategoryTwice);
+        if (chosenFlash) {
+          product = chosenFlash;
+          console.log(`[WhatsApp Deal] ⚡ Prioridade Relâmpago com contador ativo: furando fila para "${product.title}" (${product.category})`);
+        }
       }
 
       // 2.2 FILA 1 (INÉDITOS): Prioridade máxima para produtos que NUNCA foram postados no grupo VIP!
-      // Existem mais de 200 produtos cadastrados que nunca foram enviados.
       if (!product) {
         const { data: unpostedProducts } = await supabaseAdmin
           .from('fast_affiliate_products')
@@ -556,38 +623,54 @@ async function handleSendWhatsAppDeal(req, res) {
           .eq('is_active', true)
           .is('last_posted_at', null)
           .order('created_at', { ascending: false, nullsFirst: false })
-          .limit(15);
+          .limit(40);
 
         if (unpostedProducts && unpostedProducts.length > 0) {
-          // Sorteia dentro da amostra dos inéditos para garantir rotação e variedade de categorias
-          const randIdx = Math.floor(Math.random() * unpostedProducts.length);
-          product = unpostedProducts[randIdx];
-          console.log(`[WhatsApp Deal] 🆕 Produto INÉDITO selecionado (nunca postado): "${product.title}" (ID ${product.id})`);
+          // Se a categoria anterior já saiu 2x seguidas, só usa inédito se houver de OUTRA categoria.
+          // Se todos os inéditos forem daquela categoria (ex: lote recém-lançado de brinquedos),
+          // pula para a Fila 2 para intercalar com outros produtos do catálogo!
+          if (sameCategoryTwice && lastCat) {
+            const diffUnposted = unpostedProducts.filter(p => (p.category || 'outros').trim().toLowerCase() !== lastCat);
+            if (diffUnposted.length > 0) {
+              product = diffUnposted[Math.floor(Math.random() * Math.min(diffUnposted.length, 10))];
+              console.log(`[WhatsApp Deal] 🆕 Produto INÉDITO intercalado (${product.category}): "${product.title}"`);
+            } else {
+              console.log(`[WhatsApp Deal] ⏳ Categoria '${lastCat}' já enviada 2x seguidas e só há inéditos dessa categoria. Pulando para Fila 2 para intercalar com o catálogo!`);
+            }
+          } else {
+            product = selectDiverseProduct(unpostedProducts, lastCat, sameCategoryTwice);
+            if (product) {
+              console.log(`[WhatsApp Deal] 🆕 Produto INÉDITO selecionado (${product.category}): "${product.title}" (ID ${product.id})`);
+            }
+          }
         }
       }
 
-      // 2.3 FILA 2 (ROTAÇÃO GERAL): Apenas se TODOS os produtos já tiverem sido postados pelo menos 1 vez
+      // 2.3 FILA 2 (ROTAÇÃO GERAL): Seleciona produtos do catálogo intercalando categorias
       if (!product) {
         const { data: affiliateProducts, error: affErr } = await supabaseAdmin
           .from('fast_affiliate_products')
           .select('*')
           .eq('is_active', true)
           .order('last_posted_at', { ascending: true, nullsFirst: true })
-          .limit(1);
+          .limit(50);
 
-      if (affErr) {
-        throw new Error(`Erro no banco Supabase: ${affErr.message}`);
-      }
+        if (affErr) {
+          throw new Error(`Erro no banco Supabase: ${affErr.message}`);
+        }
 
-      if (!affiliateProducts || affiliateProducts.length === 0) {
-        return res.status(200).json({
-          success: false,
-          message: 'Nenhum produto ativo encontrado para disparo.'
-        });
-      }
+        if (!affiliateProducts || affiliateProducts.length === 0) {
+          return res.status(200).json({
+            success: false,
+            message: 'Nenhum produto ativo encontrado para disparo.'
+          });
+        }
 
-        product = affiliateProducts[0];
-        console.log(`[WhatsApp Deal] 🔄 Rotação regular (mais antigo sem disparo): "${product.title}" (ID ${product.id}, último envio: ${product.last_posted_at})`);
+        product = selectDiverseProduct(affiliateProducts, lastCat, sameCategoryTwice);
+        if (!product) {
+          product = affiliateProducts[0];
+        }
+        console.log(`[WhatsApp Deal] 🔄 Rotação intercalada por categoria (${product.category}): "${product.title}" (ID ${product.id}, último envio: ${product.last_posted_at})`);
       }
 
       // Validação em tempo real do preço e disponibilidade antes do disparo

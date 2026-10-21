@@ -525,15 +525,9 @@ async function handleMineShopeeDeals(req, res) {
           if (discPct >= 40) badgeColor = 'blue';
           else if (discPct >= 25) badgeColor = 'pink';
 
-          const shopBadge = node.shopType === 1 ? 'Loja Oficial' : (node.shopType === 2 || node.shopType === 4 ? 'Vendedor Indicado' : '');
-          const descParts = [];
-          if (shopBadge) descParts.push(`🔸 ${shopBadge} Shopee`);
-          if (node.shopName) descParts.push(`🔸 Loja: ${node.shopName}`);
-          if (node.sales > 0) descParts.push(`🔸 ⭐ ${node.ratingStar || '4.8'} (${node.sales} vendidos)`);
-
           candidateDeals.push({
             title,
-            description: descParts.join('\n') || null,
+            description: null,
             affiliate_url: node.offerLink,
             image_url: node.imageUrl,
             price_display: priceDisplay,
