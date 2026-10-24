@@ -291,8 +291,8 @@ async function dispatchWhatsAppMessage(messageCaption, mediaUrl, options = {}) {
   // 1. Se possuir URL de imagem, envia EXCLUSIVAMENTE via sendMedia (evita mensagens duplicadas)
   if (mediaUrl && mediaUrl.startsWith('http')) {
     const controller = new AbortController();
-    // 35 segundos de timeout para acomodar cold-start do Render (Free Tier demora ~20-25s para acordar se inativo)
-    const timeoutId = setTimeout(() => controller.abort(), 35000);
+    // 45 segundos de timeout para acomodar download e envio da imagem
+    const timeoutId = setTimeout(() => controller.abort(), 45000);
 
     try {
       const mediaEndpoint = `${evolutionApiUrl}/message/sendMedia/${evolutionInstance}`;
@@ -323,15 +323,19 @@ async function dispatchWhatsAppMessage(messageCaption, mediaUrl, options = {}) {
         return await response.json();
       } else {
         const errText = await response.text();
-        console.warn(`[WhatsApp Dispatch] Falha no sendMedia (${evolutionInstance} -> ${targetRecipient}, HTTP ${response.status}), tentando fallback para sendText:`, errText);
+        console.warn(`[WhatsApp Dispatch] Falha no sendMedia (${evolutionInstance} -> ${targetRecipient}, HTTP ${response.status}):`, errText);
+        return { success: false, status: response.status, error: errText };
       }
     } catch (err) {
       clearTimeout(timeoutId);
-      console.warn(`[WhatsApp Dispatch] sendMedia (${evolutionInstance}) erro/timeout, tentando fallback para sendText:`, err.message);
+      console.warn(`[WhatsApp Dispatch] sendMedia (${evolutionInstance}) erro/timeout:`, err.message);
+      // NUNCA chamar sendText de fallback quando a imagem falhar/der timeout,
+      // para evitar que o WhatsApp entregue a imagem com legenda E depois repita o texto avulso embaixo!
+      return { success: false, error: err.message };
     }
   }
 
-  // 2. Se NÃO houver imagem ou se sendMedia falhar, envia texto formatado com link preview
+  // 2. Apenas se NÃO houver imagem (mediaUrl vazio), envia texto formatado com link preview
   const controller = new AbortController();
   // 18 segundos de timeout para envio de texto no fallback
   const timeoutId = setTimeout(() => controller.abort(), 18000);
@@ -389,44 +393,89 @@ async function sendProductDealToWhatsApp(product) {
 }
 
 /**
- * Seleciona um produto garantindo variedade e intercalação de categorias
- * - Máximo de 1 ou 2 produtos consecutivos da mesma categoria
- * - Preferência alta (75%) para trocar de categoria após 1 disparo
- * - Se a mesma categoria já saiu 2 vezes seguidas, é 100% OBRIGATÓRIO trocar de categoria
+ * Seleciona um produto garantindo variedade máxima e intercalação inteligente:
+ * 1. PLATAFORMAS: Se o anterior foi Shopee, prioriza fortemente Mercado Livre ou Amazon.
+ *    Se a mesma loja saiu 2x seguidas, proíbe 100% repetir a mesma loja.
+ * 2. CATEGORIAS: Se a mesma categoria saiu 2x seguidas, proíbe 100% repetir.
+ * 3. EQUILÍBRIO: Garante que o catálogo inteiro circule, sem ficar preso apenas nos últimos cadastrados.
  */
-function selectDiverseProduct(candidates, lastCat, sameCategoryTwice) {
+function selectDiverseProduct(candidates, options = {}) {
   if (!candidates || candidates.length === 0) return null;
 
+  const {
+    lastCat = null,
+    sameCategoryTwice = false,
+    lastPlatform = null,
+    samePlatformTwice = false
+  } = (typeof options === 'object' && options !== null) ? options : { lastCat: options };
+
   const normalizeCat = (c) => (c || 'outros').trim().toLowerCase();
+  const getPlat = (p) => {
+    return (detectPlatform(p.affiliate_url || p.url).id || 'generic').toLowerCase();
+  };
 
-  // Se já foram enviados 2 seguidos da mesma categoria, proíbe essa categoria
-  if (sameCategoryTwice && lastCat) {
-    const diffCatPool = candidates.filter(p => normalizeCat(p.category) !== lastCat);
-    if (diffCatPool.length > 0) {
-      console.log(`[WhatsApp Deal] 🔀 Categoria '${lastCat}' já enviada 2x seguidas. Intercalando obrigatoriamente com outra categoria.`);
-      return diffCatPool[Math.floor(Math.random() * Math.min(diffCatPool.length, 10))];
+  const scored = candidates.map(product => {
+    const plat = getPlat(product);
+    const cat = normalizeCat(product.category);
+    let score = 50;
+
+    // 1. DIVERSIDADE DE LOJA / PLATAFORMA (Shopee / Amazon / Mercado Livre)
+    if (lastPlatform) {
+      if (plat !== lastPlatform) {
+        score += 85; // Forte incentivo para trocar de loja
+      } else {
+        if (samePlatformTwice) {
+          score -= 1000; // PROÍBE 3 disparos seguidos da mesma loja
+        } else {
+          score -= 45; // Penaliza se for a mesma loja do último envio
+        }
+      }
     }
-  }
 
-  // Se foi enviado 1 produto da categoria anterior:
-  // 75% das vezes intercala com outra categoria (1 por categoria);
-  // 25% das vezes permite um 2º produto consecutivo (no máximo 2 por categoria).
-  if (lastCat) {
-    const diffCatPool = candidates.filter(p => normalizeCat(p.category) !== lastCat);
-    const sameCatPool = candidates.filter(p => normalizeCat(p.category) === lastCat);
-
-    const shouldSwitch = Math.random() < 0.75;
-    if (shouldSwitch && diffCatPool.length > 0) {
-      return diffCatPool[Math.floor(Math.random() * Math.min(diffCatPool.length, 10))];
-    } else if (!shouldSwitch && sameCatPool.length > 0) {
-      return sameCatPool[Math.floor(Math.random() * Math.min(sameCatPool.length, 5))];
-    } else if (diffCatPool.length > 0) {
-      return diffCatPool[Math.floor(Math.random() * Math.min(diffCatPool.length, 10))];
+    // 2. DIVERSIDADE DE CATEGORIA
+    if (lastCat) {
+      if (cat !== lastCat) {
+        score += 65; // Forte incentivo para trocar de categoria
+      } else {
+        if (sameCategoryTwice) {
+          score -= 1000; // PROÍBE 3 disparos seguidos da mesma categoria
+        } else {
+          score -= 35;
+        }
+      }
     }
-  }
 
-  // Fallback padrão se não houver histórico recente
-  return candidates[Math.floor(Math.random() * Math.min(candidates.length, 10))];
+    // 3. EQUILÍBRIO NOVO vs CATÁLOGO
+    // Inéditos ganham bônus (+20), mas não superam a penalidade se a loja e categoria forem repetidas!
+    if (!product.last_posted_at) {
+      score += 20;
+    }
+
+    // Oferta relâmpago com prazo ativo ganha bônus
+    if (product.badge_color === 'flash_deal' || (product.flash_deal_end && new Date(product.flash_deal_end) > new Date())) {
+      score += 25;
+    }
+
+    // Produtos com desconto alto (>= 30% OFF) ganham bônus
+    const discPct = calcDiscountPercent(product.original_price, product.price_display);
+    if (discPct >= 30) score += 15;
+
+    // Jitter aleatório leve (+0 a 12) para quebrar empates de forma dinâmica
+    score += Math.random() * 12;
+
+    return { product, score, plat, cat };
+  });
+
+  // Ordena pelo maior score
+  scored.sort((a, b) => b.score - a.score);
+
+  // Filtra candidatos válidos (com score > 0)
+  const validCandidates = scored.filter(s => s.score > 0);
+  const poolToPick = (validCandidates.length > 0 ? validCandidates : scored).slice(0, 3);
+  const chosen = poolToPick[Math.floor(Math.random() * poolToPick.length)].product;
+
+  console.log(`[WhatsApp Deal] 🎯 Selecionado: "${chosen.title}" | Loja: ${getPlat(chosen).toUpperCase()} | Categoria: ${normalizeCat(chosen.category)} | Inédito: ${!chosen.last_posted_at}`);
+  return chosen;
 }
 
 async function handleSendWhatsAppDeal(req, res) {
@@ -569,108 +618,116 @@ async function handleSendWhatsAppDeal(req, res) {
 
     // 2. Se for modo afiliado ou se não encontrou produto de loja, busca nos achadinhos
     if (!product) {
-      // 2.0 HISTÓRICO DE DISPAROS: Busca as categorias dos 2 últimos produtos enviados para intercalar
+      // 2.0 HISTÓRICO DE DISPAROS: Busca as 3 últimas postagens para alternar loja e categoria
       let lastCat = null;
       let secondLastCat = null;
       let sameCategoryTwice = false;
+      let lastPlatform = null;
+      let secondLastPlatform = null;
+      let samePlatformTwice = false;
 
       try {
         const { data: recentDispatches } = await supabaseAdmin
           .from('fast_affiliate_products')
-          .select('id, category, last_posted_at')
+          .select('id, category, last_posted_at, affiliate_url')
           .not('last_posted_at', 'is', null)
           .order('last_posted_at', { ascending: false })
-          .limit(2);
+          .limit(3);
 
         if (recentDispatches && recentDispatches.length > 0) {
           const recentCats = recentDispatches.map(p => (p.category || 'outros').trim().toLowerCase());
           lastCat = recentCats[0] || null;
           secondLastCat = recentCats[1] || null;
           sameCategoryTwice = Boolean(lastCat && secondLastCat && lastCat === secondLastCat);
-          console.log(`[WhatsApp Deal] 📊 Categorias recentes: [${recentCats.join(', ')}] | Bloquear '${lastCat}': ${sameCategoryTwice}`);
+
+          const recentPlats = recentDispatches.map(p => detectPlatform(p.affiliate_url).id.toLowerCase());
+          lastPlatform = recentPlats[0] || null;
+          secondLastPlatform = recentPlats[1] || null;
+          samePlatformTwice = Boolean(lastPlatform && secondLastPlatform && lastPlatform === secondLastPlatform);
+
+          console.log(`[WhatsApp Deal] 📊 Histórico Recente: Lojas [${recentPlats.join(' -> ')}] | Categorias [${recentCats.join(' -> ')}]`);
         }
       } catch (histErr) {
-        console.warn('[WhatsApp Deal] Aviso ao consultar histórico de categorias:', histErr.message);
+        console.warn('[WhatsApp Deal] Aviso ao consultar histórico:', histErr.message);
       }
 
-      // 2.1 PRIORIDADE RELÂMPAGO: Produtos com contador REAL ativo que não foram postados nas últimas 24h
-      const twentyFourHoursAgo = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+      // 2.1 CONSTRUÇÃO DO POOL DE CANDIDATOS (EQUILÍBRIO INÉDITOS + CATÁLOGO EXISTENTE)
+      // Para evitar que um lote minerado domine todas as próximas horas,
+      // juntamos no pool produtos inéditos (novos) E produtos consolidados do catálogo (antigos)!
+      const candidatePool = [];
+      const seenIds = new Set();
+
+      // a) Produtos com contador RELÂMPAGO ativo (Prioridade alta)
       const nowIso = new Date().toISOString();
+      const twentyFourHoursAgo = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+      try {
+        const { data: flashCandidates } = await supabaseAdmin
+          .from('fast_affiliate_products')
+          .select('*')
+          .eq('is_active', true)
+          .gt('flash_deal_end', nowIso)
+          .or(`last_posted_at.is.null,last_posted_at.lt.${twentyFourHoursAgo}`)
+          .limit(10);
 
-      const { data: flashCandidates } = await supabaseAdmin
-        .from('fast_affiliate_products')
-        .select('*')
-        .eq('is_active', true)
-        .gt('flash_deal_end', nowIso)
-        .or(`last_posted_at.is.null,last_posted_at.lt.${twentyFourHoursAgo}`)
-        .order('last_posted_at', { ascending: true, nullsFirst: true })
-        .limit(5);
-
-      if (flashCandidates && flashCandidates.length > 0) {
-        // Se a mesma categoria já saiu 2x seguidas, só usa oferta relâmpago se for de outra categoria
-        const chosenFlash = selectDiverseProduct(flashCandidates, lastCat, sameCategoryTwice);
-        if (chosenFlash) {
-          product = chosenFlash;
-          console.log(`[WhatsApp Deal] ⚡ Prioridade Relâmpago com contador ativo: furando fila para "${product.title}" (${product.category})`);
+        if (flashCandidates) {
+          flashCandidates.forEach(p => {
+            if (!seenIds.has(p.id)) { seenIds.add(p.id); candidatePool.push(p); }
+          });
         }
-      }
+      } catch (e) { }
 
-      // 2.2 FILA 1 (INÉDITOS): Prioridade máxima para produtos que NUNCA foram postados no grupo VIP!
-      if (!product) {
+      // b) Produtos INÉDITOS (que nunca foram postados): busca até 30
+      try {
         const { data: unpostedProducts } = await supabaseAdmin
           .from('fast_affiliate_products')
           .select('*')
           .eq('is_active', true)
           .is('last_posted_at', null)
-          .order('created_at', { ascending: false, nullsFirst: false })
-          .limit(40);
+          .order('created_at', { ascending: false })
+          .limit(30);
 
-        if (unpostedProducts && unpostedProducts.length > 0) {
-          // Se a categoria anterior já saiu 2x seguidas, só usa inédito se houver de OUTRA categoria.
-          // Se todos os inéditos forem daquela categoria (ex: lote recém-lançado de brinquedos),
-          // pula para a Fila 2 para intercalar com outros produtos do catálogo!
-          if (sameCategoryTwice && lastCat) {
-            const diffUnposted = unpostedProducts.filter(p => (p.category || 'outros').trim().toLowerCase() !== lastCat);
-            if (diffUnposted.length > 0) {
-              product = diffUnposted[Math.floor(Math.random() * Math.min(diffUnposted.length, 10))];
-              console.log(`[WhatsApp Deal] 🆕 Produto INÉDITO intercalado (${product.category}): "${product.title}"`);
-            } else {
-              console.log(`[WhatsApp Deal] ⏳ Categoria '${lastCat}' já enviada 2x seguidas e só há inéditos dessa categoria. Pulando para Fila 2 para intercalar com o catálogo!`);
-            }
-          } else {
-            product = selectDiverseProduct(unpostedProducts, lastCat, sameCategoryTwice);
-            if (product) {
-              console.log(`[WhatsApp Deal] 🆕 Produto INÉDITO selecionado (${product.category}): "${product.title}" (ID ${product.id})`);
-            }
-          }
+        if (unpostedProducts) {
+          unpostedProducts.forEach(p => {
+            if (!seenIds.has(p.id)) { seenIds.add(p.id); candidatePool.push(p); }
+          });
         }
-      }
+      } catch (e) { }
 
-      // 2.3 FILA 2 (ROTAÇÃO GERAL): Seleciona produtos do catálogo intercalando categorias
-      if (!product) {
-        const { data: affiliateProducts, error: affErr } = await supabaseAdmin
+      // c) Produtos do CATÁLOGO GERAL (Amazon, Mercado Livre, Shopee que faz mais tempo sem sair)
+      // Busca 60 produtos com last_posted_at mais antigo para garantir opções de todas as lojas e categorias
+      try {
+        const { data: catalogProducts } = await supabaseAdmin
           .from('fast_affiliate_products')
           .select('*')
           .eq('is_active', true)
-          .order('last_posted_at', { ascending: true, nullsFirst: true })
-          .limit(50);
+          .not('last_posted_at', 'is', null)
+          .order('last_posted_at', { ascending: true })
+          .limit(60);
 
-        if (affErr) {
-          throw new Error(`Erro no banco Supabase: ${affErr.message}`);
-        }
-
-        if (!affiliateProducts || affiliateProducts.length === 0) {
-          return res.status(200).json({
-            success: false,
-            message: 'Nenhum produto ativo encontrado para disparo.'
+        if (catalogProducts) {
+          catalogProducts.forEach(p => {
+            if (!seenIds.has(p.id)) { seenIds.add(p.id); candidatePool.push(p); }
           });
         }
+      } catch (e) { }
 
-        product = selectDiverseProduct(affiliateProducts, lastCat, sameCategoryTwice);
-        if (!product) {
-          product = affiliateProducts[0];
-        }
-        console.log(`[WhatsApp Deal] 🔄 Rotação intercalada por categoria (${product.category}): "${product.title}" (ID ${product.id}, último envio: ${product.last_posted_at})`);
+      if (candidatePool.length === 0) {
+        return res.status(200).json({
+          success: false,
+          message: 'Nenhum produto ativo encontrado no catálogo para disparo.'
+        });
+      }
+
+      // 2.2 SELEÇÃO INTELIGENTE COM ROTAÇÃO DE PLATAFORMA E CATEGORIA
+      product = selectDiverseProduct(candidatePool, {
+        lastCat,
+        sameCategoryTwice,
+        lastPlatform,
+        samePlatformTwice
+      });
+
+      if (!product) {
+        product = candidatePool[0];
       }
 
       // Validação em tempo real do preço e disponibilidade antes do disparo
