@@ -4,7 +4,7 @@
  */
 
 window.AchadinhosCategories = (function () {
-  const STORAGE_KEY = 'fast_achadinhos_categories_v6';
+  const STORAGE_KEY = 'fast_achadinhos_categories_v7';
   const VERSION_KEY = 'fast_achadinhos_categories_version';
 
   // Árvore Padrão (8 Macro Grupos e Subcategorias Otimizadas)
@@ -20,7 +20,6 @@ window.AchadinhosCategories = (function () {
         { slug: 'limpeza_organizacao', label: 'Limpeza e Organização', aliases: ['limpeza', 'organizacao_limpeza'] },
         { slug: 'confeitaria_sobremesas', label: 'Confeitaria & Sobremesas', aliases: ['mercearia_doce'] },
         { slug: 'ingredientes_profissionais', label: 'Ingredientes Profissionais', aliases: [] },
-        { slug: 'formas_utensilios', label: 'Formas, Maquinários & Utensílios', aliases: ['confeitaria'] },
         { slug: 'embalagens', label: 'Embalagens & Descartáveis', aliases: [] },
         { slug: 'festas', label: 'Artigos de Festa & Decoração', aliases: ['presentes'] }
       ]
@@ -31,6 +30,8 @@ window.AchadinhosCategories = (function () {
       icon: '🍳',
       subcategories: [
         { slug: 'eletros', label: 'Eletros', aliases: ['eletroportateis', 'eletrodomesticos', 'grandes_eletros', 'cozinha', 'eletroportateis_cozinha', 'fogao', 'microondas'] },
+        { slug: 'formas_utensilios', label: 'Formas e Maquinários', aliases: ['formas_maquinarios', 'confeitaria'] },
+        { slug: 'facas_faqueiros', label: 'Facas, Faqueiros e Afins', aliases: ['faqueiros', 'facas', 'faca_chef', 'jogo_facas'] },
         { slug: 'panelas_loucas_copos', label: 'Panelas, Louças & Copos', aliases: ['panelas', 'loucas', 'copos'] },
         { slug: 'cafe_cha_expresso', label: 'Café, Chá & Expresso', aliases: ['cafe', 'cafeteira', 'cha_expresso'] },
         { slug: 'utensilios_domesticos', label: 'Utensílios Domésticos', aliases: ['utensilios', 'organizacao', 'utilidades', 'decoracao_basica'] }

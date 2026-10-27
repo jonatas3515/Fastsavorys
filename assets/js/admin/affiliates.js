@@ -1837,7 +1837,8 @@ window.AffiliatesModule = (function () {
       { category: 'festas', keywords: ['artigo de festa', 'decoracao festa', 'decoração festa', 'balao', 'balão', 'bexiga', 'topo de bolo', 'vela aniversario', 'vela aniversário', 'painel festa', 'lembrancinha', 'presente', 'kit festa'] },
 
       // 🏠 Casa & Utilidades
-      { category: 'cozinha', keywords: ['air fryer', 'airfryer', 'fritadeira', 'panela', 'panelas', 'frigideira', 'liquidificador', 'batedeira', 'cafeteira', 'nespresso', 'dolce gusto', 'sanduicheira', 'grill', 'mixer', 'processador', 'chaleira', 'faqueiro', 'faca chef', 'prato', 'copo', 'talher', 'balanca cozinha', 'balança digital', 'garrafa termica'] },
+      { category: 'facas_faqueiros', keywords: ['faqueiro', 'faca chef', 'jogo de facas', 'cepo de facas', 'conjunto de facas', 'faca de corte', 'faca picanheira', 'faca desossa', 'faca japonesa', 'faca santoku', 'amolador de facas', 'afiador de facas', 'chaira', 'faca para churrasco', 'cutelo', 'facas'] },
+      { category: 'cozinha', keywords: ['panela', 'panelas', 'frigideira', 'cafeteira', 'nespresso', 'dolce gusto', 'prato', 'copo', 'talher', 'balanca cozinha', 'balança digital', 'garrafa termica'] },
       { category: 'cama_mesa_banho', keywords: ['toalha de banho', 'toalha de rosto', 'jogo de toalhas', 'lencol', 'lençol', 'edredom', 'cobertor', 'manta', 'travesseiro', 'fronha', 'cobre leito', 'jogo de cama', 'cortina banheiro', 'tapete banheiro', 'toalha de mesa'] },
       { category: 'organizacao', keywords: ['organizador', 'organizadora', 'pote hermetico', 'potes hermeticos', 'vassoura', 'mop', 'rodo', 'dispenser', 'lixeira', 'cabide', 'varal', 'cesto organizador', 'prateleira', 'caixa organizadora', 'sapateira'] },
 
