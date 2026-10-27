@@ -1824,7 +1824,7 @@ window.AffiliatesModule = (function () {
       // 📺 Eletros, TV & Games
       { category: 'games', keywords: ['playstation', 'ps5', 'ps4', 'xbox', 'nintendo switch', 'console', 'gamepad', 'joystick', 'controle ps5', 'controle xbox', 'jogos ps5', 'jogos switch'] },
       { category: 'tv_audio_video', keywords: ['smart tv', 'tv 50', 'tv 55', 'tv 65', 'televisao', 'televisão', 'soundbar', 'home theater', 'projetor', 'chromecast', 'fire stick', 'roku', 'tv box'] },
-      { category: 'eletrodomesticos', keywords: ['geladeira', 'refrigerador', 'lavadora', 'maquina de lavar', 'máquina de lavar', 'lava e seca', 'fogao', 'fogão', 'cooktop', 'forno de embutir', 'ar condicionado', 'microondas', 'micro-ondas', 'freezer', 'cervejeira', 'adega climatizada'] },
+      { category: 'eletros', keywords: ['geladeira', 'refrigerador', 'fogao', 'fogão', 'cooktop', 'forno de embutir', 'microondas', 'micro-ondas', 'freezer', 'cervejeira', 'adega climatizada', 'air fryer', 'airfryer', 'liquidificador', 'batedeira', 'sanduicheira', 'mixer', 'processador', 'chaleira eletrica'] },
 
       // ⚡ Tecnologia & Celulares
       { category: 'audio_gadgets', keywords: ['fone de ouvido', 'fone bluetooth', 'headphone', 'airpod', 'caixa de som', 'jbl', 'alexa', 'echo dot', 'microfone', 'power bank', 'carregador portatil', 'smartband', 'drone', 'camera digital'] },

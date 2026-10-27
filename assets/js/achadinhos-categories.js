@@ -4,66 +4,21 @@
  */
 
 window.AchadinhosCategories = (function () {
-  const STORAGE_KEY = 'fast_achadinhos_categories_v5';
+  const STORAGE_KEY = 'fast_achadinhos_categories_v6';
   const VERSION_KEY = 'fast_achadinhos_categories_version';
 
-  // Árvore Padrão (12 Macro Grupos e Subcategorias Otimizadas)
+  // Árvore Padrão (8 Macro Grupos e Subcategorias Otimizadas)
   const DEFAULT_TREE = [
     {
-      id: 'group_supermercado',
-      label: 'Supermercado & Mercearia',
+      id: 'group_supermercado_festas',
+      label: 'Supermercado, Confeitaria & Festas',
       icon: '🛒',
       subcategories: [
-        { slug: 'confeitaria_sobremesas', label: 'Confeitaria & Sobremesas', aliases: ['mercearia_doce'] },
         { slug: 'alimentos_basicos', label: 'Alimentos Básicos & Grãos', aliases: ['alimentos_basicos_graos', 'mercearia_salgada'] },
         { slug: 'molhos_temperos', label: 'Molhos, Temperos & Conservas', aliases: ['molhos_temperos_conservas'] },
         { slug: 'bebidas_snacks', label: 'Bebidas & Snacks', aliases: ['supermercado'] },
-        { slug: 'limpeza_organizacao', label: 'Limpeza e Organização', aliases: ['limpeza', 'organizacao_limpeza'] }
-      ]
-    },
-    {
-      id: 'group_casa',
-      label: 'Cozinha',
-      icon: '🍳',
-      subcategories: [
-        { slug: 'eletroportateis', label: 'Eletroportáteis', aliases: ['cozinha', 'eletroportateis_cozinha'] },
-        { slug: 'eletrodomesticos', label: 'Eletrodomésticos', aliases: ['fogao', 'microondas'] },
-        { slug: 'cama_mesa_banho', label: 'Cama, Mesa & Banho', aliases: ['banho', 'mesa'] },
-        { slug: 'cafe_cha_expresso', label: 'Café, Chá & Expresso', aliases: ['cafe', 'cafeteira', 'cha_expresso'] },
-        { slug: 'panelas_loucas_copos', label: 'Panelas, Louças & Copos', aliases: ['panelas', 'loucas', 'copos'] },
-        { slug: 'utensilios_domesticos', label: 'Utensílios Domésticos', aliases: ['utensilios', 'organizacao', 'utilidades', 'decoracao_basica'] }
-      ]
-    },
-    {
-      id: 'group_eletros',
-      label: 'Eletros, TV & Climatização',
-      icon: '📺',
-      subcategories: [
-        { slug: 'aspiradores_limpeza', label: 'Aspiradores & Limpeza', aliases: ['robo_aspiradores_de_po', 'aspiradores', 'extratoras', 'aspirador'] },
-        { slug: 'grandes_eletros', label: 'Grandes Eletrodomésticos', aliases: [] },
-        { slug: 'lavagem_secagem', label: 'Lavagem & Secagem', aliases: ['lavanderia'] },
-        { slug: 'climatizacao', label: 'Climatização & Ar-Condicionado', aliases: ['ar_condicionado'] },
-        { slug: 'tv_audio_video', label: 'TVs, Áudio & Vídeo', aliases: ['tv', 'audio_video'] },
-        { slug: 'ventiladores', label: 'Ventiladores', aliases: ['ventilador', 'circuladores'] }
-      ]
-    },
-    {
-      id: 'group_beleza',
-      label: 'Beleza & Cuidados Pessoais',
-      icon: '💄',
-      subcategories: [
-        { slug: 'cabelos', label: 'Cabelos', aliases: ['cabelo'] },
-        { slug: 'pele_rosto', label: 'Cuidados com a Pele & Rosto', aliases: ['pele', 'rosto'] },
-        { slug: 'maquiagem_unhas', label: 'Maquiagem & Unhas', aliases: ['maquiagem', 'unhas'] },
-        { slug: 'perfumaria_higiene', label: 'Perfumaria & Higiene', aliases: ['beleza', 'perfumaria', 'higiene', 'higiene_pessoal'] },
-        { slug: 'barbear_depilacao', label: 'Barbear & Depilação', aliases: ['barbear', 'depilacao', 'barba'] }
-      ]
-    },
-    {
-      id: 'group_festas',
-      label: 'Confeitaria & Festas',
-      icon: '🎂',
-      subcategories: [
+        { slug: 'limpeza_organizacao', label: 'Limpeza e Organização', aliases: ['limpeza', 'organizacao_limpeza'] },
+        { slug: 'confeitaria_sobremesas', label: 'Confeitaria & Sobremesas', aliases: ['mercearia_doce'] },
         { slug: 'ingredientes_profissionais', label: 'Ingredientes Profissionais', aliases: [] },
         { slug: 'formas_utensilios', label: 'Formas, Maquinários & Utensílios', aliases: ['confeitaria'] },
         { slug: 'embalagens', label: 'Embalagens & Descartáveis', aliases: [] },
@@ -71,16 +26,48 @@ window.AchadinhosCategories = (function () {
       ]
     },
     {
-      id: 'group_moveis',
-      label: 'Móveis & Decoração',
+      id: 'group_casa',
+      label: 'Cozinha',
+      icon: '🍳',
+      subcategories: [
+        { slug: 'eletros', label: 'Eletros', aliases: ['eletroportateis', 'eletrodomesticos', 'grandes_eletros', 'cozinha', 'eletroportateis_cozinha', 'fogao', 'microondas'] },
+        { slug: 'panelas_loucas_copos', label: 'Panelas, Louças & Copos', aliases: ['panelas', 'loucas', 'copos'] },
+        { slug: 'cafe_cha_expresso', label: 'Café, Chá & Expresso', aliases: ['cafe', 'cafeteira', 'cha_expresso'] },
+        { slug: 'utensilios_domesticos', label: 'Utensílios Domésticos', aliases: ['utensilios', 'organizacao', 'utilidades', 'decoracao_basica'] }
+      ]
+    },
+    {
+      id: 'group_moveis_eletros',
+      label: 'Móveis, TV & Climatização',
       icon: '🛋️',
       subcategories: [
-        { slug: 'cama_mesa_banho', label: 'Cama, Mesa & Banho', aliases: ['banho', 'mesa'] },
-        { slug: 'decoracao_iluminacao', label: 'Decoração & Iluminação', aliases: ['decoracao_basica', 'iluminacao', 'quadros', 'luminarias'] },
-        { slug: 'quarto', label: 'Quarto', aliases: [] },
         { slug: 'sala_estar', label: 'Sala de Estar', aliases: [] },
+        { slug: 'quarto', label: 'Quarto', aliases: [] },
         { slug: 'sala_jantar', label: 'Sala de Jantar', aliases: [] },
-        { slug: 'escritorio_organizacao', label: 'Escritório & Organização', aliases: [] }
+        { slug: 'escritorio_organizacao', label: 'Escritório & Organização', aliases: [] },
+        { slug: 'decoracao_iluminacao', label: 'Decoração & Iluminação', aliases: ['decoracao_basica', 'iluminacao', 'quadros', 'luminarias'] },
+        { slug: 'cama_mesa_banho', label: 'Cama, Mesa & Banho', aliases: ['banho', 'mesa'] },
+        { slug: 'tv_audio_video', label: 'TVs, Áudio & Vídeo', aliases: ['tv', 'audio_video'] },
+        { slug: 'climatizacao', label: 'Climatização & Ar-Condicionado', aliases: ['ar_condicionado'] },
+        { slug: 'ventiladores', label: 'Ventiladores', aliases: ['ventilador', 'circuladores'] },
+        { slug: 'lavagem_secagem', label: 'Lavagem & Secagem', aliases: ['lavanderia'] },
+        { slug: 'aspiradores_limpeza', label: 'Aspiradores & Limpeza', aliases: ['robo_aspiradores_de_po', 'aspiradores', 'extratoras', 'aspirador'] }
+      ]
+    },
+    {
+      id: 'group_beleza_saude',
+      label: 'Beleza, Saúde & Bem-Estar',
+      icon: '💄',
+      subcategories: [
+        { slug: 'cabelos', label: 'Cabelos', aliases: ['cabelo'] },
+        { slug: 'pele_rosto', label: 'Cuidados com a Pele & Rosto', aliases: ['pele', 'rosto'] },
+        { slug: 'maquiagem_unhas', label: 'Maquiagem & Unhas', aliases: ['maquiagem', 'unhas'] },
+        { slug: 'perfumaria_higiene', label: 'Perfumaria & Higiene', aliases: ['beleza', 'perfumaria', 'higiene', 'higiene_pessoal'] },
+        { slug: 'barbear_depilacao', label: 'Barbear & Depilação', aliases: ['barbear', 'depilacao', 'barba'] },
+        { slug: 'suplementos', label: 'Suplementos & Nutrição', aliases: [] },
+        { slug: 'treino_funcional', label: 'Treino & Equipamentos Funcionais', aliases: ['fitness'] },
+        { slug: 'esportes_lazer', label: 'Esportes & Lazer', aliases: ['esportes_e_lazer', 'lazer'] },
+        { slug: 'monitoramento_saude', label: 'Monitoramento & Saúde', aliases: ['saude'] }
       ]
     },
     {
@@ -96,14 +83,30 @@ window.AchadinhosCategories = (function () {
       ]
     },
     {
-      id: 'group_games',
-      label: 'Games & Geek',
+      id: 'group_games_infantil',
+      label: 'Games, Brinquedos & Papelaria',
       icon: '🎮',
       subcategories: [
         { slug: 'consoles', label: 'Consoles & Aparelhos', aliases: ['games'] },
         { slug: 'jogos_midias', label: 'Jogos & Mídias Digitais', aliases: [] },
         { slug: 'controles_acessorios_gamer', label: 'Controles & Acessórios Gamer', aliases: [] },
-        { slug: 'colecionaveis_geek', label: 'Colecionáveis & Universo Geek', aliases: [] }
+        { slug: 'colecionaveis_geek', label: 'Colecionáveis & Universo Geek', aliases: [] },
+        { slug: 'bebes_cuidados', label: 'Bebês & Primeiros Passos', aliases: ['bebes', 'puericultura', 'fraldas'] },
+        { slug: 'brinquedos_pedagogicos', label: 'Brinquedos & Pedagógicos', aliases: ['brinquedos'] },
+        { slug: 'jogos_tabuleiro', label: 'Jogos de Cartas, Tabuleiro & Família', aliases: ['jogos', 'tabuleiro', 'cartas', 'baralho', 'uno', 'domino'] },
+        { slug: 'livros_leitura', label: 'Livros, Bíblias & Leitura', aliases: ['livros_e_revistas', 'livros', 'biblia'] },
+        { slug: 'papelaria_escolar', label: 'Papelaria & Material de Escritório', aliases: ['papelaria', 'escritorio_envelopamento', 'envelopamento', 'material_escritorio'] }
+      ]
+    },
+    {
+      id: 'group_moda',
+      label: 'Moda & Acessórios',
+      icon: '👗',
+      subcategories: [
+        { slug: 'roupas', label: 'Roupas', aliases: ['moda'] },
+        { slug: 'calcados', label: 'Calçados', aliases: [] },
+        { slug: 'bolsas_malas', label: 'Bolsas, Mochilas & Malas', aliases: ['acessorios'] },
+        { slug: 'relogios_oculos', label: 'Relógios & Óculos', aliases: ['joias', 'chapeus_bones_e_gorros'] }
       ]
     },
     {
@@ -115,40 +118,6 @@ window.AchadinhosCategories = (function () {
         { slug: 'construcao_eletrica', label: 'Construção, Elétrica & Hidráulica', aliases: ['casa_construcao', 'eletrica'] },
         { slug: 'automotivo', label: 'Automotivo & Moto', aliases: ['veiculos'] },
         { slug: 'petshop', label: 'Pet Shop', aliases: [] }
-      ]
-    },
-    {
-      id: 'group_moda',
-      label: 'Moda & Acessórios',
-      icon: '👗',
-      subcategories: [
-        { slug: 'roupas', label: 'Roupas', aliases: ['moda'] },
-        { slug: 'calcados', label: 'Calçados', aliases: [] },
-        { slug: 'bolsas_malas', label: 'Bolsas, Mochilas & Malas', aliases: ['acessorios'] },
-        { slug: 'relogios_oculos', label: 'Relógios & Óculos', aliases: ['joias'] }
-      ]
-    },
-    {
-      id: 'group_saude',
-      label: 'Saúde & Bem-Estar',
-      icon: '💊',
-      subcategories: [
-        { slug: 'suplementos', label: 'Suplementos & Nutrição', aliases: [] },
-        { slug: 'treino_funcional', label: 'Treino & Equipamentos Funcionais', aliases: ['fitness'] },
-        { slug: 'esportes_lazer', label: 'Esportes & Lazer', aliases: ['esportes_e_lazer', 'lazer'] },
-        { slug: 'monitoramento_saude', label: 'Monitoramento & Saúde', aliases: ['saude'] }
-      ]
-    },
-    {
-      id: 'group_infantil',
-      label: 'Brinquedos & Papelaria',
-      icon: '🧸',
-      subcategories: [
-        { slug: 'bebes_cuidados', label: 'Bebês & Primeiros Passos', aliases: ['bebes', 'puericultura', 'fraldas'] },
-        { slug: 'brinquedos_pedagogicos', label: 'Brinquedos & Pedagógicos', aliases: ['brinquedos'] },
-        { slug: 'jogos_tabuleiro', label: 'Jogos de Cartas, Tabuleiro & Família', aliases: ['jogos', 'tabuleiro', 'cartas', 'baralho', 'uno', 'domino'] },
-        { slug: 'livros_leitura', label: 'Livros, Bíblias & Leitura', aliases: ['livros_e_revistas', 'livros', 'biblia'] },
-        { slug: 'papelaria_escolar', label: 'Papelaria & Material de Escritório', aliases: ['papelaria', 'escritorio_envelopamento', 'envelopamento', 'material_escritorio'] }
       ]
     }
   ];
@@ -326,6 +295,25 @@ window.AchadinhosCategories = (function () {
         icon: group.icon || '📂',
         categories: allSlugs
       };
+    });
+
+    // Mapeamento retrocompatível para IDs de grupos legados
+    const legacyMap = {
+      group_supermercado: 'group_supermercado_festas',
+      group_festas: 'group_supermercado_festas',
+      group_beleza: 'group_beleza_saude',
+      group_saude: 'group_beleza_saude',
+      group_games: 'group_games_infantil',
+      group_infantil: 'group_games_infantil',
+      group_moveis: 'group_moveis_eletros',
+      group_eletros: 'group_moveis_eletros'
+    };
+
+    Object.keys(legacyMap).forEach(oldId => {
+      const newId = legacyMap[oldId];
+      if (groups[newId] && !groups[oldId]) {
+        groups[oldId] = groups[newId];
+      }
     });
 
     return groups;
