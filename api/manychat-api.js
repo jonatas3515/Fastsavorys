@@ -2938,7 +2938,9 @@ module.exports = async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type,Authorization,X-Webhook-Secret,X-API-Key');
 
     if (req.method === 'OPTIONS') return res.status(200).end();
-    if (req.method !== 'POST' && req.query?.type !== 'evolution') return res.status(200).json({ success: false, error: 'Use POST' });
+
+
+    if (req.method !== 'POST') return res.status(200).json({ success: false, error: 'Use POST' });
 
     // --- SEGURANÇA (Etapa 2): Validação de Webhook Secret ---
     const requiredSecret = process.env.MANYCHAT_WEBHOOK_SECRET;

@@ -3,11 +3,11 @@
  * 
  * Substitui o ManyChat como canal de atendimento:
  * - Recebe mensagens do WhatsApp da lanchonete (instância fast_lanchonete na Oracle VPS)
- * - Processa mensagens de texto e ÁUDIOS (transcrição direta via Gemini)
+ * - Processa mensagens de texto, ÁUDIOS, IMAGENS e DOCUMENTOS/PDFs (comprovantes)
  * - Processa mensagens com o Gemini (motor inteligente com regras de cardápio, entrega, sabores, memória e pedidos)
  * - Responde automaticamente pelo WhatsApp via Evolution API (sem delay e sem card gigante de linkPreview)
  * - Permite pausa para atendimento humano quando Jéssica responder no celular
- * - Notifica Jéssica no WhatsApp pessoal quando um novo pedido for finalizado ou atendente solicitado
+ * - Notifica Jéssica no WhatsApp pessoal quando um novo pedido for finalizado, comprovante enviado ou atendente solicitado
  */
 
 const { handleGeminiCore, createMockRes, normalizeBrazilianPhone } = require('../manychat-api');
@@ -101,7 +101,7 @@ async function sendWhatsAppMessage(recipientPhone, text) {
     }
 }
 
-// Busca o arquivo base64 de um áudio/mídia na Evolution API caso não venha no webhook
+// Busca o arquivo base64 de uma mídia (áudio, imagem ou PDF) na Evolution API
 async function getMediaBase64FromEvolution(messageId) {
     if (!messageId) return null;
     const endpoint = `${EVOLUTION_API_URL}/chat/getBase64FromMediaMessage/${EVOLUTION_INSTANCE}`;
@@ -133,12 +133,11 @@ async function getMediaBase64FromEvolution(messageId) {
     }
 }
 
-// Transcreve áudio diretamente usando o Gemini 2.5 Flash Multimodal
-async function transcribeAudioWithGemini(base64Data) {
+// Analisa qualquer mídia (áudio, imagem ou PDF) usando o Gemini 2.5 Flash Multimodal
+async function analyzeMultimodalWithGemini(base64Data, mimeType, prompt) {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey || !base64Data) return null;
 
-    // Limpa prefixo data:audio/...;base64, se existir
     const rawBase64 = base64Data.replace(/^data:[^;]+;base64,/, '');
 
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
@@ -151,25 +150,25 @@ async function transcribeAudioWithGemini(base64Data) {
                     parts: [
                         {
                             inline_data: {
-                                mime_type: 'audio/ogg',
+                                mime_type: mimeType,
                                 data: rawBase64
                             }
                         },
                         {
-                            text: 'Transcreva o áudio acima em texto, em português do Brasil. Retorne APENAS o que a pessoa disse, sem introduções ou explicações.'
+                            text: prompt
                         }
                     ]
                 }],
                 generationConfig: {
                     temperature: 0.1,
-                    maxOutputTokens: 512
+                    maxOutputTokens: 1024
                 }
             })
         });
 
         if (!response.ok) {
             const errText = await response.text().catch(() => '');
-            console.error(`[evolution-webhook] Gemini transcription error ${response.status}:`, errText.substring(0, 200));
+            console.error(`[evolution-webhook] Gemini multimodal error ${response.status}:`, errText.substring(0, 200));
             return null;
         }
 
@@ -177,7 +176,7 @@ async function transcribeAudioWithGemini(base64Data) {
         const candidateText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
         return candidateText ? candidateText.trim() : null;
     } catch (err) {
-        console.error('[evolution-webhook] Exceção na transcrição de áudio:', err.message);
+        console.error('[evolution-webhook] Exceção multimodal:', err.message);
         return null;
     }
 }
@@ -209,6 +208,31 @@ async function notifyJessica(orderSummary, clientPhone, clientName) {
     await sendWhatsAppMessage(JESSICA_PHONE, msg);
 }
 
+function unwrapMessage(rawMsg) {
+    if (!rawMsg) return {};
+    let m = rawMsg;
+    while (m) {
+        if (m.ephemeralMessage?.message) {
+            m = m.ephemeralMessage.message;
+            continue;
+        }
+        if (m.viewOnceMessage?.message) {
+            m = m.viewOnceMessage.message;
+            continue;
+        }
+        if (m.viewOnceMessageV2?.message) {
+            m = m.viewOnceMessageV2.message;
+            continue;
+        }
+        if (m.documentWithCaptionMessage?.message) {
+            m = m.documentWithCaptionMessage.message;
+            continue;
+        }
+        break;
+    }
+    return m;
+}
+
 module.exports = async (req, res) => {
     // 1. Healthcheck / GET
     if (req.method === 'GET') {
@@ -236,6 +260,7 @@ module.exports = async (req, res) => {
         const data = Array.isArray(payload.data) ? payload.data[0] : (payload.data || payload);
         const key = data?.key || {};
         const remoteJid = key.remoteJid || '';
+        const remoteJidAlt = key.remoteJidAlt || '';
         const fromMe = Boolean(key.fromMe);
         const messageId = key.id;
 
@@ -244,10 +269,24 @@ module.exports = async (req, res) => {
             return res.status(200).json({ success: true, ignored: 'group_or_broadcast' });
         }
 
-        const clientPhone = remoteJid.replace('@s.whatsapp.net', '').replace(/\D/g, '');
+        // Determina o número real de WhatsApp do cliente (lid vs s.whatsapp.net)
+        let clientPhone = '';
+        if (remoteJidAlt && remoteJidAlt.includes('@s.whatsapp.net')) {
+            clientPhone = remoteJidAlt.replace('@s.whatsapp.net', '').replace(/\D/g, '');
+        } else if (remoteJid.includes('@s.whatsapp.net')) {
+            clientPhone = remoteJid.replace('@s.whatsapp.net', '').replace(/\D/g, '');
+        } else {
+            clientPhone = remoteJid.replace('@lid', '').replace(/\D/g, '');
+        }
+
         if (!clientPhone) {
             return res.status(200).json({ success: true, ignored: 'no_phone' });
         }
+
+        // Destinatário para envio na Evolution API (prioriza número limpo do WhatsApp)
+        const targetRecipient = (clientPhone && clientPhone.length >= 10 && clientPhone.length <= 13)
+            ? clientPhone
+            : (remoteJid || clientPhone);
 
         // Se a mensagem partiu do próprio WhatsApp da Lanchonete (Jéssica falando no celular):
         if (fromMe) {
@@ -264,12 +303,13 @@ module.exports = async (req, res) => {
             return res.status(200).json({ success: true, ignored: 'human_paused' });
         }
 
-        // Extrai dados da mensagem
-        const msg = data.message || {};
+        // Extrai dados da mensagem desempacotando visualização única ou efêmera
+        const msg = unwrapMessage(data.message);
         let messageText = msg.conversation ||
                           msg.extendedTextMessage?.text ||
                           msg.imageMessage?.caption ||
                           msg.videoMessage?.caption ||
+                          msg.documentMessage?.caption ||
                           '';
 
         const clientName = data.pushName || 'Cliente';
@@ -277,11 +317,11 @@ module.exports = async (req, res) => {
         // Comando manual de destravamento/pausa pelo cliente (ex: #ia ou #voltar)
         if (/^#?(voltar|chamar\s*ia|ativar\s*ia)$/i.test(messageText.trim())) {
             humanPauses.delete(clientPhone);
-            await sendWhatsAppMessage(clientPhone, 'Olá! O assistente virtual da FastSavory\'s foi reativado. Como posso te ajudar? 😊');
+            await sendWhatsAppMessage(targetRecipient, 'Olá! O assistente virtual da FastSavory\'s foi reativado. Como posso te ajudar? 😊');
             return res.status(200).json({ success: true, action: 'ai_reactivated' });
         }
 
-        // PROCESSAMENTO DE ÁUDIO (se recebido)
+        // 1. PROCESSAMENTO DE ÁUDIO
         if (msg.audioMessage) {
             console.log(`[evolution-webhook] 🎤 Áudio recebido de ${clientName} (${clientPhone}), buscando base64...`);
             let audioBase64 = data.base64 || (data.message && data.message.base64);
@@ -291,7 +331,11 @@ module.exports = async (req, res) => {
 
             if (audioBase64) {
                 console.log(`[evolution-webhook] 🎤 Transcrevendo áudio com Gemini 2.5 Flash...`);
-                const transcribed = await transcribeAudioWithGemini(audioBase64);
+                const transcribed = await analyzeMultimodalWithGemini(
+                    audioBase64,
+                    'audio/ogg',
+                    'Transcreva o áudio acima em texto, em português do Brasil. Retorne APENAS o que a pessoa disse, sem introduções ou explicações.'
+                );
                 if (transcribed && transcribed.length > 0) {
                     console.log(`[evolution-webhook] 🎤 ✅ Áudio transcrito com sucesso: "${transcribed}"`);
                     messageText = transcribed;
@@ -301,8 +345,82 @@ module.exports = async (req, res) => {
             }
 
             if (!messageText || messageText.trim().length === 0) {
-                await sendWhatsAppMessage(clientPhone, 'Recebi seu áudio! 🎤 Mas o som não ficou muito nítido aqui pra mim. Você poderia me escrever em texto ou mandar outro áudio? 😊');
+                await sendWhatsAppMessage(targetRecipient, 'Recebi seu áudio! 🎤 Mas o som não ficou muito nítido aqui pra mim. Você poderia me escrever em texto ou mandar outro áudio? 😊');
                 return res.status(200).json({ success: true, replied: 'audio_fallback_requested' });
+            }
+        }
+
+        // 2. PROCESSAMENTO DE DOCUMENTO / PDF (ex: comprovantes de PicPay, Nubank, Banco)
+        const docMsg = msg.documentMessage || msg.documentWithCaptionMessage?.message?.documentMessage;
+        if (docMsg) {
+            const fileName = docMsg.fileName || 'documento.pdf';
+            const mimeType = docMsg.mimetype || 'application/pdf';
+            console.log(`[evolution-webhook] 📄 Documento recebido de ${clientName} (${clientPhone}): "${fileName}" (${mimeType})`);
+
+            let docBase64 = data.base64 || (data.message && data.message.base64);
+            if (!docBase64) {
+                docBase64 = await getMediaBase64FromEvolution(messageId);
+            }
+
+            if (docBase64) {
+                console.log(`[evolution-webhook] 📄 Analisando documento com Gemini 2.5 Flash...`);
+                const pdfPrompt = `Analise este documento com cuidado.
+Se contiver QUALQUER sinal de comprovante de pagamento, Pix, transferência bancária ou recibo:
+Retorne no formato exato:
+COMPROVANTE DE PAGAMENTO
+- Tipo: (Pix / Transferência / etc.)
+- Valor: R$ XX,XX
+- Data e hora: DD/MM/AAAA às HH:MM
+- Pagador (quem enviou): nome completo
+- Recebedor (favorecido): nome completo
+- Instituição: banco ou fintech (PicPay, Nubank, Itaú, etc.)
+- ID da transação: se visível
+
+Se for outro documento, resuma o conteúdo principal.`;
+
+                const analyzedDoc = await analyzeMultimodalWithGemini(docBase64, 'application/pdf', pdfPrompt);
+                if (analyzedDoc) {
+                    console.log(`[evolution-webhook] 📄 ✅ Documento analisado: "${analyzedDoc.substring(0, 100)}"`);
+                    messageText = `[ARQUIVO PDF ENVIADO: ${fileName}]\n${analyzedDoc}`;
+                }
+            }
+
+            if (!messageText || messageText.trim().length === 0) {
+                messageText = `[Cliente enviou arquivo PDF: ${fileName}]`;
+            }
+        }
+
+        // 3. PROCESSAMENTO DE IMAGEM (foto ou print de tela de comprovante)
+        const imgMsg = msg.imageMessage;
+        if (imgMsg && (!messageText || messageText.trim().length === 0 || imgMsg.caption)) {
+            console.log(`[evolution-webhook] 🖼️ Imagem recebida de ${clientName} (${clientPhone}), buscando base64...`);
+            let imgBase64 = data.base64 || (data.message && data.message.base64);
+            if (!imgBase64) {
+                imgBase64 = await getMediaBase64FromEvolution(messageId);
+            }
+
+            if (imgBase64) {
+                console.log(`[evolution-webhook] 🖼️ Analisando imagem com Gemini 2.5 Flash...`);
+                const imgPrompt = `Analise esta imagem com cuidado.
+Se contiver QUALQUER sinal de comprovante de pagamento, Pix, transferência bancária, recibo ou print de app de banco:
+Retorne no formato exato:
+COMPROVANTE DE PAGAMENTO
+- Tipo: (Pix / Transferência / etc.)
+- Valor: R$ XX,XX
+- Data e hora: DD/MM/AAAA às HH:MM
+- Pagador (quem enviou): nome completo
+- Recebedor (favorecido): nome completo
+- Instituição: banco ou fintech (PicPay, Nubank, Itaú, etc.)
+- ID da transação: se visível
+
+Se for foto de comida, cardápio ou outro assunto, descreva brevemente.`;
+
+                const analyzedImg = await analyzeMultimodalWithGemini(imgBase64, imgMsg.mimetype || 'image/jpeg', imgPrompt);
+                if (analyzedImg) {
+                    console.log(`[evolution-webhook] 🖼️ ✅ Imagem analisada: "${analyzedImg.substring(0, 100)}"`);
+                    const existingCaption = messageText ? `Legenda do cliente: "${messageText}"\n\n` : '';
+                    messageText = `${existingCaption}[IMAGEM ENVIADA]:\n${analyzedImg}`;
+                }
             }
         }
 
@@ -310,7 +428,7 @@ module.exports = async (req, res) => {
             return res.status(200).json({ success: true, ignored: 'empty_message' });
         }
 
-                // Se for mensagem encaminhada pelo cardápio online do site
+        // Se for mensagem encaminhada pelo cardápio online do site
         const isSiteOrder = /Pedido Fast Savory|Código:.*#|Itens do Pedido:/i.test(messageText);
         if (isSiteOrder && JESSICA_PHONE && clientPhone !== JESSICA_PHONE) {
             console.log(`[evolution-webhook] 🌐 Pedido do SITE recebido de ${clientName} (${clientPhone})! Notificando Jéssica...`);
@@ -342,15 +460,25 @@ module.exports = async (req, res) => {
         const handover = result.handover_to_human === 1;
 
         if (replyText) {
-            console.log(`[evolution-webhook] 🤖 Enviando resposta da IA para ${clientPhone}...`);
-            await sendWhatsAppMessage(clientPhone, replyText);
+            console.log(`[evolution-webhook] 🤖 Enviando resposta da IA para ${targetRecipient}...`);
+            await sendWhatsAppMessage(targetRecipient, replyText);
+        }
+
+        // Se for comprovante de pagamento recebido, notifica Jéssica no WhatsApp pessoal
+        const isReceipt = /COMPROVANTE DE PAGAMENTO/i.test(messageText) || /Comprovante recebido/i.test(replyText || '');
+        if (isReceipt && JESSICA_PHONE && clientPhone !== JESSICA_PHONE) {
+            console.log(`[evolution-webhook] 💸 Comprovante recebido de ${clientName} (${clientPhone})! Notificando Jéssica...`);
+            await sendWhatsAppMessage(
+                JESSICA_PHONE,
+                `🔔 *COMPROVANTE DE PAGAMENTO RECEBIDO!* 💸\n\n👤 *Cliente:* ${clientName}\n📱 *WhatsApp:* https://wa.me/${clientPhone}\n\n${messageText}\n\n💬 *Conversa:* https://wa.me/${clientPhone}`
+            );
         }
 
         // Se cliente solicitou atendente humano
         if (handover) {
             console.log(`[evolution-webhook] 🚨 Atendimento humano solicitado por ${clientPhone}.`);
             await setHumanPause(clientPhone, 60);
-            if (JESSICA_PHONE) {
+            if (JESSICA_PHONE && !isReceipt) {
                 await sendWhatsAppMessage(
                     JESSICA_PHONE,
                     `⚠️ *ATENDIMENTO HUMANO SOLICITADO*\n\nO cliente *${clientName}* (${clientPhone}) solicitou falar com uma atendente.\nA IA foi pausada nesta conversa por 1 hora.\n💬 Conversa: https://wa.me/${clientPhone}`
