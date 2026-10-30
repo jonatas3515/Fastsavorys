@@ -1655,10 +1655,12 @@ async function handleAutoSyncLinks(req, res) {
       // Pega estritamente os top 2
       const topDrops = priceDropCandidates.slice(0, 2);
 
-      // Apenas dispara alertas no WhatsApp entre 07h00 e 22h30 para não incomodar de madrugada
+      // Apenas dispara alertas no WhatsApp entre 07h00 e 22h30 para não incomodar à noite/madrugada
+      // (Bloqueia rigorosamente disparos às 22h45 e 22h55)
       const now = new Date();
       const brtHours = (now.getUTCHours() - 3 + 24) % 24;
-      const isAllowedAlertHour = brtHours >= 7 && brtHours <= 22;
+      const brtMinutes = now.getUTCMinutes();
+      const isAllowedAlertHour = (brtHours >= 7 && brtHours < 22) || (brtHours === 22 && brtMinutes <= 30);
 
       if (isAllowedAlertHour) {
         try {

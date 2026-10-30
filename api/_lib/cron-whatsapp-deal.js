@@ -518,37 +518,21 @@ async function handleSendWhatsAppDeal(req, res) {
   const { isDoubleDay, eventLabel } = getDoubleDayContext();
 
   if (mode === 'auto' && !force) {
-    if (isDoubleDay) {
-      // MEGA EVENTO (ex: 09/09, 10/10, 11/11, 12/12):
-      // Disparos a cada 15 min das 07h00 às 22h00
-      const isWithinEventHours = roundedBrtHours >= 7 && roundedBrtHours <= 22;
-      if (!isWithinEventHours) {
-        return res.status(200).json({
-          success: true,
-          skipped: true,
-          message: `Horário ${timeKey} fora da janela do Mega Evento ${eventLabel} (07h às 22h).`,
-          isDoubleDay: true,
-          eventLabel
-        });
-      }
-      const isFastSavorysSlot = fastSavorysSlots.includes(timeKey);
-      targetType = isFastSavorysSlot ? 'fastsavorys' : 'affiliate';
-    } else {
-      // DIAS NORMAIS:
-      // Apenas slots de 30 min (:00 e :30) ou os horários estratégicos da FastSavory's
-      const isStandardSlot = (roundedSlotMinute === 0 || roundedSlotMinute === 30);
-      const isFastSavorysSlot = fastSavorysSlots.includes(timeKey);
-
-      if (!isStandardSlot && !isFastSavorysSlot) {
-        return res.status(200).json({
-          success: true,
-          skipped: true,
-          message: `Horário ${timeKey} (:15/:45) reservado exclusivamente para Mega Eventos (dias duplos). Em dias normais, disparos ocorrem a cada 30 min.`,
-          isDoubleDay: false
-        });
-      }
-      targetType = isFastSavorysSlot ? 'fastsavorys' : 'affiliate';
+    // Janela permitida: das 07h00 até as 22h30 exatamente (último disparo às 22h30)
+    // Bloqueia qualquer disparo antes das 07h00 ou após as 22h30 (como 22h45 e 22h55)
+    const isWithinHours = (roundedBrtHours >= 7 && roundedBrtHours < 22) || (roundedBrtHours === 22 && roundedSlotMinute <= 30);
+    if (!isWithinHours) {
+      return res.status(200).json({
+        success: true,
+        skipped: true,
+        message: `Horário ${timeKey} fora da janela oficial de disparos (07h00 às 22h30).`,
+        timeKey
+      });
     }
+
+    // Disparos a cada 15 minutos com intercalação de slots do cardápio FastSavory's
+    const isFastSavorysSlot = fastSavorysSlots.includes(timeKey);
+    targetType = isFastSavorysSlot ? 'fastsavorys' : 'affiliate';
   }
 
   try {
