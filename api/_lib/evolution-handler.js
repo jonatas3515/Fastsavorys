@@ -22,8 +22,10 @@ const EVOLUTION_API_URL = (process.env.EVOLUTION_API_URL || 'http://136.248.121.
 const EVOLUTION_API_KEY = (process.env.EVOLUTION_STORE_API_KEY || process.env.EVOLUTION_API_KEY || 'B6D711FCDE4D4FD5936544120E713976').trim();
 const EVOLUTION_INSTANCE = (process.env.EVOLUTION_STORE_INSTANCE || 'fast_lanchonete').trim();
 
-// Número da Jéssica para receber notificações de novos pedidos e transbordo
-const JESSICA_PHONE = (process.env.WHATSAPP_NUMBER || '5573999366554').replace(/\D/g, '');
+// Número pessoal da Jéssica para receber notificações de novos pedidos, comprovantes e transbordo
+const JESSICA_PHONE = (process.env.JESSICA_PERSONAL_PHONE || '5573998621125').replace(/\D/g, '');
+// WhatsApp da lanchonete (canal do bot)
+const STORE_PHONE = (process.env.WHATSAPP_NUMBER || '5573999366554').replace(/\D/g, '');
 
 // Cache em memória de pausas humanas (temporário por processo)
 const humanPauses = new Map();
