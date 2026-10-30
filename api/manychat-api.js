@@ -2867,80 +2867,18 @@ function getBrazilTime() {
         }
     }
 
-    // --- Interceptador de Link de Pagamento via Cartão (PRO-ATIVO) ---
-    // Quando [GERAR_LINK_CARTAO:VALOR] é detectado, gera link de checkout do Stripe
+        // --- Interceptador de Cartão (STRIPE OCULTO/DESATIVADO) ---
+    // Pagamento em cartão agora é feito na maquininha física
     const gerarCartaoRegex = /\[GERAR_LINK_CARTAO:([0-9.,]+)\]/gi;
-    const cartaoMatch = reply.match(gerarCartaoRegex);
-    if (cartaoMatch) {
-        // Extrai valor do primeiro match
-        const valMatch = cartaoMatch[0].match(/([0-9.,]+)/i);
-        let amt = 0;
-        if (valMatch) {
-            amt = parseFloat(valMatch[1].replace(',', '.'));
-            if (isNaN(amt)) amt = 0;
-        }
-
-        // Segurança: rejeita valor alucinado pelo modelo (que não bate com a conversa)
-        const safeAmt = validateCartaoAmount(amt, session.history, effectiveMessage, priceMap);
-        if (safeAmt < 0) {
-            // Valor inventado: NÃO gera o link de cobrança. Pede confirmação / oferece Pix.
-            reply = reply.replace(gerarCartaoRegex, 'Deixa eu confirmar o valor certinho do seu pedido antes de gerar o link de pagamento, tá bom? 😊 Se preferir, posso te enviar a chave Pix.');
-        } else {
-            amt = safeAmt;
-        }
-
-        if (safeAmt >= 0 && amt > 0 && stripe) {
-            // Gera link de checkout do Stripe de forma assíncrona
-            // Como estamos em um contexto síncrono, usamos await aqui
-            const checkoutLink = await generateStripeCheckoutLink(stripe, amt, name || 'Cliente');
-            if (checkoutLink) {
-                // Substitui a tag pelo link de checkout
-                reply = reply.replace(gerarCartaoRegex, checkoutLink);
-                console.log(`[manychat-api] ✅ Stripe checkout link generated for amount: R$ ${amt}`);
-            } else {
-                // Se falhar, remove a tag e informa erro
-                reply = reply.replace(gerarCartaoRegex, '[Erro ao gerar link de pagamento. Tente novamente ou use Pix.]');
-                console.error(`[manychat-api] ❌ Failed to generate Stripe checkout link for amount: R$ ${amt}`);
-            }
-        } else {
-            // Se Stripe não configurado ou valor inválido
-            reply = reply.replace(gerarCartaoRegex, '[Pagamento via cartão indisponível no momento. Use Pix.]');
-        }
+    if (reply.match(gerarCartaoRegex)) {
+        reply = reply.replace(gerarCartaoRegex, 'O pagamento no cartão (débito ou crédito) é feito diretamente na maquininha levada na entrega ou passada na retirada na loja.');
     }
 
-    // --- Fallback de SEGURANÇA: modelo escreveu um LINK DE PAGAMENTO FALSO (alucinado) ---
-    // Às vezes o modelo ignora a tag [GERAR_LINK_CARTAO:VALOR] e INVENTA uma URL de checkout
-    // (ex: https://pagamento.fastsavorys.com/checkout/...), que NÃO funciona. Detectamos qualquer
-    // URL de pagamento que NÃO seja do Stripe e a trocamos por um link REAL (se houver valor
-    // confiável) ou por uma mensagem segura. Espelha o fallback que já existe para o PIX.
-    {
-        const urls = reply.match(/https?:\/\/[^\s<>"')]+/gi) || [];
-        const fakePayUrl = urls.find(u =>
-            !/stripe\.com/i.test(u) &&
-            /(pagamento\.|\/checkout\/|\/pay\/|\/pagar|\/cobranca|payment)/i.test(u)
-        );
-        if (fakePayUrl) {
-            console.warn(`[cartao] ⚠️ Modelo gerou link de pagamento FALSO: ${fakePayUrl}. Substituindo por link real/seguro.`);
-            // Pega o MAIOR valor R$ citado na resposta (geralmente o total com a taxa de cartão)
-            let amt = 0;
-            for (const vm of reply.matchAll(/R\$\s*([0-9]{1,3}(?:\.[0-9]{3})*(?:,[0-9]{2})?|[0-9]+(?:[.,][0-9]{2})?)/gi)) {
-                const v = parseBrlNumber(vm[1]);
-                if (!isNaN(v) && v > amt) amt = v;
-            }
-            const safeAmt = validateCartaoAmount(amt, session.history, effectiveMessage, priceMap);
-            let realLink = null;
-            if (safeAmt > 0 && stripe) {
-                realLink = await generateStripeCheckoutLink(stripe, safeAmt, name || 'Cliente');
-            }
-            if (realLink) {
-                reply = reply.replace(fakePayUrl, realLink);
-                console.log(`[cartao] ✅ Link falso substituído pelo Stripe real (R$ ${safeAmt}).`);
-            } else {
-                // Sem valor confiável ou Stripe indisponível: remove o link falso e oferece Pix
-                reply = reply.replace(fakePayUrl, '').replace(/\n{3,}/g, '\n\n').trim();
-                reply += '\n\nDeixa eu confirmar o valor certinho pra gerar o link de pagamento, tá? 😊 Se preferir, posso te enviar a chave Pix.';
-            }
-        }
+    // Remove qualquer link inventado de checkout (Stripe desativado)
+    const urls = reply.match(/https?:\/\/[^\s<>"')]+/gi) || [];
+    const fakePayUrl = urls.find(u => /(stripe\.com|pagamento\.|\/checkout\/|\/pay\/|\/pagar|\/cobranca|payment)/i.test(u));
+    if (fakePayUrl) {
+        reply = reply.replace(fakePayUrl, 'O pagamento no cartão é feito na maquininha na entrega ou retirada.').trim();
     }
 
     // --- Monta mensagem para ManyChat ---

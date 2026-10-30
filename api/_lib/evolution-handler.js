@@ -3,10 +3,11 @@
  * 
  * Substitui o ManyChat como canal de atendimento:
  * - Recebe mensagens do WhatsApp da lanchonete (instância fast_lanchonete na Oracle VPS)
- * - Processa mensagens com o Gemini (mesmo motor inteligente com regras de cardápio, entrega, memória e pedidos)
- * - Responde automaticamente pelo WhatsApp via Evolution API
+ * - Processa mensagens de texto e ÁUDIOS (transcrição direta via Gemini)
+ * - Processa mensagens com o Gemini (motor inteligente com regras de cardápio, entrega, sabores, memória e pedidos)
+ * - Responde automaticamente pelo WhatsApp via Evolution API (sem delay e sem card gigante de linkPreview)
  * - Permite pausa para atendimento humano quando Jéssica responder no celular
- * - Notifica Jéssica no WhatsApp pessoal quando um novo pedido for finalizado
+ * - Notifica Jéssica no WhatsApp pessoal quando um novo pedido for finalizado ou atendente solicitado
  */
 
 const { handleGeminiCore, createMockRes, normalizeBrazilianPhone } = require('../manychat-api');
@@ -32,7 +33,6 @@ async function isHumanPaused(phone) {
     if (expiresAt && Date.now() < expiresAt) {
         return true;
     }
-    // Também checa no banco se houver registro recente
     if (supabaseAdmin) {
         try {
             const { data } = await supabaseAdmin
@@ -51,9 +51,7 @@ async function isHumanPaused(phone) {
                     return true;
                 }
             }
-        } catch (e) {
-            // Silencioso se tabela não responder
-        }
+        } catch (e) {}
     }
     return false;
 }
@@ -73,6 +71,7 @@ async function setHumanPause(phone, minutes = 45) {
     }
 }
 
+// Envia mensagem pelo WhatsApp via Evolution API de forma rápida e sem preview gigante
 async function sendWhatsAppMessage(recipientPhone, text) {
     const endpoint = `${EVOLUTION_API_URL}/message/sendText/${EVOLUTION_INSTANCE}`;
     const cleanPhone = recipientPhone.replace(/\D/g, '');
@@ -86,8 +85,8 @@ async function sendWhatsAppMessage(recipientPhone, text) {
             body: JSON.stringify({
                 number: cleanPhone,
                 text: text,
-                delay: 1000,
-                linkPreview: true
+                delay: 0,
+                linkPreview: false
             })
         });
         const data = await response.json().catch(() => ({}));
@@ -99,6 +98,87 @@ async function sendWhatsAppMessage(recipientPhone, text) {
     } catch (err) {
         console.error(`[evolution-webhook] Erro de rede ao enviar mensagem para ${cleanPhone}:`, err.message);
         return false;
+    }
+}
+
+// Busca o arquivo base64 de um áudio/mídia na Evolution API caso não venha no webhook
+async function getMediaBase64FromEvolution(messageId) {
+    if (!messageId) return null;
+    const endpoint = `${EVOLUTION_API_URL}/chat/getBase64FromMediaMessage/${EVOLUTION_INSTANCE}`;
+    try {
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'apikey': EVOLUTION_API_KEY
+            },
+            body: JSON.stringify({
+                message: {
+                    key: {
+                        id: messageId
+                    }
+                },
+                convertToMp4: false
+            })
+        });
+        if (!response.ok) {
+            console.warn(`[evolution-webhook] getBase64FromMediaMessage HTTP ${response.status}`);
+            return null;
+        }
+        const data = await response.json().catch(() => ({}));
+        return data.base64 || null;
+    } catch (err) {
+        console.error('[evolution-webhook] Erro ao buscar base64 da Evolution:', err.message);
+        return null;
+    }
+}
+
+// Transcreve áudio diretamente usando o Gemini 2.5 Flash Multimodal
+async function transcribeAudioWithGemini(base64Data) {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey || !base64Data) return null;
+
+    // Limpa prefixo data:audio/...;base64, se existir
+    const rawBase64 = base64Data.replace(/^data:[^;]+;base64,/, '');
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+    try {
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{
+                    parts: [
+                        {
+                            inline_data: {
+                                mime_type: 'audio/ogg',
+                                data: rawBase64
+                            }
+                        },
+                        {
+                            text: 'Transcreva o áudio acima em texto, em português do Brasil. Retorne APENAS o que a pessoa disse, sem introduções ou explicações.'
+                        }
+                    ]
+                }],
+                generationConfig: {
+                    temperature: 0.1,
+                    maxOutputTokens: 512
+                }
+            })
+        });
+
+        if (!response.ok) {
+            const errText = await response.text().catch(() => '');
+            console.error(`[evolution-webhook] Gemini transcription error ${response.status}:`, errText.substring(0, 200));
+            return null;
+        }
+
+        const data = await response.json();
+        const candidateText = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        return candidateText ? candidateText.trim() : null;
+    } catch (err) {
+        console.error('[evolution-webhook] Exceção na transcrição de áudio:', err.message);
+        return null;
     }
 }
 
@@ -148,7 +228,7 @@ module.exports = async (req, res) => {
         const payload = req.body || {};
         const event = String(payload.event || payload.type || '').toLowerCase();
 
-        // Só processamos eventos de mensagens recebidas (upsert)
+        // Só processamos eventos de mensagens recebidas
         if (event && !event.includes('messages.upsert') && !event.includes('message')) {
             return res.status(200).json({ success: true, ignored: `event_${event}` });
         }
@@ -157,6 +237,7 @@ module.exports = async (req, res) => {
         const key = data?.key || {};
         const remoteJid = key.remoteJid || '';
         const fromMe = Boolean(key.fromMe);
+        const messageId = key.id;
 
         // Ignora grupos e transmissões
         if (!remoteJid || remoteJid.endsWith('@g.us') || remoteJid.includes('@broadcast') || remoteJid.includes('status@broadcast')) {
@@ -170,7 +251,6 @@ module.exports = async (req, res) => {
 
         // Se a mensagem partiu do próprio WhatsApp da Lanchonete (Jéssica falando no celular):
         if (fromMe) {
-            // Se for Jéssica enviando mensagem para um cliente, pausamos a IA para não atrapalhar o atendimento humano
             if (clientPhone !== JESSICA_PHONE) {
                 console.log(`[evolution-webhook] 👤 Jéssica interagiu com ${clientPhone}. Ativando pausa humana de 45 min.`);
                 await setHumanPause(clientPhone, 45);
@@ -184,7 +264,7 @@ module.exports = async (req, res) => {
             return res.status(200).json({ success: true, ignored: 'human_paused' });
         }
 
-        // Extrai texto da mensagem
+        // Extrai dados da mensagem
         const msg = data.message || {};
         let messageText = msg.conversation ||
                           msg.extendedTextMessage?.text ||
@@ -201,16 +281,36 @@ module.exports = async (req, res) => {
             return res.status(200).json({ success: true, action: 'ai_reactivated' });
         }
 
-        if (!messageText || messageText.trim().length === 0) {
-            // Pode ser áudio
-            if (msg.audioMessage) {
-                messageText = "Oi, mandei um áudio";
-            } else {
-                return res.status(200).json({ success: true, ignored: 'empty_message' });
+        // PROCESSAMENTO DE ÁUDIO (se recebido)
+        if (msg.audioMessage) {
+            console.log(`[evolution-webhook] 🎤 Áudio recebido de ${clientName} (${clientPhone}), buscando base64...`);
+            let audioBase64 = data.base64 || (data.message && data.message.base64);
+            if (!audioBase64) {
+                audioBase64 = await getMediaBase64FromEvolution(messageId);
+            }
+
+            if (audioBase64) {
+                console.log(`[evolution-webhook] 🎤 Transcrevendo áudio com Gemini 2.5 Flash...`);
+                const transcribed = await transcribeAudioWithGemini(audioBase64);
+                if (transcribed && transcribed.length > 0) {
+                    console.log(`[evolution-webhook] 🎤 ✅ Áudio transcrito com sucesso: "${transcribed}"`);
+                    messageText = transcribed;
+                } else {
+                    console.warn(`[evolution-webhook] 🎤 Falha ao transcrever áudio.`);
+                }
+            }
+
+            if (!messageText || messageText.trim().length === 0) {
+                await sendWhatsAppMessage(clientPhone, 'Recebi seu áudio! 🎤 Mas o som não ficou muito nítido aqui pra mim. Você poderia me escrever em texto ou mandar outro áudio? 😊');
+                return res.status(200).json({ success: true, replied: 'audio_fallback_requested' });
             }
         }
 
-        console.log(`[evolution-webhook] 📩 Mensagem recebida de ${clientName} (${clientPhone}): "${messageText.substring(0, 60)}"`);
+        if (!messageText || messageText.trim().length === 0) {
+            return res.status(200).json({ success: true, ignored: 'empty_message' });
+        }
+
+        console.log(`[evolution-webhook] 📩 Mensagem de ${clientName} (${clientPhone}): "${messageText.substring(0, 60)}"`);
 
         // Executa o motor Gemini reutilizando toda a lógica de negócio do FastSavory's
         const mockReq = {
@@ -256,7 +356,7 @@ module.exports = async (req, res) => {
             // Sincroniza com Google Calendar se houver data agendada
             if (orderSummary.scheduled_date) {
                 try {
-                    const { syncOrderToGoogleCalendar } = require('./_lib/google-calendar');
+                    const { syncOrderToGoogleCalendar } = require('./google-calendar');
                     if (typeof syncOrderToGoogleCalendar === 'function') {
                         syncOrderToGoogleCalendar({
                             ...orderSummary,
