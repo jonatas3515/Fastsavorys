@@ -3041,3 +3041,7 @@ module.exports.config = {
     maxDuration: 30,
     regions: ['gru1']
 };
+
+module.exports.handleGeminiCore = handleGeminiCore;
+module.exports.createMockRes = createMockRes;
+module.exports.normalizeBrazilianPhone = normalizeBrazilianPhone;
