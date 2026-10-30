@@ -43,6 +43,10 @@
         {
             "source": "/api/sync-checkout-session",
             "destination": "/api/create-checkout-session?action=sync"
+        },
+        {
+            "source": "/api/evolution-webhook",
+            "destination": "/api/manychat-api?type=evolution"
         }
     ],
     "headers": [

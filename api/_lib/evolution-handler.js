@@ -9,7 +9,7 @@
  * - Notifica Jéssica no WhatsApp pessoal quando um novo pedido for finalizado
  */
 
-const { handleGeminiCore, createMockRes, normalizeBrazilianPhone } = require('./manychat-api');
+const { handleGeminiCore, createMockRes, normalizeBrazilianPhone } = require('../manychat-api');
 const { createClient } = require('@supabase/supabase-js');
 
 const supabaseUrl = process.env.SUPABASE_URL || 'https://vqjyjdllapqbqbylshkw.supabase.co';
