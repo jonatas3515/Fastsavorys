@@ -310,6 +310,16 @@ module.exports = async (req, res) => {
             return res.status(200).json({ success: true, ignored: 'empty_message' });
         }
 
+                // Se for mensagem encaminhada pelo cardápio online do site
+        const isSiteOrder = /Pedido Fast Savory|Código:.*#|Itens do Pedido:/i.test(messageText);
+        if (isSiteOrder && JESSICA_PHONE && clientPhone !== JESSICA_PHONE) {
+            console.log(`[evolution-webhook] 🌐 Pedido do SITE recebido de ${clientName} (${clientPhone})! Notificando Jéssica...`);
+            await sendWhatsAppMessage(
+                JESSICA_PHONE,
+                `🔔 *NOVO PEDIDO FEITO NO SITE!* 🌐\n\n👤 *Cliente:* ${clientName}\n📱 *WhatsApp:* https://wa.me/${clientPhone}\n\n${messageText}`
+            );
+        }
+
         console.log(`[evolution-webhook] 📩 Mensagem de ${clientName} (${clientPhone}): "${messageText.substring(0, 60)}"`);
 
         // Executa o motor Gemini reutilizando toda a lógica de negócio do FastSavory's
