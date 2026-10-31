@@ -30,6 +30,162 @@ const STORE_PHONE = (process.env.WHATSAPP_NUMBER || '5573999366554').replace(/\D
 // Cache em memória de pausas humanas (temporário por processo)
 const humanPauses = new Map();
 
+// Cache em memória de contatos bloqueados permanentemente (anti-spam / telemarketing)
+const blockedContactsCache = new Set();
+
+async function isContactBlocked(phone) {
+    if (!phone) return false;
+    const clean = phone.replace(/\D/g, '');
+    if (blockedContactsCache.has(clean)) return true;
+    if (supabaseAdmin) {
+        try {
+            const { data } = await supabaseAdmin
+                .from('fast_client_memory')
+                .select('memories')
+                .eq('user_id', clean)
+                .maybeSingle();
+
+            if (data?.memories?.is_blocked === true) {
+                blockedContactsCache.add(clean);
+                return true;
+            }
+        } catch (e) {}
+    }
+    return false;
+}
+
+async function blockContact(phone, reason = 'manual') {
+    if (!phone) return;
+    const clean = phone.replace(/\D/g, '');
+    blockedContactsCache.add(clean);
+    if (supabaseAdmin) {
+        try {
+            const { data } = await supabaseAdmin
+                .from('fast_client_memory')
+                .select('memories')
+                .eq('user_id', clean)
+                .maybeSingle();
+
+            const current = (data && typeof data.memories === 'object') ? data.memories : {};
+            const updated = {
+                ...current,
+                is_blocked: true,
+                blocked_reason: reason,
+                blocked_at: new Date().toISOString()
+            };
+
+            await supabaseAdmin
+                .from('fast_client_memory')
+                .upsert({
+                    user_id: clean,
+                    memories: updated,
+                    last_interaction: new Date().toISOString()
+                }, { onConflict: 'user_id' });
+        } catch (e) {
+            console.error('[blockContact] Erro ao salvar bloqueio:', e.message);
+        }
+    }
+}
+
+async function unblockContact(phone) {
+    if (!phone) return;
+    const clean = phone.replace(/\D/g, '');
+    blockedContactsCache.delete(clean);
+    if (supabaseAdmin) {
+        try {
+            const { data } = await supabaseAdmin
+                .from('fast_client_memory')
+                .select('memories')
+                .eq('user_id', clean)
+                .maybeSingle();
+
+            if (data?.memories) {
+                const updated = { ...data.memories, is_blocked: false, unblocked_at: new Date().toISOString() };
+                await supabaseAdmin
+                    .from('fast_client_memory')
+                    .update({ memories: updated })
+                    .eq('user_id', clean);
+            }
+        } catch (e) {
+            console.error('[unblockContact] Erro ao desmarcar bloqueio:', e.message);
+        }
+    }
+}
+
+// Filtro assertivo de Telemarketing, Notificações Corporativas, Bancos, Operadoras e Robôs
+function isTelemarketingOrBot(text) {
+    if (!text || typeof text !== 'string') return false;
+    const t = text.toLowerCase().trim();
+    if (t.length < 5) return false;
+
+    // 1. Códigos de segurança / Tokens / 2FA / OTP (ex: Bancos, Apps)
+    if (/(código|codigo)\s+(de\s+)?(segurança|seguranca|verificação|verificacao|acesso|confirmação|confirmacao|ativação)/i.test(t) && /\b\d{4,8}\b/.test(t)) {
+        return 'codigo_autenticacao';
+    }
+    if (/\b\d{4,8}\b/.test(t) && /(não compartilhe|nao compartilhe|este código é pessoal|este codigo e pessoal)/i.test(t)) {
+        return 'codigo_autenticacao';
+    }
+
+    // 2. Rodapés de mensagens em massa / Opt-out
+    if (/\b(responda|digite|envie)\s+(sair|stop|cancelar|não|nao)\s+(para|se não quiser|caso não queira)/i.test(t)) {
+        return 'opt_out_footer';
+    }
+    if (/(caso não queira mais receber|para não receber mais|para cancelar o recebimento)/i.test(t)) {
+        return 'opt_out_footer';
+    }
+
+    // 3. Ofertas de Empréstimo, Financiamento, Bancos, Cartões, FGTS
+    if (/(empréstimo|emprestimo|crédito|credito)\s+(consignado|pré-aprovado|pre-aprovado|pessoal|fácil|facil)/i.test(t)) {
+        return 'oferta_financeira';
+    }
+    if (/(antecipe|antecipação|saque)\s+(do\s+)?(aniversário|aniversario\s+)?fgts/i.test(t)) {
+        return 'oferta_fgts';
+    }
+    if (/(liberamos|temos|oportunidade de)\s+(um\s+)?(limite|crédito|credito|capital de giro|empréstimo|emprestimo)/i.test(t)) {
+        return 'oferta_credito';
+    }
+    if (/(portabilidade|refinanciamento)\s+de\s+(crédito|credito|salário|salario|benefício|beneficio|inss)/i.test(t)) {
+        return 'portabilidade_financeira';
+    }
+    if (/(aumento|upgrade)\s+de\s+limite\s+(do\s+seu\s+cartão|da\s+sua\s+conta)/i.test(t)) {
+        return 'aumento_limite';
+    }
+
+    // 4. Operadoras de Telefonia (Vivo, Claro, Tim, etc.)
+    if (/(aqui é da|sou da|somos da|atendimento)\s+(vivo|claro|tim|oi|embratel)/i.test(t)) {
+        return 'operadora_telefonia';
+    }
+    if (/(fatura|segunda via|plano|recarga|débito em aberto)\s+(da\s+sua\s+linha|vivo|claro|tim)/i.test(t)) {
+        return 'operadora_fatura';
+    }
+
+    // 5. Clínicas, Laboratórios e Consultas Médicas
+    if (/(lembrete|confirmação|confirmacao)\s+de\s+(consulta|exame|atendimento médico|sessão)/i.test(t)) {
+        return 'lembrete_consulta';
+    }
+    if (/(digite|responda)\s+1\s+para\s+confirmar\s+(a\s+sua\s+consulta|o\s+seu\s+exame|o\s+seu\s+agendamento)/i.test(t)) {
+        return 'confirmacao_consulta';
+    }
+    if (/(seu laudo|resultado de exame|prontuário)\s+(está disponível|ja está pronto|está pronto)/i.test(t)) {
+        return 'resultado_exame';
+    }
+
+    // 6. URAs / Menus robóticos com dígitos rígidos
+    if (/(digite|responda)\s+1\s+para\s+[^,.\n]+,\s*(digite|responda)?\s*2\s+para/i.test(t)) {
+        return 'menu_ura_numerico';
+    }
+    if (/(responda com o número|escolha uma das opções|selecione a opção desejada):\s*(\n\s*1\s*[-–.]|\n\s*\[1\])/i.test(t)) {
+        return 'menu_ura_numerico';
+    }
+
+    // 7. Pesquisas de Satisfação / NPS
+    if (/(escala de 0 a 10|de 0 a 10|qual a probabilidade de você recomendar|pesquisa de satisfação)/i.test(t)) {
+        return 'pesquisa_satisfacao';
+    }
+
+    return false;
+}
+
 async function isHumanPaused(phone) {
     const expiresAt = humanPauses.get(phone);
     if (expiresAt && Date.now() < expiresAt) {
@@ -290,21 +446,6 @@ module.exports = async (req, res) => {
             ? clientPhone
             : (remoteJid || clientPhone);
 
-        // Se a mensagem partiu do próprio WhatsApp da Lanchonete (Jéssica falando no celular):
-        if (fromMe) {
-            if (clientPhone !== JESSICA_PHONE) {
-                console.log(`[evolution-webhook] 👤 Jéssica interagiu com ${clientPhone}. Ativando pausa humana de 45 min.`);
-                await setHumanPause(clientPhone, 45);
-            }
-            return res.status(200).json({ success: true, action: 'human_takeover_recorded' });
-        }
-
-        // Verifica se a conversa está pausada para atendimento humano
-        if (await isHumanPaused(clientPhone)) {
-            console.log(`[evolution-webhook] ⏸️ Conversa com ${clientPhone} em pausa humana ativa. IA silenciada.`);
-            return res.status(200).json({ success: true, ignored: 'human_paused' });
-        }
-
         // Extrai dados da mensagem desempacotando visualização única ou efêmera
         const msg = unwrapMessage(data.message);
         let messageText = msg.conversation ||
@@ -315,6 +456,69 @@ module.exports = async (req, res) => {
                           '';
 
         const clientName = data.pushName || 'Cliente';
+
+        // Se a mensagem partiu do próprio WhatsApp da Lanchonete (Jéssica falando no celular):
+        if (fromMe) {
+            if (clientPhone === JESSICA_PHONE) {
+                return res.status(200).json({ success: true, ignored: 'self_notification_to_owner' });
+            }
+
+            // Comandos rápidos de controle manual direto na conversa do contato:
+            const trimmedMsg = messageText.trim();
+            if (/^#?(bloquear|block|spam|ignorar)$/i.test(trimmedMsg)) {
+                console.log(`[evolution-webhook] 🚫 Jéssica bloqueou o número ${clientPhone} para sempre.`);
+                await blockContact(clientPhone, 'Bloqueado manualmente no WhatsApp por Jéssica');
+                return res.status(200).json({ success: true, action: 'contact_blocked_permanently' });
+            }
+            if (/^#?(desbloquear|unblock)$/i.test(trimmedMsg)) {
+                console.log(`[evolution-webhook] 🟢 Jéssica desbloqueou o número ${clientPhone}.`);
+                await unblockContact(clientPhone);
+                return res.status(200).json({ success: true, action: 'contact_unblocked' });
+            }
+
+            console.log(`[evolution-webhook] 👤 Jéssica interagiu com ${clientPhone}. Ativando pausa humana de 45 min.`);
+            await setHumanPause(clientPhone, 45);
+            return res.status(200).json({ success: true, action: 'human_takeover_recorded' });
+        }
+
+        // Comandos remotos enviados pelo WhatsApp pessoal da Jéssica (ex: #bloquear 73999998888)
+        if (clientPhone === JESSICA_PHONE) {
+            const rawCmd = messageText.trim();
+            const blockMatch = rawCmd.match(/^#?(bloquear|block|spam|ignorar)\s+(\d{10,13})/i);
+            if (blockMatch) {
+                const targetNum = blockMatch[2];
+                await blockContact(targetNum, 'Bloqueado por comando remoto da Jéssica');
+                await sendWhatsAppMessage(JESSICA_PHONE, `🚫 *CONTATO BLOQUEADO!* O número *${targetNum}* foi bloqueado para sempre no assistente virtual.`);
+                return res.status(200).json({ success: true, action: 'remote_block_success' });
+            }
+            const unblockMatch = rawCmd.match(/^#?(desbloquear|unblock)\s+(\d{10,13})/i);
+            if (unblockMatch) {
+                const targetNum = unblockMatch[2];
+                await unblockContact(targetNum);
+                await sendWhatsAppMessage(JESSICA_PHONE, `🟢 *CONTATO DESBLOQUEADO!* O número *${targetNum}* foi reativado para atendimento normal.`);
+                return res.status(200).json({ success: true, action: 'remote_unblock_success' });
+            }
+        }
+
+        // 1. VERIFICAÇÃO DE BLOQUEIO PERMANENTE (Anti-spam / Telemarketing / Manual)
+        if (await isContactBlocked(clientPhone)) {
+            console.log(`[evolution-webhook] 🚫 Contato ${clientPhone} está BLOQUEADO PERMANENTEMENTE. Ignorando mensagem.`);
+            return res.status(200).json({ success: true, ignored: 'contact_blocked_permanently' });
+        }
+
+        // 2. FILTRO AUTOMÁTICO DE TELEMARKETING, BANCOS, OPERADORAS E ROBÔS (Zero custo / Zero IA)
+        const telemarketingType = isTelemarketingOrBot(messageText);
+        if (telemarketingType) {
+            console.log(`[evolution-webhook] 🛑 Telemarketing/Robô detectado (${telemarketingType}) de ${clientPhone}: "${messageText.substring(0, 70)}". Bloqueando contato e silenciando IA.`);
+            await blockContact(clientPhone, `Telemarketing automático detectado: ${telemarketingType}`);
+            return res.status(200).json({ success: true, ignored: 'telemarketing_blocked', type: telemarketingType });
+        }
+
+        // Verifica se a conversa está pausada para atendimento humano
+        if (await isHumanPaused(clientPhone)) {
+            console.log(`[evolution-webhook] ⏸️ Conversa com ${clientPhone} em pausa humana ativa. IA silenciada.`);
+            return res.status(200).json({ success: true, ignored: 'human_paused' });
+        }
 
         // Comando manual de destravamento/pausa pelo cliente (ex: #ia ou #voltar)
         if (/^#?(voltar|chamar\s*ia|ativar\s*ia)$/i.test(messageText.trim())) {
