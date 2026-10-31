@@ -15,12 +15,12 @@ const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persist
 function detectPlatform(url = '') {
   const u = (url || '').toLowerCase();
   if (u.includes('amazon.com.br') || u.includes('link.amazon') || u.includes('amzn.to') || u.includes('a.co') || u.includes('amazon.')) {
-    return { name: 'Amazon' };
+    return { id: 'amazon', name: 'Amazon' };
   }
   if (u.includes('shopee.com.br') || u.includes('s.shopee.com.br') || u.includes('shope.ee') || u.includes('shopee.')) {
-    return { name: 'Shopee' };
+    return { id: 'shopee', name: 'Shopee' };
   }
-  return { name: 'Mercado Livre' };
+  return { id: 'mercadolivre', name: 'Mercado Livre' };
 }
 
 function parsePrice(str) {
@@ -406,7 +406,8 @@ function selectDiverseProduct(candidates, options = {}) {
     lastCat = null,
     sameCategoryTwice = false,
     lastPlatform = null,
-    samePlatformTwice = false
+    samePlatformTwice = false,
+    recentCats = []
   } = (typeof options === 'object' && options !== null) ? options : { lastCat: options };
 
   const normalizeCat = (c) => (c || 'outros').trim().toLowerCase();
@@ -427,28 +428,36 @@ function selectDiverseProduct(candidates, options = {}) {
         if (samePlatformTwice) {
           score -= 1000; // PROÍBE 3 disparos seguidos da mesma loja
         } else {
-          score -= 45; // Penaliza se for a mesma loja do último envio
+          score -= 60; // Penaliza se for a mesma loja do último envio
         }
       }
     }
 
-    // 2. DIVERSIDADE DE CATEGORIA
+    // 2. DIVERSIDADE DE CATEGORIA (ESTRITA ALTERNÂNCIA)
     if (lastCat) {
-      if (cat !== lastCat) {
-        score += 65; // Forte incentivo para trocar de categoria
+      if (cat === lastCat) {
+        score -= sameCategoryTwice ? 1500 : 400; // ENORME penalidade se for a mesma categoria do último disparo
       } else {
-        if (sameCategoryTwice) {
-          score -= 1000; // PROÍBE 3 disparos seguidos da mesma categoria
-        } else {
-          score -= 35;
-        }
+        score += 100; // Forte incentivo para trocar de categoria
+      }
+    }
+
+    // Bônus adicional para categorias que NÃO saíram nos últimos envios
+    if (recentCats && recentCats.length > 0) {
+      const idx = recentCats.indexOf(cat);
+      if (idx === -1) {
+        score += 120; // Categoria fresca/diferente!
+      } else if (idx === 0) {
+        score -= 250; // Foi a última que saiu
+      } else if (idx === 1) {
+        score -= 100;
       }
     }
 
     // 3. EQUILÍBRIO NOVO vs CATÁLOGO
-    // Inéditos ganham bônus (+20), mas não superam a penalidade se a loja e categoria forem repetidas!
+    // Inéditos ganham bônus (+25), mas isso NUNCA supera a penalidade de categoria repetida (-400)
     if (!product.last_posted_at) {
-      score += 20;
+      score += 25;
     }
 
     // Oferta relâmpago com prazo ativo ganha bônus
@@ -460,8 +469,8 @@ function selectDiverseProduct(candidates, options = {}) {
     const discPct = calcDiscountPercent(product.original_price, product.price_display);
     if (discPct >= 30) score += 15;
 
-    // Jitter aleatório leve (+0 a 12) para quebrar empates de forma dinâmica
-    score += Math.random() * 12;
+    // Jitter aleatório leve (+0 a 10) para desempate fluido
+    score += Math.random() * 10;
 
     return { product, score, plat, cat };
   });
@@ -602,13 +611,14 @@ async function handleSendWhatsAppDeal(req, res) {
 
     // 2. Se for modo afiliado ou se não encontrou produto de loja, busca nos achadinhos
     if (!product) {
-      // 2.0 HISTÓRICO DE DISPAROS: Busca as 3 últimas postagens para alternar loja e categoria
+      // 2.0 HISTÓRICO DE DISPAROS: Busca as 5 últimas postagens para alternar loja e categoria
       let lastCat = null;
       let secondLastCat = null;
       let sameCategoryTwice = false;
       let lastPlatform = null;
       let secondLastPlatform = null;
       let samePlatformTwice = false;
+      let recentCats = [];
 
       try {
         const { data: recentDispatches } = await supabaseAdmin
@@ -616,15 +626,15 @@ async function handleSendWhatsAppDeal(req, res) {
           .select('id, category, last_posted_at, affiliate_url')
           .not('last_posted_at', 'is', null)
           .order('last_posted_at', { ascending: false })
-          .limit(3);
+          .limit(5);
 
         if (recentDispatches && recentDispatches.length > 0) {
-          const recentCats = recentDispatches.map(p => (p.category || 'outros').trim().toLowerCase());
+          recentCats = recentDispatches.map(p => (p.category || 'outros').trim().toLowerCase());
           lastCat = recentCats[0] || null;
           secondLastCat = recentCats[1] || null;
           sameCategoryTwice = Boolean(lastCat && secondLastCat && lastCat === secondLastCat);
 
-          const recentPlats = recentDispatches.map(p => detectPlatform(p.affiliate_url).id.toLowerCase());
+          const recentPlats = recentDispatches.map(p => (detectPlatform(p.affiliate_url).id || 'generic').toLowerCase());
           lastPlatform = recentPlats[0] || null;
           secondLastPlatform = recentPlats[1] || null;
           samePlatformTwice = Boolean(lastPlatform && secondLastPlatform && lastPlatform === secondLastPlatform);
@@ -702,85 +712,101 @@ async function handleSendWhatsAppDeal(req, res) {
         });
       }
 
-      // 2.2 SELEÇÃO INTELIGENTE COM ROTAÇÃO DE PLATAFORMA E CATEGORIA
-      product = selectDiverseProduct(candidatePool, {
-        lastCat,
-        sameCategoryTwice,
-        lastPlatform,
-        samePlatformTwice
-      });
+      // 2.2 SELEÇÃO INTELIGENTE COM ROTAÇÃO ESTRITA DE CATEGORIA E PLATAFORMA
+      // Executa loop de até 3 tentativas: se um produto estiver pausado/esgotado na loja de origem,
+      // ele é desativado no banco e o sistema escolhe AUTOMATICAMENTE outro produto para não perder o horário de envio!
+      let pool = [...candidatePool];
+      let chosenProduct = null;
 
-      if (!product) {
-        product = candidatePool[0];
-      }
+      for (let attempt = 1; attempt <= 3 && pool.length > 0; attempt++) {
+        const candidate = selectDiverseProduct(pool, {
+          lastCat,
+          sameCategoryTwice,
+          lastPlatform,
+          samePlatformTwice,
+          recentCats
+        }) || pool[0];
 
-      // Validação em tempo real do preço e disponibilidade antes do disparo
-      if (product && product.affiliate_url) {
-        try {
-          const { fetchProductDetails } = require('../check-affiliate-links');
-          if (typeof fetchProductDetails === 'function') {
-            const fresh = await fetchProductDetails(product.affiliate_url);
-            if (fresh) {
-              if (fresh.is_active === false) {
-                console.log(`[WhatsApp Deal] Produto ${product.id} pausado/esgotado na loja de origem. Desativando no banco.`);
-                await supabaseAdmin
-                  .from('fast_affiliate_products')
-                  .update({ is_active: false, updated_at: new Date().toISOString() })
-                  .eq('id', product.id);
-                return res.status(200).json({
-                  success: false,
-                  skipped: true,
-                  message: `Produto "${product.title}" pausado/esgotado na loja de origem. Produto desativado no banco para proteger o grupo VIP.`
-                });
-              }
+        if (!candidate) break;
 
-              let changed = false;
-              const updateFields = {};
-              if (fresh.price_display && fresh.price_display !== product.price_display) {
-                console.log(`[WhatsApp Deal] Preço atualizado para ${product.id}: de "${product.price_display}" para "${fresh.price_display}"`);
-                product.price_display = fresh.price_display;
-                updateFields.price_display = fresh.price_display;
-                changed = true;
-              }
-              if (fresh.original_price && fresh.original_price !== product.original_price) {
-                product.original_price = fresh.original_price;
-                updateFields.original_price = fresh.original_price;
-                changed = true;
-              }
-              if (fresh.discount_tag && fresh.discount_tag !== product.discount_tag) {
-                product.discount_tag = fresh.discount_tag;
-                updateFields.discount_tag = fresh.discount_tag;
-                changed = true;
-              }
-              if (fresh.is_prime !== undefined && fresh.is_prime !== product.is_prime) {
-                product.is_prime = fresh.is_prime;
-                updateFields.is_prime = fresh.is_prime;
-                changed = true;
-              }
-              if (fresh.coupon_code && fresh.coupon_code !== product.coupon_code) {
-                product.coupon_code = fresh.coupon_code;
-                updateFields.coupon_code = fresh.coupon_code;
-                changed = true;
-              }
-              if (fresh.is_imported !== undefined && fresh.is_imported !== product.is_imported) {
-                product.is_imported = fresh.is_imported;
-                updateFields.is_imported = fresh.is_imported;
-                changed = true;
-              }
+        let isAvailable = true;
+        if (candidate.affiliate_url) {
+          try {
+            const { fetchProductDetails } = require('../check-affiliate-links');
+            if (typeof fetchProductDetails === 'function') {
+              // Timeout rápido de 8s para não prender a execução do cron
+              const freshPromise = fetchProductDetails(candidate.affiliate_url);
+              const timeoutPromise = new Promise(resolve => setTimeout(() => resolve(null), 8000));
+              const fresh = await Promise.race([freshPromise, timeoutPromise]);
 
-              if (changed) {
-                updateFields.updated_at = new Date().toISOString();
-                await supabaseAdmin
-                  .from('fast_affiliate_products')
-                  .update(updateFields)
-                  .eq('id', product.id);
+              if (fresh) {
+                if (fresh.is_active === false) {
+                  console.log(`[WhatsApp Deal] ⚠️ Produto ${candidate.id} ("${candidate.title}") pausado/esgotado na loja. Desativando e buscando outro...`);
+                  await supabaseAdmin
+                    .from('fast_affiliate_products')
+                    .update({ is_active: false, updated_at: new Date().toISOString() })
+                    .eq('id', candidate.id);
+                  // Remove do pool e tenta o próximo candidato
+                  pool = pool.filter(p => p.id !== candidate.id);
+                  isAvailable = false;
+                } else {
+                  let changed = false;
+                  const updateFields = {};
+                  if (fresh.price_display && fresh.price_display !== candidate.price_display) {
+                    console.log(`[WhatsApp Deal] Preço atualizado para ${candidate.id}: de "${candidate.price_display}" para "${fresh.price_display}"`);
+                    candidate.price_display = fresh.price_display;
+                    updateFields.price_display = fresh.price_display;
+                    changed = true;
+                  }
+                  if (fresh.original_price && fresh.original_price !== candidate.original_price) {
+                    candidate.original_price = fresh.original_price;
+                    updateFields.original_price = fresh.original_price;
+                    changed = true;
+                  }
+                  if (fresh.discount_tag && fresh.discount_tag !== candidate.discount_tag) {
+                    candidate.discount_tag = fresh.discount_tag;
+                    updateFields.discount_tag = fresh.discount_tag;
+                    changed = true;
+                  }
+                  if (fresh.is_prime !== undefined && fresh.is_prime !== candidate.is_prime) {
+                    candidate.is_prime = fresh.is_prime;
+                    updateFields.is_prime = fresh.is_prime;
+                    changed = true;
+                  }
+                  if (fresh.coupon_code && fresh.coupon_code !== candidate.coupon_code) {
+                    candidate.coupon_code = fresh.coupon_code;
+                    updateFields.coupon_code = fresh.coupon_code;
+                    changed = true;
+                  }
+                  if (fresh.is_imported !== undefined && fresh.is_imported !== candidate.is_imported) {
+                    candidate.is_imported = fresh.is_imported;
+                    updateFields.is_imported = fresh.is_imported;
+                    changed = true;
+                  }
+                  if (changed) {
+                    updateFields.updated_at = new Date().toISOString();
+                    supabaseAdmin
+                      .from('fast_affiliate_products')
+                      .update(updateFields)
+                      .eq('id', candidate.id)
+                      .then()
+                      .catch(() => {});
+                  }
+                }
               }
             }
+          } catch (fetchErr) {
+            console.warn('[WhatsApp Deal] Rechecagem em tempo real falhou, mantendo dados do banco:', fetchErr.message);
           }
-        } catch (fetchErr) {
-          console.warn('[WhatsApp Deal] Rechecagem em tempo real falhou, mantendo dados do banco:', fetchErr.message);
+        }
+
+        if (isAvailable) {
+          chosenProduct = candidate;
+          break;
         }
       }
+
+      product = chosenProduct || candidatePool[0];
       // GUARDA DE SANIDADE: Proteção de Credibilidade do Grupo VIP
       // Bloqueia qualquer produto com preço quebrado/irrisório para pacotes ou kits (ex: R$ 1,42 para 12 unidades)
       const numPrice = parsePrice(product.price_display);

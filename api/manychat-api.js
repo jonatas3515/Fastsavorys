@@ -2939,6 +2939,13 @@ module.exports = async function handler(req, res) {
 
     if (req.method === 'OPTIONS') return res.status(200).end();
 
+    const type = req.query?.type;
+
+    // Roteia webhook da Evolution API (suporta GET para healthcheck/keepalive e POST para mensagens)
+    if (type === 'evolution' || type === 'evolution-webhook') {
+        const handleEvolutionWebhook = require('./_lib/evolution-handler');
+        return await handleEvolutionWebhook(req, res);
+    }
 
     if (req.method !== 'POST') return res.status(200).json({ success: false, error: 'Use POST' });
 
@@ -2957,7 +2964,6 @@ module.exports = async function handler(req, res) {
         }
     }
 
-    const type = req.query.type;
 
     // Roteia webhook da Evolution API se solicitado
     if (type === 'evolution' || type === 'evolution-webhook') {
