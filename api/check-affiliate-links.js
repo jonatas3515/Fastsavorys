@@ -579,6 +579,14 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
     }
   }
 
+  // Padronização com espaço após R$ (ex: R$108,52 -> R$ 108,52)
+  if (price) {
+    price = price.replace(/^R\$\s*/, 'R$ ');
+  }
+  if (originalPrice) {
+    originalPrice = originalPrice.replace(/^R\$\s*/, 'R$ ');
+  }
+
   // Validação estrita: Preço riscado NUNCA pode ser menor ou igual ao preço atual (evita pegar parcelas de 6x ou erros de scraping)
   if (originalPrice && price) {
     const pOrig = parsePrice(originalPrice);
@@ -645,11 +653,11 @@ async function fetchProductDetails(rawUrl) {
     targetUrl.includes('shope.ee')
   ) {
     try {
-      const isAmz = platform === 'amazon' || targetUrl.includes('amazon') || targetUrl.includes('amzn') || targetUrl.includes('amzlinks');
+      const isAmz = platform === 'amazon' || targetUrl.includes('amazon') || targetUrl.includes('amzn') || targetUrl.includes('amzlinks') || targetUrl.includes('a.co');
       const isShopee = platform === 'shopee' || targetUrl.includes('shopee') || targetUrl.includes('s.shopee') || targetUrl.includes('shope.ee');
-      const ua = (isAmz || isShopee)
+      const ua = isShopee
         ? 'WhatsApp/2.24.8.85 i'
-        : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+        : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
 
       const headRes = await fetch(targetUrl, {
         method: 'GET',
@@ -657,7 +665,15 @@ async function fetchProductDetails(rawUrl) {
         headers: {
           'User-Agent': ua,
           'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-          'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7'
+          'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
+          'Sec-Ch-Ua': '"Chromium";v="126", "Google Chrome";v="126", "Not-A.Brand";v="99"',
+          'Sec-Ch-Ua-Mobile': '?0',
+          'Sec-Ch-Ua-Platform': '"Windows"',
+          'Sec-Fetch-Dest': 'document',
+          'Sec-Fetch-Mode': 'navigate',
+          'Sec-Fetch-Site': 'none',
+          'Sec-Fetch-User': '?1',
+          'Upgrade-Insecure-Requests': '1'
         }
       });
 
@@ -692,16 +708,20 @@ async function fetchProductDetails(rawUrl) {
   platform = detectPlatform(targetUrl);
 
   const isShopeeTarget = platform === 'shopee' || targetUrl.includes('shopee') || targetUrl.includes('s.shopee') || targetUrl.includes('shope.ee');
-  const fetchUa = (platform === 'amazon' || isShopeeTarget)
+  const fetchUa = isShopeeTarget
     ? 'WhatsApp/2.24.8.85 i'
-    : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+    : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
 
   let html = initialHtml;
 
   // 2. Fetch page HTML if needed
-  if (!html || (!html.includes('og:title') && !html.includes('productTitle') && !html.includes('ui-pdp-title'))) {
+  // Para Amazon, precisamos da página de produto real com BuyBox (productTitle, a-price, etc.).
+  const isAmazonProductHtml = platform === 'amazon' && html && (html.includes('productTitle') || html.includes('id="desktop_buybox"') || html.includes('apexPriceToPay') || html.includes('a-price'));
+  const hasValidHtml = html && (isAmazonProductHtml || html.includes('productTitle') || html.includes('ui-pdp-title') || (html.includes('og:title') && html.length > 5000));
+
+  if (!hasValidHtml) {
     try {
-      const requestHeaders = (platform === 'amazon' || isShopeeTarget)
+      const requestHeaders = isShopeeTarget
         ? {
             'User-Agent': fetchUa,
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
@@ -711,7 +731,7 @@ async function fetchProductDetails(rawUrl) {
             'User-Agent': fetchUa,
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
             'Accept-Language': 'pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7',
-            'Sec-Ch-Ua': '"Chromium";v="124", "Google Chrome";v="124", "Not-A.Brand";v="99"',
+            'Sec-Ch-Ua': '"Chromium";v="126", "Google Chrome";v="126", "Not-A.Brand";v="99"',
             'Sec-Ch-Ua-Mobile': '?0',
             'Sec-Ch-Ua-Platform': '"Windows"',
             'Sec-Fetch-Dest': 'document',
@@ -723,7 +743,8 @@ async function fetchProductDetails(rawUrl) {
 
       const pageRes = await fetch(targetUrl, {
         method: 'GET',
-        headers: requestHeaders
+        headers: requestHeaders,
+        redirect: 'follow'
       });
       html = await pageRes.text();
     } catch (e) {
@@ -1242,11 +1263,10 @@ async function handler(req, res) {
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 8000);
 
-          const isAmz = url.includes('amazon') || url.includes('amzn') || url.includes('a.co') || url.includes('amzlinks');
           const isShopee = url.includes('shopee') || url.includes('s.shopee') || url.includes('shope.ee');
-          const fetchUa = (isAmz || isShopee)
+          const fetchUa = isShopee
             ? 'WhatsApp/2.24.8.85 i'
-            : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
+            : 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36';
 
           const response = await fetch(url, {
             method: 'GET',
