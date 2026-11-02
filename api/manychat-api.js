@@ -2971,6 +2971,12 @@ module.exports = async function handler(req, res) {
         return await handleEvolutionWebhook(req, res);
     }
 
+    // Roteia webhook oficial da Meta WhatsApp Cloud API
+    if (type === 'meta' || type === 'meta-webhook' || type === 'whatsapp-webhook') {
+        const handleMetaWebhook = require('./_lib/meta-whatsapp-handler');
+        return await handleMetaWebhook(req, res);
+    }
+
     try {
         if (type === 'notify-new-order') {
             return await handleNotifyNewOrder(req, res);

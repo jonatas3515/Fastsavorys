@@ -47,6 +47,10 @@
         {
             "source": "/api/evolution-webhook",
             "destination": "/api/manychat-api?type=evolution"
+        },
+        {
+            "source": "/api/whatsapp-webhook",
+            "destination": "/api/manychat-api?type=meta"
         }
     ],
     "headers": [
