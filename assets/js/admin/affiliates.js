@@ -2009,7 +2009,8 @@ window.AffiliatesModule = (function () {
 
     if (window.AchadinhosCategories) {
       await window.AchadinhosCategories.loadCategories();
-      manageTreeCopy = JSON.parse(JSON.stringify(window.AchadinhosCategories.getTree()));
+      const rawTree = window.AchadinhosCategories.getTree();
+      manageTreeCopy = window.AchadinhosCategories.sanitizeTree ? window.AchadinhosCategories.sanitizeTree(rawTree) : JSON.parse(JSON.stringify(rawTree));
     } else {
       manageTreeCopy = [];
     }
@@ -2163,16 +2164,39 @@ window.AffiliatesModule = (function () {
 
     const label = prompt(`Adicionar nova subcategoria em "${group.label}":`, '');
     if (!label || !label.trim()) return;
-
-    const slug = window.AchadinhosCategories ? window.AchadinhosCategories.generateSlug(label) : 'nova_sub';
+    const cleanLabel = label.trim();
 
     if (!Array.isArray(group.subcategories)) {
       group.subcategories = [];
     }
 
+    const normLabel = cleanLabel.toLowerCase();
+    if (group.subcategories.some(s => s && s.label && s.label.toLowerCase() === normLabel)) {
+      alert(`⚠️ A subcategoria "${cleanLabel}" já existe no grupo "${group.label}".`);
+      return;
+    }
+
+    let slug = window.AchadinhosCategories ? window.AchadinhosCategories.generateSlug(cleanLabel) : 'nova_sub';
+    if (group.subcategories.some(s => s.slug === slug)) {
+      let counter = 2;
+      while (group.subcategories.some(s => s.slug === `${slug}_${counter}`)) {
+        counter++;
+      }
+      slug = `${slug}_${counter}`;
+    }
+
+    // Limpa este slug de quaisquer aliases em outras categorias para evitar conflito/duplicação
+    manageTreeCopy.forEach(g => {
+      (g.subcategories || []).forEach(s => {
+        if (Array.isArray(s.aliases)) {
+          s.aliases = s.aliases.filter(a => a !== slug);
+        }
+      });
+    });
+
     group.subcategories.push({
       slug,
-      label: label.trim(),
+      label: cleanLabel,
       aliases: []
     });
 
@@ -2186,8 +2210,16 @@ window.AffiliatesModule = (function () {
 
     const newLabel = prompt('Editar Nome da Subcategoria:', sub.label);
     if (!newLabel || !newLabel.trim()) return;
+    const cleanLabel = newLabel.trim();
+    if (cleanLabel.toLowerCase() === sub.label.toLowerCase()) return;
 
-    sub.label = newLabel.trim();
+    const duplicate = group.subcategories.find((s, idx) => idx !== subIdx && s.label && s.label.toLowerCase() === cleanLabel.toLowerCase());
+    if (duplicate) {
+      alert(`⚠️ Já existe uma subcategoria chamada "${cleanLabel}" neste grupo.`);
+      return;
+    }
+
+    sub.label = cleanLabel;
     renderCategoriesManagerTree();
   }
 

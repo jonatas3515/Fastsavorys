@@ -4,7 +4,7 @@
  */
 
 window.AchadinhosCategories = (function () {
-  const STORAGE_KEY = 'fast_achadinhos_categories_v7';
+  const STORAGE_KEY = 'fast_achadinhos_categories_v8';
   const VERSION_KEY = 'fast_achadinhos_categories_version';
 
   // Árvore Padrão (8 Macro Grupos e Subcategorias Otimizadas)
@@ -115,8 +115,9 @@ window.AchadinhosCategories = (function () {
       label: 'Ferramentas, Auto & Pet',
       icon: '🛠️',
       subcategories: [
-        { slug: 'ferramentas', label: 'Ferramentas Elétricas & Manuais', aliases: ['construcao', 'ferramentas_manuais', 'ferramentas_eletricas'] },
-        { slug: 'construcao_eletrica', label: 'Construção, Elétrica & Hidráulica', aliases: ['casa_construcao', 'eletrica'] },
+        { slug: 'ferramentas_eletricas', label: 'Ferramentas Elétricas', aliases: ['ferramentas'] },
+        { slug: 'ferramentas_manuais', label: 'Ferramentas Manuais', aliases: [] },
+        { slug: 'construcao_eletrica', label: 'Construção, Elétrica & Hidráulica', aliases: ['casa_construcao', 'eletrica', 'construcao'] },
         { slug: 'automotivo', label: 'Automotivo & Moto', aliases: ['veiculos'] },
         { slug: 'petshop', label: 'Pet Shop', aliases: [] }
       ]
@@ -134,6 +135,102 @@ window.AchadinhosCategories = (function () {
   }
 
   /**
+   * Sanitiza e valida a árvore de categorias:
+   * 1. Elimina duplicatas de subcategorias (por slug ou por nome).
+   * 2. Garante que Ferramentas Elétricas e Ferramentas Manuais sejam independentes e únicas.
+   * 3. Limpa aliases colidentes com slugs ativos.
+   */
+  function sanitizeTree(rawTree) {
+    if (!Array.isArray(rawTree) || rawTree.length === 0) return getDefaultTree();
+    const cleanTree = [];
+
+    // Mapeamento prévio de todos os slugs presentes para evitar colisões
+    const allKnownSlugs = new Set();
+    rawTree.forEach(g => {
+      (g.subcategories || []).forEach(s => {
+        if (s && s.slug) allKnownSlugs.add(String(s.slug).trim());
+      });
+    });
+
+    rawTree.forEach(group => {
+      if (!group || !group.id) return;
+      const cleanGroup = {
+        id: String(group.id).trim(),
+        label: String(group.label || '').trim() || 'Grupo',
+        icon: String(group.icon || '📂').trim(),
+        subcategories: []
+      };
+
+      const seenSlugs = new Set();
+      const seenLabels = new Set();
+
+      (group.subcategories || []).forEach(sub => {
+        if (!sub) return;
+        let label = String(sub.label || '').trim();
+        let slug = String(sub.slug || '').trim();
+
+        if (!label && !slug) return;
+        if (!label) label = slug;
+        if (!slug) slug = generateSlug(label);
+
+        // Correção de inconsistências legadas de Ferramentas Manuais / Elétricas
+        if (cleanGroup.id === 'group_outros') {
+          if (label.toLowerCase() === 'ferramentas manuais' && (slug === 'ferramentas' || slug === 'ferramentas_eletricas')) {
+            const hasManuais = (group.subcategories || []).some(s => s && s.slug === 'ferramentas_manuais');
+            if (hasManuais) {
+              // Já existe uma subcategoria dedicada a Ferramentas Manuais; converte esta para Elétricas
+              label = 'Ferramentas Elétricas';
+              slug = 'ferramentas_eletricas';
+            } else {
+              slug = 'ferramentas_manuais';
+            }
+          } else if (label.toLowerCase().includes('elétricas') && label.toLowerCase().includes('manuais')) {
+            label = 'Ferramentas Elétricas';
+            slug = 'ferramentas_eletricas';
+          }
+        }
+
+        const normLabel = label.toLowerCase();
+
+        // Evita duplicatas exatas dentro do mesmo grupo
+        if (seenSlugs.has(slug) || seenLabels.has(normLabel)) {
+          const existing = cleanGroup.subcategories.find(s => s.slug === slug || s.label.toLowerCase() === normLabel);
+          if (existing && Array.isArray(sub.aliases)) {
+            existing.aliases = Array.from(new Set([...(existing.aliases || []), ...sub.aliases]));
+          }
+          return;
+        }
+
+        seenSlugs.add(slug);
+        seenLabels.add(normLabel);
+
+        // Filtra aliases para não colidir com o próprio slug nem com outros slugs principais
+        let aliases = Array.isArray(sub.aliases) ? sub.aliases : [];
+        aliases = aliases
+          .map(a => String(a || '').trim().toLowerCase())
+          .filter(a => a && a !== slug && a !== 'ferramentas_manuais'); // ferramentas_manuais é subcategoria exclusiva
+
+        // Se for ferramentas elétricas, preserva 'ferramentas' como alias legado
+        if (slug === 'ferramentas_eletricas' && !aliases.includes('ferramentas')) {
+          aliases.push('ferramentas');
+        }
+
+        aliases = Array.from(new Set(aliases));
+
+        cleanGroup.subcategories.push({
+          slug,
+          label,
+          aliases
+        });
+      });
+
+      cleanTree.push(cleanGroup);
+    });
+
+    return cleanTree.length > 0 ? cleanTree : getDefaultTree();
+  }
+
+  /**
    * Obtém a árvore ativa em memória ou cache local
    */
   function getTree() {
@@ -146,7 +243,7 @@ window.AchadinhosCategories = (function () {
       if (cached) {
         const parsed = JSON.parse(cached);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          currentTree = parsed;
+          currentTree = sanitizeTree(parsed);
           return currentTree;
         }
       }
@@ -158,28 +255,24 @@ window.AchadinhosCategories = (function () {
     return currentTree;
   }
 
-  let remoteColumnDisabled = false;
-
   /**
-   * Carrega categorias do Supabase com stale-while-revalidate
+   * Carrega categorias do Supabase com sincronização contínua
    */
   async function loadCategories(force = false) {
     // 1. Garante que temos pelo menos o cache local carregado
     getTree();
 
-    if (remoteColumnDisabled) return getTree();
-
-    // 2. Busca do Supabase em background (silencioso)
+    // 2. Busca do Supabase (fast_store_config)
     try {
       if (window.supabaseClient) {
         const { data, error } = await window.supabaseClient
           .from('fast_store_config')
-          .select('*')
+          .select('affiliate_categories')
           .eq('id', 1)
           .maybeSingle();
 
-        if (error || !data) {
-          remoteColumnDisabled = true;
+        if (error) {
+          console.warn('[AchadinhosCategories] Aviso ao carregar do Supabase:', error.message);
           return getTree();
         }
 
@@ -190,13 +283,13 @@ window.AchadinhosCategories = (function () {
           }
 
           if (remoteData && (Array.isArray(remoteData) || remoteData.tree)) {
-            const tree = Array.isArray(remoteData) ? remoteData : remoteData.tree;
-            const version = remoteData.version || new Date(data.updated_at || Date.now()).getTime();
+            const rawTree = Array.isArray(remoteData) ? remoteData : remoteData.tree;
+            const version = remoteData.version || Date.now();
 
-            if (Array.isArray(tree) && tree.length > 0) {
-              currentTree = tree;
+            if (Array.isArray(rawTree) && rawTree.length > 0) {
+              currentTree = sanitizeTree(rawTree);
               currentVersion = version;
-              localStorage.setItem(STORAGE_KEY, JSON.stringify(tree));
+              localStorage.setItem(STORAGE_KEY, JSON.stringify(currentTree));
               localStorage.setItem(VERSION_KEY, String(version));
               return currentTree;
             }
@@ -204,7 +297,7 @@ window.AchadinhosCategories = (function () {
         }
       }
     } catch (e) {
-      remoteColumnDisabled = true;
+      console.warn('[AchadinhosCategories] Falha de rede ao consultar Supabase:', e.message);
     }
 
     return getTree();
@@ -218,7 +311,7 @@ window.AchadinhosCategories = (function () {
       throw new Error('A árvore de categorias não pode estar vazia.');
     }
 
-    currentTree = JSON.parse(JSON.stringify(tree));
+    currentTree = sanitizeTree(tree);
     currentVersion = Date.now();
 
     // 1. Salva no localStorage imediatamente
@@ -226,7 +319,7 @@ window.AchadinhosCategories = (function () {
     localStorage.setItem(VERSION_KEY, String(currentVersion));
 
     // 2. Salva no Supabase (fast_store_config)
-    if (window.supabaseClient && !remoteColumnDisabled) {
+    if (window.supabaseClient) {
       const payload = {
         affiliate_categories: {
           version: currentVersion,
@@ -242,10 +335,12 @@ window.AchadinhosCategories = (function () {
           .eq('id', 1);
 
         if (error) {
-          remoteColumnDisabled = true;
+          console.error('[AchadinhosCategories] Erro no update do Supabase:', error);
+          throw new Error('Falha ao gravar categorias no banco: ' + (error.message || 'Erro desconhecido'));
         }
       } catch (err) {
-        remoteColumnDisabled = true;
+        console.error('[AchadinhosCategories] Erro ao salvar no Supabase:', err);
+        throw err;
       }
     }
 
@@ -321,6 +416,24 @@ window.AchadinhosCategories = (function () {
   }
 
   /**
+   * Resolve um slug (inclusive alias legado como 'ferramentas') para o slug canônico ativo
+   */
+  function resolveCategorySlug(category) {
+    if (!category) return category;
+    const cleanCat = String(category).trim().toLowerCase();
+    const tree = getTree();
+    for (const group of tree) {
+      for (const sub of (group.subcategories || [])) {
+        if (sub.slug === cleanCat) return sub.slug;
+        if (Array.isArray(sub.aliases) && sub.aliases.includes(cleanCat)) {
+          return sub.slug;
+        }
+      }
+    }
+    return category;
+  }
+
+  /**
    * Popula qualquer elemento <select> com os optgroups e options da árvore
    */
   function populateSelect(selectEl, selectedValue = '', options = {}) {
@@ -351,7 +464,11 @@ window.AchadinhosCategories = (function () {
 
     selectEl.innerHTML = html;
     if (selectedValue) {
-      selectEl.value = selectedValue;
+      const canonical = resolveCategorySlug(selectedValue);
+      selectEl.value = canonical;
+      if (!selectEl.value && selectedValue) {
+        selectEl.value = selectedValue;
+      }
     }
   }
 
@@ -390,6 +507,8 @@ window.AchadinhosCategories = (function () {
     loadCategories,
     saveTree,
     getDefaultTree,
+    sanitizeTree,
+    resolveCategorySlug,
     getCategoryMap,
     getMacroGroups,
     populateSelect,
