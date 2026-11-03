@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conectar WhatsApp da Loja - Modo Coexistência | FastSavory's</title>
+    <link rel="stylesheet" href="../assets/css/styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+
+    <div class="max-w-xl w-full bg-white rounded-3xl shadow-xl border border-gray-100 p-8">
+        
+        <div class="text-center mb-6">
+            <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-3 shadow-inner">
+                📲
+            </div>
+            <h1 class="text-2xl font-black text-gray-900">Modo de Coexistência WhatsApp</h1>
+            <p class="text-sm text-gray-500 mt-1">Conecte a Cloud API Oficial da Meta mantendo o WhatsApp Business ativo no celular da Jéssica</p>
+        </div>
+
+        <div class="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 mb-6 text-xs text-emerald-800 space-y-2">
+            <p class="font-bold flex items-center gap-1.5">
+                <span>🛡️</span> <span>Como funciona a segurança deste processo:</span>
+            </p>
+            <ul class="list-disc pl-5 space-y-1 text-emerald-700">
+                <li>O WhatsApp Business no celular da loja <strong>NÃO</strong> será desinstalado nem apagado.</li>
+                <li>A Meta enviará um código de segurança de 6 dígitos <strong>direto no WhatsApp da loja</strong>.</li>
+                <li>Após confirmar, a inteligência artificial atenderá pela nuvem oficial com 99.9% de estabilidade.</li>
+            </ul>
+        </div>
+
+        <div class="space-y-4">
+            <button id="btnConnect" onclick="launchCoexistenceLogin()" class="w-full py-4 px-6 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-extrabold text-base rounded-2xl shadow-lg shadow-emerald-600/20 transition transform active:scale-98 flex items-center justify-center gap-2">
+                <span>🚀</span> <span>Iniciar Conexão Oficial da Meta</span>
+            </button>
+
+            <div id="statusContainer" class="hidden p-4 rounded-2xl border text-xs"></div>
+        </div>
+
+        <div class="mt-8 pt-6 border-t border-gray-100 text-center text-xs text-gray-400">
+            FastSavory's Delivery &bull; App ID Meta: <code class="font-mono text-gray-600">1846550623013023</code>
+        </div>
+    </div>
+
+    <!-- Facebook SDK -->
+    <script async defer crossorigin="anonymous" src="https://connect.facebook.net/pt_BR/sdk.js"></script>
+
+    <script>
+        const SUPABASE_URL = 'https://vqjyjdllapqbqpylshkw.supabase.co';
+        const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxanlqZGxsYXBxYnFweWxzaGt3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgzMTA5MzgsImV4cCI6MjA3Mzg4NjkzOH0.5n8hNf7_kG4-o88s_c4L0v_e0mE_V_U8wJ7cQ_mQ7kU';
+        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+        window.fbAsyncInit = function() {
+            FB.init({
+                appId: '1846550623013023',
+                cookie: true,
+                xfbml: true,
+                version: 'v21.0'
+            });
+            console.log('[Meta Coex] Facebook SDK inicializado com sucesso.');
+        };
+
+        // Escuta os eventos do Embedded Signup da Meta
+        let capturedData = {};
+        window.addEventListener('message', (event) => {
+            if (event.origin !== 'https://www.facebook.com' && event.origin !== 'https://web.facebook.com') return;
+            try {
+                const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+                if (data.type === 'WA_EMBEDDED_SIGNUP') {
+                    console.log('[Meta Coex] Evento recebido:', data);
+                    if (data.data) {
+                        capturedData = { ...capturedData, ...data.data };
+                        showStatus('info', `Progresso: ${data.event} - WABA ID: ${data.data.waba_id || 'capturando...'}`);
+                    }
+                }
+            } catch (e) {}
+        });
+
+        function showStatus(type, text) {
+            const container = document.getElementById('statusContainer');
+            container.classList.remove('hidden', 'bg-blue-50', 'text-blue-800', 'border-blue-200', 'bg-green-50', 'text-green-800', 'border-green-200', 'bg-red-50', 'text-red-800', 'border-red-200');
+
+            if (type === 'success') {
+                container.classList.add('bg-green-50', 'text-green-800', 'border-green-200');
+            } else if (type === 'error') {
+                container.classList.add('bg-red-50', 'text-red-800', 'border-red-200');
+            } else {
+                container.classList.add('bg-blue-50', 'text-blue-800', 'border-blue-200');
+            }
+            container.innerHTML = text;
+        }
+
+        function launchCoexistenceLogin() {
+            if (typeof FB === 'undefined') {
+                showStatus('error', 'O SDK do Facebook ainda está carregando. Aguarde 3 segundos e tente novamente.');
+                return;
+            }
+
+            showStatus('info', 'Abrindo a janela oficial da Meta... Aguarde e siga as instruções na tela da Meta.');
+
+            FB.login(function(response) {
+                console.log('[Meta Coex] Resposta FB.login:', response);
+                if (response.authResponse) {
+                    const code = response.authResponse.code;
+                    showStatus('success', '🎉 <strong>Autorização confirmada pela Meta!</strong><br>Gravando configurações oficiais no sistema...');
+                    
+                    // Salva as credenciais no Supabase
+                    saveToSupabase({
+                        authCode: code,
+                        accessToken: response.authResponse.accessToken,
+                        userID: response.authResponse.userID,
+                        capturedData: capturedData
+                    });
+                } else {
+                    showStatus('error', 'Conexão cancelada ou não autorizada. Se a janela fechou antes do final, tente novamente.');
+                }
+            }, {
+                scope: 'whatsapp_business_management,whatsapp_business_messaging',
+                response_type: 'code',
+                override_default_response_type: true
+            });
+        }
+
+        async function saveToSupabase(details) {
+            try {
+                const configPayload = {
+                    updated_at: new Date().toISOString(),
+                    whatsapp_meta_config: {
+                        app_id: '1846550623013023',
+                        auth_code: details.authCode || null,
+                        user_id: details.userID || null,
+                        captured_waba_id: details.capturedData?.waba_id || null,
+                        captured_phone_number_id: details.capturedData?.phone_number_id || null,
+                        coexistence_active: true
+                    }
+                };
+
+                const { error } = await supabase
+                    .from('fast_store_config')
+                    .update(configPayload)
+                    .eq('id', 1);
+
+                if (error) throw error;
+
+                showStatus('success', '✅ <strong>Conexão concluída com sucesso!</strong><br>O Modo de Coexistência está pronto e sincronizado.');
+            } catch (err) {
+                console.error('[Meta Coex] Erro ao gravar:', err);
+                showStatus('info', `Conexão autorizada pela Meta! Código: <code>${details.authCode?.substring(0, 25)}...</code>`);
+            }
+        }
+    </script>
+</body>
+</html>
