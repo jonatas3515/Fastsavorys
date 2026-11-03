@@ -13,20 +13,52 @@ const supabaseUrl = process.env.SUPABASE_URL || 'https://vqjyjdllapqbqpylshkw.su
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const supabaseAdmin = (supabaseUrl && supabaseKey) ? createClient(supabaseUrl, supabaseKey) : null;
 
-// Configuração Meta Cloud API
-const DEFAULT_PHONE_ID = process.env.WHATSAPP_PHONE_NUMBER_ID || '1310573275483130';
-const DEFAULT_WABA_ID = process.env.WHATSAPP_WABA_ID || '1125196940008268';
-const META_TOKEN = (process.env.WHATSAPP_META_TOKEN || process.env.WHATSAPP_TOKEN || 'EAAaPbZAHxyJ8BSwdG65U21HDNjGvpP9rGMAZBWYJ5O6kH22NL6OSTfB3Keymg5PASSTWTnVS9ThR9RPtdQPi5kp8FTPzQZC0sDT1k0jPrH4vcK2nkSsZA5CCU3kSUsIhq4H4ICZBVpHypOEOxJsigwCQMiZCoSmJZChzQdtgCW0emZADQedIeX1aNm8AfQfZC8D7EIYvxislyo7RCsU2q9bEO1eTT11nJZAZBL5DHFjfTS8yoAV4pKfoOKIfTxsApDzRDduTvpZCzlyJk6ZAv3cIwa0Y7aPG4923Oyb9BKFuS2ZA8ZD').trim();
+// Configuração Meta Cloud API Oficial
+const DEFAULT_PHONE_ID = process.env.WHATSAPP_PHONE_NUMBER_ID || '963270203535226';
+const DEFAULT_WABA_ID = process.env.WHATSAPP_WABA_ID || '833910726072810';
+const DEFAULT_META_TOKEN = (process.env.WHATSAPP_META_TOKEN || process.env.WHATSAPP_TOKEN || 'EAAaPbZAHxyJ8BS5eInKTKAOoDiAcvnkB72Bw0LRhNbNzwZCsOlMaCw2MZBUtm9IeEtAKIOtDobiqEtpW52DjYJZAXZBzcWncjD9esqfSe2W3WZCQB3ZBNuYB6KHN1qJ7GQQPq6ZAd4pMDiHJ9OZAiX05wjWPIRO3c8Mmk3O5kwu51ZCsZCRplkQIZBdJFAv8a7l8W2tWEIA7q0adLHvU').trim();
 const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN || 'fastsavorys_meta_webhook_2026';
 
 // Número da Jéssica para alertas
 const JESSICA_PHONE = (process.env.JESSICA_PERSONAL_PHONE || '5573998621125').replace(/\D/g, '');
 
 /**
+ * Busca credenciais atualizadas do Meta WhatsApp no Supabase
+ */
+async function getActiveMetaCredentials() {
+    try {
+        if (supabaseAdmin) {
+            const { data } = await supabaseAdmin
+                .from('fast_store_config')
+                .select('whatsapp_meta_config')
+                .eq('id', 1)
+                .maybeSingle();
+
+            const cfg = data?.whatsapp_meta_config;
+            if (cfg?.access_token) {
+                return {
+                    token: cfg.access_token.trim(),
+                    phoneId: cfg.phone_number_id || DEFAULT_PHONE_ID,
+                    wabaId: cfg.waba_id || DEFAULT_WABA_ID
+                };
+            }
+        }
+    } catch (e) {
+        console.warn('[meta-webhook] Falha ao carregar credenciais do Supabase, usando padrão:', e.message);
+    }
+    return {
+        token: DEFAULT_META_TOKEN,
+        phoneId: DEFAULT_PHONE_ID,
+        wabaId: DEFAULT_WABA_ID
+    };
+}
+
+/**
  * Envia mensagem de texto oficial via Meta Cloud API
  */
 async function sendMetaMessage(phoneNumberId, to, text) {
-    const targetPhoneId = phoneNumberId || DEFAULT_PHONE_ID;
+    const creds = await getActiveMetaCredentials();
+    const targetPhoneId = phoneNumberId || creds.phoneId;
     const cleanTo = String(to).replace(/\D/g, '');
     const url = `https://graph.facebook.com/v21.0/${targetPhoneId}/messages`;
 
@@ -34,7 +66,7 @@ async function sendMetaMessage(phoneNumberId, to, text) {
         const response = await fetch(url, {
             method: 'POST',
             headers: {
-                'Authorization': `Bearer ${META_TOKEN}`,
+                'Authorization': `Bearer ${creds.token}`,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
@@ -64,14 +96,15 @@ async function sendMetaMessage(phoneNumberId, to, text) {
 async function downloadMetaMedia(mediaId) {
     if (!mediaId) return null;
     try {
+        const creds = await getActiveMetaCredentials();
         const metaRes = await fetch(`https://graph.facebook.com/v21.0/${mediaId}`, {
-            headers: { 'Authorization': `Bearer ${META_TOKEN}` }
+            headers: { 'Authorization': `Bearer ${creds.token}` }
         });
         const metaData = await metaRes.json();
         if (!metaData.url) return null;
 
         const fileRes = await fetch(metaData.url, {
-            headers: { 'Authorization': `Bearer ${META_TOKEN}` }
+            headers: { 'Authorization': `Bearer ${creds.token}` }
         });
         const arrayBuf = await fileRes.arrayBuffer();
         return {
