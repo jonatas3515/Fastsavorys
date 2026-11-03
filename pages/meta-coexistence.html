@@ -48,7 +48,7 @@
 
     <script>
         const SUPABASE_URL = 'https://vqjyjdllapqbqpylshkw.supabase.co';
-        const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxanlqZGxsYXBxYnFweWxzaGt3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgzMTA5MzgsImV4cCI6MjA3Mzg4NjkzOH0.5n8hNf7_kG4-o88s_c4L0v_e0mE_V_U8wJ7cQ_mQ7kU';
+        const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxanlqZGxsYXBxYnFweWxzaGt3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY0MzgyNDUsImV4cCI6MjA4MjAxNDI0NX0.tfTR9YnM5l0do7FJfxML6i05KTSrMInQMqFrWXx6aAU';
         const supabaseClient = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON) : null;
 
         window.fbAsyncInit = function() {
@@ -130,23 +130,33 @@
                         app_id: '1846550623013023',
                         auth_code: details.authCode || null,
                         user_id: details.userID || null,
+                        access_token: details.accessToken || null,
                         captured_waba_id: details.capturedData?.waba_id || null,
                         captured_phone_number_id: details.capturedData?.phone_number_id || null,
                         coexistence_active: true
                     }
                 };
 
-                const { error } = await supabaseClient
+                const { data, error } = await supabaseClient
                     .from('fast_store_config')
                     .update(configPayload)
-                    .eq('id', 1);
+                    .eq('id', 1)
+                    .select();
 
                 if (error) throw error;
 
-                showStatus('success', '✅ <strong>Conexão concluída com sucesso!</strong><br>O Modo de Coexistência está pronto e sincronizado.');
+                showStatus('success', `🎉 <strong>Conexão Autorizada com Sucesso!</strong><br><br>
+                <strong>Código / Token:</strong> Conectado ao app FastSavory's.<br>
+                <strong>Status no Banco:</strong> Gravado no Supabase com sucesso!<br>
+                <div class="mt-2 p-2 bg-white rounded border border-green-300 font-mono text-[10px] break-all select-all">
+                UserID: ${details.userID || 'N/A'}<br>
+                AuthCode: ${details.authCode || 'N/A'}<br>
+                AccessToken: ${details.accessToken ? details.accessToken.substring(0, 30) + '...' : 'N/A'}
+                </div>`);
             } catch (err) {
                 console.error('[Meta Coex] Erro ao gravar:', err);
-                showStatus('info', `Conexão autorizada pela Meta! Código: <code>${details.authCode?.substring(0, 25)}...</code>`);
+                showStatus('error', `Falha ao gravar no Supabase: ${err.message || JSON.stringify(err)}<br>
+                Código recebido da Meta: <code class="break-all">${details.authCode || 'Nenhum'}</code>`);
             }
         }
     </script>
