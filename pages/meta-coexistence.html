@@ -49,7 +49,7 @@
     <script>
         const SUPABASE_URL = 'https://vqjyjdllapqbqpylshkw.supabase.co';
         const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZxanlqZGxsYXBxYnFweWxzaGt3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgzMTA5MzgsImV4cCI6MjA3Mzg4NjkzOH0.5n8hNf7_kG4-o88s_c4L0v_e0mE_V_U8wJ7cQ_mQ7kU';
-        const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+        const supabaseClient = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON) : null;
 
         window.fbAsyncInit = function() {
             FB.init({
@@ -136,7 +136,7 @@
                     }
                 };
 
-                const { error } = await supabase
+                const { error } = await supabaseClient
                     .from('fast_store_config')
                     .update(configPayload)
                     .eq('id', 1);
