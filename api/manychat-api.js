@@ -2947,6 +2947,12 @@ module.exports = async function handler(req, res) {
         return await handleEvolutionWebhook(req, res);
     }
 
+    // Roteia webhook oficial da Meta WhatsApp Cloud API (suporta GET para validação e POST para mensagens)
+    if (type === 'meta' || type === 'meta-webhook' || type === 'whatsapp-webhook') {
+        const handleMetaWebhook = require('./_lib/meta-whatsapp-handler');
+        return await handleMetaWebhook(req, res);
+    }
+
     if (req.method !== 'POST') return res.status(200).json({ success: false, error: 'Use POST' });
 
     // --- SEGURANÇA (Etapa 2): Validação de Webhook Secret ---
@@ -2971,11 +2977,7 @@ module.exports = async function handler(req, res) {
         return await handleEvolutionWebhook(req, res);
     }
 
-    // Roteia webhook oficial da Meta WhatsApp Cloud API
-    if (type === 'meta' || type === 'meta-webhook' || type === 'whatsapp-webhook') {
-        const handleMetaWebhook = require('./_lib/meta-whatsapp-handler');
-        return await handleMetaWebhook(req, res);
-    }
+
 
     try {
         if (type === 'notify-new-order') {
