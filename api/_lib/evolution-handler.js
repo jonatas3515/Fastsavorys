@@ -291,14 +291,14 @@ async function getMediaBase64FromEvolution(messageId) {
     }
 }
 
-// Analisa qualquer mídia (áudio, imagem ou PDF) usando o Gemini 2.5 Flash Multimodal
+// Analisa qualquer mídia (áudio, imagem ou PDF) usando o Gemini 3.5 Flash-Lite Multimodal
 async function analyzeMultimodalWithGemini(base64Data, mimeType, prompt) {
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey || !base64Data) return null;
 
     const rawBase64 = base64Data.replace(/^data:[^;]+;base64,/, '');
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash-lite:generateContent?key=${apiKey}`;
     try {
         const response = await fetch(url, {
             method: 'POST',
@@ -318,7 +318,6 @@ async function analyzeMultimodalWithGemini(base64Data, mimeType, prompt) {
                     ]
                 }],
                 generationConfig: {
-                    temperature: 0.1,
                     maxOutputTokens: 1024
                 }
             })
@@ -400,6 +399,13 @@ module.exports = async (req, res) => {
             instance: EVOLUTION_INSTANCE,
             timestamp: new Date().toISOString()
         });
+    }
+
+    // EVOLUTION API PAUSADA PARA TESTES E TRANSIÇÃO DEFINITIVA PARA META CLOUD API OFICIAL
+    const EVOLUTION_PAUSED = true;
+    if (EVOLUTION_PAUSED) {
+        console.log('[evolution-webhook] ⏸️ Evolution API temporariamente pausada para testes da Meta Cloud API.');
+        return res.status(200).json({ success: true, paused: true, message: 'Evolution API webhook is paused' });
     }
 
     if (req.method !== 'POST') {
@@ -536,7 +542,7 @@ module.exports = async (req, res) => {
             }
 
             if (audioBase64) {
-                console.log(`[evolution-webhook] 🎤 Transcrevendo áudio com Gemini 2.5 Flash...`);
+                console.log(`[evolution-webhook] 🎤 Transcrevendo áudio com Gemini 3.5 Flash-Lite...`);
                 const transcribed = await analyzeMultimodalWithGemini(
                     audioBase64,
                     'audio/ogg',
@@ -569,7 +575,7 @@ module.exports = async (req, res) => {
             }
 
             if (docBase64) {
-                console.log(`[evolution-webhook] 📄 Analisando documento com Gemini 2.5 Flash...`);
+                console.log(`[evolution-webhook] 📄 Analisando documento com Gemini 3.5 Flash-Lite...`);
                 const pdfPrompt = `Analise este documento com cuidado.
 Se contiver QUALQUER sinal de comprovante de pagamento, Pix, transferência bancária ou recibo:
 Retorne no formato exato:
@@ -606,7 +612,7 @@ Se for outro documento, resuma o conteúdo principal.`;
             }
 
             if (imgBase64) {
-                console.log(`[evolution-webhook] 🖼️ Analisando imagem com Gemini 2.5 Flash...`);
+                console.log(`[evolution-webhook] 🖼️ Analisando imagem com Gemini 3.5 Flash-Lite...`);
                 const imgPrompt = `Analise esta imagem com cuidado.
 Se contiver QUALQUER sinal de comprovante de pagamento, Pix, transferência bancária, recibo ou print de app de banco:
 Retorne no formato exato:

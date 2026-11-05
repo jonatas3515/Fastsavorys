@@ -1964,6 +1964,19 @@ function createMockRes() {
 
 async function handleGemini(req, res) {
     const { message, user_id, attachments, audio_url, image_url, file_url } = req.body || {};
+    // ⏸️ PAUSA GERAL DO ASSISTENTE DE IA: Deixa o bot 100% mudo e transfere para atendimento humano
+    const AI_ASSISTANT_PAUSED = process.env.AI_ASSISTANT_PAUSED === 'false' ? false : true;
+    if (AI_ASSISTANT_PAUSED) {
+        console.log('[gemini] ⏸️ Assistente de IA PAUSADO. Nenhuma mensagem enviada para user_id=' + user_id);
+        return res.status(200).json({
+            version: 'v2',
+            content: { messages: [], actions: [], quick_replies: [] },
+            handover_to_human: 1,
+            order_ready: 0,
+            order_summary: DEFAULT_ORDER_SUMMARY
+        });
+    }
+
     const rawMessage = message || req.body?.text || req.body?.content || '';
     const trimmed = rawMessage.trim();
 
@@ -2077,6 +2090,19 @@ async function handleGeminiCore(req, res) {
     }
 
     const { message, name, user_id, attachments, media_url, audio_url, image_url, file_url } = req.body || {};
+    // ⏸️ PAUSA GERAL DO ASSISTENTE DE IA: Deixa o bot 100% mudo
+    const AI_ASSISTANT_PAUSED = process.env.AI_ASSISTANT_PAUSED === 'false' ? false : true;
+    if (AI_ASSISTANT_PAUSED) {
+        console.log('[geminiCore] ⏸️ Assistente de IA PAUSADO. Nenhuma mensagem enviada para user_id=' + (user_id || 'unknown'));
+        return res.status(200).json({
+            version: 'v2',
+            content: { messages: [], actions: [], quick_replies: [] },
+            handover_to_human: 1,
+            order_ready: 0,
+            order_summary: DEFAULT_ORDER_SUMMARY
+        });
+    }
+
 
     const SITE_URL = 'https://fastsavorys.vercel.app/pages/fast.html';
 

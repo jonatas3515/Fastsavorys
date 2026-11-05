@@ -213,6 +213,13 @@ module.exports = async (req, res) => {
     const senderPhone = msg.from;
     const phoneNumberId = value.metadata?.phone_number_id || DEFAULT_PHONE_ID;
     const clientName = value.contacts?.[0]?.profile?.name || 'Cliente';
+    // ⏸️ PAUSA GERAL DO ASSISTENTE DE IA: Deixa o bot 100% mudo no WhatsApp
+    const AI_ASSISTANT_PAUSED = process.env.AI_ASSISTANT_PAUSED === 'false' ? false : true;
+    if (AI_ASSISTANT_PAUSED) {
+        console.log('[meta-webhook] ⏸️ Assistente de IA PAUSADO. Mensagem de ' + senderPhone + ' não respondida automaticamente.');
+        return res.status(200).json({ success: true, paused: true });
+    }
+
 
     try {
         let messageText = '';

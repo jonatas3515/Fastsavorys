@@ -4,6 +4,7 @@
   "description": "FastSavory's - Sistema de Delivery e Encomendas",
   "main": "index.html",
   "scripts": {
+    "test": "node test/gemini-migration.test.js",
     "prebuild": "node scripts/generate-version.js",
     "dev": "npm run build:css:watch",
     "build:css:watch": "tailwindcss -i ./assets/css/tailwind.css -o ./assets/css/styles.css --watch",

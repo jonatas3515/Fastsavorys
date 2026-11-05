@@ -88,8 +88,8 @@ function populateConfigForm() {
     const aiTemp = document.getElementById('aiTemperature');
     const aiTokens = document.getElementById('aiMaxOutputTokens');
     const mediaEnabled = document.getElementById('mediaProcessingEnabled');
-    if (aiModel) aiModel.value = cfg.ai_model_primary || 'gemini-2.5-flash-lite';
-    if (aiMultimodal) aiMultimodal.value = cfg.ai_model_multimodal || 'gemini-2.5-flash';
+    if (aiModel) aiModel.value = cfg.ai_model_primary || 'gemini-3.5-flash-lite';
+    if (aiMultimodal) aiMultimodal.value = cfg.ai_model_multimodal || 'gemini-3.5-flash-lite';
     if (aiTemp) aiTemp.value = cfg.ai_temperature != null ? cfg.ai_temperature : 0.7;
     if (aiTokens) aiTokens.value = cfg.ai_max_output_tokens || 2048;
     if (mediaEnabled) mediaEnabled.checked = cfg.media_processing_enabled !== false;
@@ -148,8 +148,8 @@ async function saveStoreConfig() {
 
 // --- Save AI Settings ---
 async function handleSaveAiSettings() {
-    const aiModel = document.getElementById('aiModelPrimary')?.value || 'gemini-2.5-flash-lite';
-    const aiMultimodal = document.getElementById('aiModelMultimodal')?.value || 'gemini-2.5-flash';
+    const aiModel = document.getElementById('aiModelPrimary')?.value || 'gemini-3.5-flash-lite';
+    const aiMultimodal = document.getElementById('aiModelMultimodal')?.value || 'gemini-3.5-flash-lite';
     const aiTemp = parseFloat(document.getElementById('aiTemperature')?.value) || 0.7;
     const aiTokens = parseInt(document.getElementById('aiMaxOutputTokens')?.value) || 2048;
     const mediaEnabled = document.getElementById('mediaProcessingEnabled')?.checked !== false;

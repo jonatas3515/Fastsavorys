@@ -11,7 +11,7 @@ BEGIN
         SELECT 1 FROM information_schema.columns
         WHERE table_name = 'fast_store_config' AND column_name = 'ai_model_primary'
     ) THEN
-        ALTER TABLE fast_store_config ADD COLUMN ai_model_primary TEXT NOT NULL DEFAULT 'gemini-2.5-flash-lite';
+        ALTER TABLE fast_store_config ADD COLUMN ai_model_primary TEXT NOT NULL DEFAULT 'gemini-3.5-flash-lite';
     END IF;
 
     -- AI Multimodal Model (for audio/image/PDF — must support inline_data)
@@ -19,7 +19,7 @@ BEGIN
         SELECT 1 FROM information_schema.columns
         WHERE table_name = 'fast_store_config' AND column_name = 'ai_model_multimodal'
     ) THEN
-        ALTER TABLE fast_store_config ADD COLUMN ai_model_multimodal TEXT NOT NULL DEFAULT 'gemini-2.5-flash';
+        ALTER TABLE fast_store_config ADD COLUMN ai_model_multimodal TEXT NOT NULL DEFAULT 'gemini-3.5-flash-lite';
     END IF;
 
     -- AI Temperature (0.0 to 1.0)

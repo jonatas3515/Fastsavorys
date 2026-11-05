@@ -858,8 +858,8 @@ window.StoreConfigService = {
           message_buffer_delay_seconds: parseInt(data.message_buffer_delay_seconds) || 5,
 
           // AI Config (Bot)
-          ai_model_primary: data.ai_model_primary || 'gemini-2.5-flash-lite',
-          ai_model_multimodal: data.ai_model_multimodal || 'gemini-2.5-flash',
+          ai_model_primary: data.ai_model_primary || 'gemini-3.5-flash-lite',
+          ai_model_multimodal: data.ai_model_multimodal || 'gemini-3.5-flash-lite',
           ai_temperature: parseFloat(data.ai_temperature) || 0.7,
           ai_max_output_tokens: parseInt(data.ai_max_output_tokens) || 2048,
           media_processing_enabled: data.media_processing_enabled !== false
