@@ -280,6 +280,13 @@
         min-width: 8rem;
       }
     }
+
+    /* Ocultar Tela de Boas-Vindas no Mobile para cair direto na vitrine de pedidos */
+    @media (max-width: 639px) {
+      #welcomeScreen {
+        display: none !important;
+      }
+    }
   </style>
 </head>
 
@@ -307,7 +314,7 @@
     }
   </script>
   <!-- Welcome Screen with Gradient Background -->
-  <div id="welcomeScreen" class="fixed inset-0 z-[100] overflow-hidden"
+  <div id="welcomeScreen" class="hidden sm:block fixed inset-0 z-[100] overflow-hidden"
     style="background: linear-gradient(135deg, #9e0b5a 0%, #7a0945 25%, #5a0733 50%, #1f2937 75%, #000000 100%);">
 
     <!-- Mobile layout (sem absolute para não sobrepor) -->
@@ -4052,8 +4059,10 @@
 
     // Public Store Logo - Click to return to welcome screen
     const resetWelcome = () => {
-      document.getElementById('welcomeScreen').classList.remove('hidden');
-      sessionStorage.removeItem('fastWelcomeSeen');
+      if (window.innerWidth >= 640) {
+        document.getElementById('welcomeScreen')?.classList.remove('hidden');
+        sessionStorage.removeItem('fastWelcomeSeen');
+      }
     };
     document.getElementById('publicStoreLogo')?.addEventListener('click', resetWelcome);
     document.getElementById('publicStoreLogoDesktop')?.addEventListener('click', resetWelcome);
