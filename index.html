@@ -35,16 +35,15 @@
       return a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168);
     })();
     const isDevHost = isLocalhost || isPrivateIPv4;
-    if (!isDevHost && 'serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker
-          .register('/service-worker.js')
-          .then(reg => console.log('[SW] Registrado:', reg.scope))
-          .catch(err => console.error('[SW] Erro:', err));
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function (registrations) {
+        for (let registration of registrations) {
+          registration.unregister();
+        }
       });
     }
     // Redirecionar automaticamente para a página da FastSavorys
-    window.location.href = 'pages/fast.html';
+    window.location.replace('pages/fast.html');
   </script>
 </head>
 <body>

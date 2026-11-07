@@ -304,7 +304,11 @@
       const ws = document.getElementById('welcomeScreen');
       if (ws) {
         ws.style.display = 'none';
-        ws.classList.add('hidden');
+        try { ws.remove(); } catch (e) { ws.classList.add('hidden'); }
+      }
+      const tc = document.getElementById('testimonialsColumn');
+      if (tc) {
+        try { tc.remove(); } catch (e) { tc.style.display = 'none'; }
       }
       document.body.classList.remove('overflow-hidden');
       try {
@@ -547,22 +551,47 @@
       <div class="container mx-auto px-3 sm:px-4">
         <div id="openNotice" class="text-sm py-2 px-3 rounded-lg my-2 text-center"></div>
 
-        <!-- Tracking + Catalog buttons row -->
-        <div class="flex flex-row justify-center gap-2 mb-1 sm:mb-2">
-          <button id="openTrackingModalBtn" type="button"
-            class="text-xs sm:text-sm bg-gray-100 hover:bg-gray-200 text-gray-800 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-medium flex-1 sm:flex-none sm:w-auto">
+        <!-- Versão Desktop (sm:flex): 4 botões na mesma linha com Império entre Catálogo e Achadinhos -->
+        <div class="hidden sm:flex flex-row justify-center items-center gap-2 mb-2">
+          <button id="openTrackingModalBtn" type="button" onclick="openTrackingModal()"
+            class="text-sm bg-gray-100 hover:bg-gray-200 text-gray-800 px-3 py-2 rounded-lg font-medium shadow-sm transition">
             🔎 Acompanhar pedido
           </button>
-          <!-- CATALOG BUTTON (Public Store) - Added for catalog feature -->
           <button id="openCatalogBtnPublic" type="button" onclick="CatalogModule.open()"
-            class="text-xs sm:text-sm bg-gradient-to-r from-rose-500 to-purple-600 hover:from-rose-600 hover:to-purple-700 text-white px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-medium flex-1 sm:flex-none sm:w-auto">
+            class="text-sm bg-gradient-to-r from-rose-500 to-purple-600 hover:from-rose-600 hover:to-purple-700 text-white px-3 py-2 rounded-lg font-medium shadow-sm transition">
             📚 Ver Catálogo
           </button>
-          <!-- ACHADINHOS BUTTON -->
+          <a href="https://pedidos.site/pedidoimperioburguerepizzas" target="_blank"
+            class="text-sm bg-orange-500 hover:bg-orange-600 text-white px-3 py-2 rounded-lg font-medium flex items-center gap-2 shadow-sm transition">
+            <img src="../assets/img/imperio-burguer-icon.png" alt="Império" class="h-5 w-5 rounded-full object-cover" />
+            <span>Lanches e Pizzas</span>
+          </a>
           <a href="achadinhos.html"
-            class="text-xs sm:text-sm bg-gradient-to-r from-yellow-400 to-amber-500 hover:from-yellow-500 hover:to-amber-600 text-gray-950 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg font-bold flex-1 sm:flex-none sm:w-auto flex items-center justify-center gap-1.5 shadow-sm transition">
+            class="text-sm bg-gradient-to-r from-yellow-400 to-amber-500 hover:from-yellow-500 hover:to-amber-600 text-gray-950 px-3 py-2 rounded-lg font-bold flex items-center gap-1.5 shadow-sm transition">
             <span>Achadinhos</span>
-            <img src="../assets/img/ML-logo.png" alt="Mercado Livre" class="h-4 sm:h-5 object-contain" />
+            <img src="../assets/img/ML-logo.png" alt="Mercado Livre" class="h-5 object-contain" />
+          </a>
+        </div>
+
+        <!-- Versão Mobile (sm:hidden): Grade 2x2 com os 4 botões de mesmo tamanho e perfeitamente alinhados -->
+        <div class="sm:hidden grid grid-cols-2 gap-2 mb-2">
+          <button id="openTrackingModalBtnMobile" type="button" onclick="openTrackingModal()"
+            class="w-full h-10 text-xs bg-gray-100 hover:bg-gray-200 text-gray-800 px-2 rounded-lg font-medium flex items-center justify-center gap-1.5 shadow-sm transition">
+            <span>🔎 Acompanhar pedido</span>
+          </button>
+          <button id="openCatalogBtnMobilePublic" type="button" onclick="CatalogModule.open()"
+            class="w-full h-10 text-xs bg-gradient-to-r from-rose-500 to-purple-600 hover:from-rose-600 hover:to-purple-700 text-white px-2 rounded-lg font-medium flex items-center justify-center gap-1.5 shadow-sm transition">
+            <span>📚 Ver Catálogo</span>
+          </button>
+          <a href="https://pedidos.site/pedidoimperioburguerepizzas" target="_blank"
+            class="w-full h-10 text-xs bg-orange-500 hover:bg-orange-600 text-white px-2 rounded-lg font-medium flex items-center justify-center gap-1.5 shadow-sm transition">
+            <img src="../assets/img/imperio-burguer-icon.png" alt="Império" class="h-4 w-4 rounded-full object-cover" />
+            <span>Lanches e Pizzas</span>
+          </a>
+          <a href="achadinhos.html"
+            class="w-full h-10 text-xs bg-gradient-to-r from-yellow-400 to-amber-500 hover:from-yellow-500 hover:to-amber-600 text-gray-950 px-2 rounded-lg font-bold flex items-center justify-center gap-1.5 shadow-sm transition">
+            <span>Achadinhos</span>
+            <img src="../assets/img/ML-logo.png" alt="Mercado Livre" class="h-4 object-contain" />
           </a>
         </div>
 
@@ -598,11 +627,7 @@
           <button
             class="filter-tab px-4 py-2 rounded-lg bg-purple-200 text-purple-900 font-medium text-sm hover:bg-purple-300 min-w-[130px] text-center"
             data-filter="encomenda">📅 Encomendas</button>
-          <a href="https://pedidos.site/pedidoimperioburguerepizzas" target="_blank"
-            class="px-4 py-2 rounded-lg bg-orange-500 text-white font-medium text-sm hover:bg-orange-600 min-w-[130px] flex items-center justify-center gap-2">
-            <img src="../assets/img/imperio-burguer-icon.png" alt="Império" class="h-5 w-5 rounded-full object-cover" />
-            Lanches e Pizzas
-          </a>
+
         </div>
 
         <!-- Mobile: Horizontal scrollable strip -->
@@ -638,11 +663,7 @@
           <button
             class="filter-tab px-3 py-1.5 rounded-full bg-purple-200 text-purple-900 font-medium text-xs whitespace-nowrap flex-shrink-0"
             data-filter="encomenda">📅 Encomendas</button>
-          <a href="https://pedidos.site/pedidoimperioburguerepizzas" target="_blank"
-            class="px-3 py-1.5 rounded-full bg-orange-500 text-white font-medium text-xs flex items-center gap-1 whitespace-nowrap flex-shrink-0">
-            <img src="../assets/img/imperio-burguer-icon.png" alt="Império" class="h-4 w-4 rounded-full object-cover" />
-            Lanches
-          </a>
+
         </div>
       </div>
     </nav>
@@ -3173,7 +3194,95 @@
       }, 100);
     });
 
-    document.getElementById('closeTrackingModalBtn')?.addEventListener('click', (e) => {
+    function openTrackingModal() {
+      document.getElementById('trackingModal')?.classList.remove('hidden');
+    }
+    function closeTrackingModal() {
+      document.getElementById('trackingModal')?.classList.add('hidden');
+    }
+
+    async function handleTrackOrder() {
+      const codeInput = document.getElementById('trackingOrderCode');
+      const phoneInput = document.getElementById('trackingPhone');
+      const msgDiv = document.getElementById('trackingMessage');
+      const resultDiv = document.getElementById('trackingResult');
+      
+      const code = (codeInput?.value || '').trim().toUpperCase();
+      const phone = normalizePhoneDigits(phoneInput?.value || '');
+      
+      if (!code && !phone) {
+        if (msgDiv) {
+          msgDiv.textContent = 'Informe o código do pedido ou o telefone cadastrado.';
+          msgDiv.className = 'text-red-500 text-sm mt-2 block';
+        }
+        return;
+      }
+      
+      if (msgDiv) {
+        msgDiv.textContent = 'Buscando pedido...';
+        msgDiv.className = 'text-blue-500 text-sm mt-2 block';
+      }
+      resultDiv?.classList.add('hidden');
+      
+      try {
+        let query = window.supabaseClient.from('fast_orders').select('*').order('created_at', { ascending: false }).limit(1);
+        if (code) {
+          query = query.ilike('order_code', `%${code}%`);
+        } else if (phone) {
+          query = query.ilike('client_phone', `%${phone}%`);
+        }
+        
+        const { data, error } = await query;
+        if (error || !data || data.length === 0) {
+          if (msgDiv) {
+            msgDiv.textContent = 'Nenhum pedido recente encontrado.';
+            msgDiv.className = 'text-red-500 text-sm mt-2 block';
+          }
+          return;
+        }
+        
+        const order = data[0];
+        if (msgDiv) msgDiv.className = 'hidden';
+        resultDiv?.classList.remove('hidden');
+        
+        const codeLabel = document.getElementById('trackingCodeLabel');
+        const statusLabel = document.getElementById('trackingStatusLabel');
+        const estimateLabel = document.getElementById('trackingEstimateLabel');
+        const timeline = document.getElementById('trackingTimeline');
+        
+        if (codeLabel) codeLabel.textContent = order.order_code || `#${order.id}`;
+        
+        const statusMap = {
+          'pendente': '⏳ Aguardando Confirmação',
+          'preparando': '👨‍🍳 Em Preparo',
+          'pronto': '✅ Pronto para Entrega/Retirada',
+          'saiu_para_entrega': '🛵 Saiu para Entrega',
+          'entregue': '🎉 Entregue',
+          'cancelado': '❌ Cancelado'
+        };
+        const statusText = statusMap[order.status] || order.status || 'Em andamento';
+        if (statusLabel) statusLabel.textContent = statusText;
+        if (estimateLabel) estimateLabel.textContent = order.delivery_estimate || order.scheduled_time || 'Aguardando estimativa';
+        
+        if (timeline) {
+          timeline.innerHTML = `
+            <div class="p-3 bg-white rounded-lg border border-gray-200 text-xs space-y-1">
+              <p><strong>Cliente:</strong> ${order.client_name || 'Não informado'}</p>
+              <p><strong>Total:</strong> R$ ${Number(order.total || 0).toFixed(2).replace('.', ',')}</p>
+              <p><strong>Pagamento:</strong> ${order.payment_method || 'Não informado'}</p>
+              <p><strong>Entrega:</strong> ${order.address || 'Retirada no Balcão'}</p>
+            </div>
+          `;
+        }
+      } catch (err) {
+        if (msgDiv) {
+          msgDiv.textContent = 'Erro ao consultar pedido.';
+          msgDiv.className = 'text-red-500 text-sm mt-2 block';
+        }
+      }
+    }
+
+        document.getElementById('closeTrackingModalBtn')?.addEventListener('click', (e) => {
       e.preventDefault();
       closeTrackingModal();
     });

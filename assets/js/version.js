@@ -1,3 +1,3 @@
 // Auto-generated version file - DO NOT EDIT MANUALLY
-window.APP_VERSION = 1793746732730;
+window.APP_VERSION = Date.now();
 console.log('[VERSION] App version:', window.APP_VERSION);
