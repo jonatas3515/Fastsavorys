@@ -2047,10 +2047,10 @@
 
       // Welcome Screen Buttons
       document.getElementById('enterStoreBtn')?.addEventListener('click', () => {
-        document.getElementById('welcomeScreen').classList.add('hidden');
+        closeWelcomeScreen();
       });
       document.getElementById('enterStoreBtnMobile')?.addEventListener('click', () => {
-        document.getElementById('welcomeScreen').classList.add('hidden');
+        closeWelcomeScreen();
       });
     }
 
@@ -4167,14 +4167,10 @@
 
     // Welcome Screen - Enter buttons (desktop and mobile)
     document.getElementById('enterStoreBtn')?.addEventListener('click', () => {
-      document.getElementById('welcomeScreen').classList.add('hidden');
-      document.body.classList.remove('overflow-hidden');
-      sessionStorage.setItem('fastWelcomeSeen', 'true');
+      closeWelcomeScreen();
     });
     document.getElementById('enterStoreBtnMobile')?.addEventListener('click', () => {
-      document.getElementById('welcomeScreen').classList.add('hidden');
-      document.body.classList.remove('overflow-hidden');
-      sessionStorage.setItem('fastWelcomeSeen', 'true');
+      closeWelcomeScreen();
     });
 
     // Public Store Logo - Click to return to welcome screen
