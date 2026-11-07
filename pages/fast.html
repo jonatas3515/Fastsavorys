@@ -301,7 +301,7 @@
   <!-- Safe catalog opener (loads before welcome buttons are clickable) -->
   <script>
     function openCatalogSafe() {
-      document.getElementById('welcomeScreen').classList.add('hidden');
+      const ws = document.getElementById('welcomeScreen'); if (ws) { ws.classList.add('hidden'); ws.style.display = 'none'; }
       function tryOpen() {
         if (window.CatalogModule) {
           if (!CatalogModule._initialized) CatalogModule.init();
@@ -314,7 +314,7 @@
     }
   </script>
   <!-- Welcome Screen with Gradient Background -->
-  <div id="welcomeScreen" class="hidden sm:block fixed inset-0 z-[100] overflow-hidden"
+  <div id="welcomeScreen" class="fixed inset-0 z-[100] overflow-hidden"
     style="background: linear-gradient(135deg, #9e0b5a 0%, #7a0945 25%, #5a0733 50%, #1f2937 75%, #000000 100%);">
 
     <!-- Mobile layout (sem absolute para não sobrepor) -->
