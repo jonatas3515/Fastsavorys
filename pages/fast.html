@@ -551,47 +551,47 @@
       <div class="container mx-auto px-3 sm:px-4">
         <div id="openNotice" class="text-sm py-2 px-3 rounded-lg my-2 text-center"></div>
 
-        <!-- Versão Desktop (sm:flex): 4 botões na mesma linha com Império entre Catálogo e Achadinhos -->
+        <!-- Versão Desktop (sm:flex): 4 botões de mesmo tamanho em linha horizontal com Império entre Catálogo e Achadinhos -->
         <div class="hidden sm:flex flex-row justify-center items-center gap-2 mb-2">
           <button id="openTrackingModalBtn" type="button" onclick="openTrackingModal()"
-            class="text-sm bg-gray-100 hover:bg-gray-200 text-gray-800 px-3 py-2 rounded-lg font-medium shadow-sm transition">
-            🔎 Acompanhar pedido
+            class="w-48 h-10 text-sm bg-rose-600 hover:bg-rose-700 text-white px-3 rounded-lg font-medium flex items-center justify-center gap-1.5 shadow-sm transition">
+            <span>🔎 Acompanhar pedido</span>
           </button>
           <button id="openCatalogBtnPublic" type="button" onclick="CatalogModule.open()"
-            class="text-sm bg-gradient-to-r from-rose-500 to-purple-600 hover:from-rose-600 hover:to-purple-700 text-white px-3 py-2 rounded-lg font-medium shadow-sm transition">
-            📚 Ver Catálogo
+            class="w-48 h-10 text-sm bg-rose-600 hover:bg-rose-700 text-white px-3 rounded-lg font-medium flex items-center justify-center gap-1.5 shadow-sm transition">
+            <span>📚 Ver Catálogo</span>
           </button>
           <a href="https://pedidos.site/pedidoimperioburguerepizzas" target="_blank"
-            class="text-sm bg-orange-500 hover:bg-orange-600 text-white px-3 py-2 rounded-lg font-medium flex items-center gap-2 shadow-sm transition">
+            class="w-48 h-10 text-sm bg-orange-500 hover:bg-orange-600 text-white px-3 rounded-lg font-medium flex items-center justify-center gap-2 shadow-sm transition">
             <img src="../assets/img/imperio-burguer-icon.png" alt="Império" class="h-5 w-5 rounded-full object-cover" />
             <span>Lanches e Pizzas</span>
           </a>
           <a href="achadinhos.html"
-            class="text-sm bg-gradient-to-r from-yellow-400 to-amber-500 hover:from-yellow-500 hover:to-amber-600 text-gray-950 px-3 py-2 rounded-lg font-bold flex items-center gap-1.5 shadow-sm transition">
+            class="w-48 h-10 text-sm bg-rose-600 hover:bg-rose-700 text-white px-3 rounded-lg font-bold flex items-center justify-center gap-1.5 shadow-sm transition">
             <span>Achadinhos</span>
             <img src="../assets/img/ML-logo.png" alt="Mercado Livre" class="h-5 object-contain" />
           </a>
         </div>
 
-        <!-- Versão Mobile (sm:hidden): Grade 2x2 com os 4 botões de mesmo tamanho e perfeitamente alinhados -->
+        <!-- Versão Mobile (sm:hidden): Grade 2x2 com os 4 botões de mesmo tamanho, altura compacta (h-8) e alinhados -->
         <div class="sm:hidden grid grid-cols-2 gap-2 mb-2">
           <button id="openTrackingModalBtnMobile" type="button" onclick="openTrackingModal()"
-            class="w-full h-10 text-xs bg-gray-100 hover:bg-gray-200 text-gray-800 px-2 rounded-lg font-medium flex items-center justify-center gap-1.5 shadow-sm transition">
+            class="w-full h-8 text-xs bg-rose-600 hover:bg-rose-700 text-white px-2 rounded-lg font-medium flex items-center justify-center gap-1.5 shadow-sm transition">
             <span>🔎 Acompanhar pedido</span>
           </button>
           <button id="openCatalogBtnMobilePublic" type="button" onclick="CatalogModule.open()"
-            class="w-full h-10 text-xs bg-gradient-to-r from-rose-500 to-purple-600 hover:from-rose-600 hover:to-purple-700 text-white px-2 rounded-lg font-medium flex items-center justify-center gap-1.5 shadow-sm transition">
+            class="w-full h-8 text-xs bg-rose-600 hover:bg-rose-700 text-white px-2 rounded-lg font-medium flex items-center justify-center gap-1.5 shadow-sm transition">
             <span>📚 Ver Catálogo</span>
           </button>
           <a href="https://pedidos.site/pedidoimperioburguerepizzas" target="_blank"
-            class="w-full h-10 text-xs bg-orange-500 hover:bg-orange-600 text-white px-2 rounded-lg font-medium flex items-center justify-center gap-1.5 shadow-sm transition">
-            <img src="../assets/img/imperio-burguer-icon.png" alt="Império" class="h-4 w-4 rounded-full object-cover" />
+            class="w-full h-8 text-xs bg-orange-500 hover:bg-orange-600 text-white px-2 rounded-lg font-medium flex items-center justify-center gap-1.5 shadow-sm transition">
+            <img src="../assets/img/imperio-burguer-icon.png" alt="Império" class="h-3.5 w-3.5 rounded-full object-cover" />
             <span>Lanches e Pizzas</span>
           </a>
           <a href="achadinhos.html"
-            class="w-full h-10 text-xs bg-gradient-to-r from-yellow-400 to-amber-500 hover:from-yellow-500 hover:to-amber-600 text-gray-950 px-2 rounded-lg font-bold flex items-center justify-center gap-1.5 shadow-sm transition">
+            class="w-full h-8 text-xs bg-rose-600 hover:bg-rose-700 text-white px-2 rounded-lg font-bold flex items-center justify-center gap-1.5 shadow-sm transition">
             <span>Achadinhos</span>
-            <img src="../assets/img/ML-logo.png" alt="Mercado Livre" class="h-4 object-contain" />
+            <img src="../assets/img/ML-logo.png" alt="Mercado Livre" class="h-3.5 object-contain" />
           </a>
         </div>
 
