@@ -298,10 +298,21 @@
     <button onclick="this.parentElement.classList.add('hidden'); loadProducts();"
       class="text-yellow-700 hover:text-yellow-900 underline font-medium">Tentar novamente</button>
   </div>
-  <!-- Safe catalog opener (loads before welcome buttons are clickable) -->
+  <!-- Safe catalog opener & instant welcome closer -->
   <script>
+    function closeWelcomeScreen() {
+      const ws = document.getElementById('welcomeScreen');
+      if (ws) {
+        ws.style.display = 'none';
+        ws.classList.add('hidden');
+      }
+      document.body.classList.remove('overflow-hidden');
+      try {
+        sessionStorage.setItem('fastWelcomeSeen', 'true');
+      } catch (e) {}
+    }
     function openCatalogSafe() {
-      const ws = document.getElementById('welcomeScreen'); if (ws) { ws.classList.add('hidden'); ws.style.display = 'none'; }
+      closeWelcomeScreen();
       function tryOpen() {
         if (window.CatalogModule) {
           if (!CatalogModule._initialized) CatalogModule.init();
@@ -332,7 +343,7 @@
           style="max-width: 50vw; max-height: 80vh; width: auto; height: auto;" />
       </div>
       <div class="text-center pb-6 space-y-3">
-        <button id="enterStoreBtnMobile"
+        <button id="enterStoreBtnMobile" onclick="closeWelcomeScreen()"
           class="px-6 py-3 bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-black font-bold text-base rounded-full shadow-2xl animate-pulse">
           🛒 Fazer Pedido
         </button>
@@ -355,7 +366,7 @@
         <p class="text-xl md:text-2xl text-white drop-shadow-lg" style="margin-top: 1rem; margin-bottom: 3rem;">
           Faça agora mesmo a sua encomenda!
         </p>
-        <button id="enterStoreBtn"
+        <button id="enterStoreBtn" onclick="closeWelcomeScreen()"
           class="px-6 py-3 bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-black font-bold text-lg rounded-full shadow-2xl transform hover:scale-105 transition-all duration-300">
           🛒 Fazer Pedido
         </button>
