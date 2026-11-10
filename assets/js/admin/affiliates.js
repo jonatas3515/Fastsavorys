@@ -24,13 +24,35 @@ window.AffiliatesModule = (function () {
 
     try {
       if (window.supabaseClient) {
-        const { data, error } = await window.supabaseClient
-          .from('fast_affiliate_products')
-          .select('*')
-          .order('position', { ascending: true });
+        let allProducts = [];
+        let from = 0;
+        const pageSize = 1000;
+        let hasMore = true;
 
-        if (!error && data) {
-          productsList = data;
+        while (hasMore) {
+          const { data, error } = await window.supabaseClient
+            .from('fast_affiliate_products')
+            .select('*')
+            .order('position', { ascending: true })
+            .range(from, from + pageSize - 1);
+
+          if (error) {
+            console.warn('[Admin Affiliates] Erro na paginação:', error);
+            hasMore = false;
+          } else if (data && data.length > 0) {
+            allProducts.push(...data);
+            if (data.length < pageSize) {
+              hasMore = false;
+            } else {
+              from += pageSize;
+            }
+          } else {
+            hasMore = false;
+          }
+        }
+
+        if (allProducts.length > 0) {
+          productsList = allProducts;
         } else {
           // Fallback inicial
           productsList = window.DEFAULT_AFFILIATE_PRODUCTS || [];

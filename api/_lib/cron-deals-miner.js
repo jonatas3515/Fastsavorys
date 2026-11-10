@@ -267,7 +267,7 @@ async function handleMineDeals(req, res) {
     let existingTitles = new Set();
 
     try {
-      const getRes = await fetch(`${SUPABASE_URL}/rest/v1/fast_affiliate_products?select=id,title,affiliate_url&limit=300`, {
+      const getRes = await fetch(`${SUPABASE_URL}/rest/v1/fast_affiliate_products?select=id,title,affiliate_url&limit=10000`, {
         headers: {
           'apikey': SUPABASE_KEY,
           'Authorization': `Bearer ${SUPABASE_KEY}`
@@ -443,7 +443,7 @@ async function handleMineShopeeDeals(req, res) {
     let existingUrls = new Set();
     let existingTitles = new Set();
     try {
-      const getRes = await fetch(`${SUPABASE_URL}/rest/v1/fast_affiliate_products?select=id,title,affiliate_url&limit=600`, {
+      const getRes = await fetch(`${SUPABASE_URL}/rest/v1/fast_affiliate_products?select=id,title,affiliate_url&limit=10000`, {
         headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
       });
       if (getRes.ok) {

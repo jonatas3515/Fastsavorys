@@ -278,14 +278,36 @@
 
     try {
       if (window.supabaseClient) {
-        const { data, error } = await window.supabaseClient
-          .from('fast_affiliate_products')
-          .select('*')
-          .eq('is_active', true)
-          .order('position', { ascending: true });
+        let allProducts = [];
+        let from = 0;
+        const pageSize = 1000;
+        let hasMore = true;
 
-        if (!error && data && data.length > 0) {
-          affiliateProducts = data;
+        while (hasMore) {
+          const { data, error } = await window.supabaseClient
+            .from('fast_affiliate_products')
+            .select('*')
+            .eq('is_active', true)
+            .order('position', { ascending: true })
+            .range(from, from + pageSize - 1);
+
+          if (error) {
+            console.warn('[Achadinhos] Erro na paginação:', error);
+            hasMore = false;
+          } else if (data && data.length > 0) {
+            allProducts.push(...data);
+            if (data.length < pageSize) {
+              hasMore = false;
+            } else {
+              from += pageSize;
+            }
+          } else {
+            hasMore = false;
+          }
+        }
+
+        if (allProducts.length > 0) {
+          affiliateProducts = allProducts;
         } else {
           // Fallback para os dados pré-definidos
           affiliateProducts = window.DEFAULT_AFFILIATE_PRODUCTS || [];

@@ -981,7 +981,7 @@ async function handler(req, res) {
       const existingUrls = new Set();
       const existingTitles = new Set();
       try {
-        const getRes = await fetch(`${SUPABASE_URL}/rest/v1/fast_affiliate_products?select=id,title,affiliate_url&limit=600`, {
+        const getRes = await fetch(`${SUPABASE_URL}/rest/v1/fast_affiliate_products?select=id,title,affiliate_url&limit=10000`, {
           headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` }
         });
         if (getRes.ok) {
