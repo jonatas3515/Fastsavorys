@@ -529,6 +529,61 @@ async function handleSendWhatsAppDeal(req, res) {
   // Variável para rastrear o índice do disparo nas datas duplas (1 a 200)
   let doubleDayDispatchIndex = null;
 
+  // Contador dedicado de disparos do dia em fast_data_versions.
+  // last_posted_at dos produtos NÃO serve para isso: o cron do Instagram também grava
+  // nesse campo e inflaria a contagem de 200 ou dispararia o cooldown indevidamente.
+  const brtDate = new Date(now.getTime() - 3 * 3600 * 1000);
+  const todayBrt = brtDate.toISOString().split('T')[0];
+  const counterKey = `wa_deals_${todayBrt}`;
+  let dailySentCount = 0;
+  let lastSentAtMs = 0;
+
+  if (mode === 'auto' && !force) {
+    try {
+      const { data: lockRow } = await supabaseAdmin
+        .from('fast_data_versions')
+        .select('version, updated_at')
+        .eq('key', counterKey)
+        .maybeSingle();
+
+      if (lockRow) {
+        dailySentCount = Number(lockRow.version) || 0;
+        lastSentAtMs = lockRow.updated_at ? new Date(lockRow.updated_at).getTime() : 0;
+      } else {
+        // Fallback para o 1º disparo do dia (contador ainda inexistente):
+        // conta produtos já postados hoje para não reiniciar a fila em caso de redeploy
+        const todayStartIso = new Date(`${todayBrt}T00:00:00.000-03:00`).toISOString();
+        const { count: legacyCount } = await supabaseAdmin
+          .from('fast_affiliate_products')
+          .select('id', { count: 'exact', head: true })
+          .gte('last_posted_at', todayStartIso);
+        dailySentCount = Number(legacyCount) || 0;
+
+        const lastTs = [];
+        const { data: lastAffiliate } = await supabaseAdmin
+          .from('fast_affiliate_products')
+          .select('last_posted_at')
+          .not('last_posted_at', 'is', null)
+          .order('last_posted_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        const { data: lastStore } = await supabaseAdmin
+          .from('fast_products')
+          .select('last_posted_at')
+          .not('last_posted_at', 'is', null)
+          .order('last_posted_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        [lastAffiliate, lastStore].forEach(r => {
+          if (r && r.last_posted_at) lastTs.push(new Date(r.last_posted_at).getTime());
+        });
+        lastSentAtMs = lastTs.length ? Math.max(...lastTs) : 0;
+      }
+    } catch (lockErr) {
+      console.warn('[WhatsApp Deal] Aviso ao verificar contador diário:', lockErr.message);
+    }
+  }
+
   if (isDoubleDay) {
     // REGRAS ESPECÍFICAS PARA DATAS DUPLAS (01/01, 02/02, ..., 11/11, 12/12):
     // 1. Volume de envios: Exatamente 200 disparos por dia ativo
@@ -563,57 +618,31 @@ async function handleSendWhatsAppDeal(req, res) {
         });
       }
 
-      // Trava de segurança no banco: Contagem exata de disparos efetuados hoje em horário de Brasília
-      try {
-        const brtDate = new Date(now.getTime() - 3 * 3600 * 1000);
-        const todayBrt = brtDate.toISOString().split('T')[0];
-        const todayStartIso = new Date(`${todayBrt}T00:00:00.000-03:00`).toISOString();
+      if (dailySentCount >= 200) {
+        return res.status(200).json({
+          success: true,
+          skipped: true,
+          message: `O limite diário de 200 disparos do Mega Evento ${eventLabel} já foi concluído com sucesso hoje (${dailySentCount}/200). Fila diária finalizada.`,
+          dailySentCount,
+          timeKey,
+          isDoubleDay: true,
+          eventLabel
+        });
+      }
 
-        const { count: dailySentCount } = await supabaseAdmin
-          .from('fast_affiliate_products')
-          .select('id', { count: 'exact', head: true })
-          .gte('last_posted_at', todayStartIso);
-
-        if (typeof dailySentCount === 'number' && dailySentCount >= 200) {
+      // Trava de cooldown anti-duplicidade no slot de 5 minutos (evita duplo disparo se o cron rodar duas vezes)
+      if (lastSentAtMs > 0) {
+        const diffMs = now.getTime() - lastSentAtMs;
+        if (diffMs < 3 * 60 * 1000) {
           return res.status(200).json({
             success: true,
             skipped: true,
-            message: `O limite diário de 200 disparos do Mega Evento ${eventLabel} já foi concluído com sucesso hoje (${dailySentCount}/200). Fila diária finalizada.`,
-            dailySentCount,
+            message: `Disparo ignorado para evitar envio duplo no slot de 5 minutos: último envio realizado há ${Math.round(diffMs / 1000)}s.`,
             timeKey,
             isDoubleDay: true,
             eventLabel
           });
         }
-      } catch (countErr) {
-        console.warn('[WhatsApp Deal] Aviso ao verificar contagem diária:', countErr.message);
-      }
-
-      // Trava de cooldown anti-duplicidade no slot de 5 minutos (evita duplo disparo se o cron rodar duas vezes)
-      try {
-        const { data: lastPost } = await supabaseAdmin
-          .from('fast_affiliate_products')
-          .select('last_posted_at')
-          .not('last_posted_at', 'is', null)
-          .order('last_posted_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (lastPost && lastPost.last_posted_at) {
-          const diffMs = now.getTime() - new Date(lastPost.last_posted_at).getTime();
-          if (diffMs < 3 * 60 * 1000) {
-            return res.status(200).json({
-              success: true,
-              skipped: true,
-              message: `Disparo ignorado para evitar envio duplo no slot de 5 minutos: último envio realizado há ${Math.round(diffMs / 1000)}s.`,
-              timeKey,
-              isDoubleDay: true,
-              eventLabel
-            });
-          }
-        }
-      } catch (coolErr) {
-        console.warn('[WhatsApp Deal] Aviso ao verificar cooldown:', coolErr.message);
       }
 
       // Em datas duplas, todos os 200 envios são promoções de ofertas para o grupo
@@ -636,6 +665,21 @@ async function handleSendWhatsAppDeal(req, res) {
           timeKey,
           isDoubleDay: false
         });
+      }
+
+      // Cooldown de ~15 minutos em dias normais: mantém a cadência mesmo se o agendador
+      // chamar o endpoint com mais frequência (ex.: */5 da Oracle nos dias duplos)
+      if (lastSentAtMs > 0) {
+        const diffMs = now.getTime() - lastSentAtMs;
+        if (diffMs < 12 * 60 * 1000) {
+          return res.status(200).json({
+            success: true,
+            skipped: true,
+            message: `Disparo ignorado: último envio ao grupo há ${Math.round(diffMs / 60000)} min (cadência de ~15 min em dias normais).`,
+            timeKey,
+            isDoubleDay: false
+          });
+        }
       }
 
       // Disparos a cada 15 minutos com intercalação de slots do cardápio FastSavory's
@@ -970,6 +1014,22 @@ async function handleSendWhatsAppDeal(req, res) {
         .eq('id', product.id);
     } catch (updateErr) {
       console.warn(`[WhatsApp Deal] Aviso ao atualizar last_posted_at em ${targetTable}:`, updateErr.message);
+    }
+
+    // Incrementa o contador dedicado de disparos do dia (conta apenas envios reais ao grupo)
+    try {
+      const brtDay = new Date(now.getTime() - 3 * 3600 * 1000).toISOString().split('T')[0];
+      const key = `wa_deals_${brtDay}`;
+      const { data: row } = await supabaseAdmin
+        .from('fast_data_versions')
+        .select('version')
+        .eq('key', key)
+        .maybeSingle();
+      await supabaseAdmin
+        .from('fast_data_versions')
+        .upsert({ key, version: (Number(row && row.version) || 0) + 1, updated_at: nowIso });
+    } catch (counterErr) {
+      console.warn('[WhatsApp Deal] Aviso ao incrementar contador diário:', counterErr.message);
     }
 
     return res.status(200).json({
