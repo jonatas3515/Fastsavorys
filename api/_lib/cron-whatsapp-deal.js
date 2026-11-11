@@ -511,8 +511,13 @@ async function handleSendWhatsAppDeal(req, res) {
   // Converte para minutos totais do dia no Horário de Brasília (UTC-3)
   const totalBrtMinutes = ((utcHours - 3 + 24) % 24) * 60 + utcMinutes;
 
-  // Arredonda para o intervalo de 15 minutos mais próximo (tolerância de +/- 7 minutos para atrasos de rede/cron)
-  const roundedMinutes = Math.round(totalBrtMinutes / 15) * 15;
+  const { isDoubleDay, eventLabel } = getDoubleDayContext(now);
+
+  // Intervalo e timeKey:
+  // - Em Datas Duplas: intervalo contínuo de 5 minutos (tolerância de +/- 2 minutos)
+  // - Em Dias Normais: intervalo padrão de 15 minutos (tolerância de +/- 7 minutos)
+  const slotInterval = isDoubleDay ? 5 : 15;
+  const roundedMinutes = Math.round(totalBrtMinutes / slotInterval) * slotInterval;
   const roundedBrtHours = Math.floor(roundedMinutes / 60) % 24;
   const roundedSlotMinute = roundedMinutes % 60;
   const timeKey = `${String(roundedBrtHours).padStart(2, '0')}:${String(roundedSlotMinute).padStart(2, '0')}`;
@@ -521,27 +526,122 @@ async function handleSendWhatsAppDeal(req, res) {
   const force = req.query.force === 'true' || (req.body && req.body.force === true);
   let targetType = mode;
 
-  // 9 Horários estratégicos da FastSavory's intercalados (Almoço, Sobremesas, Fornadas, Lanche e Encomendas da tarde)
-  const fastSavorysSlots = ['11:30', '12:00', '12:45', '13:30', '14:00', '15:00', '15:45', '16:30', '17:30'];
+  // Variável para rastrear o índice do disparo nas datas duplas (1 a 200)
+  let doubleDayDispatchIndex = null;
 
-  const { isDoubleDay, eventLabel } = getDoubleDayContext();
+  if (isDoubleDay) {
+    // REGRAS ESPECÍFICAS PARA DATAS DUPLAS (01/01, 02/02, ..., 11/11, 12/12):
+    // 1. Volume de envios: Exatamente 200 disparos por dia ativo
+    // 2. Horário de início: 1º disparo pontualmente às 06:00 (minuto 360)
+    // 3. Intervalo entre envios: 1 mensagem a cada 5 minutos de forma contínua
+    // 4. Horário de encerramento: 200º e último disparo pontualmente às 22:35 (minuto 1355)
+    //    Cálculo: (1355 - 360) / 5 + 1 = 199 intervalos + 1 = exatamente 200 disparos!
+    const startMinute = 6 * 60; // 06:00 BRT = 360 minutos
+    const endMinute = 22 * 60 + 35; // 22:35 BRT = 1355 minutos
+    doubleDayDispatchIndex = Math.round((roundedMinutes - startMinute) / 5) + 1;
 
-  if (mode === 'auto' && !force) {
-    // Janela permitida: das 07h00 até as 22h30 exatamente (último disparo às 22h30)
-    // Bloqueia qualquer disparo antes das 07h00 ou após as 22h30 (como 22h45 e 22h55)
-    const isWithinHours = (roundedBrtHours >= 7 && roundedBrtHours < 22) || (roundedBrtHours === 22 && roundedSlotMinute <= 30);
-    if (!isWithinHours) {
-      return res.status(200).json({
-        success: true,
-        skipped: true,
-        message: `Horário ${timeKey} fora da janela oficial de disparos (07h00 às 22h30).`,
-        timeKey
-      });
+    if (mode === 'auto' && !force) {
+      if (roundedMinutes < startMinute) {
+        return res.status(200).json({
+          success: true,
+          skipped: true,
+          message: `Horário ${timeKey} fora da janela oficial de Mega Evento ${eventLabel} (06h00 às 22h35). O 1º disparo ocorrerá pontualmente às 06h00.`,
+          timeKey,
+          isDoubleDay: true,
+          eventLabel
+        });
+      }
+
+      if (roundedMinutes > endMinute) {
+        return res.status(200).json({
+          success: true,
+          skipped: true,
+          message: `Fila diária de 200 disparos do Mega Evento ${eventLabel} encerrada pontualmente às 22h35. Nenhum disparo restante para hoje.`,
+          timeKey,
+          isDoubleDay: true,
+          eventLabel
+        });
+      }
+
+      // Trava de segurança no banco: Contagem exata de disparos efetuados hoje em horário de Brasília
+      try {
+        const brtDate = new Date(now.getTime() - 3 * 3600 * 1000);
+        const todayBrt = brtDate.toISOString().split('T')[0];
+        const todayStartIso = new Date(`${todayBrt}T00:00:00.000-03:00`).toISOString();
+
+        const { count: dailySentCount } = await supabaseAdmin
+          .from('fast_affiliate_products')
+          .select('id', { count: 'exact', head: true })
+          .gte('last_posted_at', todayStartIso);
+
+        if (typeof dailySentCount === 'number' && dailySentCount >= 200) {
+          return res.status(200).json({
+            success: true,
+            skipped: true,
+            message: `O limite diário de 200 disparos do Mega Evento ${eventLabel} já foi concluído com sucesso hoje (${dailySentCount}/200). Fila diária finalizada.`,
+            dailySentCount,
+            timeKey,
+            isDoubleDay: true,
+            eventLabel
+          });
+        }
+      } catch (countErr) {
+        console.warn('[WhatsApp Deal] Aviso ao verificar contagem diária:', countErr.message);
+      }
+
+      // Trava de cooldown anti-duplicidade no slot de 5 minutos (evita duplo disparo se o cron rodar duas vezes)
+      try {
+        const { data: lastPost } = await supabaseAdmin
+          .from('fast_affiliate_products')
+          .select('last_posted_at')
+          .not('last_posted_at', 'is', null)
+          .order('last_posted_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (lastPost && lastPost.last_posted_at) {
+          const diffMs = now.getTime() - new Date(lastPost.last_posted_at).getTime();
+          if (diffMs < 3 * 60 * 1000) {
+            return res.status(200).json({
+              success: true,
+              skipped: true,
+              message: `Disparo ignorado para evitar envio duplo no slot de 5 minutos: último envio realizado há ${Math.round(diffMs / 1000)}s.`,
+              timeKey,
+              isDoubleDay: true,
+              eventLabel
+            });
+          }
+        }
+      } catch (coolErr) {
+        console.warn('[WhatsApp Deal] Aviso ao verificar cooldown:', coolErr.message);
+      }
+
+      // Em datas duplas, todos os 200 envios são promoções de ofertas para o grupo
+      targetType = 'affiliate';
     }
+  } else {
+    // DIAS NORMAIS (MANTIDOS EXATAMENTE COMO ESTAVAM):
+    // 9 Horários estratégicos da FastSavory's intercalados (Almoço, Sobremesas, Fornadas, Lanche e Encomendas da tarde)
+    const fastSavorysSlots = ['11:30', '12:00', '12:45', '13:30', '14:00', '15:00', '15:45', '16:30', '17:30'];
 
-    // Disparos a cada 15 minutos com intercalação de slots do cardápio FastSavory's
-    const isFastSavorysSlot = fastSavorysSlots.includes(timeKey);
-    targetType = isFastSavorysSlot ? 'fastsavorys' : 'affiliate';
+    if (mode === 'auto' && !force) {
+      // Janela permitida: das 07h00 até as 22h30 exatamente (último disparo às 22h30)
+      // Bloqueia qualquer disparo antes das 07h00 ou após as 22h30 (como 22h45 e 22h55)
+      const isWithinHours = (roundedBrtHours >= 7 && roundedBrtHours < 22) || (roundedBrtHours === 22 && roundedSlotMinute <= 30);
+      if (!isWithinHours) {
+        return res.status(200).json({
+          success: true,
+          skipped: true,
+          message: `Horário ${timeKey} fora da janela oficial de disparos (07h00 às 22h30).`,
+          timeKey,
+          isDoubleDay: false
+        });
+      }
+
+      // Disparos a cada 15 minutos com intercalação de slots do cardápio FastSavory's
+      const isFastSavorysSlot = fastSavorysSlots.includes(timeKey);
+      targetType = isFastSavorysSlot ? 'fastsavorys' : 'affiliate';
+    }
   }
 
   try {
@@ -874,12 +974,18 @@ async function handleSendWhatsAppDeal(req, res) {
 
     return res.status(200).json({
       success: true,
-      message: `Oferta enviada com sucesso para o grupo (${product.title || product.name})`,
+      message: isDoubleDay
+        ? `Oferta ${doubleDayDispatchIndex ? `${doubleDayDispatchIndex}/200 ` : ''}do Mega Evento ${eventLabel} enviada com sucesso para o grupo (${product.title || product.name})`
+        : `Oferta enviada com sucesso para o grupo (${product.title || product.name})`,
       type: isFastSavorysStore ? 'fastsavorys_store' : 'affiliate_deal',
       productId: product.id,
       productTitle: product.title || product.name,
       timeKey,
       postedAt: nowIso,
+      isDoubleDay,
+      eventLabel: isDoubleDay ? eventLabel : null,
+      dispatchNumber: isDoubleDay ? doubleDayDispatchIndex : null,
+      totalDispatchesTarget: isDoubleDay ? 200 : null,
       evolutionResponse: sendResponse
     });
 
