@@ -1,8 +1,14 @@
 name: Disparo Automático de Ofertas no WhatsApp (FastSavory's)
 
 on:
+  # Agendamento automático: a cada 5 minutos via GitHub Actions
+  # NOTA: GitHub Actions free pode ter atrasos de 5-30 min. Para máxima precisão,
+  # o crontab da Oracle VPS (*/5 * * * *) é o agendador principal.
+  # Este workflow serve como backup e para disparos manuais.
+  schedule:
+    - cron: '*/5 * * * *'
+
   # Permite disparar manualmente a qualquer momento pelo botão "Run workflow" no GitHub
-  # Os agendamentos automáticos de hora em hora rodam exclusivamente via cron-job.org
   workflow_dispatch:
     inputs:
       mode:
