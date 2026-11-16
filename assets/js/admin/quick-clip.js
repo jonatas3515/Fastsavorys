@@ -6,6 +6,78 @@
  * Proteção total: NUNCA salva produtos do Mercado Livre com links comuns sem comissão!
  */
 (async function () {
+  // Variável global de captura de link de afiliado oficial
+  let lastCapturedAffiliateLink = null;
+
+  // 1. Intercepta navigator.clipboard.writeText para capturar links copiados pelo modal do ML
+  try {
+    if (navigator && navigator.clipboard && navigator.clipboard.writeText) {
+      if (!window._fastClipWriteHooked) {
+        window._fastClipWriteHooked = true;
+        const origWriteText = navigator.clipboard.writeText.bind(navigator.clipboard);
+        navigator.clipboard.writeText = async function (text) {
+          if (typeof text === 'string') {
+            const m = text.match(/https?:\/\/(?:mercadolivre\.com\/sec|meli\.la)\/[a-zA-Z0-9_\-\.\/]+/i);
+            if (m) {
+              lastCapturedAffiliateLink = m[0];
+              console.log('[Quick Clip Hook] Link capturado via clipboard.writeText:', m[0]);
+            }
+          }
+          try {
+            return await origWriteText(text);
+          } catch (e) {
+            return Promise.resolve();
+          }
+        };
+      }
+    }
+  } catch (e) {}
+
+  // 2. Intercepta evento de 'copy' no document (caso o ML use document.execCommand('copy'))
+  try {
+    if (!window._fastCopyEventHooked) {
+      window._fastCopyEventHooked = true;
+      document.addEventListener('copy', function (e) {
+        try {
+          if (e.clipboardData) {
+            const text = e.clipboardData.getData('text/plain');
+            if (text) {
+              const m = text.match(/https?:\/\/(?:mercadolivre\.com\/sec|meli\.la)\/[a-zA-Z0-9_\-\.\/]+/i);
+              if (m) {
+                lastCapturedAffiliateLink = m[0];
+                console.log('[Quick Clip Hook] Link capturado via copy event:', m[0]);
+              }
+            }
+          }
+        } catch (err) {}
+      }, true);
+    }
+  } catch (e) {}
+
+  // 3. Intercepta window.fetch para capturar respostas de APIs do Mercado Livre
+  try {
+    if (!window._fastFetchHooked && window.fetch) {
+      window._fastFetchHooked = true;
+      const origFetch = window.fetch;
+      window.fetch = async function (...args) {
+        const res = await origFetch.apply(this, args);
+        try {
+          const clone = res.clone();
+          clone.text().then(text => {
+            if (text) {
+              const m = text.match(/https?:\/\/(?:mercadolivre\.com\/sec|meli\.la)\/[a-zA-Z0-9_\-\.\/]+/i);
+              if (m) {
+                lastCapturedAffiliateLink = m[0];
+                console.log('[Quick Clip Hook] Link capturado via fetch API:', m[0]);
+              }
+            }
+          }).catch(() => {});
+        } catch (err) {}
+        return res;
+      };
+    }
+  } catch (e) {}
+
   try {
     const host = window.location.hostname;
     const href = window.location.href;
@@ -38,10 +110,59 @@
   }
 
   // ------------------------------------------------------------
+  // FUNÇÃO AUXILIAR: CLICA NO BOTÃO "COPIAR LINK" NO MODAL DO MERCADO LIVRE
+  // ------------------------------------------------------------
+  function clickCopyLinkInModal() {
+    const modal = document.querySelector('.andes-modal, [role="dialog"], [class*="modal-content"], [class*="modal"]');
+    const root = modal || document;
+
+    // 1. Procura em todos os elementos cujo texto seja exatamente "copiar link"
+    const all = Array.from(root.querySelectorAll('*'));
+    for (const el of all) {
+      if (el.children.length <= 2) {
+        const txt = (el.textContent || el.innerText || '').trim().toLowerCase();
+        if (txt === 'copiar link' || txt === 'copiar o link' || txt === 'copiar link de afiliado') {
+          const clickable = el.closest('button, [role="button"], a, [tabindex="0"], div') || el.parentElement || el;
+          clickable.focus();
+          clickable.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
+          clickable.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
+          clickable.click();
+          console.log('[Quick Clip] Botão "Copiar link" clicado com sucesso!');
+          return true;
+        }
+      }
+    }
+
+    // 2. Procura por botões com aria-label ou title "copiar link"
+    for (const el of all) {
+      const aria = (el.getAttribute('aria-label') || el.getAttribute('title') || '').toLowerCase();
+      if (aria.includes('copiar link')) {
+        el.focus();
+        el.click();
+        return true;
+      }
+    }
+
+    // 3. Fallback: primeiro botão que contenha a palavra "copiar" dentro do modal (sem ser ID ou informação)
+    for (const el of all) {
+      const txt = (el.textContent || el.innerText || '').trim().toLowerCase();
+      if (txt.includes('copiar') && !txt.includes('id') && !txt.includes('informação') && !txt.includes('informacao')) {
+        const clickable = el.closest('button, [role="button"], a') || el;
+        clickable.click();
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  // ------------------------------------------------------------
   // FUNÇÃO AUXILIAR: EXTRAÇÃO ROBUSTA DE LINK OFICIAL /sec/ OU meli.la
   // ------------------------------------------------------------
   async function extractMLShareLink(shareBtn) {
     if (!shareBtn) return null;
+
+    lastCapturedAffiliateLink = null;
 
     try {
       shareBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -51,78 +172,89 @@
       console.warn('[Quick Clip] Erro ao clicar no botão compartilhar:', e);
     }
 
-    const maxWait = 3200;
+    const maxWait = 4500;
     const start = Date.now();
-    let foundUrl = null;
+    let copyAttempts = 0;
 
     while (Date.now() - start < maxWait) {
-      // 1. Procura em todos os inputs e textareas do modal ou da página
+      if (lastCapturedAffiliateLink) break;
+
+      // Localiza o modal
+      const modalEl = document.querySelector('.andes-modal, [role="dialog"], [class*="modal-content"], [class*="modal"]');
+      if (modalEl) {
+        // Clica no botão "Copiar link" dentro do modal
+        if (copyAttempts === 0 || (Date.now() - start > 1000 && copyAttempts < 4)) {
+          if (clickCopyLinkInModal()) {
+            copyAttempts++;
+          }
+        }
+      }
+
+      if (lastCapturedAffiliateLink) break;
+
+      // Lê navigator.clipboard se disponível
+      if (navigator.clipboard && navigator.clipboard.readText) {
+        try {
+          const clipText = await navigator.clipboard.readText();
+          if (clipText) {
+            const m = clipText.match(/https?:\/\/(?:mercadolivre\.com\/sec|meli\.la)\/[a-zA-Z0-9_\-\.\/]+/i);
+            if (m) {
+              lastCapturedAffiliateLink = m[0];
+              break;
+            }
+          }
+        } catch (e) {}
+      }
+
+      if (lastCapturedAffiliateLink) break;
+
+      // Procura em todos os inputs e textareas do modal ou da página
       const allInputs = Array.from(document.querySelectorAll('.andes-modal input, .andes-modal textarea, [role="dialog"] input, [class*="modal"] input, input, textarea'));
       for (const inp of allInputs) {
         const val = (inp.value || inp.getAttribute('value') || '').trim();
         const m = val.match(/https?:\/\/(?:mercadolivre\.com\/sec|meli\.la)\/[a-zA-Z0-9_\-\.\/]+/i);
         if (m) {
-          foundUrl = m[0];
+          lastCapturedAffiliateLink = m[0];
           break;
         }
       }
-      if (foundUrl) break;
+      if (lastCapturedAffiliateLink) break;
 
-      // 2. Procura em links <a> dentro do modal
-      const modalEl = document.querySelector('.andes-modal, [role="dialog"], [class*="modal-content"]');
+      // Procura em links <a> ou innerText do modal
       if (modalEl) {
         const links = Array.from(modalEl.querySelectorAll('a'));
         for (const l of links) {
           const h = (l.href || '').trim();
           const m = h.match(/https?:\/\/(?:mercadolivre\.com\/sec|meli\.la)\/[a-zA-Z0-9_\-\.\/]+/i);
           if (m) {
-            foundUrl = m[0];
+            lastCapturedAffiliateLink = m[0];
             break;
           }
         }
-        if (foundUrl) break;
+        if (lastCapturedAffiliateLink) break;
 
-        // 3. Procura no innerText e innerHTML do modal
         const mText = (modalEl.innerText || '') + ' ' + (modalEl.innerHTML || '');
         const matchText = mText.match(/https?:\/\/(?:mercadolivre\.com\/sec|meli\.la)\/[a-zA-Z0-9_\-\.\/]+/i);
         if (matchText) {
-          foundUrl = matchText[0];
+          lastCapturedAffiliateLink = matchText[0];
           break;
         }
-
-        // 4. Se houver botão "Copiar link", clica nele para disparar a geração
-        if (Date.now() - start > 800 && !foundUrl) {
-          const copyBtn = Array.from(modalEl.querySelectorAll('button, [role="button"]')).find(b => {
-            const txt = (b.innerText || '').toLowerCase();
-            return txt.includes('copiar') || txt.includes('copy');
-          });
-          if (copyBtn && !copyBtn.dataset.fastClicked) {
-            copyBtn.dataset.fastClicked = 'true';
-            copyBtn.click();
-          }
-        }
       }
 
-      // 5. Procura no document.body
-      const bText = document.body.innerText || '';
-      const bMatch = bText.match(/https?:\/\/(?:mercadolivre\.com\/sec|meli\.la)\/[a-zA-Z0-9_\-\.\/]+/i);
-      if (bMatch) {
-        foundUrl = bMatch[0];
-        break;
-      }
-
-      await new Promise(r => setTimeout(r, 200));
+      await new Promise(r => setTimeout(r, 180));
     }
+
+    const finalUrl = lastCapturedAffiliateLink;
 
     // Fecha o modal
     try {
-      const closeBtn = document.querySelector('.andes-modal__close-button, [aria-label*="Fechar" i], [aria-label*="Close" i], [data-testid="modal-close-button"]');
+      const closeBtn = document.querySelector('.andes-modal__close-button, [aria-label*="Fechar" i], [aria-label*="Close" i], [data-testid="modal-close-button"], [class*="close-button"]');
       if (closeBtn) closeBtn.click();
-      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true }));
-      await new Promise(r => setTimeout(r, 150));
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', keyCode: 27, which: 27, bubbles: true }));
+      await new Promise(r => setTimeout(r, 200));
     } catch (e) {}
 
-    return foundUrl;
+    return finalUrl;
   }
 
   // ------------------------------------------------------------
@@ -426,6 +558,7 @@
         let affiliateUrl = null;
         if (item.shareBtn) {
           affiliateUrl = await extractMLShareLink(item.shareBtn);
+          await new Promise(r => setTimeout(r, 250));
         }
 
         const isOfficialAffiliate = Boolean(affiliateUrl && (affiliateUrl.includes('/sec/') || affiliateUrl.includes('meli.la')));
