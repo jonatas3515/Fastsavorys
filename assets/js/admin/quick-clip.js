@@ -33,12 +33,44 @@
     }
   } catch (e) {}
 
-  // 2. Intercepta evento de 'copy' no document (caso o ML use document.execCommand('copy'))
+  // 2. Intercepta document.execCommand('copy') (caso o ML use hidden textarea + execCommand)
+  try {
+    if (!window._fastExecCmdHooked && document.execCommand) {
+      window._fastExecCmdHooked = true;
+      const origExec = document.execCommand.bind(document);
+      document.execCommand = function (command) {
+        if (command === 'copy') {
+          try {
+            const sel = window.getSelection ? window.getSelection().toString() : '';
+            if (sel) {
+              const m = sel.match(/https?:\/\/(?:mercadolivre\.com\/sec|meli\.la)\/[a-zA-Z0-9_\-\.\/]+/i);
+              if (m) lastCapturedAffiliateLink = m[0];
+            }
+            const active = document.activeElement;
+            if (active && (active.value || active.innerText)) {
+              const val = active.value || active.innerText;
+              const m = val.match(/https?:\/\/(?:mercadolivre\.com\/sec|meli\.la)\/[a-zA-Z0-9_\-\.\/]+/i);
+              if (m) lastCapturedAffiliateLink = m[0];
+            }
+          } catch (err) {}
+        }
+        return origExec.apply(document, arguments);
+      };
+    }
+  } catch (e) {}
+
+  // 3. Intercepta evento de 'copy' no document
   try {
     if (!window._fastCopyEventHooked) {
       window._fastCopyEventHooked = true;
       document.addEventListener('copy', function (e) {
         try {
+          const active = document.activeElement;
+          if (active && (active.value || active.innerText)) {
+            const val = active.value || active.innerText;
+            const m = val.match(/https?:\/\/(?:mercadolivre\.com\/sec|meli\.la)\/[a-zA-Z0-9_\-\.\/]+/i);
+            if (m) lastCapturedAffiliateLink = m[0];
+          }
           if (e.clipboardData) {
             const text = e.clipboardData.getData('text/plain');
             if (text) {
@@ -54,7 +86,34 @@
     }
   } catch (e) {}
 
-  // 3. Intercepta window.fetch para capturar respostas de APIs do Mercado Livre
+  // 4. Intercepta XMLHttpRequest (usado pelo Axios no Mercado Livre)
+  try {
+    if (!window._fastXHRHooked && window.XMLHttpRequest) {
+      window._fastXHRHooked = true;
+      const origOpen = XMLHttpRequest.prototype.open;
+      const origSend = XMLHttpRequest.prototype.send;
+      XMLHttpRequest.prototype.open = function () {
+        return origOpen.apply(this, arguments);
+      };
+      XMLHttpRequest.prototype.send = function () {
+        this.addEventListener('load', function () {
+          try {
+            const res = this.responseText;
+            if (res) {
+              const m = res.match(/https?:\/\/(?:mercadolivre\.com\/sec|meli\.la)\/[a-zA-Z0-9_\-\.\/]+/i);
+              if (m) {
+                lastCapturedAffiliateLink = m[0];
+                console.log('[Quick Clip Hook] Link capturado via XMLHttpRequest:', m[0]);
+              }
+            }
+          } catch (e) {}
+        });
+        return origSend.apply(this, arguments);
+      };
+    }
+  } catch (e) {}
+
+  // 5. Intercepta window.fetch para capturar respostas de APIs do Mercado Livre
   try {
     if (!window._fastFetchHooked && window.fetch) {
       window._fastFetchHooked = true;
@@ -113,44 +172,63 @@
   // FUNÇÃO AUXILIAR: CLICA NO BOTÃO "COPIAR LINK" NO MODAL DO MERCADO LIVRE
   // ------------------------------------------------------------
   function clickCopyLinkInModal() {
-    const modal = document.querySelector('.andes-modal, [role="dialog"], [class*="modal-content"], [class*="modal"]');
-    const root = modal || document;
+    const modal = document.querySelector('.andes-modal, [role="dialog"], [class*="modal-content"], [class*="modal"], [class*="sheet"]') || document.body;
 
-    // 1. Procura em todos os elementos cujo texto seja exatamente "copiar link"
-    const all = Array.from(root.querySelectorAll('*'));
-    for (const el of all) {
-      if (el.children.length <= 2) {
-        const txt = (el.textContent || el.innerText || '').trim().toLowerCase();
-        if (txt === 'copiar link' || txt === 'copiar o link' || txt === 'copiar link de afiliado') {
-          const clickable = el.closest('button, [role="button"], a, [tabindex="0"], div') || el.parentElement || el;
-          clickable.focus();
-          clickable.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
-          clickable.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true }));
-          clickable.click();
-          console.log('[Quick Clip] Botão "Copiar link" clicado com sucesso!');
-          return true;
-        }
+    function simulateClick(el) {
+      if (!el) return;
+      try {
+        el.scrollIntoView && el.scrollIntoView({ behavior: 'auto', block: 'nearest' });
+        el.focus && el.focus();
+        const opts = { bubbles: true, cancelable: true, view: window, composed: true };
+        el.dispatchEvent(new PointerEvent('pointerdown', opts));
+        el.dispatchEvent(new MouseEvent('mousedown', opts));
+        el.dispatchEvent(new PointerEvent('pointerup', opts));
+        el.dispatchEvent(new MouseEvent('mouseup', opts));
+        el.click && el.click();
+      } catch (err) {
+        try { el.click(); } catch (e) {}
       }
     }
 
-    // 2. Procura por botões com aria-label ou title "copiar link"
+    // 1. Procura em todos os elementos com texto normalizado (espaços e quebras de linha removidos)
+    const all = Array.from(modal.querySelectorAll('*'));
+    for (const el of all) {
+      const raw = (el.innerText || el.textContent || '');
+      const norm = raw.replace(/\s+/g, ' ').trim().toLowerCase();
+      
+      // Contém 'copiar' e 'link', e NÃO contém 'id' ou 'informa' e tamanho menor que 35 caracteres
+      if (norm.includes('copiar') && norm.includes('link') && !norm.includes('id') && !norm.includes('informa') && norm.length <= 35) {
+        console.log('[Quick Clip] Match botão "Copiar link":', el, norm);
+        const btn = el.closest('button, [role="button"], a');
+        if (btn) simulateClick(btn);
+        simulateClick(el);
+        if (el.parentElement) simulateClick(el.parentElement);
+        return true;
+      }
+    }
+
+    // 2. Procura por aria-label ou title
     for (const el of all) {
       const aria = (el.getAttribute('aria-label') || el.getAttribute('title') || '').toLowerCase();
-      if (aria.includes('copiar link')) {
-        el.focus();
-        el.click();
+      if (aria.includes('copiar link') || (aria.includes('copiar') && aria.includes('link'))) {
+        console.log('[Quick Clip] Match por aria-label "copiar link":', el);
+        simulateClick(el);
         return true;
       }
     }
 
-    // 3. Fallback: primeiro botão que contenha a palavra "copiar" dentro do modal (sem ser ID ou informação)
-    for (const el of all) {
-      const txt = (el.textContent || el.innerText || '').trim().toLowerCase();
-      if (txt.includes('copiar') && !txt.includes('id') && !txt.includes('informação') && !txt.includes('informacao')) {
-        const clickable = el.closest('button, [role="button"], a') || el;
-        clickable.click();
-        return true;
-      }
+    // 3. Estratégia dos 4 botões de ação:
+    // No modal "Compartilhe para ganhar dinheiro", o 1º botão de ação é sempre "Copiar link"
+    const actionButtons = Array.from(modal.querySelectorAll('button, [role="button"]')).filter(b => {
+      const aria = (b.getAttribute('aria-label') || '').toLowerCase();
+      const cls = (b.className || '').toLowerCase();
+      return !aria.includes('fechar') && !aria.includes('close') && !cls.includes('close');
+    });
+
+    if (actionButtons.length >= 1) {
+      console.log('[Quick Clip] Clicando no 1º botão de ação do modal (fallback posicional):', actionButtons[0]);
+      simulateClick(actionButtons[0]);
+      return true;
     }
 
     return false;
@@ -172,6 +250,9 @@
       console.warn('[Quick Clip] Erro ao clicar no botão compartilhar:', e);
     }
 
+    // Aguarda o modal abrir na tela
+    await new Promise(r => setTimeout(r, 450));
+
     const maxWait = 4500;
     const start = Date.now();
     let copyAttempts = 0;
@@ -179,14 +260,10 @@
     while (Date.now() - start < maxWait) {
       if (lastCapturedAffiliateLink) break;
 
-      // Localiza o modal
-      const modalEl = document.querySelector('.andes-modal, [role="dialog"], [class*="modal-content"], [class*="modal"]');
-      if (modalEl) {
-        // Clica no botão "Copiar link" dentro do modal
-        if (copyAttempts === 0 || (Date.now() - start > 1000 && copyAttempts < 4)) {
-          if (clickCopyLinkInModal()) {
-            copyAttempts++;
-          }
+      // Clica no botão "Copiar link" dentro do modal
+      if (copyAttempts === 0 || (Date.now() - start > 1000 && copyAttempts < 4)) {
+        if (clickCopyLinkInModal()) {
+          copyAttempts++;
         }
       }
 
@@ -221,6 +298,7 @@
       if (lastCapturedAffiliateLink) break;
 
       // Procura em links <a> ou innerText do modal
+      const modalEl = document.querySelector('.andes-modal, [role="dialog"], [class*="modal-content"], [class*="modal"]');
       if (modalEl) {
         const links = Array.from(modalEl.querySelectorAll('a'));
         for (const l of links) {
@@ -574,8 +652,9 @@
         }
 
         if (statusEl) {
-          statusEl.innerText = 'Link Oficial ✅';
+          statusEl.innerText = `${affiliateUrl.replace(/^https?:\/\//i, '')} ✅`;
           statusEl.style.color = '#10b981';
+          statusEl.style.fontWeight = 'bold';
         }
 
         itemsToUpload.push({
