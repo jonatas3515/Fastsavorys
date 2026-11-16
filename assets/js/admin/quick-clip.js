@@ -543,9 +543,15 @@
         }
       });
 
-      countEl.innerText = parsedItems.length;
+      // Trava de Segurança Anti-Rate Limit do Mercado Livre:
+      // O Mercado Livre bloqueia temporariamente a geração de meli.la ao atingir ~30 requisições seguidas.
+      // Limitamos o lote a 28 itens no máximo para garantir 100% de sucesso sem nenhum erro.
+      const MAX_SAFE_BATCH = 28;
+      const finalItems = parsedItems.slice(0, MAX_SAFE_BATCH);
 
-      if (parsedItems.length === 0) {
+      countEl.innerText = finalItems.length;
+
+      if (finalItems.length === 0) {
         listEl.innerHTML = `
           <div style="text-align: center; padding: 30px 10px; color: #94a3b8; font-size: 13px;">
             <div style="font-size: 28px; margin-bottom: 8px;">🔍</div>
@@ -556,7 +562,7 @@
         return [];
       }
 
-      parsedItems.forEach((item, index) => {
+      finalItems.forEach((item, index) => {
         const row = document.createElement('div');
         row.id = `fast-row-${index}`;
         row.style.cssText = `
@@ -586,7 +592,7 @@
         listEl.appendChild(row);
       });
 
-      return parsedItems;
+      return finalItems;
     }
 
     let currentItems = scanCards();
