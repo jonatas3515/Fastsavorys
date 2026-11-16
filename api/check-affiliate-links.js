@@ -1034,6 +1034,17 @@ async function handler(req, res) {
           }
         }
 
+        // Validação obrigatória de afiliação do Mercado Livre (exige /sec/ ou meli.la)
+        const isML = affiliate_url.includes('mercadolivre.com') || affiliate_url.includes('mercadolibre.com') || affiliate_url.includes('meli.la');
+        if (isML) {
+          const isOfficialMeli = affiliate_url.includes('meli.la') || affiliate_url.includes('/sec/');
+          if (!isOfficialMeli) {
+            console.warn(`[Quick-Save Guard] Bloqueado produto "${title}": link do Mercado Livre não possui rastreador oficial (/sec/ ou meli.la). URL: ${affiliate_url}`);
+            duplicatesSkipped++;
+            continue;
+          }
+        }
+
         const priceDisplay = item.price_display ? String(item.price_display).replace(/,+/g, ',').trim() : (item.price ? String(item.price).replace(/,+/g, ',').trim() : null);
         const originalPrice = item.original_price ? String(item.original_price).replace(/,+/g, ',').trim() : null;
 

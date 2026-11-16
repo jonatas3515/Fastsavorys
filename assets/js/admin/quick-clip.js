@@ -1,10 +1,11 @@
 /**
  * FastSavory's Quick Clip Turbo (Universal In-Browser Extension / Bookmarklet)
  * Suporta:
- * 1. Mineração em LOTE no Hub de Afiliados do Mercado Livre (afiliados/hub) com captura automática de links /sec/ oficiais.
+ * 1. Mineração em LOTE no Hub de Afiliados do Mercado Livre (afiliados/hub) com captura OBRIGATÓRIA de links /sec/ ou meli.la oficiais.
  * 2. Mineração individual em 1-Clique na Amazon, Shopee, Mercado Livre (PDP), Natura e Avon.
+ * Proteção total: NUNCA salva produtos do Mercado Livre com links comuns sem comissão!
  */
-(function () {
+(async function () {
   try {
     const host = window.location.hostname;
     const href = window.location.href;
@@ -30,10 +31,98 @@
     // ============================================================
     // 2. MODO INDIVIDUAL: PRODUTOS AVULSOS (AMAZON, SHOPEE, ML, NATURA)
     // ============================================================
-    runSingleProductQuickClip(host, href);
+    await runSingleProductQuickClip(host, href);
 
   } catch (e) {
     alert('Erro Quick Clip: ' + e.message);
+  }
+
+  // ------------------------------------------------------------
+  // FUNÇÃO AUXILIAR: EXTRAÇÃO ROBUSTA DE LINK OFICIAL /sec/ OU meli.la
+  // ------------------------------------------------------------
+  async function extractMLShareLink(shareBtn) {
+    if (!shareBtn) return null;
+
+    try {
+      shareBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      await new Promise(r => setTimeout(r, 150));
+      shareBtn.click();
+    } catch (e) {
+      console.warn('[Quick Clip] Erro ao clicar no botão compartilhar:', e);
+    }
+
+    const maxWait = 3200;
+    const start = Date.now();
+    let foundUrl = null;
+
+    while (Date.now() - start < maxWait) {
+      // 1. Procura em todos os inputs e textareas do modal ou da página
+      const allInputs = Array.from(document.querySelectorAll('.andes-modal input, .andes-modal textarea, [role="dialog"] input, [class*="modal"] input, input, textarea'));
+      for (const inp of allInputs) {
+        const val = (inp.value || inp.getAttribute('value') || '').trim();
+        const m = val.match(/https?:\/\/(?:mercadolivre\.com\/sec|meli\.la)\/[a-zA-Z0-9_\-\.\/]+/i);
+        if (m) {
+          foundUrl = m[0];
+          break;
+        }
+      }
+      if (foundUrl) break;
+
+      // 2. Procura em links <a> dentro do modal
+      const modalEl = document.querySelector('.andes-modal, [role="dialog"], [class*="modal-content"]');
+      if (modalEl) {
+        const links = Array.from(modalEl.querySelectorAll('a'));
+        for (const l of links) {
+          const h = (l.href || '').trim();
+          const m = h.match(/https?:\/\/(?:mercadolivre\.com\/sec|meli\.la)\/[a-zA-Z0-9_\-\.\/]+/i);
+          if (m) {
+            foundUrl = m[0];
+            break;
+          }
+        }
+        if (foundUrl) break;
+
+        // 3. Procura no innerText e innerHTML do modal
+        const mText = (modalEl.innerText || '') + ' ' + (modalEl.innerHTML || '');
+        const matchText = mText.match(/https?:\/\/(?:mercadolivre\.com\/sec|meli\.la)\/[a-zA-Z0-9_\-\.\/]+/i);
+        if (matchText) {
+          foundUrl = matchText[0];
+          break;
+        }
+
+        // 4. Se houver botão "Copiar link", clica nele para disparar a geração
+        if (Date.now() - start > 800 && !foundUrl) {
+          const copyBtn = Array.from(modalEl.querySelectorAll('button, [role="button"]')).find(b => {
+            const txt = (b.innerText || '').toLowerCase();
+            return txt.includes('copiar') || txt.includes('copy');
+          });
+          if (copyBtn && !copyBtn.dataset.fastClicked) {
+            copyBtn.dataset.fastClicked = 'true';
+            copyBtn.click();
+          }
+        }
+      }
+
+      // 5. Procura no document.body
+      const bText = document.body.innerText || '';
+      const bMatch = bText.match(/https?:\/\/(?:mercadolivre\.com\/sec|meli\.la)\/[a-zA-Z0-9_\-\.\/]+/i);
+      if (bMatch) {
+        foundUrl = bMatch[0];
+        break;
+      }
+
+      await new Promise(r => setTimeout(r, 200));
+    }
+
+    // Fecha o modal
+    try {
+      const closeBtn = document.querySelector('.andes-modal__close-button, [aria-label*="Fechar" i], [aria-label*="Close" i], [data-testid="modal-close-button"]');
+      if (closeBtn) closeBtn.click();
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true }));
+      await new Promise(r => setTimeout(r, 150));
+    } catch (e) {}
+
+    return foundUrl;
   }
 
   // ------------------------------------------------------------
@@ -53,7 +142,7 @@
       position: fixed;
       bottom: 20px;
       right: 20px;
-      width: 420px;
+      width: 440px;
       max-width: 95vw;
       max-height: 85vh;
       background: #0f172a;
@@ -73,7 +162,7 @@
         <div style="display: flex; align-items: center; gap: 8px;">
           <span style="font-size: 20px;">⚡</span>
           <div>
-            <h3 style="margin: 0; font-size: 15px; font-weight: 700; color: #fff; letter-spacing: -0.3px;">FastSavory's Hub Miner</h3>
+            <h3 style="margin: 0; font-size: 15px; font-weight: 700; color: #fff; letter-spacing: -0.3px;">FastSavory's Hub Miner (Comissão 100%)</h3>
             <p style="margin: 0; font-size: 11px; color: #94a3b8;">Central de Afiliados Mercado Livre</p>
           </div>
         </div>
@@ -83,11 +172,8 @@
         </div>
       </div>
 
-      <div style="padding: 12px 18px; background: rgba(30, 41, 59, 0.5); border-bottom: 1px solid #334155; font-size: 12px; color: #cbd5e1;">
-        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-          <input type="checkbox" id="fast-auto-share-links" checked style="accent-color: #3b82f6; width: 15px; height: 15px;">
-          <span>Gerar links <strong>/sec/ oficiais</strong> (auto-clique em Compartilhar)</span>
-        </label>
+      <div style="padding: 10px 18px; background: rgba(16, 185, 129, 0.1); border-bottom: 1px solid #10b981; font-size: 11px; color: #a7f3d0; line-height: 1.4;">
+        🛡️ <strong>Proteção de Afiliado Ativa:</strong> O script aguarda a geração do link oficial <strong>meli.la</strong> de cada produto para garantir 100% de comissão. Produtos sem link oficial são bloqueados automaticamente.
       </div>
 
       <div id="fast-items-list" style="flex: 1; overflow-y: auto; padding: 12px 18px; display: flex; flex-direction: column; gap: 10px; max-height: 45vh;">
@@ -123,7 +209,6 @@
       const countEl = document.getElementById('fast-item-count');
       listEl.innerHTML = '';
 
-      // Localiza todos os botões "Compartilhar" ou cards
       const allButtons = Array.from(document.querySelectorAll('button, a'));
       const shareButtons = allButtons.filter(b => (b.innerText || '').trim().toLowerCase() === 'compartilhar');
 
@@ -152,11 +237,9 @@
       rawCards.forEach((rc, idx) => {
         const c = rc.container;
 
-        // Imagem
         const imgEl = c.querySelector('img[src^="http"], img[data-src^="http"]');
         const image_url = imgEl ? (imgEl.src || imgEl.getAttribute('data-src') || '') : '';
 
-        // Título
         const titleEl = c.querySelector('h2, h3, h4, [class*="title"], a[title]');
         let title = (titleEl ? (titleEl.innerText || titleEl.getAttribute('title')) : '').trim();
         if (!title) {
@@ -180,11 +263,9 @@
           }
         }
 
-        // Link de produto padrão
         const linkEl = c.querySelector('a[href*="mercadolivre.com"], a[href*="MLB"], a[href*="/p/"]') || c.querySelector('a');
         let product_url = linkEl ? linkEl.href : '';
 
-        // Preço original (riscado)
         let original_price = '';
         const origEl = c.querySelector('s, del, [class*="original"], [style*="line-through"], .andes-money-amount--previous');
         if (origEl) {
@@ -198,7 +279,6 @@
           }
         }
 
-        // Preço atual da oferta (ignora parcelas e comissões)
         let price_display = '';
         const currentPriceEl = c.querySelector('.poly-price__current .andes-money-amount, .ui-search-price__second-line .andes-money-amount, [class*="price__current"] .andes-money-amount') ||
                                Array.from(c.querySelectorAll('.andes-money-amount')).find(el => {
@@ -214,10 +294,9 @@
           }
         }
 
-        // Fallback inteligente caso o layout do card seja diferente
         if (!price_display) {
           const cleanCardText = (c.innerText || '')
-            .replace(/(?:GANHOS\s+EXTRAS|COMISS[ÃA]O)[\s\S]*$/gi, '')
+            .replace(/(?:GANHOS\s+EXTRAS|COMISS[ÃO]O)[\s\S]*$/gi, '')
             .replace(/(?:\d{1,2}x|em\s+\d{1,2}x\s+de)\s+R\$\s*[0-9.,]+/gi, '');
           const rawMatches = cleanCardText.match(/R\$\s*[0-9]+(?:\.[0-9]{3})*(?:,[0-9]{2})?/g) || [];
           if (rawMatches.length > 0) {
@@ -229,15 +308,13 @@
           }
         }
 
-        // Desconto %
         let discount_tag = '';
         const discMatch = (c.innerText || '').match(/([0-9]{1,2}%\s*OFF)/i);
         if (discMatch) {
           discount_tag = discMatch[1].toUpperCase();
         }
 
-        // Comissão / Ganhos
-        const comMatch = (c.innerText || '').match(/(?:GANHOS EXTRAS|COMISS[ÃA]O)\s*([0-9%]+)/i);
+        const comMatch = (c.innerText || '').match(/(?:GANHOS EXTRAS|COMISS[ÃO]O)\s*([0-9%]+)/i);
         const commission_tag = comMatch ? comMatch[0] : '';
 
         if (title && price_display) {
@@ -308,7 +385,7 @@
       currentItems = scanCards();
     };
 
-    // BOTÃO SALVAR NO SITE (PROCESSAMENTO E ENVIO EM LOTE)
+    // BOTÃO SALVAR NO SITE (PROCESSAMENTO COM CAPTURA OBRIGATÓRIA DE LINK DE AFILIADO)
     document.getElementById('fast-import-btn').onclick = async () => {
       const checkboxes = Array.from(document.querySelectorAll('.fast-item-check:checked'));
       if (checkboxes.length === 0) {
@@ -316,7 +393,6 @@
         return;
       }
 
-      const autoShare = document.getElementById('fast-auto-share-links').checked;
       const progressContainer = document.getElementById('fast-progress-bar-container');
       const progressBar = document.getElementById('fast-progress-bar');
       const progressLabel = document.getElementById('fast-progress-label');
@@ -328,6 +404,7 @@
       progressContainer.style.display = 'block';
 
       const itemsToUpload = [];
+      let skippedNoAffiliate = 0;
 
       for (let i = 0; i < checkboxes.length; i++) {
         const idx = parseInt(checkboxes[i].getAttribute('data-index'), 10);
@@ -338,46 +415,33 @@
         const pct = Math.round(((i + 1) / checkboxes.length) * 100);
         progressBar.style.width = `${pct}%`;
         progressPct.innerText = `${pct}%`;
-        progressLabel.innerText = `Processando ${i + 1} de ${checkboxes.length}: ${(item.title || '').substring(0, 20)}...`;
+        progressLabel.innerText = `Gerando link de afiliado ${i + 1}/${checkboxes.length}: ${(item.title || '').substring(0, 20)}...`;
 
         if (statusEl) {
-          statusEl.innerText = 'Capturando link...';
+          statusEl.innerText = 'Gerando meli.la...';
           statusEl.style.color = '#38bdf8';
         }
 
-        let affiliateUrl = item.product_url;
+        // Tenta capturar o link oficial meli.la ou /sec/
+        let affiliateUrl = null;
+        if (item.shareBtn) {
+          affiliateUrl = await extractMLShareLink(item.shareBtn);
+        }
 
-        // Auto-clique em Compartilhar para obter link /sec/ oficial
-        if (autoShare && item.shareBtn) {
-          try {
-            item.shareBtn.click();
-            await new Promise(r => setTimeout(r, 450));
+        const isOfficialAffiliate = Boolean(affiliateUrl && (affiliateUrl.includes('/sec/') || affiliateUrl.includes('meli.la')));
 
-            // Procura link /sec/ ou meli.la no modal
-            const secMatch = (document.body.innerText || '').match(/https?:\/\/(?:mercadolivre\.com\/sec|meli\.la)\/[a-zA-Z0-9_-]+/i);
-            const inputLink = document.querySelector('input[value*="/sec/"], input[value*="meli.la"], .andes-modal input');
-
-            if (inputLink && inputLink.value) {
-              affiliateUrl = inputLink.value.trim();
-            } else if (secMatch) {
-              affiliateUrl = secMatch[0].trim();
-            }
-
-            // Fecha modal
-            const closeBtn = document.querySelector('.andes-modal__close-button, [aria-label*="Fechar" i], [aria-label*="Close" i], [data-testid="modal-close-button"]');
-            if (closeBtn) {
-              closeBtn.click();
-            } else {
-              document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true }));
-            }
-            await new Promise(r => setTimeout(r, 200));
-          } catch (shareErr) {
-            console.warn('[Hub Miner] Erro no auto-compartilhar:', shareErr);
+        if (!isOfficialAffiliate) {
+          if (statusEl) {
+            statusEl.innerText = '❌ Sem Link de Afiliado';
+            statusEl.style.color = '#ef4444';
           }
+          skippedNoAffiliate++;
+          console.warn(`[Quick Clip] Produto "${item.title}" ignorado pois não gerou link oficial meli.la.`);
+          continue; // NUNCA SALVAR PRODUTO DO ML SEM O LINK OFICIAL DE AFILIADO!
         }
 
         if (statusEl) {
-          statusEl.innerText = affiliateUrl.includes('/sec/') || affiliateUrl.includes('meli.la') ? 'Link Oficial ✅' : 'OK';
+          statusEl.innerText = 'Link Oficial ✅';
           statusEl.style.color = '#10b981';
         }
 
@@ -394,6 +458,18 @@
         });
       }
 
+      if (itemsToUpload.length === 0) {
+        progressContainer.style.display = 'none';
+        importBtn.disabled = false;
+        importBtn.style.opacity = '1';
+        alert(
+          '⚠️ NENHUM PRODUTO SALVO!\n\n' +
+          'Nenhum dos itens selecionados conseguiu gerar o link oficial de afiliado (meli.la) pelo Mercado Livre.\n\n' +
+          '💡 Dica: Certifique-se de que você está logado na sua conta de Afiliado do Mercado Livre antes de minerar!'
+        );
+        return;
+      }
+
       progressLabel.innerText = `Enviando ${itemsToUpload.length} produtos para o FastSavory's...`;
 
       try {
@@ -405,9 +481,14 @@
         const data = await res.json();
 
         if (data.success) {
-          progressLabel.innerText = `🎉 Concluído! +${data.inserted_count || itemsToUpload.length} salvos no site!`;
+          progressLabel.innerText = `🎉 Concluído! +${data.inserted_count || itemsToUpload.length} salvos no site com comissão!`;
           progressLabel.style.color = '#10b981';
-          alert(`🎉 Sucesso FastSavory's!\n\n${data.inserted_count || 0} novas ofertas cadastradas.\n${data.duplicates_skipped || 0} já estavam no site.\n\nVerifique no seu painel de admin!`);
+          
+          let alertMsg = `🎉 Sucesso FastSavory's!\n\n✅ ${data.inserted_count || 0} novas ofertas cadastradas com link oficial de comissão!`;
+          if (data.duplicate_count > 0) alertMsg += `\nℹ️ ${data.duplicate_count} já estavam no catálogo.`;
+          if (skippedNoAffiliate > 0) alertMsg += `\n⚠️ ${skippedNoAffiliate} itens foram ignorados por falta de link meli.la.`;
+          alertMsg += '\n\nTodos os links inseridos agora contêm seu rastreamento de afiliado oficial!';
+          alert(alertMsg);
         } else {
           throw new Error(data.error || 'Erro ao salvar produtos');
         }
@@ -425,7 +506,7 @@
   // ------------------------------------------------------------
   // FUNÇÃO: SALVAMENTO RÁPIDO INDIVIDUAL (AMAZON, SHOPEE, ML PDP)
   // ------------------------------------------------------------
-  function runSingleProductQuickClip(host, href) {
+  async function runSingleProductQuickClip(host, href) {
     let payload = {
       platform: 'unknown',
       url: href,
@@ -485,6 +566,47 @@
       const disc = document.querySelector('.ui-pdp-price__second-line .andes-money-amount__discount, .ui-pdp-price .andes-money-amount__discount')?.innerText?.trim();
       if (disc) payload.discount_tag = disc + ' OFF';
       payload.is_imported = Boolean(document.querySelector('.ui-pdp-buybox, #shipping-summary, .ui-pdp-promotions-pill, .ui-pdp-seller__header')?.innerText?.match(/compra\s+internacional|vendedor\s+internacional/i));
+
+      // VERIFICAÇÃO RIGOROSA DO LINK DE AFILIADO NO MERCADO LIVRE:
+      let isOfficialAffiliate = href.includes('/sec/') || href.includes('meli.la');
+
+      if (!isOfficialAffiliate) {
+        // Tenta achar botão compartilhar da página ou da barra de afiliados
+        const shareBtn = Array.from(document.querySelectorAll('button, a')).find(b => {
+          const t = (b.innerText || '').toLowerCase();
+          return (t.includes('compartilhar') || t.includes('link de afiliado') || t.includes('copiar link')) &&
+                 !b.closest('#fastsavorys-hub-drawer');
+        });
+
+        if (shareBtn) {
+          const toastSearching = document.createElement('div');
+          toastSearching.style.cssText = 'position:fixed;top:20px;right:20px;z-index:99999999;background:#3b82f6;color:#fff;padding:14px 20px;border-radius:12px;font-family:sans-serif;font-weight:bold;font-size:13px;box-shadow:0 10px 25px rgba(0,0,0,0.3);';
+          toastSearching.innerText = '⚡ Obtendo seu link oficial meli.la...';
+          document.body.appendChild(toastSearching);
+
+          const generatedLink = await extractMLShareLink(shareBtn);
+          toastSearching.remove();
+
+          if (generatedLink) {
+            payload.url = generatedLink;
+            payload.affiliate_url = generatedLink;
+            isOfficialAffiliate = true;
+          }
+        }
+      }
+
+      if (!isOfficialAffiliate) {
+        alert(
+          '⚠️ ATENÇÃO: Link de Afiliado do Mercado Livre NÃO Detectado!\n\n' +
+          'No Mercado Livre, a sua comissão só é creditada se o produto for cadastrado com o link oficial (meli.la ou mercadolivre.com/sec/).\n\n' +
+          '💡 Como cadastrar ganhando comissão:\n' +
+          '1. Abra o Hub de Afiliados: mercadolivre.com.br/afiliados/hub\n' +
+          '2. Lá você clica no Quick Clip e captura os produtos em lote com link oficial 100% garantido!\n' +
+          '3. Se estiver em uma página avulsa, gere o link pelo botão "Compartilhar e ganhar" antes de clipar.\n\n' +
+          'O produto NÃO foi salvo para proteger as suas comissões!'
+        );
+        return;
+      }
 
     } else if (host.includes('shopee')) {
       payload.platform = 'shopee';

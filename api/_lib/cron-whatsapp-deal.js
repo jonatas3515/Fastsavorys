@@ -795,6 +795,17 @@ async function handleSendWhatsAppDeal(req, res) {
       const candidatePool = [];
       const seenIds = new Set();
 
+      // GUARDA DE AFILIAÇÃO: Garante que NENHUM produto do Mercado Livre seja disparado sem link comissionado oficial (/sec/ ou meli.la)
+      const isValidAffiliateCandidate = (p) => {
+        if (!p || !p.affiliate_url) return false;
+        const url = String(p.affiliate_url).toLowerCase();
+        const isML = url.includes('mercadolivre') || url.includes('mercadolibre') || url.includes('meli.la');
+        if (isML && !url.includes('/sec/') && !url.includes('meli.la')) {
+          return false;
+        }
+        return true;
+      };
+
       // a) Produtos com contador RELÂMPAGO ativo (Prioridade alta)
       const nowIso = new Date().toISOString();
       const twentyFourHoursAgo = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
@@ -809,7 +820,7 @@ async function handleSendWhatsAppDeal(req, res) {
 
         if (flashCandidates) {
           flashCandidates.forEach(p => {
-            if (!seenIds.has(p.id)) { seenIds.add(p.id); candidatePool.push(p); }
+            if (!seenIds.has(p.id) && isValidAffiliateCandidate(p)) { seenIds.add(p.id); candidatePool.push(p); }
           });
         }
       } catch (e) { }
@@ -826,7 +837,7 @@ async function handleSendWhatsAppDeal(req, res) {
 
         if (unpostedProducts) {
           unpostedProducts.forEach(p => {
-            if (!seenIds.has(p.id)) { seenIds.add(p.id); candidatePool.push(p); }
+            if (!seenIds.has(p.id) && isValidAffiliateCandidate(p)) { seenIds.add(p.id); candidatePool.push(p); }
           });
         }
       } catch (e) { }
@@ -844,7 +855,7 @@ async function handleSendWhatsAppDeal(req, res) {
 
         if (catalogProducts) {
           catalogProducts.forEach(p => {
-            if (!seenIds.has(p.id)) { seenIds.add(p.id); candidatePool.push(p); }
+            if (!seenIds.has(p.id) && isValidAffiliateCandidate(p)) { seenIds.add(p.id); candidatePool.push(p); }
           });
         }
       } catch (e) { }
