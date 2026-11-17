@@ -273,6 +273,21 @@ async function handleSendInstagramPost(req, res) {
   const channel = (req.query?.channel || req.body?.channel || 'store').toLowerCase();
   const target = (req.query?.target || req.body?.target || 'feed').toLowerCase();
   const dryRun = req.query?.dry_run === 'true' || req.body?.dry_run === true;
+  const force = req.query?.force === 'true' || req.body?.force === true;
+
+  const now = new Date();
+  const utcHours = now.getUTCHours();
+  const brtHours = (utcHours - 3 + 24) % 24;
+
+  // BLOQUEIO DE MEIO-DIA (12h BRT): Solicitado pelo usuário para evitar repetição devido ao catálogo reduzido
+  if (brtHours === 12 && !force) {
+    console.log('[Instagram Cron] 🛑 Disparo das 12h cancelado: horário bloqueado para evitar repetição de produtos.');
+    return res.status(200).json({
+      success: true,
+      skipped: true,
+      message: 'Disparo de meio-dia (12h) no Instagram está bloqueado para evitar repetição de produtos da loja.'
+    });
+  }
 
   // REGRA DE OURO: Bloqueio estrito de Achadinhos no Feed
   if (target === 'feed' && (channel === 'deal' || channel === 'affiliate')) {

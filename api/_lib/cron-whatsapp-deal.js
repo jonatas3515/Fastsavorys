@@ -296,7 +296,7 @@ async function dispatchWhatsAppMessage(messageCaption, mediaUrl, options = {}) {
 
     try {
       const mediaEndpoint = `${evolutionApiUrl}/message/sendMedia/${evolutionInstance}`;
-      const response = await fetch(mediaEndpoint, {
+      let response = await fetch(mediaEndpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -323,6 +323,39 @@ async function dispatchWhatsAppMessage(messageCaption, mediaUrl, options = {}) {
         return await response.json();
       } else {
         const errText = await response.text();
+        // Auto-reconexão: se o WhatsApp Web fechou a conexão (Connection Closed), reinicia a instância na Evolution e retenta
+        if (errText.includes('Connection Closed') || errText.includes('connectionClosed') || response.status === 500) {
+          console.warn(`[WhatsApp Dispatch] Conexão fechada detectada na Evolution API (${evolutionInstance}). Reiniciando instância e retentando...`);
+          try {
+            await fetch(`${evolutionApiUrl}/instance/restart/${evolutionInstance}`, {
+              method: 'POST',
+              headers: { 'apikey': evolutionApiKey }
+            });
+            await new Promise(r => setTimeout(r, 2000));
+            const retryRes = await fetch(mediaEndpoint, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'apikey': evolutionApiKey
+              },
+              body: JSON.stringify({
+                number: targetRecipient,
+                media: mediaUrl,
+                mediatype: 'image',
+                mimetype: 'image/jpeg',
+                caption: messageCaption,
+                fileName: 'oferta.jpg',
+                options: { delay: 1000 }
+              })
+            });
+            if (retryRes.ok) {
+              console.log(`[WhatsApp Dispatch] ✅ Reenvio com sucesso após reinício da instância ${evolutionInstance}!`);
+              return await retryRes.json();
+            }
+          } catch (reErr) {
+            console.error('[WhatsApp Dispatch] Erro na auto-reconexão:', reErr.message);
+          }
+        }
         console.warn(`[WhatsApp Dispatch] Falha no sendMedia (${evolutionInstance} -> ${targetRecipient}, HTTP ${response.status}):`, errText);
         return { success: false, status: response.status, error: errText };
       }
@@ -514,9 +547,11 @@ async function handleSendWhatsAppDeal(req, res) {
   const { isDoubleDay, eventLabel } = getDoubleDayContext(now);
 
   // Intervalo e timeKey:
-  // - Em Datas Duplas: intervalo contínuo de 5 minutos (tolerância de +/- 2 minutos)
-  // - Em Dias Normais: intervalo padrão de 15 minutos (tolerância de +/- 7 minutos)
+  // - Em Datas Duplas: intervalo contínuo de 5 minutos (06:00 às 22:35)
+  // - Em Dias Normais: intervalo exato de 15 minutos (:00, :15, :30, :45) das 07:00 às 22:30
   const slotInterval = isDoubleDay ? 5 : 15;
+  const remainder = totalBrtMinutes % slotInterval;
+  const distanceToSlot = Math.min(remainder, slotInterval - remainder);
   const roundedMinutes = Math.round(totalBrtMinutes / slotInterval) * slotInterval;
   const roundedBrtHours = Math.floor(roundedMinutes / 60) % 24;
   const roundedSlotMinute = roundedMinutes % 60;
@@ -529,58 +564,43 @@ async function handleSendWhatsAppDeal(req, res) {
   // Variável para rastrear o índice do disparo nas datas duplas (1 a 200)
   let doubleDayDispatchIndex = null;
 
-  // Contador dedicado de disparos do dia em fast_data_versions.
-  // last_posted_at dos produtos NÃO serve para isso: o cron do Instagram também grava
-  // nesse campo e inflaria a contagem de 200 ou dispararia o cooldown indevidamente.
+  // Contador dedicado de disparos do dia e trava por slot específico em fast_data_versions
   const brtDate = new Date(now.getTime() - 3 * 3600 * 1000);
   const todayBrt = brtDate.toISOString().split('T')[0];
   const counterKey = `wa_deals_${todayBrt}`;
+  const slotLockKey = `wa_slot_${todayBrt}_${timeKey}`;
   let dailySentCount = 0;
   let lastSentAtMs = 0;
+  let slotAlreadySent = false;
 
   if (mode === 'auto' && !force) {
     try {
-      const { data: lockRow } = await supabaseAdmin
+      const { data: lockRows } = await supabaseAdmin
         .from('fast_data_versions')
-        .select('version, updated_at')
-        .eq('key', counterKey)
-        .maybeSingle();
+        .select('key, version, updated_at')
+        .in('key', [counterKey, slotLockKey]);
 
-      if (lockRow) {
-        dailySentCount = Number(lockRow.version) || 0;
-        lastSentAtMs = lockRow.updated_at ? new Date(lockRow.updated_at).getTime() : 0;
+      if (lockRows && lockRows.length > 0) {
+        for (const row of lockRows) {
+          if (row.key === counterKey) {
+            dailySentCount = Number(row.version) || 0;
+            lastSentAtMs = row.updated_at ? new Date(row.updated_at).getTime() : 0;
+          }
+          if (row.key === slotLockKey) {
+            slotAlreadySent = true;
+          }
+        }
       } else {
-        // Fallback para o 1º disparo do dia (contador ainda inexistente):
-        // conta produtos já postados hoje para não reiniciar a fila em caso de redeploy
+        // Fallback para o 1º disparo do dia (contador ainda inexistente)
         const todayStartIso = new Date(`${todayBrt}T00:00:00.000-03:00`).toISOString();
         const { count: legacyCount } = await supabaseAdmin
           .from('fast_affiliate_products')
           .select('id', { count: 'exact', head: true })
           .gte('last_posted_at', todayStartIso);
         dailySentCount = Number(legacyCount) || 0;
-
-        const lastTs = [];
-        const { data: lastAffiliate } = await supabaseAdmin
-          .from('fast_affiliate_products')
-          .select('last_posted_at')
-          .not('last_posted_at', 'is', null)
-          .order('last_posted_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        const { data: lastStore } = await supabaseAdmin
-          .from('fast_products')
-          .select('last_posted_at')
-          .not('last_posted_at', 'is', null)
-          .order('last_posted_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        [lastAffiliate, lastStore].forEach(r => {
-          if (r && r.last_posted_at) lastTs.push(new Date(r.last_posted_at).getTime());
-        });
-        lastSentAtMs = lastTs.length ? Math.max(...lastTs) : 0;
       }
     } catch (lockErr) {
-      console.warn('[WhatsApp Deal] Aviso ao verificar contador diário:', lockErr.message);
+      console.warn('[WhatsApp Deal] Aviso ao verificar contador diário e trava de slot:', lockErr.message);
     }
   }
 
@@ -590,7 +610,6 @@ async function handleSendWhatsAppDeal(req, res) {
     // 2. Horário de início: 1º disparo pontualmente às 06:00 (minuto 360)
     // 3. Intervalo entre envios: 1 mensagem a cada 5 minutos de forma contínua
     // 4. Horário de encerramento: 200º e último disparo pontualmente às 22:35 (minuto 1355)
-    //    Cálculo: (1355 - 360) / 5 + 1 = 199 intervalos + 1 = exatamente 200 disparos!
     const startMinute = 6 * 60; // 06:00 BRT = 360 minutos
     const endMinute = 22 * 60 + 35; // 22:35 BRT = 1355 minutos
     doubleDayDispatchIndex = Math.round((roundedMinutes - startMinute) / 5) + 1;
@@ -630,56 +649,62 @@ async function handleSendWhatsAppDeal(req, res) {
         });
       }
 
-      // Trava de cooldown anti-duplicidade no slot de 5 minutos (evita duplo disparo se o cron rodar duas vezes)
-      if (lastSentAtMs > 0) {
-        const diffMs = now.getTime() - lastSentAtMs;
-        if (diffMs < 3 * 60 * 1000) {
-          return res.status(200).json({
-            success: true,
-            skipped: true,
-            message: `Disparo ignorado para evitar envio duplo no slot de 5 minutos: último envio realizado há ${Math.round(diffMs / 1000)}s.`,
-            timeKey,
-            isDoubleDay: true,
-            eventLabel
-          });
-        }
+      // Trava de slot: evita duplo disparo no mesmo slot de 5 minutos
+      if (slotAlreadySent) {
+        return res.status(200).json({
+          success: true,
+          skipped: true,
+          message: `Disparo ignorado: o slot oficial ${timeKey} de 5 min do Mega Evento ${eventLabel} já foi enviado hoje.`,
+          timeKey,
+          isDoubleDay: true,
+          eventLabel
+        });
       }
 
       // Em datas duplas, todos os 200 envios são promoções de ofertas para o grupo
       targetType = 'affiliate';
     }
   } else {
-    // DIAS NORMAIS (MANTIDOS EXATAMENTE COMO ESTAVAM):
+    // DIAS NORMAIS (HORÁRIOS EXATOS DE 15 EM 15 MINUTOS):
     // 9 Horários estratégicos da FastSavory's intercalados (Almoço, Sobremesas, Fornadas, Lanche e Encomendas da tarde)
     const fastSavorysSlots = ['11:30', '12:00', '12:45', '13:30', '14:00', '15:00', '15:45', '16:30', '17:30'];
 
     if (mode === 'auto' && !force) {
-      // Janela permitida: das 07h00 até as 22h30 exatamente (último disparo às 22h30)
-      // Bloqueia qualquer disparo antes das 07h00 ou após as 22h30 (como 22h45 e 22h55)
-      const isWithinHours = (roundedBrtHours >= 7 && roundedBrtHours < 22) || (roundedBrtHours === 22 && roundedSlotMinute <= 30);
-      if (!isWithinHours) {
+      // Janela oficial: das 07h00 até as 22h30 rigorosamente
+      const startMinute = 7 * 60; // 07:00 BRT
+      const endMinute = 22 * 60 + 30; // 22:30 BRT
+      if (roundedMinutes < startMinute || roundedMinutes > endMinute) {
         return res.status(200).json({
           success: true,
           skipped: true,
-          message: `Horário ${timeKey} fora da janela oficial de disparos (07h00 às 22h30).`,
+          message: `Horário ${timeKey} fora da janela oficial de disparos (07h00 às 22h30). O primeiro disparo ocorre pontualmente às 07h00 e o último às 22h30.`,
           timeKey,
           isDoubleDay: false
         });
       }
 
-      // Cooldown de ~15 minutos em dias normais: mantém a cadência mesmo se o agendador
-      // chamar o endpoint com mais frequência (ex.: */5 da Oracle nos dias duplos)
-      if (lastSentAtMs > 0) {
-        const diffMs = now.getTime() - lastSentAtMs;
-        if (diffMs < 12 * 60 * 1000) {
-          return res.status(200).json({
-            success: true,
-            skipped: true,
-            message: `Disparo ignorado: último envio ao grupo há ${Math.round(diffMs / 60000)} min (cadência de ~15 min em dias normais).`,
-            timeKey,
-            isDoubleDay: false
-          });
-        }
+      // REGRA DE HORÁRIO EXATO (elimina minutos quebrados como :05, :10, :20, :25, :33, :40):
+      // Aceita apenas chamadas com tolerância de até ±2 minutos do slot oficial (:00, :15, :30, :45).
+      if (distanceToSlot > 2) {
+        return res.status(200).json({
+          success: true,
+          skipped: true,
+          message: `Minuto atual fora do horário exato de 15 minutos. Os envios ocorrem rigorosamente nos horários cheios (:00, :15, :30, :45). Próximo slot oficial: ${timeKey}.`,
+          timeKey,
+          distanceToSlot,
+          isDoubleDay: false
+        });
+      }
+
+      // Trava por slot exato: se o slot (ex: 07:15, 07:30) já foi enviado hoje, NÃO repete!
+      if (slotAlreadySent) {
+        return res.status(200).json({
+          success: true,
+          skipped: true,
+          message: `Disparo ignorado: o slot oficial ${timeKey} de hoje já foi enviado com sucesso. Aguardando próximo horário exato em 15 minutos.`,
+          timeKey,
+          isDoubleDay: false
+        });
       }
 
       // Disparos a cada 15 minutos com intercalação de slots do cardápio FastSavory's
@@ -993,15 +1018,35 @@ async function handleSendWhatsAppDeal(req, res) {
     }
 
     // Disparo centralizado via dispatchWhatsAppMessage
-    const sendResponse = await dispatchWhatsAppMessage(messageCaption, mediaUrl, {
+    let sendResponse = await dispatchWhatsAppMessage(messageCaption, mediaUrl, {
       instance: evolutionInstance,
       targetJid: targetGroupJid
     });
 
-    const isSendOk = sendResponse &&
+    let isSendOk = sendResponse &&
       sendResponse.success !== false &&
       !sendResponse.error &&
       (Boolean(sendResponse.key) || typeof sendResponse.status === 'string' || !sendResponse.status || (typeof sendResponse.status === 'number' && sendResponse.status < 400));
+
+    // Contingência Automática Dupla: se uma instância falhar, tenta a outra imediatamente
+    if (!isSendOk) {
+      const backupInstance = (evolutionInstance === 'fast_lanchonete') ? 'fastsavorys' : 'fast_lanchonete';
+      console.warn(`[WhatsApp Deal Cron] ⚠️ Instância ${evolutionInstance} falhou (${sendResponse?.error || 'erro'}). Enviando via contingência ${backupInstance}...`);
+      const fallbackResponse = await dispatchWhatsAppMessage(messageCaption, mediaUrl, {
+        instance: backupInstance,
+        targetJid: targetGroupJid
+      });
+      const isFallbackOk = fallbackResponse &&
+        fallbackResponse.success !== false &&
+        !fallbackResponse.error &&
+        (Boolean(fallbackResponse.key) || typeof fallbackResponse.status === 'string' || !fallbackResponse.status || (typeof fallbackResponse.status === 'number' && fallbackResponse.status < 400));
+
+      if (isFallbackOk) {
+        console.log(`[WhatsApp Deal Cron] ✅ Envio de oferta bem-sucedido via instância de contingência ${backupInstance}!`);
+        sendResponse = fallbackResponse;
+        isSendOk = true;
+      }
+    }
 
     if (!isSendOk) {
       const errMsg = sendResponse?.error || (typeof sendResponse === 'object' ? JSON.stringify(sendResponse) : 'Falha desconhecida no WhatsApp');
@@ -1027,20 +1072,28 @@ async function handleSendWhatsAppDeal(req, res) {
       console.warn(`[WhatsApp Deal] Aviso ao atualizar last_posted_at em ${targetTable}:`, updateErr.message);
     }
 
-    // Incrementa o contador dedicado de disparos do dia (conta apenas envios reais ao grupo)
+    // Registra a trava do slot oficial e incrementa o contador diário em fast_data_versions
     try {
       const brtDay = new Date(now.getTime() - 3 * 3600 * 1000).toISOString().split('T')[0];
       const key = `wa_deals_${brtDay}`;
+      const slotKey = `wa_slot_${brtDay}_${timeKey}`;
+
       const { data: row } = await supabaseAdmin
         .from('fast_data_versions')
         .select('version')
         .eq('key', key)
         .maybeSingle();
-      await supabaseAdmin
-        .from('fast_data_versions')
-        .upsert({ key, version: (Number(row && row.version) || 0) + 1, updated_at: nowIso });
+
+      await Promise.all([
+        supabaseAdmin
+          .from('fast_data_versions')
+          .upsert({ key, version: (Number(row && row.version) || 0) + 1, updated_at: nowIso }),
+        supabaseAdmin
+          .from('fast_data_versions')
+          .upsert({ key: slotKey, version: 1, updated_at: nowIso })
+      ]);
     } catch (counterErr) {
-      console.warn('[WhatsApp Deal] Aviso ao incrementar contador diário:', counterErr.message);
+      console.warn('[WhatsApp Deal] Aviso ao incrementar contador/trava de slot:', counterErr.message);
     }
 
     return res.status(200).json({
