@@ -193,7 +193,7 @@ window.isFastOpen = function () {
     const todayHours = businessHours.find(bh => bh.day_of_week === d);
     if (todayHours) {
         if (!todayHours.is_open) return false;
-        const [openH, openM] = (todayHours.open_time || '14:00').split(':').map(Number);
+        const [openH, openM] = (todayHours.open_time || '16:00').split(':').map(Number);
         const [closeH, closeM] = (todayHours.close_time || '18:00').split(':').map(Number);
         const openTime = openH + openM / 60;
         const closeTime = closeH + closeM / 60;
@@ -201,8 +201,7 @@ window.isFastOpen = function () {
     }
 
     if (d === 0) return false;
-    if (d === 5) return timeNow >= 14 && timeNow < 19.5;
-    return timeNow >= 14 && timeNow < 18;
+    return timeNow >= 16 && timeNow < 18;
 };
 
 // Verifica regras de horário para encomenda

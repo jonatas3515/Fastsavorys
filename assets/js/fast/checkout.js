@@ -126,10 +126,12 @@ window.CheckoutModule = {
         try {
             const slot = document.getElementById('orderTimeSlot');
             if (slot) {
-                const winStart = (window.storeConfig && window.storeConfig.order_window_start) || '07:00';
-                const winEnd = (window.storeConfig && window.storeConfig.order_window_end) || '18:00';
-                if (e.target.value === 'entrega') { slot.min = winStart; slot.max = winEnd; }
-                else { slot.removeAttribute('min'); slot.removeAttribute('max'); }
+                if (e.target.value === 'entrega') {
+                    slot.min = '16:00';
+                    slot.max = '18:00';
+                } else {
+                    this.updateMinTimeForDate(document.getElementById('orderDate')?.value);
+                }
             }
         } catch (e2) { }
 
@@ -167,46 +169,62 @@ window.CheckoutModule = {
         }
     },
 
-    // Atualiza horário mínimo quando data é hoje
+    // Atualiza horário mínimo e máximo baseado na data e no modo (entrega x retirada)
     updateMinTimeForDate: function (dateStr) {
         const timeInput = document.getElementById('orderTimeSlot');
         if (!timeInput) return;
 
+        const isDelivery = document.querySelector('input[name="delivery"]:checked')?.value === 'entrega';
         const brasilia = window.getBrasiliaDate ? window.getBrasiliaDate() : new Date();
         const todayStr = window.formatYYYYMMDD(brasilia);
+        const hint = document.getElementById('orderTimeHint');
 
+        // REGRA DE ENTREGA: Sempre das 16:00 às 18:00 (mesmo dia ou agendada)
+        if (isDelivery) {
+            timeInput.min = '16:00';
+            timeInput.max = '18:00';
+            if (timeInput.value && (timeInput.value < '16:00' || timeInput.value > '18:00')) {
+                timeInput.value = '';
+            }
+            if (hint) hint.textContent = '🛵 Horário de entrega: exclusivamente das 16:00 às 18:00';
+            return;
+        }
+
+        // REGRA DE RETIRADA:
         if (dateStr === todayStr) {
-            // Data é hoje - definir horário mínimo como agora + 30min
+            // No mesmo dia: liberação exclusivamente das 16:00 às 18:00
             const currentHour = brasilia.getHours();
             const currentMin = brasilia.getMinutes();
             let minHour = currentHour;
             let minMin = currentMin + 30;
-
             if (minMin >= 60) {
                 minHour += 1;
                 minMin -= 60;
             }
 
-            const minTime = `${String(minHour).padStart(2, '0')}:${String(minMin).padStart(2, '0')}`;
-            timeInput.min = minTime;
-
-            // Se horário atual é menor que mínimo, limpar
-            if (timeInput.value && timeInput.value < minTime) {
-                timeInput.value = '';
-                if (window.showToast) window.showToast(`⏰ Horário mínimo para hoje: ${minTime}`, 'warning');
+            let effectiveMin = '16:00';
+            const calcMin = `${String(minHour).padStart(2, '0')}:${String(minMin).padStart(2, '0')}`;
+            if (calcMin > effectiveMin) {
+                effectiveMin = calcMin;
             }
 
-            // Mostrar hint
-            const hint = document.getElementById('orderTimeHint');
-            if (hint) hint.textContent = `Para hoje, horário mínimo: ${minTime} (30min preparo)`;
+            timeInput.min = effectiveMin;
+            timeInput.max = '18:00';
+
+            if (timeInput.value && (timeInput.value < effectiveMin || timeInput.value > '18:00')) {
+                timeInput.value = '';
+                if (window.showToast) window.showToast('⏰ Retirada para hoje permitida apenas das 16:00 às 18:00', 'warning');
+            }
+
+            if (hint) hint.textContent = `⏰ Retirada para hoje: das 16:00 às 18:00`;
         } else {
-            // Data futura - REMOVER TODAS as restrições de horário
-            timeInput.removeAttribute('min');
-            timeInput.removeAttribute('max');
-            const winStart = (window.storeConfig && window.storeConfig.order_window_start) || '07:00';
-            const winEnd = (window.storeConfig && window.storeConfig.order_window_end) || '18:00';
-            const hint = document.getElementById('orderTimeHint');
-            if (hint) hint.textContent = `Horário de funcionamento: ${winStart} às ${winEnd}`;
+            // Retirada agendada (dia anterior / futuro): das 08:00 às 18:00
+            timeInput.min = '08:00';
+            timeInput.max = '18:00';
+            if (timeInput.value && (timeInput.value < '08:00' || timeInput.value > '18:00')) {
+                timeInput.value = '';
+            }
+            if (hint) hint.textContent = '⏰ Retirada agendada: das 08:00 às 18:00';
         }
     },
 

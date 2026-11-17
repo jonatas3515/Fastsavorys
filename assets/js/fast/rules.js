@@ -46,8 +46,7 @@ window.RulesModule = {
 
         // Fallback to defaults if no config found (Legacy Logic)
         if (d === 0) return false; // Domingo fechado
-        if (d === 5) return timeNow >= 14 && timeNow < 18; // Sexta até 18h
-        return timeNow >= 14 && timeNow < 18; // Seg-Qui e Sáb
+        return timeNow >= 16 && timeNow < 18; // Seg-Sáb das 16h às 18h
     },
 
     // Birthday Logic

@@ -291,6 +291,7 @@ window.getMinOrderDate = function (cartItems = window.cart) {
 
     const today = window.formatYYYYMMDD(brasilia);
     const tomorrow = window.formatYYYYMMDD(new Date(brasilia.getTime() + 24 * 60 * 60 * 1000));
+    const afterTomorrow = window.formatYYYYMMDD(new Date(brasilia.getTime() + 48 * 60 * 60 * 1000));
 
     // Regra 0: Pedidos do mesmo dia desabilitados pelo administrador
     if (window.storeConfig && window.storeConfig.same_day_orders_enabled === false) {
@@ -301,53 +302,73 @@ window.getMinOrderDate = function (cartItems = window.cart) {
         };
     }
 
-    // Regra 1: Kit Festa, Bolo G/P, Vulcão → sempre D+1 (mínimo amanhã)
+    // Regra 1: Kit Festa, Bolo G/P, Vulcão:
+    // "Para Kits festa, só aceite pedidos até as 18h do dia anterior, se pedir as 18h01, fica para dois dias (D+2)"
     if (analysis.hasBoloGrande) {
-        return {
-            minDate: tomorrow,
-            reason: '🎂 Bolos e Kits Festa exigem 1 dia de antecedência para preparo.',
-            canOrderToday: false
-        };
-    }
-
-    // Regra 2: Vulcão Mini → até 10h pode pedir para hoje, após 10h só amanhã
-    if (analysis.hasBoloMini) {
-        const cutoffMini = 10 * 60; // 10:00
-        if (tempoAtual > cutoffMini) {
+        const cutoffBolo = 18 * 60; // 18:00
+        if (tempoAtual > cutoffBolo) {
+            const [y, m, d] = afterTomorrow.split('-');
             return {
-                minDate: tomorrow,
-                reason: '🌋 Bolo Vulcão Mini: após as 10h, pedidos apenas para o dia seguinte.',
+                minDate: afterTomorrow,
+                reason: `🎂 Kits Festa e Bolos para o dia seguinte devem ser pedidos até as 18h. Pedidos feitos após as 18h ficam para 2 dias de antecedência (a partir de ${d}/${m}/${y}).`,
                 canOrderToday: false
             };
         }
         return {
-            minDate: today,
-            reason: '🌋 Bolo Vulcão Mini: pedido até 10h para o mesmo dia.',
-            canOrderToday: true
+            minDate: tomorrow,
+            reason: '🎂 Bolos e Kits Festa exigem antecedência (pedidos até as 18h para o dia seguinte).',
+            canOrderToday: false
         };
     }
 
-    // Regra 3: Salgados → até 8h pode pedir para hoje
-    if (analysis.hasSalgados) {
-        const cutoffSalgados = 8 * 60; // 08:00
-        if (tempoAtual > cutoffSalgados) {
-            const sameDayStart = (window.storeConfig && window.storeConfig.same_day_pickup_start) || '12:00';
+    // Regra 2: Vulcão Mini
+    if (analysis.hasBoloMini) {
+        const cutoffMini = 18 * 60; // 18:00
+        if (tempoAtual > cutoffMini) {
+            const [y, m, d] = afterTomorrow.split('-');
             return {
-                minDate: today, // Ainda pode pedir para hoje, mas com restrições de horário
-                reason: `🥟 Salgados: após as 8h, pedidos para entrega/retirada para hoje somente a partir das ${sameDayStart}.`,
-                canOrderToday: true,
-                sameDayRestricted: true
+                minDate: afterTomorrow,
+                reason: `🌋 Bolo Vulcão Mini: pedidos após as 18h ficam disponíveis a partir de ${d}/${m}/${y}.`,
+                canOrderToday: false
             };
         }
         return {
-            minDate: today,
-            reason: '🥟 Salgados: pedido até 8h para o mesmo dia.',
-            canOrderToday: true
+            minDate: tomorrow,
+            reason: '🌋 Bolo Vulcão Mini: pedidos aceitos até as 18h para amanhã.',
+            canOrderToday: false
         };
     }
 
-    // Default: pode pedir para hoje
-    return { minDate: today, reason: '', canOrderToday: true };
+    // Regra 3: Apenas Salgados
+    // "Agora se for apenas salgados pode aceitar pedidos feitos até as 21h."
+    // - Para amanhã (D+1): pedidos aceitos até as 21h do dia anterior. Após as 21h, pula para D+2!
+    // - Para hoje (mesmo dia): liberado das 16h às 18h. Se já passou das 18h, encerra para hoje e permite agendar para amanhã até as 21h.
+    const cutoffSalgadosNextDay = 21 * 60; // 21:00
+    const cutoffSameDay = 18 * 60; // 18:00
+
+    if (tempoAtual > cutoffSalgadosNextDay) {
+        const [y, m, d] = afterTomorrow.split('-');
+        return {
+            minDate: afterTomorrow,
+            reason: `🥟 Pedidos de salgados para o dia seguinte são aceitos até as 21h. Pedidos após as 21h ficam para ${d}/${m}/${y}.`,
+            canOrderToday: false
+        };
+    }
+
+    if (tempoAtual >= cutoffSameDay) {
+        return {
+            minDate: tomorrow,
+            reason: '🥟 Pedidos para hoje encerrados às 18h. Agendamento disponível para amanhã (pedidos até as 21h).',
+            canOrderToday: false
+        };
+    }
+
+    // Antes das 18h: pode pedir para hoje (liberado a partir das 16h) ou agendar para amanhã
+    return {
+        minDate: today,
+        reason: '🥟 Salgados: pedidos para hoje disponíveis para retirada/entrega das 16h às 18h.',
+        canOrderToday: true
+    };
 };
 
 // ============================================
@@ -365,55 +386,31 @@ window.getMinOrderDate = function (cartItems = window.cart) {
  */
 window.validateOrderTime = function (timeSlot, orderDate, cartItems = window.cart, cartTotal = window.cartTotal, isDelivery = false) {
     if (!timeSlot) {
-        return { allowed: false, reason: 'Por favor, selecione o horário desejado para entrega ou retirada (das 12h às 18h).' };
+        return { allowed: false, reason: isDelivery ? 'Por favor, selecione o horário desejado para entrega (das 16h às 18h).' : 'Por favor, selecione o horário desejado para retirada.' };
     }
 
-    const analysis = window.analyzeCart(cartItems);
     const brasilia = window.getBrasiliaDate();
     const today = window.formatYYYYMMDD(brasilia);
     const isToday = orderDate === today;
 
-    // Normalizar horário
+    // Normalizar horário (ex: "16:00" -> 1600, "08:30" -> 830)
     const normalizeTime = (t) => (t || '').replace(/:/g, '').substring(0, 4).padStart(4, '0');
     const timeNum = parseInt(normalizeTime(timeSlot), 10);
 
-    // Janela geral de funcionamento (do Admin ou padrão 07:00 às 18:00)
-    const windowStart = (window.storeConfig && window.storeConfig.order_window_start) || '07:00';
-    const windowEnd = (window.storeConfig && window.storeConfig.order_window_end) || '18:00';
-    const minTimeNum = parseInt(normalizeTime(windowStart), 10);
-    const maxTimeNum = parseInt(normalizeTime(windowEnd), 10);
-
-    // Validação geral da janela de pedidos
-    if (timeNum < minTimeNum || timeNum > maxTimeNum) {
-        return {
-            allowed: false,
-            reason: `⏰ O horário selecionado deve estar dentro da janela de funcionamento: das ${windowStart} às ${windowEnd}.`
-        };
-    }
-
-    // Regra 1: Kit Festa, Bolo G/P, Vulcão → dentro da janela geral (D+1 já validado em getMinOrderDate)
-    if (analysis.hasBoloGrande) {
-        if (timeNum < minTimeNum || timeNum > maxTimeNum) {
+    // REGRA 1: ENTREGAS
+    // "entregas das 16h as 18h" - Tanto para o mesmo dia quanto agendadas no dia anterior!
+    if (isDelivery) {
+        if (timeNum < 1600 || timeNum > 1800) {
             return {
                 allowed: false,
-                reason: `⏰ Para bolos e kits festa, a retirada deve ser entre ${windowStart} e ${windowEnd}.`
+                reason: '🛵 Nossas entregas funcionam exclusivamente das 16:00 às 18:00.'
             };
         }
         return { allowed: true, reason: '' };
     }
 
-    // Regra 2: Vulcão Mini → dentro da janela geral
-    if (analysis.hasBoloMini) {
-        if (timeNum < minTimeNum || timeNum > maxTimeNum) {
-            return {
-                allowed: false,
-                reason: `⏰ Para Bolo Vulcão Mini, o horário deve ser entre ${windowStart} e ${windowEnd}.`
-            };
-        }
-        return { allowed: true, reason: '' };
-    }
-
-    // Regra 3: Pedidos no Mesmo Dia
+    // REGRA 2: RETIRADAS NO MESMO DIA
+    // "Pedidos feitos no mesmo dia só podem ser liberados para retirar ou entregar após as 16h até as 18h"
     if (isToday) {
         if (window.storeConfig && window.storeConfig.same_day_orders_enabled === false) {
             return {
@@ -422,65 +419,23 @@ window.validateOrderTime = function (timeSlot, orderDate, cartItems = window.car
             };
         }
 
-        const sameDayStart = (window.storeConfig && window.storeConfig.same_day_pickup_start) || '12:00';
-        const sameDayEnd = (window.storeConfig && window.storeConfig.same_day_pickup_end) || windowEnd;
-        const sameDayStartNum = parseInt(normalizeTime(sameDayStart), 10);
-        const sameDayEndNum = parseInt(normalizeTime(sameDayEnd), 10);
-
-        if (timeNum < sameDayStartNum || timeNum > sameDayEndNum) {
+        if (timeNum < 1600 || timeNum > 1800) {
             return {
                 allowed: false,
-                reason: `⏰ Para pedidos no mesmo dia, o horário permitido é das ${sameDayStart} às ${sameDayEnd}.`
+                reason: '⏰ Para pedidos no mesmo dia, a retirada na loja é permitida exclusivamente das 16:00 às 18:00.'
             };
         }
-
-        // Valor mínimo para o mesmo dia antes do expediente normal (12h às 14h)
-        // No horário de funcionamento normal (14h às 18h), aplicam-se os mínimos padrão (Entrega R$ 15,00 / Retirada R$ 9,00)
-        if (timeNum < 1400) {
-            const sameDayMinValue = (window.storeConfig && typeof window.storeConfig.same_day_min_value === 'number')
-                ? window.storeConfig.same_day_min_value
-                : 25;
-            if (cartTotal < sameDayMinValue) {
-                const faltando = (sameDayMinValue - cartTotal).toFixed(2).replace('.', ',');
-                return {
-                    allowed: false,
-                    reason: `💰 Para pedidos no mesmo dia antes das 14h, o pedido mínimo é de R$ ${sameDayMinValue.toFixed(2).replace('.', ',')}. Faltam R$ ${faltando}.`
-                };
-            }
-        }
+        return { allowed: true, reason: '' };
     }
 
-    // Regra 4: REGRA DA MANHÃ (Configurável no Admin - ex: antes das 13h, mín. R$ 40,00)
-    // Aplica para entrega e retirada, agendado ou mesmo dia
-    const morningEnabled = window.storeConfig ? window.storeConfig.morning_rule_enabled !== false : true;
-    const morningEndTime = (window.storeConfig && window.storeConfig.morning_rule_end_time) || '13:00';
-    const morningMinValue = (window.storeConfig && typeof window.storeConfig.morning_rule_min_value === 'number')
-        ? window.storeConfig.morning_rule_min_value
-        : 40.00;
-    const morningEndNum = parseInt(normalizeTime(morningEndTime), 10);
-
-    if (morningEnabled && timeNum >= minTimeNum && timeNum < morningEndNum) {
-        if (cartTotal < morningMinValue) {
-            const faltando = (morningMinValue - cartTotal).toFixed(2).replace('.', ',');
-            return {
-                allowed: false,
-                reason: `🌅 Para pedidos entre ${windowStart} e ${morningEndTime} (${isDelivery ? 'entrega' : 'retirada'}), o pedido mínimo é de R$ ${morningMinValue.toFixed(2).replace('.', ',')}. Faltam R$ ${faltando}.`
-            };
-        }
-    }
-
-    // Regra 5: Mínimo Retirada Fora-Horário (ex: entre 12h e 14h se configurado diferente do mínimo padrão)
-    if (!isDelivery && timeNum >= 1200 && timeNum < 1400) {
-        const minOffhours = (window.storeConfig && typeof window.storeConfig.min_order_pickup_offhours === 'number')
-            ? window.storeConfig.min_order_pickup_offhours
-            : 15;
-        if (cartTotal < minOffhours) {
-            const faltando = (minOffhours - cartTotal).toFixed(2).replace('.', ',');
-            return {
-                allowed: false,
-                reason: `💰 Para retirada entre 12:00 e 14:00, o pedido mínimo é de R$ ${minOffhours.toFixed(2).replace('.', ',')}. Faltam R$ ${faltando}.`
-            };
-        }
+    // REGRA 3: RETIRADAS AGENDADAS (DIA ANTERIOR / FUTURO)
+    // "Pedido feitos no dia anterior, pode ser agendados, apenas para retirada das 8h até as 16h e entregas das 16h as 18h"
+    // Retirada agendada permitida das 08:00 às 18:00
+    if (timeNum < 800 || timeNum > 1800) {
+        return {
+            allowed: false,
+            reason: '⏰ Para encomendas agendadas, a retirada é permitida das 08:00 às 18:00.'
+        };
     }
 
     return { allowed: true, reason: '' };
@@ -764,15 +719,14 @@ window.updateOrderRulesUI = function () {
         let rulesHtml = '';
 
         if (analysis.hasBoloGrande) {
-            rulesHtml = `<strong>🎂 Bolos e Kits Festa:</strong> Mínimo 1 dia de antecedência. Retirada das ${windowStart} às ${windowEnd}. <strong>Apenas retirada, sem entrega.</strong>`;
+            rulesHtml = `<strong>🎂 Bolos e Kits Festa:</strong> Pedidos até as 18h do dia anterior (pedidos após as 18h ficam para 2 dias). <strong>Apenas retirada na loja, das 08h às 18h.</strong>`;
         } else if (analysis.hasBoloMini) {
-            rulesHtml = `<strong>🌋 Vulcão Mini:</strong> Pedidos até 10h para o mesmo dia. Após 10h, só para o dia seguinte. Horário: ${windowStart}-${windowEnd}.`;
+            rulesHtml = `<strong>🌋 Vulcão Mini:</strong> Pedidos até as 18h para o dia seguinte. Retirada das 08h às 18h, entregas das 16h às 18h.`;
         } else if (analysis.hasSalgados) {
-            const morningText = morningEnabled ? `• Manhã (${windowStart}-${morningEndTime}): mín. R$ ${morningMinValue.toFixed(2).replace('.', ',')}` : '';
-            rulesHtml = `<strong>🥟 Salgados:</strong> Mesmo dia: pedir até 8h (disponível ${sameDayStart}-${windowEnd}, mín. R$ ${sameDayMinValue.toFixed(2).replace('.', ',')}). Encomendas: ${windowStart}-${windowEnd}.<br>
-                        <span class="text-xs">${morningText}</span>`;
+            rulesHtml = `<strong>🥟 Salgados:</strong> Mesmo dia: retirada e entrega das 16h às 18h.<br>
+                        • Encomendas para o dia seguinte: aceitas até as 21h (retirada das 08h às 18h, entregas das 16h às 18h).`;
         } else {
-            rulesHtml = `<strong>📋 Horário de funcionamento:</strong> ${windowStart} às ${windowEnd}`;
+            rulesHtml = `<strong>📋 Horário de funcionamento:</strong> Loja aberta das 16h às 18h (retiradas agendadas a partir das 08h).`;
         }
 
         orderRulesInfo.innerHTML = rulesHtml;
