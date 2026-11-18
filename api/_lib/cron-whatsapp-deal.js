@@ -229,7 +229,7 @@ async function dispatchWhatsAppMessage(messageCaption, mediaUrl, options = {}) {
   let defaultApiKey = (process.env.EVOLUTION_API_KEY || 'B6D711FCDE4D4FD5936544120E713976').trim();
   let evolutionApiKey = (options.apiKey || defaultApiKey).trim();
 
-  const defaultInstance = (process.env.EVOLUTION_INSTANCE || 'fastsavorys').trim();
+  const defaultInstance = (process.env.EVOLUTION_INSTANCE || 'fast_pessoal').trim();
   const evolutionInstance = (options.instance || defaultInstance).trim();
   const defaultTargetJid = (process.env.WHATSAPP_DEALS_GROUP_JID || '').trim();
   const targetRecipient = (options.targetJid || defaultTargetJid).trim();
@@ -527,7 +527,7 @@ async function handleSendWhatsAppDeal(req, res) {
 
   let evolutionApiUrl = (process.env.EVOLUTION_API_URL || 'http://136.248.121.245:8080').replace(/\/+$/, '');
   let evolutionApiKey = process.env.EVOLUTION_API_KEY || 'B6D711FCDE4D4FD5936544120E713976';
-  const evolutionInstance = process.env.EVOLUTION_INSTANCE || 'fastsavorys';
+  const evolutionInstance = process.env.EVOLUTION_INSTANCE || 'fast_pessoal';
   const targetGroupJid = process.env.WHATSAPP_DEALS_GROUP_JID || '';
 
   if (!evolutionApiUrl || !evolutionApiKey || !targetGroupJid) {
@@ -1028,10 +1028,11 @@ async function handleSendWhatsAppDeal(req, res) {
       !sendResponse.error &&
       (Boolean(sendResponse.key) || typeof sendResponse.status === 'string' || !sendResponse.status || (typeof sendResponse.status === 'number' && sendResponse.status < 400));
 
-    // Contingência Automática Dupla: se uma instância falhar, tenta a outra imediatamente
-    if (!isSendOk) {
-      const backupInstance = (evolutionInstance === 'fast_lanchonete') ? 'fastsavorys' : 'fast_lanchonete';
-      console.warn(`[WhatsApp Deal Cron] ⚠️ Instância ${evolutionInstance} falhou (${sendResponse?.error || 'erro'}). Enviando via contingência ${backupInstance}...`);
+    // Contingência: Apenas para produtos do cardápio da FastSavory's.
+    // Para Achadinhos de Afiliados (Mercado Livre, Amazon, Shopee), o usuário exige EXCLUSIVAMENTE o seu número pessoal!
+    if (!isSendOk && isFastSavorysStore) {
+      const backupInstance = 'fast_lanchonete';
+      console.warn(`[WhatsApp Deal Cron] ⚠️ Instância principal falhou para produto da loja. Tentando ${backupInstance}...`);
       const fallbackResponse = await dispatchWhatsAppMessage(messageCaption, mediaUrl, {
         instance: backupInstance,
         targetJid: targetGroupJid
@@ -1042,7 +1043,7 @@ async function handleSendWhatsAppDeal(req, res) {
         (Boolean(fallbackResponse.key) || typeof fallbackResponse.status === 'string' || !fallbackResponse.status || (typeof fallbackResponse.status === 'number' && fallbackResponse.status < 400));
 
       if (isFallbackOk) {
-        console.log(`[WhatsApp Deal Cron] ✅ Envio de oferta bem-sucedido via instância de contingência ${backupInstance}!`);
+        console.log(`[WhatsApp Deal Cron] ✅ Envio de produto da loja bem-sucedido via ${backupInstance}!`);
         sendResponse = fallbackResponse;
         isSendOk = true;
       }
