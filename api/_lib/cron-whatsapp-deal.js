@@ -292,8 +292,8 @@ async function dispatchWhatsAppMessage(messageCaption, mediaUrl, options = {}) {
   // 1. Se possuir URL de imagem, envia EXCLUSIVAMENTE via sendMedia (evita mensagens duplicadas)
   if (mediaUrl && mediaUrl.startsWith('http')) {
     const controller = new AbortController();
-    // 45 segundos de timeout para acomodar download e envio da imagem
-    const timeoutId = setTimeout(() => controller.abort(), 45000);
+    // 54 segundos de timeout para acomodar download e envio da imagem na Evolution API
+    const timeoutId = setTimeout(() => controller.abort(), 54000);
 
     try {
       const mediaEndpoint = `${evolutionApiUrl}/message/sendMedia/${evolutionInstance}`;
