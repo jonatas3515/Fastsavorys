@@ -229,7 +229,8 @@ async function dispatchWhatsAppMessage(messageCaption, mediaUrl, options = {}) {
   let defaultApiKey = (process.env.EVOLUTION_API_KEY || 'B6D711FCDE4D4FD5936544120E713976').trim();
   let evolutionApiKey = (options.apiKey || defaultApiKey).trim();
 
-  const defaultInstance = (process.env.EVOLUTION_INSTANCE || 'fast_pessoal').trim();
+  const configuredInstance = (process.env.EVOLUTION_INSTANCE || '').trim();
+  const defaultInstance = (configuredInstance === 'fastsavorys' || !configuredInstance) ? 'fast_pessoal' : configuredInstance;
   const evolutionInstance = (options.instance || defaultInstance).trim();
   const defaultTargetJid = (process.env.WHATSAPP_DEALS_GROUP_JID || '').trim();
   const targetRecipient = (options.targetJid || defaultTargetJid).trim();
@@ -527,7 +528,9 @@ async function handleSendWhatsAppDeal(req, res) {
 
   let evolutionApiUrl = (process.env.EVOLUTION_API_URL || 'http://136.248.121.245:8080').replace(/\/+$/, '');
   let evolutionApiKey = process.env.EVOLUTION_API_KEY || 'B6D711FCDE4D4FD5936544120E713976';
-  const evolutionInstance = process.env.EVOLUTION_INSTANCE || 'fast_pessoal';
+  const configuredInstance = (process.env.EVOLUTION_INSTANCE || '').trim();
+  const defaultInstance = (configuredInstance === 'fastsavorys' || !configuredInstance) ? 'fast_pessoal' : configuredInstance;
+  const evolutionInstance = (req.query.instance || (req.body && req.body.instance) || defaultInstance).trim();
   const targetGroupJid = process.env.WHATSAPP_DEALS_GROUP_JID || '';
 
   if (!evolutionApiUrl || !evolutionApiKey || !targetGroupJid) {
