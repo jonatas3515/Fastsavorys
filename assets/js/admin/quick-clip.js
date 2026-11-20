@@ -17,7 +17,7 @@
         const origWriteText = navigator.clipboard.writeText.bind(navigator.clipboard);
         navigator.clipboard.writeText = async function (text) {
           if (typeof text === 'string') {
-            const m = text.match(/https?:\/\/(?:mercadolivre\.com\/sec|meli\.la)\/[a-zA-Z0-9_\-\.\/]+/i);
+            const m = text.match(/https?:\/\/(?:mercadolivre\.com\/sec|meli\.la|amzn\.to|s\.shopee\.com\.br|shope\.ee)\/[a-zA-Z0-9_\-\.\/]+/i);
             if (m) {
               lastCapturedAffiliateLink = m[0];
               console.log('[Quick Clip Hook] Link capturado via clipboard.writeText:', m[0]);
@@ -43,13 +43,13 @@
           try {
             const sel = window.getSelection ? window.getSelection().toString() : '';
             if (sel) {
-              const m = sel.match(/https?:\/\/(?:mercadolivre\.com\/sec|meli\.la)\/[a-zA-Z0-9_\-\.\/]+/i);
+              const m = sel.match(/https?:\/\/(?:mercadolivre\.com\/sec|meli\.la|amzn\.to|s\.shopee\.com\.br|shope\.ee)\/[a-zA-Z0-9_\-\.\/]+/i);
               if (m) lastCapturedAffiliateLink = m[0];
             }
             const active = document.activeElement;
             if (active && (active.value || active.innerText)) {
               const val = active.value || active.innerText;
-              const m = val.match(/https?:\/\/(?:mercadolivre\.com\/sec|meli\.la)\/[a-zA-Z0-9_\-\.\/]+/i);
+              const m = val.match(/https?:\/\/(?:mercadolivre\.com\/sec|meli\.la|amzn\.to|s\.shopee\.com\.br|shope\.ee)\/[a-zA-Z0-9_\-\.\/]+/i);
               if (m) lastCapturedAffiliateLink = m[0];
             }
           } catch (err) {}
@@ -68,13 +68,13 @@
           const active = document.activeElement;
           if (active && (active.value || active.innerText)) {
             const val = active.value || active.innerText;
-            const m = val.match(/https?:\/\/(?:mercadolivre\.com\/sec|meli\.la)\/[a-zA-Z0-9_\-\.\/]+/i);
+            const m = val.match(/https?:\/\/(?:mercadolivre\.com\/sec|meli\.la|amzn\.to|s\.shopee\.com\.br|shope\.ee)\/[a-zA-Z0-9_\-\.\/]+/i);
             if (m) lastCapturedAffiliateLink = m[0];
           }
           if (e.clipboardData) {
             const text = e.clipboardData.getData('text/plain');
             if (text) {
-              const m = text.match(/https?:\/\/(?:mercadolivre\.com\/sec|meli\.la)\/[a-zA-Z0-9_\-\.\/]+/i);
+              const m = text.match(/https?:\/\/(?:mercadolivre\.com\/sec|meli\.la|amzn\.to|s\.shopee\.com\.br|shope\.ee)\/[a-zA-Z0-9_\-\.\/]+/i);
               if (m) {
                 lastCapturedAffiliateLink = m[0];
                 console.log('[Quick Clip Hook] Link capturado via copy event:', m[0]);
@@ -100,7 +100,7 @@
           try {
             const res = this.responseText;
             if (res) {
-              const m = res.match(/https?:\/\/(?:mercadolivre\.com\/sec|meli\.la)\/[a-zA-Z0-9_\-\.\/]+/i);
+              const m = res.match(/https?:\/\/(?:mercadolivre\.com\/sec|meli\.la|amzn\.to|s\.shopee\.com\.br|shope\.ee)\/[a-zA-Z0-9_\-\.\/]+/i);
               if (m) {
                 lastCapturedAffiliateLink = m[0];
                 console.log('[Quick Clip Hook] Link capturado via XMLHttpRequest:', m[0]);
@@ -124,7 +124,7 @@
           const clone = res.clone();
           clone.text().then(text => {
             if (text) {
-              const m = text.match(/https?:\/\/(?:mercadolivre\.com\/sec|meli\.la)\/[a-zA-Z0-9_\-\.\/]+/i);
+              const m = text.match(/https?:\/\/(?:mercadolivre\.com\/sec|meli\.la|amzn\.to|s\.shopee\.com\.br|shope\.ee)\/[a-zA-Z0-9_\-\.\/]+/i);
               if (m) {
                 lastCapturedAffiliateLink = m[0];
                 console.log('[Quick Clip Hook] Link capturado via fetch API:', m[0]);
@@ -160,12 +160,416 @@
     }
 
     // ============================================================
+    // 1.5. MODO LOTE: AMAZON (MAIS VENDIDOS, OFERTAS DO DIA, CATEGORIAS, BUSCA)
+    // ============================================================
+    const isAmazon = host.includes('amazon');
+    const isAmazonProduct = isAmazon && (
+      document.getElementById('productTitle') !== null ||
+      document.getElementById('dp') !== null ||
+      /\/dp\/[A-Z0-9]{10}/i.test(href) ||
+      /\/gp\/product\/[A-Z0-9]{10}/i.test(href)
+    );
+    const isAmazonListing = isAmazon && !isAmazonProduct && (
+      href.includes('/bestsellers') ||
+      href.includes('/deals') ||
+      href.includes('/goldbox') ||
+      href.includes('/gp/') ||
+      href.includes('/s?') ||
+      href.includes('/s/') ||
+      document.querySelector('#gridItemRoot, .zg-grid-general-faceout, .s-result-item[data-asin]') !== null
+    );
+
+    if (isAmazon && isAmazonListing && !isAmazonProduct) {
+      runAmazonBatchMiner();
+      return;
+    }
+
+    // ============================================================
     // 2. MODO INDIVIDUAL: PRODUTOS AVULSOS (AMAZON, SHOPEE, ML, NATURA)
     // ============================================================
     await runSingleProductQuickClip(host, href);
 
   } catch (e) {
     alert('Erro Quick Clip: ' + e.message);
+  }
+
+  // ------------------------------------------------------------
+  // FUNÇÃO AUXILIAR AMAZON: EXTRAI LINK CURTO OFICIAL amzn.to DO SITESTRIPE
+  // ------------------------------------------------------------
+  async function extractAmazonSiteStripeLink() {
+    lastCapturedAffiliateLink = null;
+
+    // 1. Procura o botão "Obter link" na barra SiteStripe
+    const allButtons = Array.from(document.querySelectorAll('button, a, [role="button"], span, div'));
+    const getLinkBtn = allButtons.find(el => {
+      const t = (el.innerText || el.textContent || '').trim().toLowerCase();
+      const id = (el.id || '').toLowerCase();
+      const cls = (el.className || '').toLowerCase();
+      return (t === 'obter link' || t === 'get link' || id.includes('amzn-ss-text-link') || cls.includes('amzn-ss-text-link')) &&
+             !el.closest('#fastsavorys-hub-drawer');
+    });
+
+    if (!getLinkBtn) {
+      console.log('[Quick Clip Amazon] Barra SiteStripe "Obter link" não detectada.');
+      return null;
+    }
+
+    try {
+      getLinkBtn.click();
+    } catch(e) {
+      console.warn('[Quick Clip Amazon] Erro ao clicar em Obter link:', e);
+    }
+
+    // Aguarda o modal/popover do SiteStripe abrir
+    await new Promise(r => setTimeout(r, 450));
+
+    const maxWait = 3500;
+    const start = Date.now();
+    let copyAttempts = 0;
+
+    while (Date.now() - start < maxWait) {
+      if (lastCapturedAffiliateLink && lastCapturedAffiliateLink.includes('amzn.to')) break;
+
+      // Clica no botão "Copiar link de associado" ou "Copiar link"
+      if (copyAttempts === 0 || (Date.now() - start > 1000 && copyAttempts < 3)) {
+        const modalEls = Array.from(document.querySelectorAll('[role="dialog"], [class*="modal"], [class*="popover"], [id*="popover"], [id*="sitestripe"], div'));
+        for (const m of modalEls) {
+          const btns = Array.from(m.querySelectorAll('button, [role="button"], a, input[type="button"], div, span'));
+          const copyBtn = btns.find(b => {
+            const bt = (b.innerText || b.value || b.textContent || '').trim().toLowerCase();
+            return (bt.includes('copiar link de associado') || bt.includes('copiar link') || bt.includes('copy link')) &&
+                   !b.closest('#fastsavorys-hub-drawer');
+          });
+          if (copyBtn) {
+            try {
+              copyBtn.click();
+              copyAttempts++;
+            } catch(e) {}
+            break;
+          }
+        }
+      }
+
+      if (lastCapturedAffiliateLink && lastCapturedAffiliateLink.includes('amzn.to')) break;
+
+      // Lê navigator.clipboard se permitido
+      if (navigator.clipboard && navigator.clipboard.readText) {
+        try {
+          const clipText = await navigator.clipboard.readText();
+          if (clipText && clipText.includes('amzn.to')) {
+            const m = clipText.match(/https?:\/\/amzn\.to\/[a-zA-Z0-9_\-\.\/]+/i);
+            if (m) {
+              lastCapturedAffiliateLink = m[0];
+              break;
+            }
+          }
+        } catch(e) {}
+      }
+
+      // Procura em inputs e textareas do popover
+      const allInputs = Array.from(document.querySelectorAll('input, textarea'));
+      for (const inp of allInputs) {
+        const val = (inp.value || inp.getAttribute('value') || '').trim();
+        const m = val.match(/https?:\/\/amzn\.to\/[a-zA-Z0-9_\-\.\/]+/i);
+        if (m) {
+          lastCapturedAffiliateLink = m[0];
+          break;
+        }
+      }
+
+      if (lastCapturedAffiliateLink && lastCapturedAffiliateLink.includes('amzn.to')) break;
+
+      await new Promise(r => setTimeout(r, 200));
+    }
+
+    const finalShortLink = lastCapturedAffiliateLink;
+
+    // Fecha o modal do SiteStripe
+    try {
+      const closeBtn = document.querySelector('[aria-label="Close"], [aria-label="Fechar"], [class*="close"], [id*="close"], .a-button-close, [role="button"][aria-label*="close" i]');
+      if (closeBtn) closeBtn.click();
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', keyCode: 27, which: 27, bubbles: true }));
+    } catch(e) {}
+
+    return finalShortLink;
+  }
+
+  // ------------------------------------------------------------
+  // FUNÇÃO: MINERAÇÃO EM LOTE NA AMAZON (MAIS VENDIDOS, OFERTAS, CATEGORIAS)
+  // ------------------------------------------------------------
+  function runAmazonBatchMiner() {
+    const existingDrawer = document.getElementById('fastsavorys-hub-drawer');
+    if (existingDrawer) {
+      existingDrawer.style.display = existingDrawer.style.display === 'none' ? 'block' : 'none';
+      return;
+    }
+
+    const drawer = document.createElement('div');
+    drawer.id = 'fastsavorys-hub-drawer';
+    drawer.style.cssText = `
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      width: 440px;
+      max-width: 95vw;
+      max-height: 85vh;
+      background: #0f172a;
+      color: #f8fafc;
+      border: 1px solid #334155;
+      border-radius: 16px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.05);
+      z-index: 999999999;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    `;
+
+    drawer.innerHTML = `
+      <div style="background: linear-gradient(135deg, #1e293b, #0f172a); padding: 14px 18px; border-bottom: 1px solid #334155; display: flex; align-items: center; justify-content: space-between;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 20px;">📦</span>
+          <div>
+            <h3 style="margin: 0; font-size: 15px; font-weight: 700; color: #fff; letter-spacing: -0.3px;">FastSavory's Amazon Miner</h3>
+            <p style="margin: 0; font-size: 11px; color: #94a3b8;">Mais Vendidos & Ofertas com Tag jonatas00a3-20</p>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span id="fast-item-count" style="background: #f59e0b; color: #000; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px;">0</span>
+          <button id="fast-close-btn" style="background: transparent; border: none; color: #94a3b8; font-size: 18px; cursor: pointer; padding: 4px; line-height: 1;">✕</button>
+        </div>
+      </div>
+
+      <div style="padding: 10px 18px; background: rgba(245, 158, 11, 0.1); border-bottom: 1px solid #f59e0b; font-size: 11px; color: #fde68a; line-height: 1.4;">
+        🛡️ <strong>Rastreamento Ativo:</strong> Todos os produtos serão importados com seu código oficial <strong>jonatas00a3-20</strong> e comissão garantida!
+      </div>
+
+      <div id="fast-items-list" style="flex: 1; overflow-y: auto; padding: 12px 18px; display: flex; flex-direction: column; gap: 10px; max-height: 45vh;">
+        <!-- Itens inseridos dinamicamente -->
+      </div>
+
+      <div id="fast-progress-bar-container" style="display: none; padding: 10px 18px; background: #1e293b; border-top: 1px solid #334155;">
+        <div style="display: flex; justify-content: space-between; font-size: 11px; color: #94a3b8; margin-bottom: 4px;">
+          <span id="fast-progress-label">Salvando...</span>
+          <span id="fast-progress-pct">0%</span>
+        </div>
+        <div style="width: 100%; height: 6px; background: #334155; border-radius: 999px; overflow: hidden;">
+          <div id="fast-progress-bar" style="width: 0%; height: 100%; background: #f59e0b; transition: width 0.2s;"></div>
+        </div>
+      </div>
+
+      <div style="padding: 14px 18px; background: #0f172a; border-top: 1px solid #334155; display: flex; gap: 10px;">
+        <button id="fast-rescan-btn" style="flex: 1; background: #334155; color: #fff; border: none; border-radius: 8px; padding: 10px; font-size: 12px; font-weight: 600; cursor: pointer; transition: 0.2s;">
+          🔄 Re-escanear
+        </button>
+        <button id="fast-import-btn" style="flex: 2; background: linear-gradient(135deg, #f59e0b, #d97706); color: #000; border: none; border-radius: 8px; padding: 10px; font-size: 13px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: 0.2s;">
+          <span>🚀 Salvar Selecionados</span>
+        </button>
+      </div>
+    `;
+
+    document.body.appendChild(drawer);
+    document.getElementById('fast-close-btn').onclick = () => drawer.remove();
+
+    function scanAmazonCards() {
+      const listEl = document.getElementById('fast-items-list');
+      const countEl = document.getElementById('fast-item-count');
+      listEl.innerHTML = '';
+
+      const rawCards = Array.from(document.querySelectorAll(
+        '#gridItemRoot, .zg-grid-general-faceout, [id^="p13n-asin-index-"], div[data-asin]:not([data-asin=""]), .s-result-item[data-asin]:not([data-asin=""])'
+      ));
+
+      const parsedItems = [];
+      const seenAsins = new Set();
+
+      rawCards.forEach((c) => {
+        let asin = c.getAttribute('data-asin') || '';
+        if (!asin) {
+          const lk = c.querySelector('a[href*="/dp/"], a[href*="/gp/product/"]');
+          if (lk && lk.href) {
+            const m = lk.href.match(/\/(?:dp|gp\/product)\/([A-Z0-9]{10})/i);
+            if (m) asin = m[1];
+          }
+        }
+        if (!asin || seenAsins.has(asin)) return;
+
+        const titleEl = c.querySelector('.p13n-sc-truncate-desktop-type2, [class*="p13n-sc-css-line-clamp"], h2, .a-size-medium, .a-size-base-plus, a[href*="/dp/"] span, [class*="title"]');
+        const title = (titleEl?.innerText || titleEl?.textContent || '').trim();
+        if (!title || title.length < 4) return;
+
+        const imgEl = c.querySelector('img.a-dynamic-image, img.s-image, img[data-a-hires], img[src*="media-amazon.com"], img');
+        const img = imgEl?.getAttribute('data-old-hires') || imgEl?.getAttribute('data-a-hires') || imgEl?.src || '';
+
+        let price = '';
+        const priceEl = c.querySelector('.p13n-sc-price, .a-price .a-offscreen, .a-price, [class*="price"]');
+        if (priceEl) {
+          const off = priceEl.querySelector?.('.a-offscreen')?.innerText?.trim() || priceEl.innerText?.trim() || '';
+          const matchPrice = off.match(/R\$\s*[0-9.,]+/i);
+          if (matchPrice) {
+            price = matchPrice[0].replace(/\s+/g, ' ');
+          } else {
+            const whole = c.querySelector('.a-price-whole')?.innerText?.replace(/[^\d]/g, '');
+            const frac = c.querySelector('.a-price-fraction')?.innerText?.replace(/[^\d]/g, '');
+            if (whole) price = `R$ ${whole},${frac || '00'}`;
+          }
+        }
+        if (!price) return;
+
+        let origPrice = '';
+        const origEl = c.querySelector('.a-text-price .a-offscreen, .basisPrice .a-offscreen, [class*="strike"], del');
+        if (origEl) {
+          const mOrig = (origEl.innerText || '').match(/R\$\s*[0-9.,]+/i);
+          if (mOrig) origPrice = mOrig[0].replace(/\s+/g, ' ');
+        }
+
+        let discountTag = '';
+        const savEl = c.querySelector('[class*="savingsPercentage"], .badge-percent-off, [class*="badge"]');
+        if (savEl && savEl.innerText.includes('%')) {
+          discountTag = savEl.innerText.replace('-', '').trim() + ' OFF';
+        }
+
+        const rankEl = c.querySelector('.zg-badge-text, .zg-bdg-text, [class*="badge-text"], [class*="rank"]');
+        const rank = rankEl?.innerText?.trim() || '';
+
+        const isPrime = Boolean(c.querySelector('.a-icon-prime, [aria-label*="Prime"], [class*="prime"]'));
+
+        seenAsins.add(asin);
+        const affiliateUrl = `https://www.amazon.com.br/dp/${asin}?tag=jonatas00a3-20&linkCode=sl2`;
+
+        parsedItems.push({
+          asin,
+          title,
+          price,
+          origPrice,
+          discountTag,
+          image: img,
+          affiliateUrl,
+          isPrime,
+          rank
+        });
+      });
+
+      countEl.innerText = parsedItems.length;
+
+      if (parsedItems.length === 0) {
+        listEl.innerHTML = `
+          <div style="text-align: center; padding: 25px 10px; color: #94a3b8; font-size: 13px;">
+            <p style="margin: 0 0 6px;">Nenhum produto identificado nesta seção.</p>
+            <p style="margin: 0; font-size: 11px;">Role um pouco a página para baixo para carregar os produtos e clique em Re-escanear.</p>
+          </div>
+        `;
+        return;
+      }
+
+      parsedItems.forEach((item, idx) => {
+        const row = document.createElement('div');
+        row.style.cssText = `
+          background: #1e293b;
+          border: 1px solid #334155;
+          border-radius: 10px;
+          padding: 8px 10px;
+          display: flex;
+          align-items: center;
+          gap: 10px;
+        `;
+
+        row.innerHTML = `
+          <input type="checkbox" id="fast-item-${idx}" checked style="width: 16px; height: 16px; cursor: pointer; accent-color: #f59e0b;">
+          <img src="${item.image || 'https://via.placeholder.com/50'}" style="width: 44px; height: 44px; object-fit: contain; border-radius: 6px; background: #fff; padding: 2px;">
+          <div style="flex: 1; min-width: 0;">
+            <div style="display: flex; align-items: center; gap: 5px; margin-bottom: 2px;">
+              ${item.rank ? `<span style="background: #334155; color: #f59e0b; font-size: 10px; font-weight: 700; padding: 1px 5px; border-radius: 4px;">${item.rank}</span>` : ''}
+              ${item.isPrime ? `<span style="background: #0284c7; color: #fff; font-size: 9px; font-weight: 700; padding: 1px 4px; border-radius: 4px;">PRIME</span>` : ''}
+              ${item.discountTag ? `<span style="background: #dc2626; color: #fff; font-size: 9px; font-weight: 700; padding: 1px 4px; border-radius: 4px;">${item.discountTag}</span>` : ''}
+            </div>
+            <div style="font-size: 12px; font-weight: 600; color: #f8fafc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${item.title}">
+              ${item.title}
+            </div>
+            <div style="font-size: 11px; color: #94a3b8; display: flex; align-items: center; gap: 6px; margin-top: 2px;">
+              <span style="color: #f59e0b; font-weight: 700;">${item.price}</span>
+              ${item.origPrice ? `<span style="text-decoration: line-through; opacity: 0.7;">${item.origPrice}</span>` : ''}
+            </div>
+          </div>
+        `;
+        listEl.appendChild(row);
+      });
+
+      window._fastAmazonParsedItems = parsedItems;
+    }
+
+    scanAmazonCards();
+    document.getElementById('fast-rescan-btn').onclick = scanAmazonCards;
+
+    document.getElementById('fast-import-btn').onclick = async () => {
+      const parsedItems = window._fastAmazonParsedItems || [];
+      const selected = [];
+      parsedItems.forEach((item, idx) => {
+        const chk = document.getElementById(`fast-item-${idx}`);
+        if (chk && chk.checked) selected.push(item);
+      });
+
+      if (selected.length === 0) {
+        alert('Selecione pelo menos 1 produto para salvar no site!');
+        return;
+      }
+
+      const importBtn = document.getElementById('fast-import-btn');
+      const progressContainer = document.getElementById('fast-progress-bar-container');
+      const progressBar = document.getElementById('fast-progress-bar');
+      const progressLabel = document.getElementById('fast-progress-label');
+      const progressPct = document.getElementById('fast-progress-pct');
+
+      importBtn.disabled = true;
+      importBtn.style.opacity = '0.5';
+      progressContainer.style.display = 'block';
+
+      try {
+        const payloadItems = selected.map(item => ({
+          platform: 'amazon',
+          title: item.title,
+          image_url: item.image,
+          price_display: item.price,
+          original_price: item.origPrice || null,
+          discount_tag: item.discountTag || null,
+          affiliate_url: item.affiliateUrl,
+          url: item.affiliateUrl,
+          is_prime: item.isPrime
+        }));
+
+        progressBar.style.width = '70%';
+        progressPct.innerText = '70%';
+        progressLabel.innerText = `Enviando ${payloadItems.length} produtos para o site...`;
+
+        const res = await fetch('https://fastsavorys.vercel.app/api/check-affiliate-links?action=quick-save', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items: payloadItems })
+        });
+        const data = await res.json();
+
+        progressBar.style.width = '100%';
+        progressPct.innerText = '100%';
+
+        if (data.success) {
+          progressLabel.innerText = `🎉 Concluído! ${data.inserted_count || payloadItems.length} produtos salvos!`;
+          progressLabel.style.color = '#10b981';
+          alert(`🎉 Sucesso FastSavory's!
+
+✅ ${data.inserted_count || 0} novas ofertas da Amazon salvas com seu código de afiliado!
+${data.duplicate_count > 0 ? `ℹ️ ${data.duplicate_count} já estavam cadastradas.` : ''}`);
+        } else {
+          throw new Error(data.error || 'Erro ao salvar produtos');
+        }
+      } catch (err) {
+        progressLabel.innerText = `❌ Erro: ${err.message}`;
+        progressLabel.style.color = '#f43f5e';
+        alert(`❌ Erro ao enviar para FastSavory's: ${err.message}`);
+      } finally {
+        importBtn.disabled = false;
+        importBtn.style.opacity = '1';
+      }
+    };
   }
 
   // ------------------------------------------------------------
@@ -274,7 +678,7 @@
         try {
           const clipText = await navigator.clipboard.readText();
           if (clipText) {
-            const m = clipText.match(/https?:\/\/(?:mercadolivre\.com\/sec|meli\.la)\/[a-zA-Z0-9_\-\.\/]+/i);
+            const m = clipText.match(/https?:\/\/(?:mercadolivre\.com\/sec|meli\.la|amzn\.to|s\.shopee\.com\.br|shope\.ee)\/[a-zA-Z0-9_\-\.\/]+/i);
             if (m) {
               lastCapturedAffiliateLink = m[0];
               break;
@@ -289,7 +693,7 @@
       const allInputs = Array.from(document.querySelectorAll('.andes-modal input, .andes-modal textarea, [role="dialog"] input, [class*="modal"] input, input, textarea'));
       for (const inp of allInputs) {
         const val = (inp.value || inp.getAttribute('value') || '').trim();
-        const m = val.match(/https?:\/\/(?:mercadolivre\.com\/sec|meli\.la)\/[a-zA-Z0-9_\-\.\/]+/i);
+        const m = val.match(/https?:\/\/(?:mercadolivre\.com\/sec|meli\.la|amzn\.to|s\.shopee\.com\.br|shope\.ee)\/[a-zA-Z0-9_\-\.\/]+/i);
         if (m) {
           lastCapturedAffiliateLink = m[0];
           break;
@@ -303,7 +707,7 @@
         const links = Array.from(modalEl.querySelectorAll('a'));
         for (const l of links) {
           const h = (l.href || '').trim();
-          const m = h.match(/https?:\/\/(?:mercadolivre\.com\/sec|meli\.la)\/[a-zA-Z0-9_\-\.\/]+/i);
+          const m = h.match(/https?:\/\/(?:mercadolivre\.com\/sec|meli\.la|amzn\.to|s\.shopee\.com\.br|shope\.ee)\/[a-zA-Z0-9_\-\.\/]+/i);
           if (m) {
             lastCapturedAffiliateLink = m[0];
             break;
@@ -312,7 +716,7 @@
         if (lastCapturedAffiliateLink) break;
 
         const mText = (modalEl.innerText || '') + ' ' + (modalEl.innerHTML || '');
-        const matchText = mText.match(/https?:\/\/(?:mercadolivre\.com\/sec|meli\.la)\/[a-zA-Z0-9_\-\.\/]+/i);
+        const matchText = mText.match(/https?:\/\/(?:mercadolivre\.com\/sec|meli\.la|amzn\.to|s\.shopee\.com\.br|shope\.ee)\/[a-zA-Z0-9_\-\.\/]+/i);
         if (matchText) {
           lastCapturedAffiliateLink = matchText[0];
           break;
@@ -765,6 +1169,28 @@
       payload.is_prime = Boolean(document.querySelector('.a-icon-prime,#prime-accordion,[id*="prime"],.badge_delivery_prime,[aria-label*="Prime"]') || /frete grátis com o prime/i.test(document.querySelector('#deliveryBlockMessage')?.innerText || ''));
       payload.is_imported = Boolean(document.querySelector('#exports_desktop_qualified_buybox, #agsk-detail-bullets, #amazonGlobal_feature_div') || document.querySelector('#merchant-info, #deliveryBlockMessage')?.innerText?.match(/fora do brasil|amazon global store|estados unidos/i));
 
+      // Extração automática do link curto oficial amzn.to do SiteStripe
+      const asinMatch = href.match(/\/dp\/([A-Z0-9]{10})/i) || href.match(/\/gp\/product\/([A-Z0-9]{10})/i);
+      const asin = asinMatch ? asinMatch[1] : '';
+
+      const toastSearching = document.createElement('div');
+      toastSearching.style.cssText = 'position:fixed;top:20px;right:20px;z-index:99999999;background:#f59e0b;color:#000;padding:14px 20px;border-radius:12px;font-family:sans-serif;font-weight:bold;font-size:13px;box-shadow:0 10px 25px rgba(0,0,0,0.3);';
+      toastSearching.innerText = '⚡ Obtendo link curto oficial amzn.to...';
+      document.body.appendChild(toastSearching);
+
+      const amznShort = await extractAmazonSiteStripeLink();
+      toastSearching.remove();
+
+      if (amznShort) {
+        payload.url = amznShort;
+        payload.affiliate_url = amznShort;
+        console.log('[Quick Clip Amazon] Link curto amzn.to capturado com sucesso:', amznShort);
+      } else if (asin) {
+        payload.url = `https://www.amazon.com.br/dp/${asin}?tag=jonatas00a3-20&linkCode=sl2`;
+        payload.affiliate_url = payload.url;
+        console.log('[Quick Clip Amazon] Usando link canônico com tag:', payload.url);
+      }
+
     } else if (host.includes('mercadolivre') || host.includes('mercadolibre')) {
       payload.platform = 'mercadolivre';
       payload.title = (document.querySelector('h1.ui-pdp-title, h1')?.innerText || document.title || '').trim();
@@ -828,13 +1254,33 @@
 
     } else if (host.includes('shopee')) {
       payload.platform = 'shopee';
-      payload.title = (
-        document.querySelector('.product-briefing ._44qnta')?.innerText ||
-        document.querySelector('.product-briefing h1')?.innerText ||
-        document.querySelector('h1')?.innerText ||
-        document.querySelector('meta[property="og:title"]')?.content ||
-        document.title || ''
-      ).replace(/\s*\|\s*Shopee.*$/i, '').trim();
+
+      // 1. Tenta extrair dados ricos via microdata / JSON-LD (à prova de mudanças de CSS da Shopee)
+      try {
+        const scripts = Array.from(document.querySelectorAll('script[type="application/ld+json"]'));
+        for (const s of scripts) {
+          const j = JSON.parse(s.innerText || '{}');
+          if (j.name && !payload.title) payload.title = j.name;
+          if (j.image && !payload.image_url) {
+            payload.image_url = Array.isArray(j.image) ? j.image[0] : j.image;
+          }
+          if (j.offers?.price && !payload.price_display) {
+            payload.price_display = 'R$ ' + parseFloat(j.offers.price).toFixed(2).replace('.', ',');
+          }
+        }
+      } catch (e) {}
+
+      if (!payload.title) {
+        payload.title = (
+          document.querySelector('.product-briefing ._44qnta')?.innerText ||
+          document.querySelector('.product-briefing h1')?.innerText ||
+          document.querySelector('h1')?.innerText ||
+          document.querySelector('meta[property="og:title"]')?.content ||
+          document.title || ''
+        ).replace(/\s*\|\s*Shopee.*$/i, '').trim();
+      } else {
+        payload.title = payload.title.replace(/\s*\|\s*Shopee.*$/i, '').trim();
+      }
 
       const img = document.querySelector('.product-briefing img') ||
                   document.querySelector('._39-Y7e img') ||
