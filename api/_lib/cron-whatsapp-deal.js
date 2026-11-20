@@ -669,8 +669,9 @@ async function handleSendWhatsAppDeal(req, res) {
     }
   } else {
     // DIAS NORMAIS (HORÁRIOS EXATOS DE 15 EM 15 MINUTOS):
-    // 9 Horários estratégicos da FastSavory's intercalados (Almoço, Sobremesas, Fornadas, Lanche e Encomendas da tarde)
-    const fastSavorysSlots = ['11:30', '12:00', '12:45', '13:30', '14:00', '15:00', '15:45', '16:30', '17:30'];
+    // 5 Horários estratégicos da FastSavory's à tarde (Fornadas, Lanche e Encomendas da tarde)
+    // Os horários de almoço (11:30, 12:00, 12:45 e 13:30) agora disparam Achadinhos de Afiliados.
+    const fastSavorysSlots = ['14:00', '15:00', '15:45', '16:30', '17:30'];
 
     if (mode === 'auto' && !force) {
       // Janela oficial: das 07h00 até as 22h30 rigorosamente
