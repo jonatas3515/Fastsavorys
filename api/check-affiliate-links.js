@@ -348,14 +348,16 @@ function extractProductPriceAndStatus(html, platform = 'mercadolivre') {
       discountTag = pixDiscountMatch[1].trim();
     }
 
-    // Amazon Coupon Detection (Apenas código de cupom REAL explícito)
-    const amzCodeMatch = html.match(/(?:Salve\s+o\s+cupom|cupom|c[oó]digo|insira\s+o\s+c[oó]digo)[\s\S]{0,120}?:\s*([A-Z0-9_-]{4,20})\b/i) ||
+    // Amazon Coupon Detection (Apenas cupons REAIS do produto no BuyBox ou badge de cupom)
+    // 🛡️ Proteção: NÃO captura banners gerais de cabeçalho do site da Amazon (ex: PRIMEIRA20BF, 25PRIMEBF)
+    const amzCodeMatch = html.match(/id=["']couponBadgeV2["'][\s\S]*?([A-Z0-9_-]{4,20})/i) ||
                          html.match(/data-cpc-coupon=["']([A-Z0-9_-]{4,20})["']/i) ||
-                         html.match(/id=["']couponBadgeV2["'][\s\S]*?([A-Z0-9_-]{4,20})/i);
+                         html.match(/class=["'][^"']*vpc_coupon_description[^"']*["'][\s\S]*?([A-Z0-9_-]{4,20})/i);
     if (amzCodeMatch && amzCodeMatch[1]) {
-      const code = amzCodeMatch[1].trim();
-      if (/^[A-Z0-9_-]{4,20}$/i.test(code) && !/^(TRUE|FALSE|NULL|OFF|PRIME)$/i.test(code)) {
-        couponCode = code.toUpperCase();
+      const code = amzCodeMatch[1].trim().toUpperCase();
+      const isBlacklisted = /^(PRIMEIRA\d*BF|\d*PRIMEBF|BLACK|OFF|PRIME|TRUE|FALSE|NULL|UNDEFINED|FRETEGRATIS)$/i.test(code);
+      if (/^[A-Z0-9_-]{4,20}$/i.test(code) && !isBlacklisted) {
+        couponCode = code;
       }
     }
 
