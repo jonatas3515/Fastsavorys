@@ -592,8 +592,8 @@ ${data.duplicate_count > 0 ? `ℹ️ ${data.duplicate_count} já estavam cadastr
   // ------------------------------------------------------------
   // FUNÇÃO AUXILIAR: EXTRAÇÃO ROBUSTA DE LINK OFICIAL SHOPEE (s.shopee.com.br)
   // ------------------------------------------------------------
-  async function extractShopeeShareLink(shareBtn, previousUrl) {
-    if (!shareBtn) return null;
+  async function extractShopeeShareLink(shareBtn, leafBtn, previousUrl) {
+    if (!shareBtn && !leafBtn) return null;
 
     lastCapturedAffiliateLink = null;
 
@@ -610,9 +610,11 @@ ${data.duplicate_count > 0 ? `ℹ️ ${data.duplicate_count} já estavam cadastr
       });
     });
 
+    const targetEl = shareBtn || leafBtn;
+
     // 2. Rolagem suave até o produto na página (igual ao Mercado Livre)
     try {
-      shareBtn.scrollIntoView && shareBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      targetEl.scrollIntoView && targetEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
       await new Promise(r => setTimeout(r, 250));
     } catch (e) {}
 
@@ -624,9 +626,9 @@ ${data.duplicate_count > 0 ? `ℹ️ ${data.duplicate_count} já estavam cadastr
     };
 
     // 4. Identifica o elemento oficial de clique do botão
-    const realBtn = (shareBtn.tagName === 'BUTTON' || shareBtn.getAttribute('role') === 'button')
-      ? shareBtn
-      : (shareBtn.closest('button, [role="button"]') || shareBtn);
+    const realBtn = (targetEl.tagName === 'BUTTON' || targetEl.getAttribute('role') === 'button')
+      ? targetEl
+      : (targetEl.closest('button, [role="button"]') || targetEl);
 
     // 5. Neutraliza temporariamente qualquer tag <a> pai para que o card não abra link
     const neutralizedLinks = [];
@@ -645,10 +647,21 @@ ${data.duplicate_count > 0 ? `ℹ️ ${data.duplicate_count} já estavam cadastr
     }
 
     try {
-      realBtn.focus && realBtn.focus();
+      const mouseOpts = { bubbles: true, cancelable: true, view: window, composed: true };
 
-      // Dispara eventos completos com bubbles: true para que o React da Shopee abra o modal
-      const mouseOpts = { bubbles: true, cancelable: true, view: window };
+      // Se temos o nó folha com o texto "Obter link" (span), clica nele primeiro
+      if (leafBtn) {
+        leafBtn.focus && leafBtn.focus();
+        leafBtn.dispatchEvent(new PointerEvent('pointerdown', mouseOpts));
+        leafBtn.dispatchEvent(new MouseEvent('mousedown', mouseOpts));
+        leafBtn.dispatchEvent(new PointerEvent('pointerup', mouseOpts));
+        leafBtn.dispatchEvent(new MouseEvent('mouseup', mouseOpts));
+        leafBtn.dispatchEvent(new MouseEvent('click', mouseOpts));
+        if (typeof leafBtn.click === 'function') leafBtn.click();
+      }
+
+      // Clica no botão oficial
+      realBtn.focus && realBtn.focus();
       realBtn.dispatchEvent(new PointerEvent('pointerdown', mouseOpts));
       realBtn.dispatchEvent(new MouseEvent('mousedown', mouseOpts));
       realBtn.dispatchEvent(new PointerEvent('pointerup', mouseOpts));
@@ -657,72 +670,58 @@ ${data.duplicate_count > 0 ? `ℹ️ ${data.duplicate_count} já estavam cadastr
       if (typeof realBtn.click === 'function') {
         realBtn.click();
       }
-
-      // Se houver elemento filho de texto (ex: span/div), dispara nele também
-      const innerTarget = realBtn.querySelector('span, i, div');
-      if (innerTarget && innerTarget !== realBtn) {
-        innerTarget.dispatchEvent(new PointerEvent('pointerdown', mouseOpts));
-        innerTarget.dispatchEvent(new MouseEvent('mousedown', mouseOpts));
-        innerTarget.dispatchEvent(new PointerEvent('pointerup', mouseOpts));
-        innerTarget.dispatchEvent(new MouseEvent('mouseup', mouseOpts));
-        innerTarget.dispatchEvent(new MouseEvent('click', mouseOpts));
-        if (typeof innerTarget.click === 'function') innerTarget.click();
-      }
     } catch (e) {
       console.warn('[Quick Clip Shopee] Erro ao clicar no botão Obter link:', e);
     }
 
-    // Aguarda o modal abrir na tela
+    // Aguarda o modal pequeno "Link de Oferta de Produto" abrir na tela
     await new Promise(r => setTimeout(r, 600));
 
     const maxWait = 4500;
     const start = Date.now();
-    let copyAttempts = 0;
+    let copyClicked = false;
     let newAffiliateLink = null;
 
     while (Date.now() - start < maxWait) {
-      // Localiza o container do modal específico da Shopee
-      const shopeeModal = Array.from(document.querySelectorAll('[role="dialog"], [class*="modal"], [class*="dialog"], div')).find(d => {
-        if (d.closest('#fastsavorys-hub-drawer')) return false;
-        const t = d.innerText || '';
-        return t.includes('Link de Oferta de Produto') || (t.includes('copie o link') && t.includes('Copiar Link'));
+      // 1. Procura o botão "Copiar Link" dentro do modal da Shopee e clica nele
+      const allButtons = Array.from(document.querySelectorAll('button, [role="button"], a, div, span'));
+      const copyBtn = allButtons.find(b => {
+        if (b.closest('#fastsavorys-hub-drawer')) return false;
+        const t = (b.innerText || b.textContent || '').trim().toLowerCase();
+        return t === 'copiar link' || t === 'copiar' || t === 'copy link' || t.includes('copiar link');
       });
 
-      if (shopeeModal) {
-        // 1. Lê inputs de texto dentro do modal da Shopee
-        const inputs = Array.from(shopeeModal.querySelectorAll('input, textarea'));
-        for (const inp of inputs) {
-          const val = (inp.value || inp.getAttribute('value') || inp.innerText || '').trim();
-          const m = val.match(/https?:\/\/(?:s\.shopee\.com\.br|shope\.ee)\/[a-zA-Z0-9_\-\.\/]+/i);
-          if (m && m[0] !== previousUrl) {
-            newAffiliateLink = m[0];
-            break;
-          }
-        }
-
-        if (newAffiliateLink) break;
-
-        // 2. Clica no botão "Copiar Link" dentro do modal da Shopee
-        if (copyAttempts === 0 || (Date.now() - start > 1000 && copyAttempts < 3)) {
-          const btns = Array.from(shopeeModal.querySelectorAll('button, [role="button"], a, div, span'));
-          const copyBtn = btns.find(b => {
-            const t = (b.innerText || b.textContent || '').trim().toLowerCase();
-            return t === 'copiar link' || t === 'copiar' || t === 'copy link' || t.includes('copiar link');
-          });
-          if (copyBtn) {
-            try {
-              copyBtn.click();
-              copyAttempts++;
-            } catch(e) {}
-          }
-        }
+      if (copyBtn && !copyClicked) {
+        copyClicked = true;
+        try {
+          copyBtn.focus && copyBtn.focus();
+          const opts = { bubbles: true, cancelable: true, view: window, composed: true };
+          copyBtn.dispatchEvent(new PointerEvent('pointerdown', opts));
+          copyBtn.dispatchEvent(new MouseEvent('mousedown', opts));
+          copyBtn.dispatchEvent(new PointerEvent('pointerup', opts));
+          copyBtn.dispatchEvent(new MouseEvent('mouseup', opts));
+          copyBtn.dispatchEvent(new MouseEvent('click', opts));
+          if (typeof copyBtn.click === 'function') copyBtn.click();
+        } catch(e) {}
       }
 
-      // 3. Lê do interceptador global ou clipboard
+      // 2. Lê do interceptador global ou clipboard
       if (lastCapturedAffiliateLink && lastCapturedAffiliateLink !== previousUrl) {
         newAffiliateLink = lastCapturedAffiliateLink;
         break;
       }
+
+      // 3. Lê inputs de texto dentro do modal
+      const inputs = Array.from(document.querySelectorAll('input, textarea'));
+      for (const inp of inputs) {
+        const val = (inp.value || inp.getAttribute('value') || inp.innerText || '').trim();
+        const m = val.match(/https?:\/\/(?:s\.shopee\.com\.br|shope\.ee)\/[a-zA-Z0-9_\-\.\/]+/i);
+        if (m && m[0] !== previousUrl) {
+          newAffiliateLink = m[0];
+          break;
+        }
+      }
+      if (newAffiliateLink) break;
 
       if (navigator.clipboard && navigator.clipboard.readText) {
         try {
@@ -861,33 +860,24 @@ ${data.duplicate_count > 0 ? `ℹ️ ${data.duplicate_count} já estavam cadastr
       const countEl = document.getElementById('fast-item-count');
       listEl.innerHTML = '';
 
-      // 1. Localiza elementos com texto "Obter link" e mapeia apenas para o botão oficial (evita inflar com spans e wrappers)
-      const candidateEls = Array.from(document.querySelectorAll('button, [role="button"], a, div'));
-      const shareButtons = [];
-      const seenButtonNodes = new Set();
-
-      candidateEls.forEach(el => {
-        if (el.closest('#fastsavorys-hub-drawer')) return;
+      // 1. Localiza os elementos folha com texto "Obter link" (garante pegar o botão e não wrappers)
+      const allLeafs = Array.from(document.querySelectorAll('*')).filter(el => {
+        if (el.closest('#fastsavorys-hub-drawer')) return false;
+        if (el.children.length > 0) return false;
         const t = (el.innerText || el.textContent || '').trim().toLowerCase();
-        if (t !== 'obter link' && t !== 'get link') return;
-        if (t.includes('massa')) return;
-
-        // Se este elemento for ou pertencer a um <button> ou [role="button"], isola o botão
-        const realBtn = el.closest('button, [role="button"]') || el;
-        if (!seenButtonNodes.has(realBtn)) {
-          seenButtonNodes.add(realBtn);
-          shareButtons.push(realBtn);
-        }
+        return (t === 'obter link' || t === 'get link') && !t.includes('massa');
       });
 
       const parsedItems = [];
       const seenTitles = new Set();
       const seenContainers = new Set();
 
-      shareButtons.forEach((btn) => {
-        const container = btn.closest('[class*="card"], [class*="item"], [class*="product"], [class*="col"], [class*="offer"]') ||
-                          btn.parentElement?.parentElement?.parentElement ||
-                          btn.parentElement?.parentElement;
+      allLeafs.forEach((leaf) => {
+        const realBtn = leaf.closest('button, [role="button"], a') || leaf.parentElement || leaf;
+        const container = leaf.closest('[class*="card"], [class*="item"], [class*="product"], [class*="col"], [class*="offer"]') ||
+                          realBtn.closest('[class*="card"], [class*="item"], [class*="product"], [class*="col"], [class*="offer"]') ||
+                          leaf.parentElement?.parentElement?.parentElement?.parentElement ||
+                          leaf.parentElement?.parentElement?.parentElement;
         if (!container || seenContainers.has(container)) return;
         seenContainers.add(container);
 
@@ -954,7 +944,8 @@ ${data.duplicate_count > 0 ? `ℹ️ ${data.duplicate_count} já estavam cadastr
           parsedItems.push({
             id: parsedItems.length,
             container,
-            shareBtn: btn,
+            shareBtn: realBtn,
+            leafBtn: leaf,
             title,
             image_url,
             price_display,
@@ -1059,8 +1050,8 @@ ${data.duplicate_count > 0 ? `ℹ️ ${data.duplicate_count} já estavam cadastr
         }
 
         let affiliateUrl = null;
-        if (item.shareBtn) {
-          affiliateUrl = await extractShopeeShareLink(item.shareBtn, lastExtractedUrl);
+        if (item.shareBtn || item.leafBtn) {
+          affiliateUrl = await extractShopeeShareLink(item.shareBtn, item.leafBtn, lastExtractedUrl);
           if (affiliateUrl) lastExtractedUrl = affiliateUrl;
           await new Promise(r => setTimeout(r, 300));
         }
