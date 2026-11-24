@@ -597,19 +597,19 @@ ${data.duplicate_count > 0 ? `ℹ️ ${data.duplicate_count} já estavam cadastr
 
     lastCapturedAffiliateLink = null;
 
-    // 1. Bloqueia temporariamente window.open para impedir que qualquer evento dispare nova aba
+    // 1. Bloqueia temporariamente window.open para impedir abertura de abas durante o clique
     const origWindowOpen = window.open;
     window.open = function (...args) {
-      console.log('[Quick Clip Shopee] window.open interceptado/bloqueado com sucesso:', args[0]);
+      console.log('[Quick Clip Shopee] window.open bloqueado durante extração:', args[0]);
       return null;
     };
 
-    // 2. Identifica o elemento <button> ou [role="button"] exato
+    // 2. Identifica o elemento oficial de clique do botão
     const realBtn = (shareBtn.tagName === 'BUTTON' || shareBtn.getAttribute('role') === 'button')
       ? shareBtn
       : (shareBtn.closest('button, [role="button"]') || shareBtn);
 
-    // 3. Neutraliza temporariamente qualquer tag <a> pai para não navegar nem abrir aba
+    // 3. Neutraliza temporariamente qualquer tag <a> pai para que o card não abra link
     const neutralizedLinks = [];
     let p = realBtn.parentElement;
     while (p && p !== document.body) {
@@ -617,59 +617,58 @@ ${data.duplicate_count > 0 ? `ℹ️ ${data.duplicate_count} já estavam cadastr
         neutralizedLinks.push({
           el: p,
           target: p.getAttribute('target'),
-          href: p.getAttribute('href'),
-          onclick: p.onclick
+          href: p.getAttribute('href')
         });
         p.removeAttribute('target');
-        p.removeAttribute('href');
-        p.onclick = (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          return false;
-        };
+        p.setAttribute('href', 'javascript:void(0)');
       }
       p = p.parentElement;
     }
 
-    // 4. Intercepta e encerra a propagação do clique para o card não receber o evento
-    const stopBubble = (e) => {
-      e.stopPropagation();
-      if (e.stopImmediatePropagation) e.stopImmediatePropagation();
-    };
-    realBtn.addEventListener('click', stopBubble, { capture: true, once: true });
-    realBtn.addEventListener('mousedown', stopBubble, { capture: true, once: true });
-    realBtn.addEventListener('pointerdown', stopBubble, { capture: true, once: true });
-
     try {
       realBtn.scrollIntoView && realBtn.scrollIntoView({ behavior: 'auto', block: 'center' });
-      await new Promise(r => setTimeout(r, 100));
+      await new Promise(r => setTimeout(r, 120));
       realBtn.focus && realBtn.focus();
-      realBtn.click();
 
-      // Se houver elemento filho (span/div de texto), dispara nele também com stopPropagation
+      // Dispara eventos completos com bubbles: true para que o React/Vue capture e abra o modal
+      const mouseOpts = { bubbles: true, cancelable: true, view: window };
+      realBtn.dispatchEvent(new PointerEvent('pointerdown', mouseOpts));
+      realBtn.dispatchEvent(new MouseEvent('mousedown', mouseOpts));
+      realBtn.dispatchEvent(new PointerEvent('pointerup', mouseOpts));
+      realBtn.dispatchEvent(new MouseEvent('mouseup', mouseOpts));
+      realBtn.dispatchEvent(new MouseEvent('click', mouseOpts));
+      if (typeof realBtn.click === 'function') {
+        realBtn.click();
+      }
+
+      // Se houver elemento filho de texto (ex: span/div), dispara nele também
       const innerTarget = realBtn.querySelector('span, i, div');
       if (innerTarget && innerTarget !== realBtn) {
-        innerTarget.addEventListener('click', stopBubble, { capture: true, once: true });
-        innerTarget.click();
+        innerTarget.dispatchEvent(new PointerEvent('pointerdown', mouseOpts));
+        innerTarget.dispatchEvent(new MouseEvent('mousedown', mouseOpts));
+        innerTarget.dispatchEvent(new PointerEvent('pointerup', mouseOpts));
+        innerTarget.dispatchEvent(new MouseEvent('mouseup', mouseOpts));
+        innerTarget.dispatchEvent(new MouseEvent('click', mouseOpts));
+        if (typeof innerTarget.click === 'function') innerTarget.click();
       }
     } catch (e) {
       console.warn('[Quick Clip Shopee] Erro ao clicar no botão Obter link:', e);
     }
 
     // Aguarda o modal abrir na tela
-    await new Promise(r => setTimeout(r, 500));
+    await new Promise(r => setTimeout(r, 600));
 
-    const maxWait = 4500;
+    const maxWait = 5000;
     const start = Date.now();
     let copyAttempts = 0;
 
     while (Date.now() - start < maxWait) {
       if (lastCapturedAffiliateLink && (lastCapturedAffiliateLink.includes('s.shopee.com.br') || lastCapturedAffiliateLink.includes('shope.ee'))) break;
 
-      // 1. Tenta ler direto dos inputs e textareas do modal (onde o link curto já vem preenchido!)
-      const allInputs = Array.from(document.querySelectorAll('[role="dialog"] input, [role="dialog"] textarea, [class*="modal"] input, [class*="modal"] textarea, [class*="dialog"] input, [class*="dialog"] textarea, input, textarea'));
+      // 1. Tenta ler direto de TODOS os inputs e textareas (o modal da Shopee tem input preenchido com s.shopee.com.br)
+      const allInputs = Array.from(document.querySelectorAll('input, textarea'));
       for (const inp of allInputs) {
-        const val = (inp.value || inp.getAttribute('value') || inp.innerText || '').trim();
+        const val = (inp.value || inp.getAttribute('value') || '').trim();
         const m = val.match(/https?:\/\/(?:s\.shopee\.com\.br|shope\.ee)\/[a-zA-Z0-9_\-\.\/]+/i);
         if (m) {
           lastCapturedAffiliateLink = m[0];
@@ -679,13 +678,26 @@ ${data.duplicate_count > 0 ? `ℹ️ ${data.duplicate_count} já estavam cadastr
 
       if (lastCapturedAffiliateLink && (lastCapturedAffiliateLink.includes('s.shopee.com.br') || lastCapturedAffiliateLink.includes('shope.ee'))) break;
 
-      // 2. Clica no botão "Copiar Link" dentro do modal da Shopee
+      // 2. Tenta ler do texto de qualquer modal/dialog/popup na tela
+      const modalEls = Array.from(document.querySelectorAll('[role="dialog"], [class*="modal"], [class*="dialog"], [class*="popup"], [class*="overlay"]'));
+      for (const mEl of modalEls) {
+        const text = (mEl.innerText || '') + ' ' + (mEl.innerHTML || '');
+        const m = text.match(/https?:\/\/(?:s\.shopee\.com\.br|shope\.ee)\/[a-zA-Z0-9_\-\.\/]+/i);
+        if (m) {
+          lastCapturedAffiliateLink = m[0];
+          break;
+        }
+      }
+
+      if (lastCapturedAffiliateLink && (lastCapturedAffiliateLink.includes('s.shopee.com.br') || lastCapturedAffiliateLink.includes('shope.ee'))) break;
+
+      // 3. Clica no botão "Copiar Link" dentro do modal da Shopee
       if (copyAttempts === 0 || (Date.now() - start > 1000 && copyAttempts < 4)) {
-        const modal = document.querySelector('[role="dialog"], [class*="modal"], [class*="dialog"]') || document.body;
-        const btns = Array.from(modal.querySelectorAll('button, [role="button"], a, div, span'));
+        const btns = Array.from(document.querySelectorAll('button, [role="button"], a, div, span'));
         const copyBtn = btns.find(b => {
+          if (b.closest('#fastsavorys-hub-drawer')) return false;
           const t = (b.innerText || b.textContent || '').trim().toLowerCase();
-          return t.includes('copiar link') || t.includes('copy link') || t === 'copiar';
+          return t === 'copiar link' || t === 'copiar' || t === 'copy link' || t.includes('copiar link');
         });
         if (copyBtn) {
           try {
@@ -697,7 +709,7 @@ ${data.duplicate_count > 0 ? `ℹ️ ${data.duplicate_count} já estavam cadastr
 
       if (lastCapturedAffiliateLink && (lastCapturedAffiliateLink.includes('s.shopee.com.br') || lastCapturedAffiliateLink.includes('shope.ee'))) break;
 
-      // 3. Lê navigator.clipboard se disponível
+      // 4. Lê navigator.clipboard se disponível
       if (navigator.clipboard && navigator.clipboard.readText) {
         try {
           const clipText = await navigator.clipboard.readText();
@@ -711,17 +723,6 @@ ${data.duplicate_count > 0 ? `ℹ️ ${data.duplicate_count} já estavam cadastr
         } catch (e) {}
       }
 
-      // 4. Procura no innerText ou links do modal
-      const modalEl = document.querySelector('[role="dialog"], [class*="modal"], [class*="dialog"]');
-      if (modalEl) {
-        const mText = (modalEl.innerText || '') + ' ' + (modalEl.innerHTML || '');
-        const matchText = mText.match(/https?:\/\/(?:s\.shopee\.com\.br|shope\.ee)\/[a-zA-Z0-9_\-\.\/]+/i);
-        if (matchText) {
-          lastCapturedAffiliateLink = matchText[0];
-          break;
-        }
-      }
-
       await new Promise(r => setTimeout(r, 200));
     }
 
@@ -729,7 +730,7 @@ ${data.duplicate_count > 0 ? `ℹ️ ${data.duplicate_count} já estavam cadastr
 
     // Fecha o modal da Shopee
     try {
-      const modal = document.querySelector('[role="dialog"], [class*="modal"], [class*="dialog"]') || document;
+      const modal = document.querySelector('[role="dialog"], [class*="modal"], [class*="dialog"], [class*="popup"]') || document;
       const closeBtn = modal.querySelector('[class*="close"], [aria-label*="close" i], [aria-label*="fechar" i], button[class*="close"], svg[class*="close"]') ||
                        Array.from(modal.querySelectorAll('button, span, i')).find(el => el.innerText.trim() === '✕' || el.innerText.trim() === '×');
       if (closeBtn) closeBtn.click();
@@ -740,9 +741,8 @@ ${data.duplicate_count > 0 ? `ℹ️ ${data.duplicate_count} já estavam cadastr
     // Restaura window.open e links pais do card
     window.open = origWindowOpen;
     neutralizedLinks.forEach(item => {
-      if (item.target) item.el.setAttribute('target', item.target);
-      if (item.href) item.el.setAttribute('href', item.href);
-      item.el.onclick = item.onclick;
+      if (item.target) item.el.setAttribute('target', item.target); else item.el.removeAttribute('target');
+      if (item.href) item.el.setAttribute('href', item.href); else item.el.removeAttribute('href');
     });
 
     return finalUrl;
