@@ -51,11 +51,41 @@ function calcDiscountPercent(origStr, currStr) {
 
 function getDoubleDayContext(referenceDate = new Date()) {
   const brtTime = new Date(referenceDate.getTime() - 3 * 3600 * 1000);
-  const day = brtTime.getUTCDate();
+  const year = brtTime.getUTCFullYear();
   const month = brtTime.getUTCMonth() + 1; // 1 a 12
-  const isDoubleDay = day === month;
-  const eventLabel = `${day}.${month}`;
-  return { isDoubleDay, day, month, eventLabel };
+  const day = brtTime.getUTCDate();
+
+  // 1. Black Friday Oficial (27/11/2026 - Sexta-feira)
+  const isBlackFriday = (year === 2026 && month === 11 && day === 27);
+
+  // 2. Esquenta Black Friday (26/11/2026 - Quinta-feira)
+  const isBlackFridayWarmup = (year === 2026 && month === 11 && day === 26);
+
+  // 3. Datas Duplas Tradicionais (01.01, 02.02, ..., 11.11, 12.12)
+  const isDoubleDayStandard = (day === month);
+
+  // Modo Mega Evento: Ativo na Black Friday OU em Datas Duplas (5 em 5 min, 200 disparos, 06h00 às 22h35)
+  const isMegaEvent = isBlackFriday || isDoubleDayStandard;
+  const isDoubleDay = isMegaEvent; // Mantido para compatibilidade total com o restante do código
+
+  let eventLabel = `${day}.${month}`;
+  if (isBlackFriday) {
+    eventLabel = 'BLACK FRIDAY';
+  } else if (isBlackFridayWarmup) {
+    eventLabel = 'ESQUENTA BLACK FRIDAY';
+  }
+
+  return {
+    isDoubleDay,
+    isMegaEvent,
+    isBlackFriday,
+    isBlackFridayWarmup,
+    isDoubleDayStandard,
+    day,
+    month,
+    year,
+    eventLabel
+  };
 }
 
 function buildWhatsAppDealText(product, customContext = null) {
@@ -79,10 +109,16 @@ function buildWhatsAppDealText(product, customContext = null) {
     discountText = ` (${rawDisc})`;
   }
 
-  // Tag Destaque (ex: Indicado, Mais Vendido, Oferta)
+  const { isDoubleDay, isBlackFriday, isBlackFridayWarmup, eventLabel } = customContext || getDoubleDayContext();
+
+  // Tag Destaque (ex: Black Friday, Esquenta Black Friday, Indicado, Mais Vendido, Oferta)
   let tagText = '';
   const rawBadge = (product.badge_tag || '').trim();
-  if (rawBadge) {
+  if (isBlackFriday) {
+    tagText = `🏷️ *Destaque:* 🖤 Black Friday\n`;
+  } else if (isBlackFridayWarmup) {
+    tagText = `🏷️ *Destaque:* 🔥 Esquenta Black Friday\n`;
+  } else if (rawBadge) {
     if (rawBadge.toLowerCase().includes('indicado')) tagText = `🏷️ *Destaque:* 🟠 Indicado\n`;
     else if (rawBadge.toLowerCase().includes('oferta')) tagText = `🏷️ *Destaque:* 🩷 Oferta\n`;
     else tagText = `🏷️ *Destaque:* ${rawBadge}\n`;
@@ -105,10 +141,14 @@ function buildWhatsAppDealText(product, customContext = null) {
     }
   }
 
-  const { isDoubleDay, eventLabel } = customContext || getDoubleDayContext();
-  const eventHeader = isDoubleDay
-    ? `🔥🎯 *MEGA EVENTO ${eventLabel} | DIA DE SUPER OFERTAS!* 🏷️⚡\n💥 *Aproveite os cupons liberados e os maiores descontos do mês!*\n\n`
-    : '';
+  let eventHeader = '';
+  if (isBlackFriday) {
+    eventHeader = `🖤🔥 *BLACK FRIDAY 2026 | O MAIOR DIA DE DESCONTOS DO ANO!* 🏷️⚡\n💥 *Preços no chão, cupons liberados e estoque promocional limitado! CORRE!*\n\n`;
+  } else if (isBlackFridayWarmup) {
+    eventHeader = `🔥🚀 *MEGA ESQUENTA BLACK FRIDAY!* 🏷️⚡\n💥 *As ofertas antecipadas e cupons já estão liberados! Aproveite antes que esgote!*\n\n`;
+  } else if (isDoubleDay) {
+    eventHeader = `🔥🎯 *MEGA EVENTO ${eventLabel} | DIA DE SUPER OFERTAS!* 🏷️⚡\n💥 *Aproveite os cupons liberados e os maiores descontos do mês!*\n\n`;
+  }
 
   const isFlashDeal = Boolean(
     product.badge_color === 'flash_deal' || 
@@ -191,10 +231,15 @@ function buildPriceDropAlertText(product, oldPrice, newPrice, customContext = nu
   const pct = calcDiscountPercent(oldPrice, newPrice);
   const discountText = pct > 0 ? ` (${pct}% DE QUEDA)` : '';
 
-  const { isDoubleDay, eventLabel } = customContext || getDoubleDayContext();
-  const alertHeader = isDoubleDay
-    ? `🚨 *QUEDA DE PREÇO RELÂMPAGO NO ${eventLabel}!* 📉⚡\n🔥🎯 *SUPER DESCONTO DETECTADO AGORA!*\n`
-    : `🚨 *ALERTA DE QUEDA DE PREÇO NO AR!* 📉⚡\n`;
+  const { isDoubleDay, isBlackFriday, isBlackFridayWarmup, eventLabel } = customContext || getDoubleDayContext();
+  let alertHeader = `🚨 *ALERTA DE QUEDA DE PREÇO NO AR!* 📉⚡\n`;
+  if (isBlackFriday) {
+    alertHeader = `🚨 *QUEDA DE PREÇO HISTÓRICA NA BLACK FRIDAY!* 📉⚡\n🖤🎯 *SUPER DESCONTO DETECTADO AGORA!*\n`;
+  } else if (isBlackFridayWarmup) {
+    alertHeader = `🚨 *QUEDA DE PREÇO NO ESQUENTA BLACK FRIDAY!* 📉⚡\n🔥🎯 *SUPER DESCONTO DETECTADO AGORA!*\n`;
+  } else if (isDoubleDay) {
+    alertHeader = `🚨 *QUEDA DE PREÇO RELÂMPAGO NO ${eventLabel}!* 📉⚡\n🔥🎯 *SUPER DESCONTO DETECTADO AGORA!*\n`;
+  }
 
   return `${alertHeader}${sealHeader}🛍️ *ACHADINHO ${platform}*\n🔥 *${product.title}*\n\n💥 *BAIXOU AGORA:* de ~${oldPrice}~ por apenas *${newPrice}*!${discountText}\n\n👉 *GARANTA COM O MENOR PREÇO AQUI:*\n${product.affiliate_url}\n\n💬 *Entre no canal VIP de ofertas da FastSavory's:*\nhttps://chat.whatsapp.com/C7dT0ZWaUZKHm7atI3eOLE`;
 }
@@ -547,7 +592,7 @@ async function handleSendWhatsAppDeal(req, res) {
   // Converte para minutos totais do dia no Horário de Brasília (UTC-3)
   const totalBrtMinutes = ((utcHours - 3 + 24) % 24) * 60 + utcMinutes;
 
-  const { isDoubleDay, eventLabel } = getDoubleDayContext(now);
+  const { isDoubleDay, isMegaEvent, isBlackFriday, isBlackFridayWarmup, eventLabel } = getDoubleDayContext(now);
 
   // Intervalo e timeKey:
   // - Em Datas Duplas: intervalo contínuo de 5 minutos (06:00 às 22:35)
@@ -687,9 +732,9 @@ async function handleSendWhatsAppDeal(req, res) {
         });
       }
 
-      // REGRA DE HORÁRIO EXATO (elimina minutos quebrados como :05, :10, :20, :25, :33, :40):
-      // Aceita apenas chamadas com tolerância de até ±2 minutos do slot oficial (:00, :15, :30, :45).
-      if (distanceToSlot > 2) {
+      // REGRA DE HORÁRIO EXATO (elimina minutos quebrados fora da janela):
+      // Aceita chamadas com tolerância de até ±3 minutos do slot oficial (:00, :15, :30, :45) para evitar falhas por atraso de fila do cron.
+      if (distanceToSlot > 3) {
         return res.status(200).json({
           success: true,
           skipped: true,
@@ -1101,18 +1146,26 @@ async function handleSendWhatsAppDeal(req, res) {
       console.warn('[WhatsApp Deal] Aviso ao incrementar contador/trava de slot:', counterErr.message);
     }
 
+    const responseMessage = isBlackFriday
+      ? `Oferta ${doubleDayDispatchIndex ? `${doubleDayDispatchIndex}/200 ` : ''}da Black Friday 2026 enviada com sucesso para o grupo (${product.title || product.name})`
+      : (isDoubleDay
+          ? `Oferta ${doubleDayDispatchIndex ? `${doubleDayDispatchIndex}/200 ` : ''}do Mega Evento ${eventLabel} enviada com sucesso para o grupo (${product.title || product.name})`
+          : (isBlackFridayWarmup
+              ? `Oferta do Esquenta Black Friday enviada com sucesso para o grupo (${product.title || product.name})`
+              : `Oferta enviada com sucesso para o grupo (${product.title || product.name})`));
+
     return res.status(200).json({
       success: true,
-      message: isDoubleDay
-        ? `Oferta ${doubleDayDispatchIndex ? `${doubleDayDispatchIndex}/200 ` : ''}do Mega Evento ${eventLabel} enviada com sucesso para o grupo (${product.title || product.name})`
-        : `Oferta enviada com sucesso para o grupo (${product.title || product.name})`,
+      message: responseMessage,
       type: isFastSavorysStore ? 'fastsavorys_store' : 'affiliate_deal',
       productId: product.id,
       productTitle: product.title || product.name,
       timeKey,
       postedAt: nowIso,
       isDoubleDay,
-      eventLabel: isDoubleDay ? eventLabel : null,
+      isBlackFriday,
+      isBlackFridayWarmup,
+      eventLabel: (isDoubleDay || isBlackFridayWarmup) ? eventLabel : null,
       dispatchNumber: isDoubleDay ? doubleDayDispatchIndex : null,
       totalDispatchesTarget: isDoubleDay ? 200 : null,
       evolutionResponse: sendResponse
