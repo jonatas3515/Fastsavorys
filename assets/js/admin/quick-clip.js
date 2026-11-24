@@ -185,6 +185,23 @@
     }
 
     // ============================================================
+    // 1.8. MODO LOTE: PORTAL DE AFILIADOS SHOPEE (OFERTAS DE PRODUTO)
+    // ============================================================
+    const isShopee = host.includes('shopee');
+    const isShopeeAffiliate = isShopee && (
+      host.includes('affiliate.shopee') ||
+      href.includes('/offer/') ||
+      href.includes('product_offer') ||
+      href.includes('affiliate') ||
+      document.querySelector('[class*="product_offer"], [class*="product-offer"], [class*="offer-card"]') !== null
+    );
+
+    if (isShopee && isShopeeAffiliate) {
+      runShopeeBatchMiner();
+      return;
+    }
+
+    // ============================================================
     // 2. MODO INDIVIDUAL: PRODUTOS AVULSOS (AMAZON, SHOPEE, ML, NATURA)
     // ============================================================
     await runSingleProductQuickClip(host, href);
@@ -558,6 +575,464 @@
 
 ✅ ${data.inserted_count || 0} novas ofertas da Amazon salvas com seu código de afiliado!
 ${data.duplicate_count > 0 ? `ℹ️ ${data.duplicate_count} já estavam cadastradas.` : ''}`);
+        } else {
+          throw new Error(data.error || 'Erro ao salvar produtos');
+        }
+      } catch (err) {
+        progressLabel.innerText = `❌ Erro: ${err.message}`;
+        progressLabel.style.color = '#f43f5e';
+        alert(`❌ Erro ao enviar para FastSavory's: ${err.message}`);
+      } finally {
+        importBtn.disabled = false;
+        importBtn.style.opacity = '1';
+      }
+    };
+  }
+
+  // ------------------------------------------------------------
+  // FUNÇÃO AUXILIAR: EXTRAÇÃO ROBUSTA DE LINK OFICIAL SHOPEE (s.shopee.com.br)
+  // ------------------------------------------------------------
+  async function extractShopeeShareLink(shareBtn) {
+    if (!shareBtn) return null;
+
+    lastCapturedAffiliateLink = null;
+
+    function simulateClick(el) {
+      if (!el) return;
+      try {
+        el.scrollIntoView && el.scrollIntoView({ behavior: 'auto', block: 'nearest' });
+        el.focus && el.focus();
+        const opts = { bubbles: true, cancelable: true, view: window, composed: true };
+        el.dispatchEvent(new PointerEvent('pointerdown', opts));
+        el.dispatchEvent(new MouseEvent('mousedown', opts));
+        el.dispatchEvent(new PointerEvent('pointerup', opts));
+        el.dispatchEvent(new MouseEvent('mouseup', opts));
+        el.click && el.click();
+      } catch (err) {
+        try { el.click(); } catch (e) {}
+      }
+    }
+
+    try {
+      simulateClick(shareBtn);
+    } catch (e) {
+      console.warn('[Quick Clip Shopee] Erro ao clicar em Obter link:', e);
+    }
+
+    // Aguarda o modal abrir na tela
+    await new Promise(r => setTimeout(r, 450));
+
+    const maxWait = 4500;
+    const start = Date.now();
+    let copyAttempts = 0;
+
+    while (Date.now() - start < maxWait) {
+      if (lastCapturedAffiliateLink && (lastCapturedAffiliateLink.includes('s.shopee.com.br') || lastCapturedAffiliateLink.includes('shope.ee'))) break;
+
+      // 1. Tenta ler direto dos inputs e textareas do modal
+      const allInputs = Array.from(document.querySelectorAll('[role="dialog"] input, [role="dialog"] textarea, [class*="modal"] input, [class*="modal"] textarea, [class*="dialog"] input, [class*="dialog"] textarea, input, textarea'));
+      for (const inp of allInputs) {
+        const val = (inp.value || inp.getAttribute('value') || '').trim();
+        const m = val.match(/https?:\/\/(?:s\.shopee\.com\.br|shope\.ee)\/[a-zA-Z0-9_\-\.\/]+/i);
+        if (m) {
+          lastCapturedAffiliateLink = m[0];
+          break;
+        }
+      }
+
+      if (lastCapturedAffiliateLink && (lastCapturedAffiliateLink.includes('s.shopee.com.br') || lastCapturedAffiliateLink.includes('shope.ee'))) break;
+
+      // 2. Clica no botão "Copiar Link" dentro do modal da Shopee
+      if (copyAttempts === 0 || (Date.now() - start > 1000 && copyAttempts < 4)) {
+        const modal = document.querySelector('[role="dialog"], [class*="modal"], [class*="dialog"]') || document.body;
+        const btns = Array.from(modal.querySelectorAll('button, [role="button"], a, div, span'));
+        const copyBtn = btns.find(b => {
+          const t = (b.innerText || b.textContent || '').trim().toLowerCase();
+          return t.includes('copiar link') || t.includes('copy link') || t === 'copiar';
+        });
+        if (copyBtn) {
+          try {
+            simulateClick(copyBtn);
+            copyAttempts++;
+          } catch(e) {}
+        }
+      }
+
+      if (lastCapturedAffiliateLink && (lastCapturedAffiliateLink.includes('s.shopee.com.br') || lastCapturedAffiliateLink.includes('shope.ee'))) break;
+
+      // 3. Lê navigator.clipboard se disponível
+      if (navigator.clipboard && navigator.clipboard.readText) {
+        try {
+          const clipText = await navigator.clipboard.readText();
+          if (clipText) {
+            const m = clipText.match(/https?:\/\/(?:s\.shopee\.com\.br|shope\.ee)\/[a-zA-Z0-9_\-\.\/]+/i);
+            if (m) {
+              lastCapturedAffiliateLink = m[0];
+              break;
+            }
+          }
+        } catch (e) {}
+      }
+
+      // 4. Procura no innerText ou links do modal
+      const modalEl = document.querySelector('[role="dialog"], [class*="modal"], [class*="dialog"]');
+      if (modalEl) {
+        const mText = (modalEl.innerText || '') + ' ' + (modalEl.innerHTML || '');
+        const matchText = mText.match(/https?:\/\/(?:s\.shopee\.com\.br|shope\.ee)\/[a-zA-Z0-9_\-\.\/]+/i);
+        if (matchText) {
+          lastCapturedAffiliateLink = matchText[0];
+          break;
+        }
+      }
+
+      await new Promise(r => setTimeout(r, 200));
+    }
+
+    const finalUrl = lastCapturedAffiliateLink;
+
+    // Fecha o modal da Shopee
+    try {
+      const modal = document.querySelector('[role="dialog"], [class*="modal"], [class*="dialog"]') || document;
+      const closeBtn = modal.querySelector('[class*="close"], [aria-label*="close" i], [aria-label*="fechar" i], button[class*="close"], svg[class*="close"]') ||
+                       Array.from(modal.querySelectorAll('button, span, i')).find(el => el.innerText.trim() === '✕' || el.innerText.trim() === '×');
+      if (closeBtn) simulateClick(closeBtn);
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', keyCode: 27, bubbles: true }));
+      await new Promise(r => setTimeout(r, 200));
+    } catch (e) {}
+
+    return finalUrl;
+  }
+
+  // ------------------------------------------------------------
+  // FUNÇÃO: MINERAÇÃO EM LOTE NO PORTAL DE AFILIADOS DA SHOPEE
+  // ------------------------------------------------------------
+  function runShopeeBatchMiner() {
+    const existingDrawer = document.getElementById('fastsavorys-hub-drawer');
+    if (existingDrawer) {
+      existingDrawer.style.display = existingDrawer.style.display === 'none' ? 'block' : 'none';
+      return;
+    }
+
+    const drawer = document.createElement('div');
+    drawer.id = 'fastsavorys-hub-drawer';
+    drawer.style.cssText = `
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      width: 440px;
+      max-width: 95vw;
+      max-height: 85vh;
+      background: #0f172a;
+      color: #f8fafc;
+      border: 1px solid #ee4d2d;
+      border-radius: 16px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(238, 77, 45, 0.2);
+      z-index: 999999999;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    `;
+
+    drawer.innerHTML = `
+      <div style="background: linear-gradient(135deg, #1e293b, #0f172a); padding: 14px 18px; border-bottom: 1px solid #334155; display: flex; align-items: center; justify-content: space-between;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 20px;">🧡</span>
+          <div>
+            <h3 style="margin: 0; font-size: 15px; font-weight: 700; color: #fff; letter-spacing: -0.3px;">FastSavory's Shopee Miner</h3>
+            <p style="margin: 0; font-size: 11px; color: #fb923c;">Portal de Afiliados Shopee (Comissão 100%)</p>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span id="fast-item-count" style="background: #ee4d2d; color: #fff; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px;">0</span>
+          <button id="fast-close-btn" style="background: transparent; border: none; color: #94a3b8; font-size: 18px; cursor: pointer; padding: 4px; line-height: 1;">✕</button>
+        </div>
+      </div>
+
+      <div style="padding: 10px 18px; background: rgba(238, 77, 45, 0.1); border-bottom: 1px solid rgba(238, 77, 45, 0.3); font-size: 11px; color: #fed7aa; line-height: 1.4;">
+        🛡️ <strong>Proteção de Afiliado Ativa:</strong> O script abre o modal e captura automaticamente o link encurtado oficial <strong>s.shopee.com.br</strong> com sua comissão garantida.
+      </div>
+
+      <div id="fast-items-list" style="flex: 1; overflow-y: auto; padding: 12px 18px; display: flex; flex-direction: column; gap: 10px; max-height: 45vh;">
+        <!-- Itens inseridos dinamicamente -->
+      </div>
+
+      <div id="fast-progress-bar-container" style="display: none; padding: 12px 18px; background: #1e293b; border-top: 1px solid #334155;">
+        <div style="display: flex; justify-content: space-between; font-size: 11px; color: #94a3b8; margin-bottom: 6px;">
+          <span id="fast-progress-label">Iniciando captura...</span>
+          <span id="fast-progress-pct">0%</span>
+        </div>
+        <div style="width: 100%; height: 6px; background: #334155; border-radius: 999px; overflow: hidden;">
+          <div id="fast-progress-bar" style="width: 0%; height: 100%; background: #ee4d2d; transition: width 0.2s;"></div>
+        </div>
+      </div>
+
+      <div style="padding: 14px 18px; background: #0f172a; border-top: 1px solid #334155; display: flex; gap: 10px;">
+        <button id="fast-rescan-btn" style="flex: 1; background: #334155; color: #fff; border: none; border-radius: 8px; padding: 10px; font-size: 12px; font-weight: 600; cursor: pointer; transition: 0.2s;">
+          🔄 Re-escanear
+        </button>
+        <button id="fast-import-btn" style="flex: 2; background: linear-gradient(135deg, #ee4d2d, #ea580c); color: #fff; border: none; border-radius: 8px; padding: 10px; font-size: 13px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; transition: 0.2s;">
+          <span>🚀 Salvar no Site</span>
+        </button>
+      </div>
+    `;
+
+    document.body.appendChild(drawer);
+    document.getElementById('fast-close-btn').onclick = () => drawer.remove();
+
+    function scanShopeeCards() {
+      const listEl = document.getElementById('fast-items-list');
+      const countEl = document.getElementById('fast-item-count');
+      listEl.innerHTML = '';
+
+      const allButtons = Array.from(document.querySelectorAll('button, a, [role="button"], div, span'));
+      const shareButtons = allButtons.filter(b => {
+        const t = (b.innerText || b.textContent || '').trim().toLowerCase();
+        return (t === 'obter link' || t === 'get link') &&
+               !t.includes('massa') &&
+               !b.closest('#fastsavorys-hub-drawer');
+      });
+
+      const parsedItems = [];
+      const seenTitles = new Set();
+
+      shareButtons.forEach((btn, idx) => {
+        const container = btn.closest('[class*="card"], [class*="item"], [class*="product"], [class*="col"]') ||
+                          btn.parentElement?.parentElement?.parentElement ||
+                          btn.parentElement?.parentElement;
+        if (!container) return;
+
+        const imgEl = container.querySelector('img[src*="susercontent.com"], img[src^="http"]') || container.querySelector('img');
+        const image_url = imgEl ? (imgEl.src || imgEl.getAttribute('src') || '') : '';
+
+        // Título
+        let title = '';
+        const titleEl = container.querySelector('[class*="title"], [class*="name"], h2, h3, h4, a[title]');
+        if (titleEl) title = (titleEl.innerText || titleEl.getAttribute('title') || '').trim();
+        if (!title) {
+          const texts = Array.from(container.querySelectorAll('div, span, p, a'));
+          for (const el of texts) {
+            const t = (el.innerText || '').trim();
+            if (t.length >= 15 && t.length <= 250 &&
+                !t.includes('R$') &&
+                !/obter link|vendas|comiss[aã]o|taxa/i.test(t)) {
+              title = t;
+              break;
+            }
+          }
+        }
+        if (!title || seenTitles.has(title.toLowerCase())) return;
+        seenTitles.add(title.toLowerCase());
+
+        // Preço
+        let price_display = '';
+        const priceMatches = container.innerText.match(/R\$\s*([0-9]+(?:\.[0-9]{3})*(?:,[0-9]{2})?|[0-9]+,[0-9]{2})/i);
+        if (priceMatches) {
+          price_display = 'R$ ' + priceMatches[1].trim();
+        }
+
+        // Desconto
+        let discount_tag = '';
+        const discMatch = container.innerText.match(/([0-9]{1,2}%\s*OFF)/i);
+        if (discMatch) {
+          discount_tag = discMatch[1].toUpperCase();
+        }
+
+        // Preço Original
+        let original_price = '';
+        const origEl = container.querySelector('s, del, [style*="line-through"]');
+        if (origEl) {
+          const oMatch = (origEl.innerText || '').match(/R\$\s*([0-9.,]+)/i);
+          if (oMatch) original_price = 'R$ ' + oMatch[1].trim();
+        }
+        if (!original_price && price_display && discount_tag) {
+          const pct = parseInt(discount_tag.replace(/[^\d]/g, ''), 10);
+          const pNum = parseFloat(price_display.replace(/[^\d,]/g, '').replace(',', '.'));
+          if (pct > 0 && pct < 100 && pNum > 0) {
+            const origNum = pNum / (1 - pct / 100);
+            original_price = 'R$ ' + origNum.toFixed(2).replace('.', ',');
+          }
+        }
+
+        // Tag
+        let badge_tag = null;
+        const cText = container.innerText.toLowerCase();
+        if (cText.includes('indicado')) badge_tag = 'Indicado';
+        else if (cText.includes('oficial')) badge_tag = 'Oficial';
+        else if (cText.includes('comissão extra') || cText.includes('comissao extra')) badge_tag = 'Comissão Extra';
+
+        if (title && price_display) {
+          parsedItems.push({
+            id: idx,
+            container,
+            shareBtn: btn,
+            title,
+            image_url,
+            price_display,
+            original_price,
+            discount_tag,
+            badge_tag
+          });
+        }
+      });
+
+      countEl.innerText = parsedItems.length;
+
+      if (parsedItems.length === 0) {
+        listEl.innerHTML = `
+          <div style="text-align: center; padding: 30px 10px; color: #94a3b8; font-size: 13px;">
+            <div style="font-size: 28px; margin-bottom: 8px;">🔍</div>
+            <p style="margin: 0 0 6px 0; font-weight: 600; color: #e2e8f0;">Nenhum produto detectado nesta tela da Shopee.</p>
+            <p style="margin: 0; font-size: 11px;">Role a página para carregar as ofertas de produtos e clique em <strong>Re-escanear</strong>.</p>
+          </div>
+        `;
+        return [];
+      }
+
+      parsedItems.forEach((item, index) => {
+        const row = document.createElement('div');
+        row.id = `fast-row-${index}`;
+        row.style.cssText = `
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          background: #1e293b;
+          padding: 8px 10px;
+          border-radius: 8px;
+          border: 1px solid #334155;
+          font-size: 12px;
+        `;
+        row.innerHTML = `
+          <input type="checkbox" class="fast-item-check" data-index="${index}" checked style="accent-color: #ee4d2d; width: 15px; height: 15px;">
+          <img src="${item.image_url || 'https://via.placeholder.com/40'}" style="width: 36px; height: 36px; object-fit: cover; border-radius: 6px; background: #fff;" />
+          <div style="flex: 1; min-width: 0;">
+            <div style="font-weight: 600; color: #f8fafc; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 12px;">${item.title}</div>
+            <div style="display: flex; align-items: center; gap: 6px; margin-top: 2px;">
+              <span style="color: #fb923c; font-weight: 700;">${item.price_display}</span>
+              ${item.original_price ? `<span style="color: #64748b; text-decoration: line-through; font-size: 10px;">${item.original_price}</span>` : ''}
+              ${item.discount_tag ? `<span style="background: #eab308; color: #000; font-size: 9px; font-weight: 700; padding: 1px 4px; border-radius: 4px;">${item.discount_tag}</span>` : ''}
+              ${item.badge_tag ? `<span style="background: #f97316; color: #fff; font-size: 9px; font-weight: 700; padding: 1px 4px; border-radius: 4px;">${item.badge_tag}</span>` : ''}
+            </div>
+          </div>
+          <span class="fast-item-status" style="font-size: 11px; color: #94a3b8;">Pronto</span>
+        `;
+        listEl.appendChild(row);
+      });
+
+      return parsedItems;
+    }
+
+    let currentItems = scanShopeeCards();
+
+    document.getElementById('fast-rescan-btn').onclick = () => {
+      currentItems = scanShopeeCards();
+    };
+
+    // BOTÃO SALVAR NO SITE
+    document.getElementById('fast-import-btn').onclick = async () => {
+      const checkboxes = Array.from(document.querySelectorAll('.fast-item-check:checked'));
+      if (checkboxes.length === 0) {
+        alert('Selecione ao menos um produto da lista!');
+        return;
+      }
+
+      const progressContainer = document.getElementById('fast-progress-bar-container');
+      const progressBar = document.getElementById('fast-progress-bar');
+      const progressLabel = document.getElementById('fast-progress-label');
+      const progressPct = document.getElementById('fast-progress-pct');
+      const importBtn = document.getElementById('fast-import-btn');
+
+      importBtn.disabled = true;
+      importBtn.style.opacity = '0.5';
+      progressContainer.style.display = 'block';
+
+      const itemsToUpload = [];
+      let skippedNoAffiliate = 0;
+
+      for (let i = 0; i < checkboxes.length; i++) {
+        const idx = parseInt(checkboxes[i].getAttribute('data-index'), 10);
+        const item = currentItems[idx];
+        const rowEl = document.getElementById(`fast-row-${idx}`);
+        const statusEl = rowEl?.querySelector('.fast-item-status');
+
+        const pct = Math.round(((i + 1) / checkboxes.length) * 100);
+        progressBar.style.width = `${pct}%`;
+        progressPct.innerText = `${pct}%`;
+        progressLabel.innerText = `Gerando link Shopee ${i + 1}/${checkboxes.length}: ${(item.title || '').substring(0, 20)}...`;
+
+        if (statusEl) {
+          statusEl.innerText = 'Obtendo link...';
+          statusEl.style.color = '#fb923c';
+        }
+
+        let affiliateUrl = null;
+        if (item.shareBtn) {
+          affiliateUrl = await extractShopeeShareLink(item.shareBtn);
+          await new Promise(r => setTimeout(r, 250));
+        }
+
+        const isOfficial = Boolean(affiliateUrl && (affiliateUrl.includes('s.shopee.com.br') || affiliateUrl.includes('shope.ee')));
+
+        if (!isOfficial) {
+          if (statusEl) {
+            statusEl.innerText = '❌ Sem Link';
+            statusEl.style.color = '#ef4444';
+          }
+          skippedNoAffiliate++;
+          console.warn(`[Quick Clip Shopee] Produto "${item.title}" ignorado pois não gerou link oficial s.shopee.com.br.`);
+          continue;
+        }
+
+        if (statusEl) {
+          statusEl.innerText = `${affiliateUrl.replace(/^https?:\/\//i, '')} ✅`;
+          statusEl.style.color = '#10b981';
+          statusEl.style.fontWeight = 'bold';
+        }
+
+        itemsToUpload.push({
+          platform: 'shopee',
+          title: item.title,
+          url: affiliateUrl,
+          affiliate_url: affiliateUrl,
+          image_url: item.image_url,
+          price_display: item.price_display,
+          original_price: item.original_price,
+          discount_tag: item.discount_tag,
+          badge_tag: item.badge_tag
+        });
+      }
+
+      if (itemsToUpload.length === 0) {
+        progressContainer.style.display = 'none';
+        importBtn.disabled = false;
+        importBtn.style.opacity = '1';
+        alert(
+          '⚠️ NENHUM PRODUTO SALVO!\n\n' +
+          'Nenhum dos itens selecionados conseguiu gerar o link oficial de afiliado da Shopee (s.shopee.com.br).\n\n' +
+          'Certifique-se de que você está logado na sua conta no Portal de Afiliados Shopee!'
+        );
+        return;
+      }
+
+      progressLabel.innerText = `Enviando ${itemsToUpload.length} produtos para o FastSavory's...`;
+
+      try {
+        const res = await fetch('https://fastsavorys.vercel.app/api/check-affiliate-links?action=quick-save-batch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ items: itemsToUpload })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          progressLabel.innerText = `🎉 Concluído! +${data.inserted_count || itemsToUpload.length} salvos no site com comissão!`;
+          progressLabel.style.color = '#10b981';
+
+          let alertMsg = `🎉 Sucesso FastSavory's!\n\n✅ ${data.inserted_count || 0} novas ofertas cadastradas com link oficial da Shopee!`;
+          if (data.duplicate_count > 0) alertMsg += `\nℹ️ ${data.duplicate_count} já estavam no catálogo.`;
+          if (skippedNoAffiliate > 0) alertMsg += `\n⚠️ ${skippedNoAffiliate} itens foram ignorados por falta de link s.shopee.com.br.`;
+          alertMsg += '\n\nTodos os links inseridos agora contêm seu rastreamento de afiliado oficial!';
+          alert(alertMsg);
         } else {
           throw new Error(data.error || 'Erro ao salvar produtos');
         }
