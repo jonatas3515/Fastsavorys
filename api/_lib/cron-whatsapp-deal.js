@@ -829,7 +829,21 @@ async function handleSendWhatsAppDeal(req, res) {
 
     // 2. Se for modo afiliado ou se não encontrou produto de loja, busca nos achadinhos
     if (!product) {
-      // 2.0 HISTÓRICO DE DISPAROS: Busca as 5 últimas postagens para alternar loja e categoria
+      // 2.0 HISTÓRICO DE DISPAROS E REGRA DOS 3 DIAS (COOLDOWN MÍNIMO DE 72 HORAS):
+      // Busca todos os produtos enviados nos últimos 3 dias para garantir que NENHUM produto repita!
+      const nowIso = new Date().toISOString();
+      const threeDaysAgoIso = new Date(Date.now() - 3 * 24 * 3600 * 1000).toISOString();
+
+      const normalizeTitle = (t = '') => {
+        return String(t)
+          .toLowerCase()
+          .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+          .replace(/[^a-z0-9]/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+      };
+
+      const recentTitlesSet = new Set();
       let lastCat = null;
       let secondLastCat = null;
       let sameCategoryTwice = false;
@@ -841,55 +855,81 @@ async function handleSendWhatsAppDeal(req, res) {
       try {
         const { data: recentDispatches } = await supabaseAdmin
           .from('fast_affiliate_products')
-          .select('id, category, last_posted_at, affiliate_url')
-          .not('last_posted_at', 'is', null)
+          .select('id, title, category, last_posted_at, affiliate_url')
+          .gte('last_posted_at', threeDaysAgoIso)
           .order('last_posted_at', { ascending: false })
-          .limit(5);
+          .limit(300);
 
         if (recentDispatches && recentDispatches.length > 0) {
-          recentCats = recentDispatches.map(p => (p.category || 'outros').trim().toLowerCase());
+          // Coleta títulos de tudo que saiu nos últimos 3 dias para bloqueio absoluto
+          recentDispatches.forEach(p => {
+            const clean = normalizeTitle(p.title);
+            if (clean) {
+              recentTitlesSet.add(clean);
+              if (clean.length > 25) {
+                recentTitlesSet.add(clean.slice(0, 35));
+              }
+            }
+          });
+
+          // Histórico das 5 últimas postagens para alternância de categoria e plataforma
+          const last5 = recentDispatches.slice(0, 5);
+          recentCats = last5.map(p => (p.category || 'outros').trim().toLowerCase());
           lastCat = recentCats[0] || null;
           secondLastCat = recentCats[1] || null;
           sameCategoryTwice = Boolean(lastCat && secondLastCat && lastCat === secondLastCat);
 
-          const recentPlats = recentDispatches.map(p => (detectPlatform(p.affiliate_url).id || 'generic').toLowerCase());
+          const recentPlats = last5.map(p => (detectPlatform(p.affiliate_url).id || 'generic').toLowerCase());
           lastPlatform = recentPlats[0] || null;
           secondLastPlatform = recentPlats[1] || null;
           samePlatformTwice = Boolean(lastPlatform && secondLastPlatform && lastPlatform === secondLastPlatform);
 
-          console.log(`[WhatsApp Deal] 📊 Histórico Recente: Lojas [${recentPlats.join(' -> ')}] | Categorias [${recentCats.join(' -> ')}]`);
+          console.log(`[WhatsApp Deal] 🛡️ Cooldown 3 Dias Ativo: ${recentTitlesSet.size} títulos bloqueados dos últimos 3 dias.`);
         }
       } catch (histErr) {
         console.warn('[WhatsApp Deal] Aviso ao consultar histórico:', histErr.message);
       }
 
-      // 2.1 CONSTRUÇÃO DO POOL DE CANDIDATOS (EQUILÍBRIO INÉDITOS + CATÁLOGO EXISTENTE)
-      // Para evitar que um lote minerado domine todas as próximas horas,
-      // juntamos no pool produtos inéditos (novos) E produtos consolidados do catálogo (antigos)!
+      // 2.1 CONSTRUÇÃO DO POOL DE CANDIDATOS (COM PRIORIDADE ABSOLUTA PARA INÉDITOS)
       const candidatePool = [];
       const seenIds = new Set();
+      const seenTitlesInPool = new Set();
 
-      // GUARDA DE AFILIAÇÃO: Garante que NENHUM produto do Mercado Livre seja disparado sem link comissionado oficial (/sec/ ou meli.la)
+      // GUARDA DE AFILIAÇÃO E REGRA ANTI-REPETIÇÃO:
       const isValidAffiliateCandidate = (p) => {
-        if (!p || !p.affiliate_url) return false;
+        if (!p || !p.affiliate_url || !p.title) return false;
         const url = String(p.affiliate_url).toLowerCase();
         const isML = url.includes('mercadolivre') || url.includes('mercadolibre') || url.includes('meli.la');
         if (isML && !url.includes('/sec/') && !url.includes('meli.la')) {
           return false;
         }
+
+        // REGRA DE COOLDOWN DE 3 DIAS: Se já foi postado nas últimas 72 horas, BLOQUEIA
+        if (p.last_posted_at && new Date(p.last_posted_at).getTime() > new Date(threeDaysAgoIso).getTime()) {
+          return false;
+        }
+
+        // REGRA ANTI-REPETIÇÃO DE TÍTULO: Bloqueia se qualquer variação saiu nos últimos 3 dias
+        const clean = normalizeTitle(p.title);
+        if (!clean) return false;
+        if (recentTitlesSet.has(clean)) return false;
+        if (clean.length > 25 && recentTitlesSet.has(clean.slice(0, 35))) return false;
+
+        // Evita duplicatas dentro do próprio pool da rodada atual
+        if (seenTitlesInPool.has(clean)) return false;
+        seenTitlesInPool.add(clean);
+
         return true;
       };
 
-      // a) Produtos com contador RELÂMPAGO ativo (Prioridade alta)
-      const nowIso = new Date().toISOString();
-      const twentyFourHoursAgo = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+      // a) Produtos com contador RELÂMPAGO ativo (Prioridade alta, desde que respeite o cooldown)
       try {
         const { data: flashCandidates } = await supabaseAdmin
           .from('fast_affiliate_products')
           .select('*')
           .eq('is_active', true)
           .gt('flash_deal_end', nowIso)
-          .or(`last_posted_at.is.null,last_posted_at.lt.${twentyFourHoursAgo}`)
+          .or(`last_posted_at.is.null,last_posted_at.lt.${threeDaysAgoIso}`)
           .limit(10);
 
         if (flashCandidates) {
@@ -899,7 +939,7 @@ async function handleSendWhatsAppDeal(req, res) {
         }
       } catch (e) { }
 
-      // b) Produtos INÉDITOS (que nunca foram postados): busca até 30
+      // b) Produtos INÉDITOS (que NUNCA foram postados): busca até 60 para esgotar itens inéditos do catálogo
       try {
         const { data: unpostedProducts } = await supabaseAdmin
           .from('fast_affiliate_products')
@@ -907,7 +947,7 @@ async function handleSendWhatsAppDeal(req, res) {
           .eq('is_active', true)
           .is('last_posted_at', null)
           .order('created_at', { ascending: false })
-          .limit(30);
+          .limit(60);
 
         if (unpostedProducts) {
           unpostedProducts.forEach(p => {
@@ -916,14 +956,14 @@ async function handleSendWhatsAppDeal(req, res) {
         }
       } catch (e) { }
 
-      // c) Produtos do CATÁLOGO GERAL (Amazon, Mercado Livre, Shopee que faz mais tempo sem sair)
-      // Busca 60 produtos com last_posted_at mais antigo para garantir opções de todas as lojas e categorias
+      // c) Produtos do CATÁLOGO GERAL: busca SOMENTE produtos postados há mais de 3 dias (>= 72 horas)
       try {
         const { data: catalogProducts } = await supabaseAdmin
           .from('fast_affiliate_products')
           .select('*')
           .eq('is_active', true)
           .not('last_posted_at', 'is', null)
+          .lt('last_posted_at', threeDaysAgoIso)
           .order('last_posted_at', { ascending: true })
           .limit(60);
 
@@ -1118,6 +1158,14 @@ async function handleSendWhatsAppDeal(req, res) {
         .from(targetTable)
         .update({ last_posted_at: nowIso, updated_at: nowIso })
         .eq('id', product.id);
+
+      // Se for afiliado, sincroniza last_posted_at para qualquer outro registro com o mesmo título exato
+      if (!isFastSavorysStore && product.title) {
+        await supabaseAdmin
+          .from('fast_affiliate_products')
+          .update({ last_posted_at: nowIso, updated_at: nowIso })
+          .eq('title', product.title.trim());
+      }
     } catch (updateErr) {
       console.warn(`[WhatsApp Deal] Aviso ao atualizar last_posted_at em ${targetTable}:`, updateErr.message);
     }
