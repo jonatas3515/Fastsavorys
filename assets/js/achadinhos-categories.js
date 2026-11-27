@@ -4,10 +4,10 @@
  */
 
 window.AchadinhosCategories = (function () {
-  const STORAGE_KEY = 'fast_achadinhos_categories_v10';
+  const STORAGE_KEY = 'fast_achadinhos_categories_v11';
   const VERSION_KEY = 'fast_achadinhos_categories_version';
 
-  // Árvore Padrão (8 Macro Grupos - Supermercado, Beleza e Moda Unificados)
+  // Árvore Padrão (8 Macro Grupos - 6 Categorias Únicas + 2 Grupos c/ Subcategorias)
   const DEFAULT_TREE = [
     {
       id: 'group_supermercado_festas',
@@ -30,33 +30,40 @@ window.AchadinhosCategories = (function () {
     },
     {
       id: 'group_casa',
-      label: 'Cozinha',
+      label: 'Tudo para Cozinha',
       icon: '🍳',
       subcategories: [
-        { slug: 'eletros', label: 'Eletros', aliases: ['eletroportateis', 'eletrodomesticos', 'grandes_eletros', 'cozinha', 'eletroportateis_cozinha', 'fogao', 'microondas'] },
-        { slug: 'formas_utensilios', label: 'Formas e Maquinários', aliases: ['formas_maquinarios', 'confeitaria'] },
-        { slug: 'facas_faqueiros', label: 'Facas, Faqueiros e Afins', aliases: ['faqueiros', 'facas', 'faca_chef', 'jogo_facas'] },
-        { slug: 'panelas_loucas_copos', label: 'Panelas, Louças & Copos', aliases: ['panelas', 'loucas', 'copos'] },
-        { slug: 'cafe_cha_expresso', label: 'Café, Chá & Expresso', aliases: ['cafe', 'cafeteira', 'cha_expresso'] },
-        { slug: 'utensilios_domesticos', label: 'Utensílios Domésticos', aliases: ['utensilios', 'organizacao', 'utilidades', 'decoracao_basica'] }
+        {
+          slug: 'tudo_para_cozinha',
+          label: 'Tudo para Cozinha',
+          aliases: [
+            'eletros', 'formas_utensilios', 'facas_faqueiros', 'panelas_loucas_copos',
+            'cafe_cha_expresso', 'utensilios_domesticos', 'cozinha',
+            'eletroportateis', 'eletrodomesticos', 'grandes_eletros', 'formas_maquinarios',
+            'confeitaria', 'faqueiros', 'facas', 'faca_chef', 'jogo_facas', 'panelas',
+            'loucas', 'copos', 'cafe', 'cafeteira', 'cha_expresso', 'utensilios',
+            'organizacao', 'utilidades', 'decoracao_basica', 'fogao', 'microondas'
+          ]
+        }
       ]
     },
     {
       id: 'group_moveis_eletros',
-      label: 'Móveis, TV & Climatização',
+      label: 'Quarto, Sala & Garagem',
       icon: '🛋️',
       subcategories: [
-        { slug: 'sala_estar', label: 'Sala de Estar', aliases: [] },
-        { slug: 'quarto', label: 'Quarto', aliases: [] },
-        { slug: 'sala_jantar', label: 'Sala de Jantar', aliases: [] },
-        { slug: 'escritorio_organizacao', label: 'Escritório & Organização', aliases: [] },
-        { slug: 'decoracao_iluminacao', label: 'Decoração & Iluminação', aliases: ['decoracao_basica', 'iluminacao', 'quadros', 'luminarias'] },
-        { slug: 'cama_mesa_banho', label: 'Cama, Mesa & Banho', aliases: ['banho', 'mesa'] },
-        { slug: 'tv_audio_video', label: 'TVs, Áudio & Vídeo', aliases: ['tv', 'audio_video'] },
-        { slug: 'climatizacao', label: 'Climatização & Ar-Condicionado', aliases: ['ar_condicionado'] },
-        { slug: 'ventiladores', label: 'Ventiladores', aliases: ['ventilador', 'circuladores'] },
-        { slug: 'lavagem_secagem', label: 'Lavagem & Secagem', aliases: ['lavanderia'] },
-        { slug: 'aspiradores_limpeza', label: 'Aspiradores & Limpeza', aliases: ['robo_aspiradores_de_po', 'aspiradores', 'extratoras', 'aspirador'] }
+        {
+          slug: 'quarto_sala_garagem',
+          label: 'Quarto, Sala & Garagem',
+          aliases: [
+            'sala_estar', 'quarto', 'sala_jantar', 'escritorio_organizacao',
+            'decoracao_iluminacao', 'cama_mesa_banho', 'tv_audio_video',
+            'climatizacao', 'ventiladores', 'lavagem_secagem', 'aspiradores_limpeza',
+            'robo_aspiradores_de_po', 'decoracao_basica', 'iluminacao', 'quadros',
+            'luminarias', 'banho', 'mesa', 'tv', 'audio_video', 'ar_condicionado',
+            'ventilador', 'circuladores', 'lavanderia', 'aspiradores', 'extratoras', 'aspirador'
+          ]
+        }
       ]
     },
     {
@@ -119,14 +126,18 @@ window.AchadinhosCategories = (function () {
     },
     {
       id: 'group_outros',
-      label: 'Ferramentas, Auto & Pet',
+      label: 'Construção, Auto & Pet',
       icon: '🛠️',
       subcategories: [
-        { slug: 'ferramentas_eletricas', label: 'Ferramentas Elétricas', aliases: ['ferramentas'] },
-        { slug: 'ferramentas_manuais', label: 'Ferramentas Manuais', aliases: [] },
-        { slug: 'construcao_eletrica', label: 'Construção, Elétrica & Hidráulica', aliases: ['casa_construcao', 'eletrica', 'construcao'] },
-        { slug: 'automotivo', label: 'Automotivo & Moto', aliases: ['veiculos'] },
-        { slug: 'petshop', label: 'Pet Shop', aliases: [] }
+        {
+          slug: 'construcao_auto_pet',
+          label: 'Construção, Auto & Pet',
+          aliases: [
+            'ferramentas_eletricas', 'ferramentas_manuais', 'construcao_eletrica',
+            'automotivo', 'petshop', 'casa_construcao', 'ferramentas', 'eletrica',
+            'construcao', 'veiculos'
+          ]
+        }
       ]
     }
   ];
@@ -409,7 +420,12 @@ window.AchadinhosCategories = (function () {
       group_games: 'group_games_infantil',
       group_infantil: 'group_games_infantil',
       group_moveis: 'group_moveis_eletros',
-      group_eletros: 'group_moveis_eletros'
+      group_eletros: 'group_moveis_eletros',
+      group_climatizacao: 'group_moveis_eletros',
+      group_cozinha: 'group_casa',
+      group_ferramentas: 'group_outros',
+      group_auto: 'group_outros',
+      group_pet: 'group_outros'
     };
 
     Object.keys(legacyMap).forEach(oldId => {
