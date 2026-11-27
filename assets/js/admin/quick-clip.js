@@ -590,14 +590,76 @@ ${data.duplicate_count > 0 ? `ℹ️ ${data.duplicate_count} já estavam cadastr
   }
 
   // ------------------------------------------------------------
-  // FUNÇÃO AUXILIAR: FECHA O MODAL PEQUENO DA SHOPEE E AGUARDA SUMIR
+  // FUNÇÕES AUXILIARES SHOPEE: CLIQUE LIMPO, FECHAMENTO DE MODAL E CAPTURA
   // ------------------------------------------------------------
-  async function closeShopeeModal(modal) {
-    if (!modal) return;
+  function getRealShopeeButton(leaf) {
+    if (!leaf) return null;
+    let curr = leaf;
+    let best = leaf;
+    while (curr && curr !== document.body) {
+      if (curr.id === 'fastsavorys-hub-drawer') break;
+      const text = (curr.innerText || curr.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
+      if (text === 'obter link' || text === 'get link') {
+        best = curr;
+        if (curr.tagName === 'BUTTON' || curr.getAttribute('role') === 'button' || /btn|button/i.test(curr.className)) {
+          return curr;
+        }
+      } else {
+        break;
+      }
+      curr = curr.parentElement;
+    }
+    return best;
+  }
 
+  function simulateShopeeClick(el) {
+    if (!el) return;
     try {
-      // 1. Procura o botão ✕ no cabeçalho do modal
-      let closeBtn = Array.from(modal.querySelectorAll('button, [role="button"], span, i, svg, a, div')).find(el => {
+      el.scrollIntoView && el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    } catch (e) {}
+
+    const targets = [el];
+    if (el.firstElementChild && el.firstElementChild !== el) {
+      targets.push(el.firstElementChild);
+    }
+    if (el.parentElement && (el.parentElement.innerText || '').replace(/\s+/g, ' ').trim().toLowerCase() === 'obter link') {
+      targets.unshift(el.parentElement);
+    }
+
+    for (const target of targets) {
+      try {
+        target.focus && target.focus();
+        const rect = target.getBoundingClientRect();
+        const clientX = rect.left + rect.width / 2;
+        const clientY = rect.top + rect.height / 2;
+        const mouseOpts = {
+          bubbles: true,
+          cancelable: true,
+          view: window,
+          composed: true,
+          clientX,
+          clientY,
+          screenX: clientX,
+          screenY: clientY,
+          button: 0,
+          buttons: 1
+        };
+        target.dispatchEvent(new PointerEvent('pointerdown', mouseOpts));
+        target.dispatchEvent(new MouseEvent('mousedown', mouseOpts));
+        target.dispatchEvent(new PointerEvent('pointerup', mouseOpts));
+        target.dispatchEvent(new MouseEvent('mouseup', mouseOpts));
+        target.dispatchEvent(new MouseEvent('click', mouseOpts));
+        if (typeof target.click === 'function') {
+          target.click();
+        }
+      } catch (e) {}
+    }
+  }
+
+  async function closeShopeeModal() {
+    try {
+      // 1. Procura o botão ✕ ou fechar no modal
+      const closeButtons = Array.from(document.querySelectorAll('button, [role="button"], span, i, svg, a, div')).filter(el => {
         if (el.closest('#fastsavorys-hub-drawer')) return false;
         const aria = (el.getAttribute('aria-label') || '').toLowerCase();
         const cls = (el.className || '').toString().toLowerCase();
@@ -607,44 +669,24 @@ ${data.duplicate_count > 0 ? `ℹ️ ${data.duplicate_count} já estavam cadastr
                txt === '✕' || txt === '×' || txt === 'X' || txt === 'x';
       });
 
-      // Se não encontrou por texto/classe, procura elemento clicável no canto superior direito
-      if (!closeBtn) {
-        const modalRect = modal.getBoundingClientRect();
-        const cornerCandidates = Array.from(modal.querySelectorAll('*')).filter(el => {
-          if (el.closest('#fastsavorys-hub-drawer')) return false;
-          const r = el.getBoundingClientRect();
-          return r.width >= 8 && r.width <= 48 && r.height >= 8 && r.height <= 48 &&
-                 (r.right >= modalRect.right - 55) && (r.top <= modalRect.top + 55);
-        });
-        if (cornerCandidates.length > 0) closeBtn = cornerCandidates[cornerCandidates.length - 1];
+      if (closeButtons.length > 0) {
+        simulateShopeeClick(closeButtons[closeButtons.length - 1]);
       }
 
-      if (closeBtn) {
-        try {
-          closeBtn.focus && closeBtn.focus();
-          closeBtn.click && closeBtn.click();
-          closeBtn.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }));
-        } catch (e) {}
-      }
-
-      // Envia tecla Escape como reforço
+      // 2. Dispara tecla Escape
       document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', keyCode: 27, bubbles: true }));
+      document.dispatchEvent(new KeyboardEvent('keyup', { key: 'Escape', code: 'Escape', keyCode: 27, bubbles: true }));
 
-      // Aguarda o modal sumir da tela antes de ir para o próximo produto
+      // 3. Aguarda o modal sumir (até 600ms)
       const startClose = Date.now();
-      while (Date.now() - startClose < 1200) {
-        if (!modal.isConnected || modal.offsetParent === null || getComputedStyle(modal).display === 'none') {
-          break;
-        }
-        await new Promise(r => setTimeout(r, 80));
-      }
-
-      // Se ainda permanecer na tela, clica no backdrop/máscara
-      if (modal.isConnected && modal.offsetParent !== null && getComputedStyle(modal).display !== 'none') {
-        const mask = document.querySelector('.shopee-modal__mask, .modal-mask, .el-overlay, [class*="mask"], [class*="overlay"], [class*="backdrop"]');
-        if (mask && !mask.closest('#fastsavorys-hub-drawer')) {
-          try { mask.click(); } catch(e) {}
-        }
+      while (Date.now() - startClose < 600) {
+        const hasVisibleModal = Array.from(document.querySelectorAll('*')).some(el => {
+          if (el.closest('#fastsavorys-hub-drawer')) return false;
+          const t = (el.innerText || el.textContent || '').trim();
+          return t === 'Link de Oferta de Produto' && el.offsetParent !== null;
+        });
+        if (!hasVisibleModal) break;
+        await new Promise(r => setTimeout(r, 60));
       }
     } catch (e) {
       console.warn('[Quick Clip Shopee] Erro ao fechar modal:', e);
@@ -659,178 +701,114 @@ ${data.duplicate_count > 0 ? `ℹ️ ${data.duplicate_count} já estavam cadastr
 
     lastCapturedAffiliateLink = null;
 
-    // Helper: Localiza de forma precisa o modal pequeno aberto na tela
-    function findShopeeModal() {
-      // 1. Procura nós de texto com título ou instruções do modal
-      const titleEls = Array.from(document.querySelectorAll('*')).filter(el => {
-        if (el.closest('#fastsavorys-hub-drawer')) return false;
-        if (el.children.length > 0) return false;
-        const t = (el.innerText || el.textContent || '').trim();
-        return t === 'Link de Oferta de Produto' || t === 'Por favor, copie o link' || t.includes('Link de Oferta');
-      });
+    // Se já havia algum modal residual aberto, fecha antes
+    await closeShopeeModal();
+    await new Promise(r => setTimeout(r, 150));
 
-      for (const tEl of titleEls) {
-        let p = tEl.parentElement;
-        while (p && p !== document.body && p !== document.documentElement) {
-          if (p.id === 'fastsavorys-hub-drawer') break;
-          const rect = p.getBoundingClientRect();
-          // O modal de link da Shopee tem aproximadamente 280px a 850px de largura e 140px a 600px de altura
-          if (rect.width >= 280 && rect.width <= 850 && rect.height >= 140 && rect.height <= 600) {
-            return p;
-          }
-          p = p.parentElement;
-        }
-      }
+    const candidate = leafBtn || shareBtn;
+    const realBtn = getRealShopeeButton(candidate) || candidate;
 
-      // 2. Fallback: procura por role="dialog" ou classes do modal
-      const dialogs = Array.from(document.querySelectorAll('[role="dialog"], .shopee-modal, .el-dialog, .ant-modal')).filter(d => !d.closest('#fastsavorys-hub-drawer'));
-      for (const d of dialogs) {
-        const r = d.getBoundingClientRect();
-        if (r.width >= 280 && r.height >= 140) return d;
-      }
-      return null;
-    }
-
-    // Se já havia algum modal residual aberto, fecha antes de começar o novo
-    let existingModal = findShopeeModal();
-    if (existingModal) {
-      await closeShopeeModal(existingModal);
-      await new Promise(r => setTimeout(r, 200));
-    }
-
-    const clickTarget = leafBtn || shareBtn;
-    const realBtn = (clickTarget.tagName === 'BUTTON' || clickTarget.getAttribute('role') === 'button')
-      ? clickTarget
-      : (clickTarget.closest('button, [role="button"]') || clickTarget);
-
-    // 1. Rola a página suavemente até o produto para que o usuário veja a ação acontecendo (igual ao Mercado Livre)
+    // 1. Rola suavemente até o produto
     try {
       realBtn.scrollIntoView && realBtn.scrollIntoView({ behavior: 'smooth', block: 'center' });
       await new Promise(r => setTimeout(r, 200));
     } catch (e) {}
 
-    // 2. Bloqueia temporariamente window.open e links pais do card para evitar abrir nova aba
+    // 2. Bloqueia temporariamente window.open para impedir abertura de abas durante o clique
     const origWindowOpen = window.open;
     window.open = function (...args) {
       console.log('[Quick Clip Shopee] window.open bloqueado durante extração:', args[0]);
       return null;
     };
 
-    const neutralizedLinks = [];
-    let p = realBtn.parentElement;
-    while (p && p !== document.body) {
-      if (p.tagName === 'A') {
-        neutralizedLinks.push({ el: p, target: p.getAttribute('target'), href: p.getAttribute('href') });
-        p.removeAttribute('target');
-        p.setAttribute('href', 'javascript:void(0)');
-      }
-      p = p.parentElement;
+    // 3. Trava o link pai do card (<a>) para não navegar ao clicar no botão
+    const parentCardLink = realBtn.closest('a');
+    let removeCardTrap = null;
+    if (parentCardLink && parentCardLink !== realBtn) {
+      const stopCardNav = (e) => {
+        e.stopPropagation();
+      };
+      parentCardLink.addEventListener('click', stopCardNav, true);
+      removeCardTrap = () => parentCardLink.removeEventListener('click', stopCardNav, true);
     }
 
-    // 3. Executa o clique limpo e único no botão "Obter link"
-    try {
-      realBtn.focus && realBtn.focus();
-      const mouseOpts = { bubbles: true, cancelable: true, view: window, composed: true };
-      realBtn.dispatchEvent(new PointerEvent('pointerdown', mouseOpts));
-      realBtn.dispatchEvent(new MouseEvent('mousedown', mouseOpts));
-      realBtn.dispatchEvent(new PointerEvent('pointerup', mouseOpts));
-      realBtn.dispatchEvent(new MouseEvent('mouseup', mouseOpts));
-      if (typeof realBtn.click === 'function') {
-        realBtn.click();
-      } else {
-        realBtn.dispatchEvent(new MouseEvent('click', mouseOpts));
-      }
-    } catch (e) {
-      console.warn('[Quick Clip Shopee] Erro ao clicar no botão Obter link:', e);
-    }
+    // 4. Executa o clique limpo e autêntico no botão "Obter link"
+    simulateShopeeClick(realBtn);
 
-    // 4. Aguarda a abertura do modal e captura o link
+    // 5. Aguarda a abertura do modal e captura o link s.shopee.com.br
     let extractedLink = null;
-    let modal = null;
     const maxModalWait = 4500;
     const startWait = Date.now();
     let copyClicked = false;
 
     while (Date.now() - startWait < maxModalWait) {
-      if (!modal) {
-        modal = findShopeeModal();
+      // Procura o botão "Copiar Link" (laranja) dentro do modal
+      if (!copyClicked || Date.now() - startWait > 1200) {
+        const allBtns = Array.from(document.querySelectorAll('button, [role="button"], div, span, a')).filter(b => !b.closest('#fastsavorys-hub-drawer'));
+        const copyBtn = allBtns.find(b => {
+          const t = (b.innerText || b.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
+          return t === 'copiar link' || t === 'copiar';
+        });
+        if (copyBtn) {
+          copyClicked = true;
+          simulateShopeeClick(copyBtn);
+        }
       }
 
-      if (modal) {
-        // Clica no botão "Copiar Link" dentro do modal (laranja)
-        if (!copyClicked) {
-          const allModalBtns = Array.from(modal.querySelectorAll('button, [role="button"], div, span, a'));
-          const copyBtn = allModalBtns.find(b => {
-            if (b.closest('#fastsavorys-hub-drawer')) return false;
-            const t = (b.innerText || b.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
-            return t === 'copiar link' || t === 'copiar' || (t.includes('copiar') && t.includes('link'));
-          });
-          if (copyBtn) {
-            copyClicked = true;
-            try {
-              copyBtn.focus && copyBtn.focus();
-              const opts = { bubbles: true, cancelable: true, view: window };
-              copyBtn.dispatchEvent(new MouseEvent('mousedown', opts));
-              copyBtn.dispatchEvent(new MouseEvent('mouseup', opts));
-              copyBtn.click && copyBtn.click();
-            } catch (e) {}
-          }
-        }
+      // 1. Verifica no interceptador de clipboard (writeText / execCommand / copy event)
+      if (lastCapturedAffiliateLink && lastCapturedAffiliateLink !== previousUrl &&
+          (lastCapturedAffiliateLink.includes('s.shopee.com.br') || lastCapturedAffiliateLink.includes('shope.ee'))) {
+        extractedLink = lastCapturedAffiliateLink;
+        break;
+      }
 
-        // 1. Verifica no interceptador de clipboard
-        if (lastCapturedAffiliateLink && lastCapturedAffiliateLink !== previousUrl &&
-            (lastCapturedAffiliateLink.includes('s.shopee.com.br') || lastCapturedAffiliateLink.includes('shope.ee'))) {
-          extractedLink = lastCapturedAffiliateLink;
+      // 2. Procura em todos os inputs e textareas (o modal tem um textarea com a URL!)
+      const inputs = Array.from(document.querySelectorAll('textarea, input')).filter(i => !i.closest('#fastsavorys-hub-drawer'));
+      for (const inp of inputs) {
+        const val = (inp.value || inp.getAttribute('value') || inp.innerText || inp.textContent || '').trim();
+        const m = val.match(/https?:\/\/(?:s\.shopee\.com\.br|shope\.ee)\/[a-zA-Z0-9_\-\.\/]+/i);
+        if (m && m[0] !== previousUrl) {
+          extractedLink = m[0];
           break;
         }
+      }
+      if (extractedLink) break;
 
-        // 2. Procura em inputs e textareas do modal
-        const inputs = Array.from(modal.querySelectorAll('input, textarea'));
-        for (const inp of inputs) {
-          const val = (inp.value || inp.getAttribute('value') || inp.innerText || inp.textContent || '').trim();
-          const m = val.match(/https?:\/\/(?:s\.shopee\.com\.br|shope\.ee)\/[a-zA-Z0-9_\-\.\/]+/i);
+      // 3. Procura no innerText de links ou elementos de texto do modal
+      const textNodes = Array.from(document.querySelectorAll('div, span, p, a')).filter(el => !el.closest('#fastsavorys-hub-drawer'));
+      for (const el of textNodes) {
+        if (el.children.length === 0 || el.tagName === 'A') {
+          const text = (el.innerText || el.textContent || el.href || '').trim();
+          const m = text.match(/https?:\/\/(?:s\.shopee\.com\.br|shope\.ee)\/[a-zA-Z0-9_\-\.\/]+/i);
           if (m && m[0] !== previousUrl) {
             extractedLink = m[0];
             break;
           }
         }
-        if (extractedLink) break;
+      }
+      if (extractedLink) break;
 
-        // 3. Procura no innerText e innerHTML do modal
-        const mText = (modal.innerText || '') + ' ' + (modal.innerHTML || '');
-        const matchRegex = mText.match(/https?:\/\/(?:s\.shopee\.com\.br|shope\.ee)\/[a-zA-Z0-9_\-\.\/]+/i);
-        if (matchRegex && matchRegex[0] !== previousUrl) {
-          extractedLink = matchRegex[0];
-          break;
-        }
-
-        // 4. Fallback navigator.clipboard
-        if (navigator.clipboard && navigator.clipboard.readText) {
-          try {
-            const clipText = await navigator.clipboard.readText();
-            const mClip = clipText ? clipText.match(/https?:\/\/(?:s\.shopee\.com\.br|shope\.ee)\/[a-zA-Z0-9_\-\.\/]+/i) : null;
-            if (mClip && mClip[0] !== previousUrl) {
-              extractedLink = mClip[0];
-              break;
-            }
-          } catch (e) {}
-        }
+      // 4. Fallback navigator.clipboard.readText se disponível
+      if (navigator.clipboard && navigator.clipboard.readText) {
+        try {
+          const clipText = await navigator.clipboard.readText();
+          const mClip = clipText ? clipText.match(/https?:\/\/(?:s\.shopee\.com\.br|shope\.ee)\/[a-zA-Z0-9_\-\.\/]+/i) : null;
+          if (mClip && mClip[0] !== previousUrl) {
+            extractedLink = mClip[0];
+            break;
+          }
+        } catch (e) {}
       }
 
-      await new Promise(r => setTimeout(r, 150));
+      await new Promise(r => setTimeout(r, 120));
     }
 
-    // 5. Fecha o modal da Shopee com segurança absoluta
-    if (modal || findShopeeModal()) {
-      await closeShopeeModal(modal || findShopeeModal());
-    }
+    // 6. Fecha o modal da Shopee
+    await closeShopeeModal();
 
-    // 6. Restaura window.open e links do card
+    // 7. Restaura window.open e listeners do card
     window.open = origWindowOpen;
-    neutralizedLinks.forEach(item => {
-      if (item.target) item.el.setAttribute('target', item.target); else item.el.removeAttribute('target');
-      if (item.href) item.el.setAttribute('href', item.href); else item.el.removeAttribute('href');
-    });
+    removeCardTrap && removeCardTrap();
 
     return extractedLink;
   }
@@ -917,11 +895,10 @@ ${data.duplicate_count > 0 ? `ℹ️ ${data.duplicate_count} já estavam cadastr
       const countEl = document.getElementById('fast-item-count');
       listEl.innerHTML = '';
 
-      // 1. Localiza os elementos folha com texto "Obter link" (garante pegar o botão e não wrappers)
-      const allLeafs = Array.from(document.querySelectorAll('*')).filter(el => {
+      // 1. Localiza os nós com texto estrito "Obter link"
+      const candidateEls = Array.from(document.querySelectorAll('button, [role="button"], a, div, span')).filter(el => {
         if (el.closest('#fastsavorys-hub-drawer')) return false;
-        if (el.children.length > 0) return false;
-        const t = (el.innerText || el.textContent || '').trim().toLowerCase();
+        const t = (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
         return (t === 'obter link' || t === 'get link') && !t.includes('massa');
       });
 
@@ -929,12 +906,12 @@ ${data.duplicate_count > 0 ? `ℹ️ ${data.duplicate_count} já estavam cadastr
       const seenTitles = new Set();
       const seenContainers = new Set();
 
-      allLeafs.forEach((leaf) => {
-        const realBtn = leaf.closest('button, [role="button"], a') || leaf.parentElement || leaf;
-        const container = leaf.closest('[class*="card"], [class*="item"], [class*="product"], [class*="col"], [class*="offer"]') ||
+      candidateEls.forEach((el) => {
+        const realBtn = getRealShopeeButton(el) || el;
+        const container = el.closest('[class*="card"], [class*="item"], [class*="product"], [class*="col"], [class*="offer"]') ||
                           realBtn.closest('[class*="card"], [class*="item"], [class*="product"], [class*="col"], [class*="offer"]') ||
-                          leaf.parentElement?.parentElement?.parentElement?.parentElement ||
-                          leaf.parentElement?.parentElement?.parentElement;
+                          el.parentElement?.parentElement?.parentElement?.parentElement ||
+                          el.parentElement?.parentElement?.parentElement;
         if (!container || seenContainers.has(container)) return;
         seenContainers.add(container);
 
@@ -947,8 +924,8 @@ ${data.duplicate_count > 0 ? `ℹ️ ${data.duplicate_count} já estavam cadastr
         if (titleEl) title = (titleEl.innerText || titleEl.getAttribute('title') || '').trim();
         if (!title) {
           const texts = Array.from(container.querySelectorAll('div, span, p, a'));
-          for (const el of texts) {
-            const t = (el.innerText || '').trim();
+          for (const tEl of texts) {
+            const t = (tEl.innerText || '').trim();
             if (t.length >= 15 && t.length <= 250 &&
                 !t.includes('R$') &&
                 !/obter link|vendas|comiss[aã]o|taxa/i.test(t)) {
@@ -1002,7 +979,7 @@ ${data.duplicate_count > 0 ? `ℹ️ ${data.duplicate_count} já estavam cadastr
             id: parsedItems.length,
             container,
             shareBtn: realBtn,
-            leafBtn: leaf,
+            leafBtn: el,
             title,
             image_url,
             price_display,

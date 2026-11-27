@@ -884,11 +884,11 @@ function detectCategory(title = '', description = '', url = '') {
   const text = `${title} ${description} ${url}`.toLowerCase();
 
   const rules = [
-    { category: 'confeitaria_sobremesas', keywords: ['chocolate', 'bombom', 'biscoito', 'bolacha', 'doce de leite', 'nutella', 'pasta de amendoim', 'leite condensado', 'creme de leite', 'barra de chocolate', 'cacau', 'granulado', 'cobertura chocolate', 'achocolatado', 'nescau', 'toddy'] },
-    { category: 'alimentos_basicos', keywords: ['arroz', 'feijao', 'feijão', 'azeite', 'oleo de soja', 'óleo de soja', 'macarrao', 'macarrão', 'massa', 'farinha de trigo', 'sal refinado', 'açucar', 'acucar', 'feijao preto', 'feijao carioca'] },
-    { category: 'molhos_temperos', keywords: ['molho de tomate', 'extrato de tomate', 'tempero', 'molho shoyu', 'maionese', 'ketchup', 'mostarda', 'atum', 'sardinha', 'conserva', 'oregano', 'pimenta', 'curry', 'chimichurri'] },
-    { category: 'bebidas_snacks', keywords: ['whisky', 'gin', 'vodka', 'cerveja', 'vinho', 'espumante', 'refrigerante', 'coca cola', 'suco', 'cafe', 'café', 'capsula cafe', 'cha', 'chá', 'snack', 'salgadinho', 'doritos', 'batata frita', 'amendoim', 'energetico', 'energético', 'red bull', 'monster'] },
-    { category: 'limpeza_organizacao', keywords: ['detergente', 'amaciante', 'sabao em po', 'sabão em pó', 'sabao liquido', 'desinfetante', 'agua sanitaria', 'água sanitária', 'esponja', 'pano microfibra', 'lustra moveis', 'inseticida', 'saco de lixo', 'cloro', 'alcool 70'] },
+    { category: 'supermercado_festas', keywords: ['chocolate', 'bombom', 'biscoito', 'bolacha', 'doce de leite', 'nutella', 'pasta de amendoim', 'leite condensado', 'creme de leite', 'barra de chocolate', 'cacau', 'granulado', 'cobertura chocolate', 'achocolatado', 'nescau', 'toddy'] },
+    { category: 'supermercado_festas', keywords: ['arroz', 'feijao', 'feijão', 'azeite', 'oleo de soja', 'óleo de soja', 'macarrao', 'macarrão', 'massa', 'farinha de trigo', 'sal refinado', 'açucar', 'acucar', 'feijao preto', 'feijao carioca'] },
+    { category: 'supermercado_festas', keywords: ['molho de tomate', 'extrato de tomate', 'tempero', 'molho shoyu', 'maionese', 'ketchup', 'mostarda', 'atum', 'sardinha', 'conserva', 'oregano', 'pimenta', 'curry', 'chimichurri'] },
+    { category: 'supermercado_festas', keywords: ['whisky', 'gin', 'vodka', 'cerveja', 'vinho', 'espumante', 'refrigerante', 'coca cola', 'suco', 'cafe', 'café', 'capsula cafe', 'cha', 'chá', 'snack', 'salgadinho', 'doritos', 'batata frita', 'amendoim', 'energetico', 'energético', 'red bull', 'monster'] },
+    { category: 'supermercado_festas', keywords: ['detergente', 'amaciante', 'sabao em po', 'sabão em pó', 'sabao liquido', 'desinfetante', 'agua sanitaria', 'água sanitária', 'esponja', 'pano microfibra', 'lustra moveis', 'inseticida', 'saco de lixo', 'cloro', 'alcool 70'] },
     { category: 'eletros', keywords: ['air fryer', 'airfryer', 'fritadeira sem oleo', 'liquidificador', 'batedeira', 'sanduicheira', 'grill', 'mixer', 'processador de alimentos', 'chaleira eletrica', 'panela de pressao eletrica', 'panela eletrica', 'torradeira', 'crepeira', 'pipoqueira', 'microondas', 'micro-ondas', 'forno eletrico', 'fogao', 'fogão', 'cooktop', 'depurador', 'coifa', 'bebedouro', 'purificador de agua', 'adega', 'geladeira', 'refrigerador', 'freezer', 'cervejeira', 'adega climatizada'] },
     { category: 'cafe_cha_expresso', keywords: ['cafeteira', 'nespresso', 'dolce gusto', 'tres coracoes', 'moedor de cafe', 'cafeteira expresso', 'cafeteira italiana', 'prensa francesa', 'capsula', 'xicara cafe', 'caneca'] },
     { category: 'panelas_loucas_copos', keywords: ['jogo de panelas', 'conjunto panelas', 'panela antiaderente', 'frigideira', 'cacarola', 'panela de pressao', 'aparelho de jantar', 'pratos', 'jogo de copos', 'tacas', 'taças', 'travessa vidro'] },
@@ -899,15 +899,15 @@ function detectCategory(title = '', description = '', url = '') {
     { category: 'climatizacao', keywords: ['ar condicionado', 'split inverter', 'climatizador de ar', 'aquecedor', 'umidificador de ar', 'desumidificador'] },
     { category: 'ventiladores', keywords: ['ventilador', 'ventilador de mesa', 'ventilador de coluna', 'ventilador de teto', 'circulador de ar', 'turbo silencioso', 'mondial turbo', 'arno turbo'] },
     { category: 'tv_audio_video', keywords: ['smart tv', 'tv 50', 'tv 55', 'tv 65', 'televisao', 'televisão', 'soundbar', 'home theater', 'projetor', 'chromecast', 'fire stick', 'roku', 'tv box'] },
-    { category: 'cabelos', keywords: ['shampoo', 'condicionador', 'mascara capilar', 'oleo capilar', 'secador de cabelo', 'chapinha', 'modelador de cachos', 'escova secadora', 'tonico capilar', 'leave in', 'cronograma capilar'] },
-    { category: 'pele_rosto', keywords: ['skincare', 'serum facial', 'sérum', 'protetor solar', 'hidratante facial', 'gel de limpeza facial', 'agua micelar', 'vitamina c facial', 'antirrugas', 'acido hialuronico'] },
-    { category: 'maquiagem_unhas', keywords: ['maquiagem', 'batom', 'base facial', 'rimel', 'rímel', 'delineador', 'paleta de sombras', 'esmalte', 'unha postica', 'cabine led unha', 'corretivo', 'po compacto', 'blush'] },
-    { category: 'perfumaria_higiene', keywords: ['perfume', 'colonia', 'colônia', 'parfum', 'deo parfum', 'eau de parfum', 'fragrancia', 'fragrância', 'kaiak', 'essencial', 'natura una', 'una somos', 'humor', 'biografia', 'ilia', 'ilía', 'luna', 'tododia', 'desodorante', 'sabonete', 'escova de dentes', 'fio dental', 'hidratante corporal', 'body splash'] },
-    { category: 'barbear_depilacao', keywords: ['barbeador', 'barbeador eletrico', 'maquina de cortar cabelo', 'depilador', 'depilador eletrico', 'lamina de barbear', 'gillette', 'espuma de barbear', 'pos barba', 'aparador de pelos'] },
-    { category: 'ingredientes_profissionais', keywords: ['pasta americana', 'corante alimenticio', 'desmoldante', 'essencia', 'emulsificante', 'glucose', 'chantilly', 'cobertura fracionada', 'harald', 'sicao', 'callebaut'] },
+    { category: 'beleza_saude', keywords: ['shampoo', 'condicionador', 'mascara capilar', 'oleo capilar', 'secador de cabelo', 'chapinha', 'modelador de cachos', 'escova secadora', 'tonico capilar', 'leave in', 'cronograma capilar'] },
+    { category: 'beleza_saude', keywords: ['skincare', 'serum facial', 'sérum', 'protetor solar', 'hidratante facial', 'gel de limpeza facial', 'agua micelar', 'vitamina c facial', 'antirrugas', 'acido hialuronico'] },
+    { category: 'beleza_saude', keywords: ['maquiagem', 'batom', 'base facial', 'rimel', 'rímel', 'delineador', 'paleta de sombras', 'esmalte', 'unha postica', 'cabine led unha', 'corretivo', 'po compacto', 'blush'] },
+    { category: 'beleza_saude', keywords: ['perfume', 'colonia', 'colônia', 'parfum', 'deo parfum', 'eau de parfum', 'fragrancia', 'fragrância', 'kaiak', 'essencial', 'natura una', 'una somos', 'humor', 'biografia', 'ilia', 'ilía', 'luna', 'tododia', 'desodorante', 'sabonete', 'escova de dentes', 'fio dental', 'hidratante corporal', 'body splash'] },
+    { category: 'beleza_saude', keywords: ['barbeador', 'barbeador eletrico', 'maquina de cortar cabelo', 'depilador', 'depilador eletrico', 'lamina de barbear', 'gillette', 'espuma de barbear', 'pos barba', 'aparador de pelos'] },
+    { category: 'supermercado_festas', keywords: ['pasta americana', 'corante alimenticio', 'desmoldante', 'essencia', 'emulsificante', 'glucose', 'chantilly', 'cobertura fracionada', 'harald', 'sicao', 'callebaut'] },
     { category: 'formas_utensilios', keywords: ['forma de bolo', 'forma silicone', 'bico de confeitar', 'bailarina bolo', 'espatula bolo', 'espátula bolo', 'cortador bolo', 'assadeira bolo', 'manga de confeitar', 'tapete silicone'] },
-    { category: 'embalagens', keywords: ['embalagem', 'embalagens', 'caixa papelao', 'caixa papelão', 'caixa presente', 'caixa bolo', 'caixa doce', 'saco kraft', 'sacola kraft', 'sacola papel', 'saquinho', 'fita adesiva', 'plastico bolha', 'saco plastico', 'descartavel', 'descartável', 'copo descartavel', 'marmita'] },
-    { category: 'festas', keywords: ['artigo de festa', 'decoracao festa', 'decoração festa', 'balao', 'balão', 'bexiga', 'topo de bolo', 'vela aniversario', 'vela aniversário', 'painel festa', 'lembrancinha', 'presente', 'kit festa'] },
+    { category: 'supermercado_festas', keywords: ['embalagem', 'embalagens', 'caixa papelao', 'caixa papelão', 'caixa presente', 'caixa bolo', 'caixa doce', 'saco kraft', 'sacola kraft', 'sacola papel', 'saquinho', 'fita adesiva', 'plastico bolha', 'saco plastico', 'descartavel', 'descartável', 'copo descartavel', 'marmita'] },
+    { category: 'supermercado_festas', keywords: ['artigo de festa', 'decoracao festa', 'decoração festa', 'balao', 'balão', 'bexiga', 'topo de bolo', 'vela aniversario', 'vela aniversário', 'painel festa', 'lembrancinha', 'presente', 'kit festa'] },
     { category: 'quarto', keywords: ['guarda roupa', 'cama box', 'colchao', 'colchão', 'cabeceira', 'comoda', 'cômoda', 'mesa de cabeceira', 'criado mudo', 'beliche'] },
     { category: 'sala_estar', keywords: ['sofa', 'sofá', 'poltrona', 'rack tv', 'painel tv', 'mesa de centro', 'tapete sala', 'cortina sala', 'almofada'] },
     { category: 'sala_jantar', keywords: ['mesa de jantar', 'cadeira de jantar', 'conjunto jantar', 'buffet sala', 'aparador', 'banqueta'] },
@@ -925,13 +925,13 @@ function detectCategory(title = '', description = '', url = '') {
     { category: 'construcao_eletrica', keywords: ['torneira', 'chuveiro', 'tomada', 'extensao eletrica', 'lampada led', 'tinta parede', 'fio eletrico', 'disjuntor', 'cano pvc'] },
     { category: 'automotivo', keywords: ['automotivo', 'carro', 'moto', 'motocicleta', 'pneu', 'capacete', 'farol', 'oleo motor', 'óleo motor', 'som automotivo', 'camera de re', 'capa automotiva', 'cera automotiva', 'lavagem automotiva', 'vonixx', 'pretinho'] },
     { category: 'petshop', keywords: ['racao', 'ração', 'cachorro', 'gato', 'pet', 'coleira', 'guia cachorro', 'arranhador', 'caminha pet', 'cama pet', 'petisco', 'comedouro', 'bebedouro pet', 'areia gato', 'tapete higienico', 'shampoo pet'] },
-    { category: 'roupas', keywords: ['camisa', 'camiseta', 'calca', 'calça', 'vestido', 'saia', 'bermuda', 'short', 'jaqueta', 'moletom', 'casaco', 'biquini', 'biquíni', 'lingerie', 'meia', 'cueca', 'sutia'] },
-    { category: 'calcados', keywords: ['tenis', 'tênis', 'sapato', 'sandalia', 'sandália', 'bota', 'chinelo', 'havaianas', 'chuteira', 'rasteirinha'] },
-    { category: 'bolsas_malas', keywords: ['bolsa', 'mochila', 'mala de viagem', 'mochila escolar', 'carteira', 'necessaire', 'pochete', 'pasta notebook'] },
-    { category: 'relogios_oculos', keywords: ['relogio', 'relógio', 'smartwatch', 'oculos de sol', 'óculos de sol', 'armacao oculos', 'joia', 'jóia', 'semijoia', 'brinco', 'colar', 'pulseira'] },
-    { category: 'suplementos', keywords: ['whey', 'creatina', 'suplemento', 'bcaa', 'glutamina', 'pre treino', 'pré treino', 'termogenico', 'vitamina', 'omega 3', 'colageno', 'hipercalorico', 'barra de proteina'] },
-    { category: 'treino_funcional', keywords: ['haltere', 'colchonete', 'elastico treino', 'kettlebell', 'corda de pular', 'caneleira', 'barra fixa', 'faixa elastica', 'luva academia', 'tapete yoga', 'roda abdominal'] },
-    { category: 'monitoramento_saude', keywords: ['medidor de pressao', 'termometro', 'inalador', 'nebulizador', 'oximetro', 'glicosimetro', 'massageador', 'balanca corporal', 'balança digital bioimpedancia', 'joelheira', 'corretor postural'] },
+    { category: 'moda_acessorios', keywords: ['camisa', 'camiseta', 'calca', 'calça', 'vestido', 'saia', 'bermuda', 'short', 'jaqueta', 'moletom', 'casaco', 'biquini', 'biquíni', 'lingerie', 'meia', 'cueca', 'sutia'] },
+    { category: 'moda_acessorios', keywords: ['tenis', 'tênis', 'sapato', 'sandalia', 'sandália', 'bota', 'chinelo', 'havaianas', 'chuteira', 'rasteirinha'] },
+    { category: 'moda_acessorios', keywords: ['bolsa', 'mochila', 'mala de viagem', 'mochila escolar', 'carteira', 'necessaire', 'pochete', 'pasta notebook'] },
+    { category: 'moda_acessorios', keywords: ['relogio', 'relógio', 'smartwatch', 'oculos de sol', 'óculos de sol', 'armacao oculos', 'joia', 'jóia', 'semijoia', 'brinco', 'colar', 'pulseira'] },
+    { category: 'beleza_saude', keywords: ['whey', 'creatina', 'suplemento', 'bcaa', 'glutamina', 'pre treino', 'pré treino', 'termogenico', 'vitamina', 'omega 3', 'colageno', 'hipercalorico', 'barra de proteina'] },
+    { category: 'beleza_saude', keywords: ['haltere', 'colchonete', 'elastico treino', 'kettlebell', 'corda de pular', 'caneleira', 'barra fixa', 'faixa elastica', 'luva academia', 'tapete yoga', 'roda abdominal'] },
+    { category: 'beleza_saude', keywords: ['medidor de pressao', 'termometro', 'inalador', 'nebulizador', 'oximetro', 'glicosimetro', 'massageador', 'balanca corporal', 'balança digital bioimpedancia', 'joelheira', 'corretor postural'] },
     { category: 'brinquedos_pedagogicos', keywords: ['brinquedo', 'brinquedos', 'boneca', 'boneco', 'carrinho', 'lego', 'pelucia', 'pelúcia', 'nerf', 'patinete', 'barbie', 'hot wheels', 'massinha', 'slime', 'bebe', 'bebê', 'fralda', 'pampers', 'huggies', 'mamadeira', 'chupeta', 'carrinho de bebe', 'mordedor'] },
     { category: 'jogos_tabuleiro', keywords: ['jogo de tabuleiro', 'quebra cabeca', 'quebra-cabeça', 'domino', 'baralho', 'xadrez', 'war', 'banco imobiliario'] },
     { category: 'papelaria_escolar', keywords: ['livro', 'gibi', 'manga', 'mangá', 'quadrinhos', 'caderno', 'caneta', 'lapis de cor', 'estojo', 'papelaria', 'planner', 'agenda', 'marca texto', 'resma papel', 'tinta guache'] },
@@ -946,7 +946,7 @@ function detectCategory(title = '', description = '', url = '') {
     }
   }
 
-  return 'confeitaria_sobremesas';
+  return 'supermercado_festas';
 }
 
 async function handler(req, res) {

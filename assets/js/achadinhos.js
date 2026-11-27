@@ -39,7 +39,27 @@
     const container = document.getElementById('affiliateDynamicAccordionGroups');
     if (container) {
       container.innerHTML = tree.map(group => {
-        const subButtons = (group.subcategories || []).map(sub => `
+        const subs = group.subcategories || [];
+
+        // Se o grupo tem apenas 1 subcategoria (ex: Moda, Supermercado, Beleza), renderiza como botão direto de 1 clique
+        if (subs.length <= 1) {
+          const catVal = group.id;
+          return `
+            <div class="rounded-xl border border-gray-200/80 overflow-hidden bg-gray-50/50 transition-all duration-200" data-group-id="${window.AchadinhosCategories.escapeHtml(group.id)}">
+              <button type="button" class="affiliate-category-btn text-left px-3 py-2 rounded-xl text-gray-700 hover:bg-gray-100 transition flex items-center justify-between text-xs w-full group font-bold" data-category="${window.AchadinhosCategories.escapeHtml(catVal)}">
+                <div class="flex items-center gap-2 truncate">
+                  <span>${window.AchadinhosCategories.escapeHtml(group.icon || '📂')}</span>
+                  <span class="truncate">${window.AchadinhosCategories.escapeHtml(group.label)}</span>
+                </div>
+                <div class="flex items-center gap-1.5 flex-shrink-0">
+                  <span class="category-count text-[10px] bg-gray-200 text-gray-700 font-bold px-1.5 py-0.5 rounded-full" data-count-for="${window.AchadinhosCategories.escapeHtml(group.id)}">0</span>
+                </div>
+              </button>
+            </div>
+          `;
+        }
+
+        const subButtons = subs.map(sub => `
           <button class="affiliate-category-btn text-left px-2.5 py-1.5 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition flex items-center justify-between text-xs w-full" data-category="${window.AchadinhosCategories.escapeHtml(sub.slug)}">
             <span class="truncate">${window.AchadinhosCategories.escapeHtml(sub.label)}</span>
             <span class="category-count text-[9px] text-gray-400 font-semibold" data-count-for="${window.AchadinhosCategories.escapeHtml(sub.slug)}">0</span>
@@ -195,7 +215,7 @@
       if (bCat === cat) {
         if (cat === 'fast_picks') {
           b.className = 'affiliate-category-btn text-left px-3 py-2 rounded-xl bg-gradient-to-r from-pink-600 via-purple-600 to-pink-600 text-white font-black shadow-md transition flex items-center justify-between text-xs w-full group';
-        } else if (cat === 'all') {
+        } else if (cat === 'all' || cat.startsWith('group_')) {
           b.className = 'affiliate-category-btn text-left px-3 py-2 rounded-xl bg-yellow-400 text-gray-950 font-bold shadow-sm transition flex items-center justify-between text-xs w-full group';
         } else {
           // Subcategoria ativa
@@ -204,8 +224,8 @@
       } else {
         if (bCat === 'fast_picks') {
           b.className = 'affiliate-category-btn text-left px-3 py-2 rounded-xl text-pink-700 bg-pink-50 hover:bg-pink-100 border border-pink-200 font-bold transition flex items-center justify-between text-xs w-full group';
-        } else if (bCat === 'all') {
-          b.className = 'affiliate-category-btn text-left px-3 py-2 rounded-xl text-gray-700 hover:bg-gray-100 transition flex items-center justify-between text-xs w-full group';
+        } else if (bCat === 'all' || (bCat && bCat.startsWith('group_'))) {
+          b.className = 'affiliate-category-btn text-left px-3 py-2 rounded-xl text-gray-700 hover:bg-gray-100 transition flex items-center justify-between text-xs w-full group font-bold';
         } else {
           // Subcategoria inativa
           b.className = 'affiliate-category-btn text-left px-2.5 py-1.5 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition flex items-center justify-between text-xs w-full';

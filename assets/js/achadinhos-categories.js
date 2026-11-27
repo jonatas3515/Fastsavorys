@@ -4,24 +4,28 @@
  */
 
 window.AchadinhosCategories = (function () {
-  const STORAGE_KEY = 'fast_achadinhos_categories_v8';
+  const STORAGE_KEY = 'fast_achadinhos_categories_v9';
   const VERSION_KEY = 'fast_achadinhos_categories_version';
 
-  // Árvore Padrão (8 Macro Grupos e Subcategorias Otimizadas)
+  // Árvore Padrão (8 Macro Grupos - Supermercado, Beleza e Moda Unificados)
   const DEFAULT_TREE = [
     {
       id: 'group_supermercado_festas',
       label: 'Supermercado, Confeitaria & Festas',
       icon: '🛒',
       subcategories: [
-        { slug: 'alimentos_basicos', label: 'Alimentos Básicos & Grãos', aliases: ['alimentos_basicos_graos', 'mercearia_salgada'] },
-        { slug: 'molhos_temperos', label: 'Molhos, Temperos & Conservas', aliases: ['molhos_temperos_conservas'] },
-        { slug: 'bebidas_snacks', label: 'Bebidas & Snacks', aliases: ['supermercado'] },
-        { slug: 'limpeza_organizacao', label: 'Limpeza e Organização', aliases: ['limpeza', 'organizacao_limpeza'] },
-        { slug: 'confeitaria_sobremesas', label: 'Confeitaria & Sobremesas', aliases: ['mercearia_doce'] },
-        { slug: 'ingredientes_profissionais', label: 'Ingredientes Profissionais', aliases: [] },
-        { slug: 'embalagens', label: 'Embalagens & Descartáveis', aliases: [] },
-        { slug: 'festas', label: 'Artigos de Festa & Decoração', aliases: ['presentes'] }
+        {
+          slug: 'supermercado_festas',
+          label: 'Supermercado, Confeitaria & Festas',
+          aliases: [
+            'alimentos_basicos', 'alimentos_basicos_graos', 'mercearia_salgada',
+            'molhos_temperos', 'molhos_temperos_conservas',
+            'bebidas_snacks', 'supermercado',
+            'limpeza_organizacao', 'limpeza', 'organizacao_limpeza',
+            'confeitaria_sobremesas', 'mercearia_doce',
+            'ingredientes_profissionais', 'embalagens', 'festas', 'presentes'
+          ]
+        }
       ]
     },
     {
@@ -60,15 +64,17 @@ window.AchadinhosCategories = (function () {
       label: 'Beleza, Saúde & Bem-Estar',
       icon: '💄',
       subcategories: [
-        { slug: 'cabelos', label: 'Cabelos', aliases: ['cabelo'] },
-        { slug: 'pele_rosto', label: 'Cuidados com a Pele & Rosto', aliases: ['pele', 'rosto'] },
-        { slug: 'maquiagem_unhas', label: 'Maquiagem & Unhas', aliases: ['maquiagem', 'unhas'] },
-        { slug: 'perfumaria_higiene', label: 'Perfumaria & Higiene', aliases: ['beleza', 'perfumaria', 'higiene', 'higiene_pessoal'] },
-        { slug: 'barbear_depilacao', label: 'Barbear & Depilação', aliases: ['barbear', 'depilacao', 'barba'] },
-        { slug: 'suplementos', label: 'Suplementos & Nutrição', aliases: [] },
-        { slug: 'treino_funcional', label: 'Treino & Equipamentos Funcionais', aliases: ['fitness'] },
-        { slug: 'esportes_lazer', label: 'Esportes & Lazer', aliases: ['esportes_e_lazer', 'lazer'] },
-        { slug: 'monitoramento_saude', label: 'Monitoramento & Saúde', aliases: ['saude'] }
+        {
+          slug: 'beleza_saude',
+          label: 'Beleza, Saúde & Bem-Estar',
+          aliases: [
+            'cabelos', 'cabelo', 'pele_rosto', 'pele', 'rosto', 'maquiagem_unhas', 'maquiagem', 'unhas',
+            'perfumaria_higiene', 'beleza', 'perfumaria', 'higiene', 'higiene_pessoal',
+            'barbear_depilacao', 'barbear', 'depilacao', 'barba',
+            'suplementos', 'treino_funcional', 'fitness',
+            'esportes_lazer', 'esportes_e_lazer', 'lazer', 'monitoramento_saude', 'saude'
+          ]
+        }
       ]
     },
     {
@@ -104,10 +110,11 @@ window.AchadinhosCategories = (function () {
       label: 'Moda & Acessórios',
       icon: '👗',
       subcategories: [
-        { slug: 'roupas', label: 'Roupas', aliases: ['moda'] },
-        { slug: 'calcados', label: 'Calçados', aliases: [] },
-        { slug: 'bolsas_malas', label: 'Bolsas, Mochilas & Malas', aliases: ['acessorios'] },
-        { slug: 'relogios_oculos', label: 'Relógios & Óculos', aliases: ['joias', 'chapeus_bones_e_gorros'] }
+        {
+          slug: 'moda_acessorios',
+          label: 'Moda & Acessórios',
+          aliases: ['roupas', 'calcados', 'bolsas_malas', 'relogios_oculos', 'moda', 'acessorios', 'joias', 'chapeus_bones_e_gorros']
+        }
       ]
     },
     {
@@ -452,14 +459,22 @@ window.AchadinhosCategories = (function () {
     }
 
     tree.forEach(group => {
-      html += `<optgroup label="${escapeHtml(group.icon || '')} ${escapeHtml(group.label)}">`;
-      if (options.includeGroupMacroOption) {
-        html += `<option value="${escapeHtml(group.id)}">${escapeHtml(group.icon || '')} Ver Tudo de ${escapeHtml(group.label)}</option>`;
+      const subs = group.subcategories || [];
+      if (subs.length <= 1) {
+        const sub = subs[0];
+        const val = options.includeGroupMacroOption ? group.id : (sub ? sub.slug : group.id);
+        const lbl = `${group.icon ? group.icon + ' ' : ''}${group.label}`;
+        html += `<option value="${escapeHtml(val)}">${escapeHtml(lbl)}</option>`;
+      } else {
+        html += `<optgroup label="${escapeHtml(group.icon || '')} ${escapeHtml(group.label)}">`;
+        if (options.includeGroupMacroOption) {
+          html += `<option value="${escapeHtml(group.id)}">${escapeHtml(group.icon || '')} Ver Tudo de ${escapeHtml(group.label)}</option>`;
+        }
+        subs.forEach(sub => {
+          html += `<option value="${escapeHtml(sub.slug)}">${escapeHtml(sub.label)}</option>`;
+        });
+        html += `</optgroup>`;
       }
-      (group.subcategories || []).forEach(sub => {
-        html += `<option value="${escapeHtml(sub.slug)}">${escapeHtml(sub.label)}</option>`;
-      });
-      html += `</optgroup>`;
     });
 
     selectEl.innerHTML = html;
