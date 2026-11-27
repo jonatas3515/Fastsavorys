@@ -4,7 +4,7 @@
  */
 
 window.AchadinhosCategories = (function () {
-  const STORAGE_KEY = 'fast_achadinhos_categories_v9';
+  const STORAGE_KEY = 'fast_achadinhos_categories_v10';
   const VERSION_KEY = 'fast_achadinhos_categories_version';
 
   // Árvore Padrão (8 Macro Grupos - Supermercado, Beleza e Moda Unificados)
@@ -460,18 +460,21 @@ window.AchadinhosCategories = (function () {
 
     tree.forEach(group => {
       const subs = group.subcategories || [];
+      const sub = subs[0];
+      const val = sub ? sub.slug : group.id;
+
       if (subs.length <= 1) {
-        const sub = subs[0];
-        const val = options.includeGroupMacroOption ? group.id : (sub ? sub.slug : group.id);
-        const lbl = `${group.icon ? group.icon + ' ' : ''}${group.label}`;
-        html += `<option value="${escapeHtml(val)}">${escapeHtml(lbl)}</option>`;
+        // Categoria única: renderiza como <optgroup> para ter exatamente o mesmo destaque e peso visual em negrito que os demais grupos
+        html += `<optgroup label="${escapeHtml(group.icon || '')} ${escapeHtml(group.label)}">`;
+        html += `<option value="${escapeHtml(val)}">${escapeHtml(group.icon || '')} ${escapeHtml(group.label)}</option>`;
+        html += `</optgroup>`;
       } else {
         html += `<optgroup label="${escapeHtml(group.icon || '')} ${escapeHtml(group.label)}">`;
         if (options.includeGroupMacroOption) {
           html += `<option value="${escapeHtml(group.id)}">${escapeHtml(group.icon || '')} Ver Tudo de ${escapeHtml(group.label)}</option>`;
         }
-        subs.forEach(sub => {
-          html += `<option value="${escapeHtml(sub.slug)}">${escapeHtml(sub.label)}</option>`;
+        subs.forEach(s => {
+          html += `<option value="${escapeHtml(s.slug)}">${escapeHtml(s.label)}</option>`;
         });
         html += `</optgroup>`;
       }

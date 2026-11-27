@@ -43,16 +43,17 @@
 
         // Se o grupo tem apenas 1 subcategoria (ex: Moda, Supermercado, Beleza), renderiza como botão direto de 1 clique
         if (subs.length <= 1) {
-          const catVal = group.id;
+          const sub = subs[0];
+          const catVal = sub ? sub.slug : group.id;
           return `
             <div class="rounded-xl border border-gray-200/80 overflow-hidden bg-gray-50/50 transition-all duration-200" data-group-id="${window.AchadinhosCategories.escapeHtml(group.id)}">
-              <button type="button" class="affiliate-category-btn text-left px-3 py-2 rounded-xl text-gray-700 hover:bg-gray-100 transition flex items-center justify-between text-xs w-full group font-bold" data-category="${window.AchadinhosCategories.escapeHtml(catVal)}">
+              <button type="button" class="affiliate-category-btn text-left px-3 py-2.5 rounded-xl text-gray-900 hover:bg-yellow-50/80 transition flex items-center justify-between text-xs w-full group font-bold" data-category="${window.AchadinhosCategories.escapeHtml(catVal)}">
                 <div class="flex items-center gap-2 truncate">
-                  <span>${window.AchadinhosCategories.escapeHtml(group.icon || '📂')}</span>
-                  <span class="truncate">${window.AchadinhosCategories.escapeHtml(group.label)}</span>
+                  <span class="text-base">${window.AchadinhosCategories.escapeHtml(group.icon || '📂')}</span>
+                  <span class="truncate font-bold text-gray-900">${window.AchadinhosCategories.escapeHtml(group.label)}</span>
                 </div>
                 <div class="flex items-center gap-1.5 flex-shrink-0">
-                  <span class="category-count text-[10px] bg-gray-200 text-gray-700 font-bold px-1.5 py-0.5 rounded-full" data-count-for="${window.AchadinhosCategories.escapeHtml(group.id)}">0</span>
+                  <span class="category-count text-[10px] bg-gray-200 text-gray-900 font-bold px-1.5 py-0.5 rounded-full" data-count-for="${window.AchadinhosCategories.escapeHtml(catVal)}">0</span>
                 </div>
               </button>
             </div>
@@ -60,21 +61,21 @@
         }
 
         const subButtons = subs.map(sub => `
-          <button class="affiliate-category-btn text-left px-2.5 py-1.5 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition flex items-center justify-between text-xs w-full" data-category="${window.AchadinhosCategories.escapeHtml(sub.slug)}">
-            <span class="truncate">${window.AchadinhosCategories.escapeHtml(sub.label)}</span>
+          <button class="affiliate-category-btn text-left px-2.5 py-1.5 rounded-lg text-gray-700 hover:text-gray-950 hover:bg-gray-100 transition flex items-center justify-between text-xs w-full font-semibold" data-category="${window.AchadinhosCategories.escapeHtml(sub.slug)}">
+            <span class="truncate font-medium">${window.AchadinhosCategories.escapeHtml(sub.label)}</span>
             <span class="category-count text-[9px] text-gray-400 font-semibold" data-count-for="${window.AchadinhosCategories.escapeHtml(sub.slug)}">0</span>
           </button>
         `).join('');
 
         return `
           <div class="accordion-group rounded-xl border border-gray-200/80 overflow-hidden bg-gray-50/50 transition-all duration-200" data-group-id="${window.AchadinhosCategories.escapeHtml(group.id)}">
-            <button type="button" class="accordion-header w-full px-3 py-2 text-left flex items-center justify-between hover:bg-yellow-50/80 transition text-xs font-bold text-gray-800" data-category="${window.AchadinhosCategories.escapeHtml(group.id)}">
+            <button type="button" class="accordion-header w-full px-3 py-2.5 text-left flex items-center justify-between hover:bg-yellow-50/80 transition text-xs font-bold text-gray-900" data-category="${window.AchadinhosCategories.escapeHtml(group.id)}">
               <div class="flex items-center gap-2 truncate">
-                <span>${window.AchadinhosCategories.escapeHtml(group.icon || '📂')}</span>
-                <span class="truncate">${window.AchadinhosCategories.escapeHtml(group.label)}</span>
+                <span class="text-base">${window.AchadinhosCategories.escapeHtml(group.icon || '📂')}</span>
+                <span class="truncate font-bold text-gray-900">${window.AchadinhosCategories.escapeHtml(group.label)}</span>
               </div>
               <div class="flex items-center gap-1.5 flex-shrink-0">
-                <span class="category-count text-[10px] bg-gray-200 text-gray-700 font-bold px-1.5 py-0.5 rounded-full" data-count-for="${window.AchadinhosCategories.escapeHtml(group.id)}">0</span>
+                <span class="category-count text-[10px] bg-gray-200 text-gray-900 font-bold px-1.5 py-0.5 rounded-full" data-count-for="${window.AchadinhosCategories.escapeHtml(group.id)}">0</span>
                 <svg class="w-3.5 h-3.5 text-gray-400 transform transition-transform duration-300 accordion-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                 </svg>
@@ -119,10 +120,31 @@
       });
     });
 
-    // Event Delegation para Accordion Headers e Subcategorias (Desktop)
+    // Event Delegation para Accordion Headers, Botões Diretos e Subcategorias (Desktop)
     const desktopNav = document.getElementById('affiliateDesktopNav');
     if (desktopNav) {
       desktopNav.addEventListener('click', (e) => {
+        // 1. Botão de categoria normal ou subcategoria
+        const btn = e.target.closest('.affiliate-category-btn');
+        if (btn) {
+          // Se for uma subcategoria dentro de um accordion-body
+          if (btn.closest('.accordion-body')) {
+            e.stopPropagation();
+            const cat = btn.getAttribute('data-category');
+            if (cat) setCategory(cat);
+            return;
+          }
+          // Se for um botão direto sem accordion (ex: Moda, Supermercado, Beleza)
+          if (!btn.classList.contains('accordion-header')) {
+            e.stopPropagation();
+            closeAllAccordions();
+            const cat = btn.getAttribute('data-category');
+            if (cat) setCategory(cat);
+            return;
+          }
+        }
+
+        // 2. Accordion Header (para grupos com múltiplas subcategorias)
         const header = e.target.closest('.accordion-header');
         if (header) {
           const groupDiv = header.closest('.accordion-group');
@@ -157,13 +179,6 @@
             setCategory(groupId);
           }
           return;
-        }
-
-        const subBtn = e.target.closest('.accordion-body .affiliate-category-btn');
-        if (subBtn) {
-          e.stopPropagation();
-          const cat = subBtn.getAttribute('data-category');
-          setCategory(cat);
         }
       });
     }
@@ -208,27 +223,29 @@
       }
     }
 
-    // Sincroniza botões da sidebar desktop
+    // Sincroniza botões da sidebar desktop (com foco e estilo negrito)
     const categoryButtons = document.querySelectorAll('.affiliate-category-btn');
     categoryButtons.forEach(b => {
       const bCat = b.getAttribute('data-category');
       if (bCat === cat) {
         if (cat === 'fast_picks') {
-          b.className = 'affiliate-category-btn text-left px-3 py-2 rounded-xl bg-gradient-to-r from-pink-600 via-purple-600 to-pink-600 text-white font-black shadow-md transition flex items-center justify-between text-xs w-full group';
-        } else if (cat === 'all' || cat.startsWith('group_')) {
-          b.className = 'affiliate-category-btn text-left px-3 py-2 rounded-xl bg-yellow-400 text-gray-950 font-bold shadow-sm transition flex items-center justify-between text-xs w-full group';
-        } else {
+          b.className = 'affiliate-category-btn text-left px-3 py-2.5 rounded-xl bg-gradient-to-r from-pink-600 via-purple-600 to-pink-600 text-white font-black shadow-md transition flex items-center justify-between text-xs w-full group';
+        } else if (b.closest('.accordion-body')) {
           // Subcategoria ativa
           b.className = 'affiliate-category-btn text-left px-2.5 py-1.5 rounded-lg bg-yellow-400 text-gray-950 font-bold shadow-sm transition flex items-center justify-between text-xs w-full';
+        } else {
+          // Categoria principal ativa (Destaque em amarelo com texto em negrito)
+          b.className = 'affiliate-category-btn text-left px-3 py-2.5 rounded-xl bg-yellow-400 text-gray-950 font-extrabold shadow-sm transition flex items-center justify-between text-xs w-full group';
         }
       } else {
         if (bCat === 'fast_picks') {
-          b.className = 'affiliate-category-btn text-left px-3 py-2 rounded-xl text-pink-700 bg-pink-50 hover:bg-pink-100 border border-pink-200 font-bold transition flex items-center justify-between text-xs w-full group';
-        } else if (bCat === 'all' || (bCat && bCat.startsWith('group_'))) {
-          b.className = 'affiliate-category-btn text-left px-3 py-2 rounded-xl text-gray-700 hover:bg-gray-100 transition flex items-center justify-between text-xs w-full group font-bold';
-        } else {
+          b.className = 'affiliate-category-btn text-left px-3 py-2.5 rounded-xl text-pink-700 bg-pink-50 hover:bg-pink-100 border border-pink-200 font-bold transition flex items-center justify-between text-xs w-full group';
+        } else if (b.closest('.accordion-body')) {
           // Subcategoria inativa
-          b.className = 'affiliate-category-btn text-left px-2.5 py-1.5 rounded-lg text-gray-600 hover:text-gray-900 hover:bg-gray-100 transition flex items-center justify-between text-xs w-full';
+          b.className = 'affiliate-category-btn text-left px-2.5 py-1.5 rounded-lg text-gray-700 hover:text-gray-950 hover:bg-gray-100 transition flex items-center justify-between text-xs w-full font-semibold';
+        } else {
+          // Categoria principal inativa (Texto em negrito com hover sutil)
+          b.className = 'affiliate-category-btn text-left px-3 py-2.5 rounded-xl text-gray-900 hover:bg-gray-100 transition flex items-center justify-between text-xs w-full group font-bold';
         }
       }
     });

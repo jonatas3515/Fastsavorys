@@ -453,7 +453,7 @@ window.AffiliatesModule = (function () {
       const isUncategorized = isItemUncategorized(item);
       const catLabel = isUncategorized 
         ? `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-900 border border-amber-300 animate-pulse">⚠️ Sem Categoria</span>`
-        : (categoryMap[item.category] || item.category || 'Geral');
+        : `<span class="font-bold text-gray-900 text-xs">${escapeHtml(categoryMap[item.category] || item.category || 'Geral')}</span>`;
 
       const pct = calcDiscountPercent(item.original_price, item.price_display);
       const rawDisc = (item.discount_tag || '').trim();
@@ -2049,6 +2049,42 @@ window.AffiliatesModule = (function () {
     }
 
     container.innerHTML = manageTreeCopy.map((group, groupIdx) => {
+      const isSingle = (group.subcategories || []).length <= 1;
+      const sub = (group.subcategories || [])[0];
+      const allSlugs = sub ? [sub.slug, ...(sub.aliases || [])] : [];
+      const assignedCount = productsList.filter(p => p.category && allSlugs.includes(p.category)).length;
+
+      // Se for categoria única (sem subcategorias), renderiza como card direto de categoria principal
+      if (isSingle) {
+        return `
+          <div class="bg-gray-50 rounded-2xl p-4 border-2 border-indigo-200/80 shadow-2xs hover:border-indigo-300 transition">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-3 min-w-0">
+                <span class="text-2xl">${escapeHtml(group.icon || '📂')}</span>
+                <div>
+                  <div class="flex items-center gap-2">
+                    <h4 class="font-extrabold text-gray-900 text-sm sm:text-base">${escapeHtml(group.label)}</h4>
+                    <span class="text-[10px] bg-emerald-100 text-emerald-800 font-extrabold px-2 py-0.5 rounded-full">⭐ Categoria Principal (Única)</span>
+                  </div>
+                  <div class="flex items-center gap-2 mt-0.5">
+                    <span class="text-[11px] font-mono text-gray-500">slug: ${escapeHtml(sub ? sub.slug : group.id)}</span>
+                    <span class="text-gray-300">•</span>
+                    <span class="text-[11px] font-extrabold text-indigo-700">${assignedCount} produtos ativos</span>
+                  </div>
+                </div>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <button type="button" onclick="AffiliatesModule.promptEditCategoryGroup(${groupIdx})"
+                  title="Editar Nome / Ícone"
+                  class="px-3 py-1.5 text-gray-700 hover:text-indigo-600 hover:bg-white rounded-lg border border-gray-200 transition text-xs font-bold flex items-center gap-1 shadow-2xs">
+                  ✏️ Editar
+                </button>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
       const subListHtml = (group.subcategories || []).map((sub, subIdx) => {
         // Count products assigned to this subcategory slug or its aliases
         const allSlugs = [sub.slug, ...(sub.aliases || [])];
