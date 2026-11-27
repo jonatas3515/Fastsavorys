@@ -1003,9 +1003,9 @@ async function handleSendWhatsAppDeal(req, res) {
           try {
             const { fetchProductDetails } = require('../check-affiliate-links');
             if (typeof fetchProductDetails === 'function') {
-              // Timeout rápido de 8s para não prender a execução do cron
+              // Timeout rápido de 3.5s para nunca prender ou atrasar a execução do cron
               const freshPromise = fetchProductDetails(candidate.affiliate_url);
-              const timeoutPromise = new Promise(resolve => setTimeout(() => resolve(null), 8000));
+              const timeoutPromise = new Promise(resolve => setTimeout(() => resolve(null), 3500));
               const fresh = await Promise.race([freshPromise, timeoutPromise]);
 
               if (fresh) {
